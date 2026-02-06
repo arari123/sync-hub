@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import './App.css'
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8001').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 const POLLING_INTERVAL_MS = 2500
 const HEALTH_POLLING_INTERVAL_MS = 7000
 const TERMINAL_STATUSES = new Set(['completed', 'failed'])

@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  web:
+    environment:
+      - OCR_WORKER_URL=http://ocr-worker:8100/ocr
+    depends_on:
+      - ocr-worker
+
+  sglang:
+    build:
+      context: .
+      dockerfile: Dockerfile.sglang
+    image: sync-hub_sglang:latest
+    container_name: synchub_sglang
+    runtime: nvidia
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      - HF_HOME=/models/hf
+      - HUGGINGFACE_HUB_CACHE=/models/hf
+    volumes:
+      - sglang_hf_cache:/models/hf
+    command: >
+      python -m sglang.launch_server
+      --host 0.0.0.0
+      --port 8080
+      --model ${SGLANG_MODEL_ID:-zai-org/GLM-OCR}
+      --served-model-name ${GLM_OCR_MODEL:-glm-ocr}
+      --trust-remote-code
+
+  ocr-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.ocr
+      args:
+        OCR_ACCELERATOR: ${OCR_ACCELERATOR:-gpu}
+        PADDLE_GPU_VERSION: ${PADDLE_GPU_VERSION:-3.2.0}
+        PADDLE_GPU_WHL_INDEX: ${PADDLE_GPU_WHL_INDEX:-https://www.paddlepaddle.org.cn/packages/stable/cu126/}
+    container_name: synchub_ocr
+    runtime: nvidia
+    restart: always
+    ports:
+      - "8100:8100"
+    environment:
+      - OCR_ACCELERATOR=${OCR_ACCELERATOR:-gpu}
+      - OCR_PROVIDER=${OCR_PROVIDER:-pypdf}
+      - LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/usr/lib/wsl/lib}
+      - GLM_OCR_ENDPOINT=${GLM_OCR_ENDPOINT:-}
+      - GLM_OCR_API_KEY=${GLM_OCR_API_KEY:-}
+      - GLM_OCR_API_KEY_HEADER=${GLM_OCR_API_KEY_HEADER:-Authorization}
+      - GLM_OCR_API_KEY_PREFIX=${GLM_OCR_API_KEY_PREFIX:-Bearer}
+      - GLM_OCR_MODE=${GLM_OCR_MODE:-openai-chat}
+      - GLM_OCR_FILE_FIELD=${GLM_OCR_FILE_FIELD:-file}
+      - GLM_OCR_BASE64_FIELD=${GLM_OCR_BASE64_FIELD:-file_base64}
+      - GLM_OCR_FILENAME_FIELD=${GLM_OCR_FILENAME_FIELD:-filename}
+      - GLM_OCR_MIMETYPE_FIELD=${GLM_OCR_MIMETYPE_FIELD:-mime_type}
+      - GLM_OCR_MODEL=${GLM_OCR_MODEL:-}
+      - GLM_OCR_PROMPT=${GLM_OCR_PROMPT:-}
+      - GLM_OCR_TEXT_PATH=${GLM_OCR_TEXT_PATH:-}
+      - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-30}
+      - GLM_OCR_MAX_TOKENS=${GLM_OCR_MAX_TOKENS:-4096}
+      - GLM_MAX_PAGES=${GLM_MAX_PAGES:-0}
+      - GLM_RENDER_DPI=${GLM_RENDER_DPI:-180}
+      - GLM_OCR_EXTRA_HEADERS=${GLM_OCR_EXTRA_HEADERS:-}
+      - GLM_HEALTHCHECK_URL=${GLM_HEALTHCHECK_URL:-}
+      - OCR_PROVIDER_HEALTH_TIMEOUT_SECONDS=${OCR_PROVIDER_HEALTH_TIMEOUT_SECONDS:-3}
+      - OCR_PYPDF_PREFLIGHT_MIN_CHARS=${OCR_PYPDF_PREFLIGHT_MIN_CHARS:-120}
+      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2-vision}
+      - OLLAMA_PROMPT=${OLLAMA_PROMPT:-}
+      - OLLAMA_MODE=${OLLAMA_MODE:-chat}
+      - OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS:-60}
+      - OLLAMA_MAX_PAGES=${OLLAMA_MAX_PAGES:-6}
+      - OLLAMA_RENDER_DPI=${OLLAMA_RENDER_DPI:-180}
+      - OLLAMA_EXTRA_OPTIONS=${OLLAMA_EXTRA_OPTIONS:-}
+      - OLLAMA_HEALTHCHECK_URL=${OLLAMA_HEALTHCHECK_URL:-}
+      - PADDLE_PIPELINE_VERSION=${PADDLE_PIPELINE_VERSION:-v1.5}
+      - PADDLE_MODEL_NAME=${PADDLE_MODEL_NAME:-PaddleOCR-VL-1.5-0.9B}
+      - PADDLE_DEVICE=${PADDLE_DEVICE:-cpu}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      - PADDLE_MAX_PAGES=${PADDLE_MAX_PAGES:-6}
+      - PADDLE_RENDER_DPI=${PADDLE_RENDER_DPI:-180}
+      - PADDLE_USE_DOC_ORIENTATION_CLASSIFY=${PADDLE_USE_DOC_ORIENTATION_CLASSIFY:-true}
+      - PADDLE_USE_DOC_UNWARPING=${PADDLE_USE_DOC_UNWARPING:-false}
+      - PADDLE_USE_TEXTLINE_ORIENTATION=${PADDLE_USE_TEXTLINE_ORIENTATION:-false}
+      - PADDLE_FORCE_RENDER_PDF=${PADDLE_FORCE_RENDER_PDF:-true}
+      - PADDLE_FAST_MODE=${PADDLE_FAST_MODE:-true}
+      - PADDLE_FAST_FIRST_PAGES=${PADDLE_FAST_FIRST_PAGES:-2}
+      - PADDLE_FAST_RENDER_DPI=${PADDLE_FAST_RENDER_DPI:-120}
+      - PADDLE_FAST_MIN_TEXT_CHARS=${PADDLE_FAST_MIN_TEXT_CHARS:-180}
+      - PADDLE_SKIP_PDF_OCR_ON_CPU=${PADDLE_SKIP_PDF_OCR_ON_CPU:-true}
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-true}
+    volumes:
+      - .:/app
+      - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro
+    devices:
+      - /dev/dxg:/dev/dxg
+    extra_hosts:
+      - "host.docker.internal:${HOST_GATEWAY_IP:-172.17.0.1}"
+    depends_on:
+      - db
+      - elasticsearch
+      - sglang
+
+volumes:
+  sglang_hf_cache:

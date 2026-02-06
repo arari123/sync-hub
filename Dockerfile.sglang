@@ -1,0 +1,6 @@
+FROM lmsysorg/sglang:dev
+
+# Pre-install latest transformers so container startup does not spend
+# time cloning/building transformers on every restart.
+RUN python -m pip install --no-cache-dir --upgrade \
+    git+https://github.com/huggingface/transformers.git

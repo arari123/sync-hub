@@ -1,0 +1,86 @@
+import os
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+load_dotenv()
+
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+_DOCUMENT_COLUMN_SPECS = {
+    "file_sha256": "VARCHAR(64)",
+    "normalized_text_sha256": "VARCHAR(64)",
+    "dedup_status": "VARCHAR(32) DEFAULT 'unique'",
+    "dedup_primary_doc_id": "INTEGER",
+    "dedup_cluster_id": "INTEGER",
+}
+
+def _run_schema_statement(connection, sql: str) -> None:
+    try:
+        connection.execute(text(sql))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[database] schema statement skipped: {exc} | sql={sql}")
+
+
+def ensure_runtime_schema() -> None:
+    """Keep table/column compatibility without Alembic migrations."""
+    Base.metadata.create_all(bind=engine)
+
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        table_names = set(inspector.get_table_names())
+        if "documents" not in table_names:
+            return
+
+        existing_columns = {column["name"] for column in inspector.get_columns("documents")}
+
+        for column_name, column_spec in _DOCUMENT_COLUMN_SPECS.items():
+            if column_name in existing_columns:
+                continue
+            _run_schema_statement(
+                connection,
+                f"ALTER TABLE documents ADD COLUMN {column_name} {column_spec}",
+            )
+
+        # Fill null status to preserve policy checks.
+        _run_schema_statement(
+            connection,
+            "UPDATE documents SET dedup_status='unique' WHERE dedup_status IS NULL",
+        )
+
+        # Add indexes for dedup lookups.
+        _run_schema_statement(
+            connection,
+            "CREATE INDEX IF NOT EXISTS idx_documents_file_sha256 ON documents (file_sha256)",
+        )
+        _run_schema_statement(
+            connection,
+            "CREATE INDEX IF NOT EXISTS idx_documents_normalized_text_sha256 ON documents (normalized_text_sha256)",
+        )
+        _run_schema_statement(
+            connection,
+            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_status ON documents (dedup_status)",
+        )
+        _run_schema_statement(
+            connection,
+            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_primary_doc_id ON documents (dedup_primary_doc_id)",
+        )
+        _run_schema_statement(
+            connection,
+            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_cluster_id ON documents (dedup_cluster_id)",
+        )
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

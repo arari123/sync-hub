@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ARG OCR_ACCELERATOR=cpu
+ARG PADDLE_GPU_VERSION=3.2.0
+ARG PADDLE_GPU_WHL_INDEX=https://www.paddlepaddle.org.cn/packages/stable/cu126/
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.ocr-worker.txt .
+RUN pip install --no-cache-dir -r requirements.ocr-worker.txt \
+    && if [ "${OCR_ACCELERATOR}" = "gpu" ]; then \
+        pip uninstall -y paddlepaddle >/dev/null 2>&1 || true; \
+        pip install --no-cache-dir "paddlepaddle-gpu==${PADDLE_GPU_VERSION}" -i "${PADDLE_GPU_WHL_INDEX}"; \
+    fi
+
+COPY app ./app
+
+CMD ["uvicorn", "app.ocr_worker:app", "--host", "0.0.0.0", "--port", "8100"]

@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+:root {
+  --font-base: 'Manrope', 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+
+  --bg-base: #07111d;
+  --bg-overlay: radial-gradient(circle at 20% 15%, #17394d 0, #07111d 52%, #050b14 100%);
+  --glass-bg: linear-gradient(140deg, rgba(20, 40, 57, 0.75), rgba(7, 20, 32, 0.7));
+  --glass-border: rgba(157, 189, 211, 0.23);
+  --glass-blur: blur(20px);
+  --text-high: rgba(237, 248, 255, 0.98);
+  --text-muted: rgba(193, 220, 231, 0.68);
+
+  font-family: var(--font-base);
+  line-height: 1.5;
+  font-weight: 500;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg-overlay), var(--bg-base);
+  color: var(--text-high);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}

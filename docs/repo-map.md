@@ -26,6 +26,7 @@
   - `src/App.jsx`: 검색/결과/상세/업로드/헬스 패널 UI 및 답변형 결과 카드 렌더링(요약+근거).
   - `src/App.css`: 결과 카드/상태 패널/하이라이트/매칭포인트 스타일.
 - `docs/`: Project documentation and PRD.
+  - `dev-setup.md`: Docker/비도커 개발 환경 구성 및 종속성 점검 가이드.
   - `reflow-chunking.md`: 리플로우/문장 청킹/표 분리/디버그 API/재색인 CLI 운영 가이드.
   - `dedup.md`: exact/near dedup 정책, 관리자 API, CLI 운영 가이드.
 - `.agent/execplans/`: Execution plans for features.

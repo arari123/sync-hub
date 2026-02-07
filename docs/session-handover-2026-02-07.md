@@ -130,7 +130,7 @@
   - 필요 시 `COMPOSE_PROJECT_NAME` 명시
   - 컨테이너 이름 고정 의존 대신 서비스 DNS(`ocr-worker`) 일관 사용
 
-3. 이미지 PDF 품질 우선 정책 분기
+3. 이미지 PDF 품질 우선 정책 분기 [완료]
 - 목표: 이미지 문서에서 preflight 조기 통과로 인한 저품질 색인 방지
 - 권장:
   - 문서 타입(스캔/이미지 PDF) 감지 시 `OCR_PYPDF_PREFLIGHT=false` 강제
@@ -152,7 +152,7 @@
 ## 체크리스트
 - [x] 1) 코드 리뷰 반영(캐시 경로 회귀 수정)
 - [x] 2) Docker 네트워크 단일화
-- [ ] 3) 이미지 PDF 품질 우선 정책 분기
+- [x] 3) 이미지 PDF 품질 우선 정책 분기
 - [ ] 4) 속도 보완(품질 유지)
 - [ ] 5) 품질 비교 리포트 자동화
 
@@ -203,3 +203,16 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - `docker-compose -f docker-compose.yml -f docker-compose.gpu.yml config`에서 `networks.default.name: synchub_default` 확인.
     - `docker run --rm --network synchub_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}' http://ocr-worker:8100/health` -> `200`
     - `docker run --rm --network synchub_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}' http://paddle-vlm-server:8000/health` -> `200`
+- 2026-02-07 (세션 재개-2)
+  - 이미지 PDF 품질 우선 정책 분기 적용:
+    - `app/ocr_worker.py`에 이미지 PDF 감지(`_is_image_pdf`) 기반 preflight 자동 비활성 로직 추가.
+    - 기본값: `OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF=true`, 샘플 `3p`, 텍스트 임계 `120 chars`, 이미지 페이지 비율 `>=0.67`.
+    - 헬스 노출: `ocr_disable_preflight_for_image_pdf`, `ocr_image_pdf_*`.
+  - 회귀 테스트 추가:
+    - `tests/test_ocr_worker_image_pdf_policy.py`
+    - `test_resolve_options_disables_preflight_for_detected_image_pdf ... ok`
+    - `test_resolve_options_respects_preflight_when_auto_detection_disabled ... ok`
+  - 실측(캐시 초기화 후, `/ocr` 직접 호출):
+    - 텍스트 PDF(`..._2.pdf`): `elapsed_s=3.103`, `engine=pypdf-preflight`, `content_chars=31658`, `pages=40`
+    - 이미지 PDF(`..._2_image.pdf`): `elapsed_s=48.894`, `engine=paddleocr-vl`, `content_chars=15798`, `pages=40`
+    - 결과: 이미지 PDF는 preflight 우회 후 OCR 본 경로를 사용해 저품질 조기 통과를 방지.

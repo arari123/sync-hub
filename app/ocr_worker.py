@@ -181,6 +181,13 @@ if PADDLE_DISABLE_MODEL_SOURCE_CHECK:
 GLM_HEALTHCHECK_URL = os.getenv("GLM_HEALTHCHECK_URL", "").strip()
 OCR_PROVIDER_HEALTH_TIMEOUT_SECONDS = float(os.getenv("OCR_PROVIDER_HEALTH_TIMEOUT_SECONDS", "3"))
 OCR_PYPDF_PREFLIGHT_MIN_CHARS = max(32, int(os.getenv("OCR_PYPDF_PREFLIGHT_MIN_CHARS", "120")))
+OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF = _read_bool_env("OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF", "true")
+OCR_IMAGE_PDF_SAMPLE_PAGES = max(1, int(os.getenv("OCR_IMAGE_PDF_SAMPLE_PAGES", "3")))
+OCR_IMAGE_PDF_MAX_TEXT_CHARS = max(0, int(os.getenv("OCR_IMAGE_PDF_MAX_TEXT_CHARS", "120")))
+OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO = max(
+    0.0,
+    min(1.0, _read_float_env("OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO", "0.67")),
+)
 PADDLE_FORCE_RENDER_PDF_DEFAULT = (
     os.getenv("PADDLE_FORCE_RENDER_PDF", "true").strip().lower() in {"1", "true", "yes", "on"}
 )
@@ -1232,6 +1239,99 @@ def _extract_text_with_pypdf(file_path: str) -> tuple[str, int]:
     return text, len(reader.pages)
 
 
+def _resolve_pypdf_object(node: Any) -> Any:
+    if node is None:
+        return None
+    if hasattr(node, "get_object"):
+        try:
+            return node.get_object()
+        except Exception:  # noqa: BLE001
+            return None
+    return node
+
+
+def _page_has_image_xobject(page: Any) -> bool:
+    if page is None:
+        return False
+
+    resources = None
+    try:
+        resources = page.get("/Resources")
+    except Exception:  # noqa: BLE001
+        resources = None
+    resources = _resolve_pypdf_object(resources)
+    if not isinstance(resources, dict):
+        return False
+
+    x_objects = _resolve_pypdf_object(resources.get("/XObject"))
+    if not isinstance(x_objects, dict):
+        return False
+
+    for value in x_objects.values():
+        resolved = _resolve_pypdf_object(value)
+        if not isinstance(resolved, dict):
+            continue
+        if str(resolved.get("/Subtype", "")).strip() == "/Image":
+            return True
+    return False
+
+
+def _is_image_pdf(file_path: str) -> bool:
+    if PdfReader is None:
+        return False
+
+    try:
+        reader = PdfReader(file_path)
+    except Exception:  # noqa: BLE001
+        return False
+
+    if getattr(reader, "is_encrypted", False):
+        try:
+            reader.decrypt("")
+        except Exception:  # noqa: BLE001
+            return False
+
+    pages = getattr(reader, "pages", None)
+    if pages is None:
+        return False
+
+    try:
+        total_pages = len(pages)
+    except Exception:  # noqa: BLE001
+        return False
+
+    if total_pages <= 0:
+        return False
+
+    sample_pages = min(total_pages, OCR_IMAGE_PDF_SAMPLE_PAGES)
+    sampled_pages = 0
+    image_pages = 0
+    sampled_text_chars = 0
+    for page_index in range(sample_pages):
+        try:
+            page = pages[page_index]
+        except Exception:  # noqa: BLE001
+            continue
+
+        sampled_pages += 1
+        try:
+            sampled_text_chars += len((page.extract_text() or "").strip())
+        except Exception:  # noqa: BLE001
+            pass
+
+        if _page_has_image_xobject(page):
+            image_pages += 1
+
+    if sampled_pages <= 0:
+        return False
+
+    image_page_ratio = image_pages / sampled_pages
+    return (
+        sampled_text_chars <= OCR_IMAGE_PDF_MAX_TEXT_CHARS
+        and image_page_ratio >= OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO
+    )
+
+
 def _paddle_runtime_info() -> dict[str, Any]:
     try:
         import paddle  # type: ignore
@@ -1328,6 +1428,14 @@ def _resolve_ocr_options(payload: OCRRequest) -> OCRResolvedOptions:
     use_pypdf_preflight = True if payload.pypdf_preflight is None else bool(payload.pypdf_preflight)
     if OCR_PROVIDER == "glm":
         use_pypdf_preflight = False
+    elif (
+        OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF
+        and use_pypdf_preflight
+        and str(file_path).lower().endswith(".pdf")
+        and _is_image_pdf(str(file_path))
+    ):
+        use_pypdf_preflight = False
+        print("[ocr-worker] Detected image-heavy PDF; disabled pypdf preflight for quality-first OCR.")
 
     should_skip_heavy_paddle_pdf = (
         OCR_PROVIDER == "paddle"
@@ -1501,6 +1609,10 @@ def health():
         "ocr_cache_dir": OCR_CACHE_DIR,
         "gpu_runtime_ready": gpu_runtime_ready,
         "gpu_runtime_warning": gpu_runtime_warning,
+        "ocr_disable_preflight_for_image_pdf": OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF,
+        "ocr_image_pdf_sample_pages": OCR_IMAGE_PDF_SAMPLE_PAGES,
+        "ocr_image_pdf_max_text_chars": OCR_IMAGE_PDF_MAX_TEXT_CHARS,
+        "ocr_image_pdf_min_image_page_ratio": OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO,
         **paddle_runtime,
         **provider_health,
     }

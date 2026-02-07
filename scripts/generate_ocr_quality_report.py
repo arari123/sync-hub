@@ -157,6 +157,10 @@ def _search(api_base: str, query: str, limit: int) -> list[dict]:
     encoded_q = urllib.parse.quote(query, safe="")
     url = f"{api_base.rstrip('/')}/documents/search?q={encoded_q}&limit={max(1, limit)}"
     data = _http_json(url)
+    if isinstance(data, dict):
+        items = data.get("items")
+        if isinstance(items, list):
+            return items
     if isinstance(data, list):
         return data
     return []

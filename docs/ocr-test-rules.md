@@ -34,6 +34,7 @@
 - `content_chars`
 - `used_fallback`
 - (색인 테스트 시) `chunk_count`
+- (품질 비교 리포트) `table_chunk_count`, `table_chunk_ratio`, `top-k recall`
 
 ## 권장 측정 절차
 1. OCR 캐시 초기화
@@ -46,3 +47,17 @@
 3. 결과 기록
 - 같은 문서/같은 파라미터 기준으로 이전 값과 비교
 - 정책 변경 시 핸드오버 문서(`docs/session-handover-2026-02-07.md`)에 반영
+
+## 품질 비교 리포트 자동화
+1. 실행 명령(컨테이너 내부 기준)
+- `docker exec synchub_web bash -lc 'cd /app && python scripts/generate_ocr_quality_report.py --api-base http://localhost:8000 --top-k 5'`
+
+2. 기본 대상
+- 텍스트 PDF: `AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2.pdf`
+- 이미지 PDF: `AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2_image.pdf`
+
+3. 산출물
+- 경로: `reports/ocr_quality_comparison_YYYY-mm-dd_HHMMSS.md`
+- 포함 항목:
+  - 문서별 `content_chars`, `chunk_count`, `table_chunk_ratio`
+  - 질의 5개 기준 `top-k recall` 및 질의별 상위 문서 ID

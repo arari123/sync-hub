@@ -143,7 +143,7 @@
   - 페이지 병렬 처리 전략 점검
   - vLLM 동시성/큐 설정 재점검(`PADDLE_VL_REC_MAX_CONCURRENCY`, `PADDLE_VLLM_MAX_NUM_SEQS`)
 
-5. 품질 비교 리포트 자동화
+5. 품질 비교 리포트 자동화 [완료]
 - 목표: 텍스트 PDF vs 이미지 PDF 동일 페이지(특히 32p) 기준 차이를 숫자로 추적
 - 권장 지표:
   - `content_chars`, `chunk_count`, 표(`chunk_type=table_*`) 비율
@@ -154,7 +154,7 @@
 - [x] 2) Docker 네트워크 단일화
 - [x] 3) 이미지 PDF 품질 우선 정책 분기
 - [x] 4) 속도 보완(품질 유지)
-- [ ] 5) 품질 비교 리포트 자동화
+- [x] 5) 품질 비교 리포트 자동화
 
 ## 다음 세션 바로 실행용 명령
 ```bash
@@ -276,6 +276,13 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
       - doc1 summary: `KEYENCE사의 LJ-X8000 기반 인라인 3D 검사 시스템의 특징과 적용 용도를 소개하는 문서입니다.`
       - doc2 title: `LJ-X8000 시리즈 광시야·고정도 타입 3D 검사 시스템`
       - doc2 summary: `LJ-X8000 시리즈는 인라인 3D 검사로 대상 물체의 형상을 정확하게 표현할 수 있습니다. 다양한 대상 물체, 다양한 범위를 커버하는 폭넓은 대응력으로 인라인에 대응할 수 있습니다.`
+- 2026-02-07 (세션 재개-8)
+  - 품질 비교 리포트 자동화 구현:
+    - 스크립트 추가: `scripts/generate_ocr_quality_report.py`
+    - 수집 지표: `content_chars`, `chunk_count`, `table_chunk_count`, `table_chunk_ratio`, 검색 질의별 `top-k recall`
+    - 기본 질의 5개: `LJ-X8000`, `라인 프로파일 센서`, `인라인 3D 검사`, `광시야 고정도 타입`, `KEYENCE LJ 시리즈`
+  - 테스트 규칙 문서 갱신:
+    - `docs/ocr-test-rules.md`에 자동 리포트 실행 명령/산출물 경로/지표 항목 추가
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

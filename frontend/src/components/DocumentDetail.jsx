@@ -1,11 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { api, API_BASE_URL, getErrorMessage } from '../lib/api';
-import { Loader2, File, Download } from 'lucide-react';
+import { Loader2, File, Download, Tag } from 'lucide-react';
+
+const DOCUMENT_TYPE_LABELS = {
+    catalog: '카탈로그',
+    manual: '설명서',
+    datasheet: '데이터시트',
+};
+
+function normalizeDocumentTypes(value) {
+    if (Array.isArray(value)) {
+        return [...new Set(value.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean))];
+    }
+
+    if (typeof value !== 'string') return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                return [...new Set(parsed.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean))];
+            }
+        } catch (error) {
+            return [];
+        }
+    }
+
+    return [...new Set(trimmed.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean))];
+}
+
+function toTypeLabel(type) {
+    return DOCUMENT_TYPE_LABELS[type] || type;
+}
 
 const DocumentDetail = ({ result }) => {
     const [docDetails, setDocDetails] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const documentTypes = normalizeDocumentTypes(result?.document_types || docDetails?.document_types);
 
     useEffect(() => {
         if (!result) return;
@@ -83,6 +117,25 @@ const DocumentDetail = ({ result }) => {
                         <div className="grid gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document Summary</span>
                             <p className="text-sm leading-relaxed">{result.summary || '요약 정보가 없습니다.'}</p>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document Type</span>
+                            {documentTypes.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {documentTypes.map((type) => (
+                                        <span
+                                            key={type}
+                                            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary"
+                                        >
+                                            <Tag className="h-3 w-3" />
+                                            {toTypeLabel(type)}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">분류 정보가 없습니다.</p>
+                            )}
                         </div>
 
                         <div className="grid gap-1">

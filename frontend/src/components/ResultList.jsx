@@ -1,10 +1,43 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { FileText, FileSearch, Hash } from 'lucide-react';
+import { FileText, FileSearch, Hash, Tag } from 'lucide-react';
+
+const DOCUMENT_TYPE_LABELS = {
+    catalog: '카탈로그',
+    manual: '설명서',
+    datasheet: '데이터시트',
+};
 
 function formatScore(score) {
     if (typeof score !== 'number') return '-';
     return score.toFixed(3);
+}
+
+function normalizeDocumentTypes(value) {
+    if (Array.isArray(value)) {
+        return [...new Set(value.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean))];
+    }
+
+    if (typeof value !== 'string') return [];
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                return [...new Set(parsed.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean))];
+            }
+        } catch (error) {
+            return [];
+        }
+    }
+
+    return [...new Set(trimmed.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean))];
+}
+
+function toTypeLabel(type) {
+    return DOCUMENT_TYPE_LABELS[type] || type;
 }
 
 const ResultList = ({ results, query, selectedResult, onSelect }) => {
@@ -29,6 +62,7 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                 const titleText = result.title || result.filename || 'Untitled document';
                 const summaryText = result.summary || '요약 정보가 아직 생성되지 않았습니다.';
                 const pageText = typeof result.page === 'number' ? `p.${result.page}` : 'p.-';
+                const documentTypes = normalizeDocumentTypes(result.document_types);
 
                 return (
                     <div
@@ -60,6 +94,15 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                         <div className="space-y-2 text-sm text-foreground/80">
                             <p className="line-clamp-2">{summaryText}</p>
                             <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {documentTypes.map((type) => (
+                                    <span
+                                        key={`${result.doc_id}-${type}`}
+                                        className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] text-primary"
+                                    >
+                                        <Tag className="h-3 w-3" />
+                                        {toTypeLabel(type)}
+                                    </span>
+                                ))}
                                 <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
                                     <FileSearch className="h-3 w-3" />
                                     검색어: {query || '-'}

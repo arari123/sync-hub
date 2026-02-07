@@ -31,12 +31,16 @@ function extractCustomerOptions(projectList) {
 
 function buildProjectFilterParams(filters) {
     const params = {};
+    const projectName = (filters.projectName || '').trim();
+    const projectCode = (filters.projectCode || '').trim();
     const minTotal = normalizeNumericFilter(filters.minTotal);
     const maxTotal = normalizeNumericFilter(filters.maxTotal);
     const customerName = (filters.customerName || '').trim();
     const authorName = (filters.authorName || '').trim();
     const projectType = (filters.projectType || '').trim();
 
+    if (projectName) params.project_name = projectName;
+    if (projectCode) params.project_code = projectCode;
     if (minTotal !== '') {
         const value = Number(minTotal);
         if (Number.isFinite(value)) params.min_total = value;
@@ -63,6 +67,8 @@ function stageBadgeClass(stage) {
 
 const BudgetManagement = () => {
     const emptyFilters = {
+        projectName: '',
+        projectCode: '',
         minTotal: '',
         maxTotal: '',
         customerName: '',
@@ -123,6 +129,10 @@ const BudgetManagement = () => {
         setDraftFilters((prev) => ({ ...prev, maxTotal: value }));
     };
 
+    const selectedCustomer = customerOptions.find(
+        (name) => name.toLowerCase() === String(draftFilters.customerName || '').trim().toLowerCase()
+    );
+
     const resetFilters = () => {
         setDraftFilters(emptyFilters);
         setAppliedFilters(emptyFilters);
@@ -182,6 +192,18 @@ const BudgetManagement = () => {
                     <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" onSubmit={applyFilters}>
                         <input
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            placeholder="프로젝트 이름"
+                            value={draftFilters.projectName}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectName: event.target.value }))}
+                        />
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            placeholder="프로젝트 코드"
+                            value={draftFilters.projectCode}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectCode: event.target.value }))}
+                        />
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="최소 금액(원)"
                             value={draftFilters.minTotal}
                             onChange={handleMinTotalChange}
@@ -192,13 +214,24 @@ const BudgetManagement = () => {
                             value={draftFilters.maxTotal}
                             onChange={handleMaxTotalChange}
                         />
-                        <input
-                            list="budget-customer-options"
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
-                            placeholder="고객사"
-                            value={draftFilters.customerName}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
-                        />
+                        <div className="space-y-1">
+                            <input
+                                list="budget-customer-options"
+                                className={`h-7 w-full rounded-md border px-2 text-[11px] ${
+                                    selectedCustomer
+                                        ? 'border-primary/70 bg-primary/5 ring-1 ring-primary/30'
+                                        : 'border-input bg-background'
+                                }`}
+                                placeholder="고객사"
+                                value={draftFilters.customerName}
+                                onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
+                            />
+                            <p className={`text-[10px] ${selectedCustomer ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
+                                {selectedCustomer
+                                    ? `선택됨: ${selectedCustomer}`
+                                    : '고객사 일부 입력 시 아래 목록에서 선택'}
+                            </p>
+                        </div>
                         <input
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="작성자"

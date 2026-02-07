@@ -347,12 +347,24 @@ def _serialize_project(
 
 def _matches_project_filters(
     project_payload: dict,
+    project_name: Optional[str],
+    project_code: Optional[str],
     project_type: Optional[str],
     customer_name: Optional[str],
     author_name: Optional[str],
     min_total: Optional[float],
     max_total: Optional[float],
 ) -> bool:
+    name_filter = (project_name or "").strip().lower()
+    if name_filter:
+        if name_filter not in (project_payload.get("name") or "").lower():
+            return False
+
+    code_filter = (project_code or "").strip().lower()
+    if code_filter:
+        if code_filter not in (project_payload.get("code") or "").lower():
+            return False
+
     if project_type:
         normalized_filter = _normalize_project_type(project_type)
         if (project_payload.get("project_type") or "") != normalized_filter:
@@ -378,6 +390,8 @@ def _matches_project_filters(
 
 @router.get("/projects")
 def list_projects(
+    project_name: Optional[str] = Query(default=None, max_length=120),
+    project_code: Optional[str] = Query(default=None, max_length=64),
     project_type: Optional[str] = Query(default=None, max_length=32),
     customer_name: Optional[str] = Query(default=None, max_length=180),
     author_name: Optional[str] = Query(default=None, max_length=180),
@@ -408,6 +422,8 @@ def list_projects(
         payload = _serialize_project(project, db, user=user, current_version=current_version)
         if not _matches_project_filters(
             payload,
+            project_name=project_name,
+            project_code=project_code,
             project_type=project_type,
             customer_name=customer_name,
             author_name=author_name,

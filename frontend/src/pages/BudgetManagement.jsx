@@ -187,9 +187,24 @@ const BudgetManagement = () => {
                 <section className="rounded-xl border bg-card p-4 shadow-sm">
                     <div className="mb-2 flex items-center justify-between">
                         <h2 className="text-xs font-semibold">필터</h2>
-                        <p className="text-[11px] text-muted-foreground">조건에 맞는 프로젝트만 표시</p>
+                        <div className="flex gap-2">
+                            <button
+                                type="submit"
+                                form="budget-filter-form"
+                                className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                            >
+                                적용
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
+                            >
+                                초기화
+                            </button>
+                        </div>
                     </div>
-                    <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" onSubmit={applyFilters}>
+                    <form id="budget-filter-form" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" onSubmit={applyFilters}>
                         <input
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="프로젝트 이름"
@@ -248,21 +263,6 @@ const BudgetManagement = () => {
                             <option value="parts">파츠</option>
                             <option value="as">AS</option>
                         </select>
-                        <div className="flex gap-2">
-                            <button
-                                type="submit"
-                                className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
-                            >
-                                적용
-                            </button>
-                            <button
-                                type="button"
-                                onClick={resetFilters}
-                                className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
-                            >
-                                초기화
-                            </button>
-                        </div>
                     </form>
                     <datalist id="budget-customer-options">
                         {customerOptions.map((name) => (

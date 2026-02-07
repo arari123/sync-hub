@@ -24,7 +24,7 @@ const Home = () => {
             </div>
 
             {SHOW_TEMP_PDF_UPLOAD && (
-                <div className="w-full max-w-3xl px-4 opacity-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-250 fill-mode-forwards">
+                <div className="w-full max-w-3xl px-4">
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                             <UploadCloud size={16} />
@@ -41,7 +41,7 @@ const Home = () => {
                 </div>
             )}
 
-            <div className="w-full max-w-4xl mt-6 px-4 opacity-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-forwards">
+            <div className="w-full max-w-4xl mt-6 px-4">
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-2">
                         <ActivityIcon />

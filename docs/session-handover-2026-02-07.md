@@ -297,6 +297,13 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 검증:
     - `docker exec synchub_frontend npm run build` 통과
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
+- 2026-02-07 (세션 재개-11)
+  - 메인 업로드 섹션 투명 상태 수정:
+    - 원인: `Home.jsx`의 `opacity-0` + 비활성 애니메이션 유틸(`animate-in`, `fill-mode-forwards`) 조합으로 섹션이 계속 투명 상태 유지.
+    - 조치: 업로드/시스템 상태 섹션 컨테이너에서 `opacity-0` 및 해당 애니메이션 의존 클래스 제거.
+  - 검증:
+    - `docker exec synchub_frontend npm run build` 통과
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

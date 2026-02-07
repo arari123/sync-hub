@@ -232,3 +232,15 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - baseline(튜닝 전): `elapsed_s=66.718`, `engine=paddleocr-vl`, `pages=40`, `content_chars=15742`
     - tuned(튜닝 후): `elapsed_s=49.825`, `engine=paddleocr-vl`, `pages=40`, `content_chars=15861`
     - 결과: 품질(텍스트량) 유지 범위에서 약 `25.3%` 처리시간 단축.
+- 2026-02-07 (세션 재개-4)
+  - `docs/dev-setup.md` 점검/갱신:
+    - 프론트 API 포트 기준(`8001` 기본, `8000` 예외) 및 검색 장애 점검 순서 문서화.
+  - 프론트 검색 장애 수정:
+    - `frontend/src/lib/api.js` 기본 API URL을 `http://localhost:8001`로 수정.
+    - `docker-compose.yml` frontend `VITE_API_URL` 기본값을 `http://localhost:8001`로 조정.
+  - 메인 페이지 업로드 기능 강화(디자인 톤 유지):
+    - `frontend/src/pages/Home.jsx`에서 검색창 바로 아래 `UploadWidget`을 전면 배치.
+    - 기존 스타일(카드/타이포/애니메이션 계열) 유지.
+  - 검증:
+    - 프론트 빌드(Docker): `docker run --rm -v /home/arari123/sync-hub:/repo node:20-bullseye ... npm run build` 성공.
+    - 백엔드 빠른 검증: `docker exec synchub_web_noreload bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과.

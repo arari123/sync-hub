@@ -43,12 +43,14 @@ function applyProjectTextFilters(projectList, filters) {
     const list = Array.isArray(projectList) ? projectList : [];
     const nameFilter = String(filters?.projectName || '').trim().toLowerCase();
     const codeFilter = String(filters?.projectCode || '').trim().toLowerCase();
+    const onlyMine = Boolean(filters?.onlyMine);
 
-    if (!nameFilter && !codeFilter) return list;
+    if (!nameFilter && !codeFilter && !onlyMine) return list;
     return list.filter((project) => {
         const projectName = String(project?.name || '').toLowerCase();
         const projectCode = String(project?.code || '').toLowerCase();
 
+        if (onlyMine && !project?.is_mine) return false;
         if (nameFilter && !projectName.includes(nameFilter)) return false;
         if (codeFilter && !projectCode.includes(codeFilter)) return false;
         return true;
@@ -76,7 +78,10 @@ function buildProjectFilterParams(filters) {
 }
 
 function stageBadgeClass(stage) {
-    const base = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors uppercase tracking-wider';
+    const emphasized = stage === 'review' || stage === 'installation' || stage === 'warranty';
+    const base = emphasized
+        ? 'px-3 py-1 rounded-full text-sm font-extrabold border transition-colors'
+        : 'px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-colors';
     // Simplified to use a uniform slate theme for all stages as requested
     return `${base} border-slate-200 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`;
 }
@@ -95,6 +100,7 @@ const BudgetManagement = () => {
         projectCode: '',
         customerName: '',
         managerName: '',
+        onlyMine: false,
         projectTypes: [],
         stages: [],
         sortBy: DEFAULT_PROJECT_SORT,
@@ -251,6 +257,14 @@ const BudgetManagement = () => {
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">상세 필터</h2>
                     <div className="flex gap-2">
+                        <Button
+                            variant={draftFilters.onlyMine ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs px-3"
+                            onClick={() => setDraftFilters((prev) => ({ ...prev, onlyMine: !prev.onlyMine }))}
+                        >
+                            내 프로젝트만
+                        </Button>
                         <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={resetFilters}>초기화</Button>
                         <Button size="sm" type="submit" form="budget-filter-form" className="h-8 text-xs px-3">필터 적용</Button>
                     </div>

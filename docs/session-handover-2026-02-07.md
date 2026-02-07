@@ -1,0 +1,205 @@
+# 세션 핸드오버 (2026-02-07)
+
+## 목적
+- 다음 세션에서 바로 이어서 작업할 수 있도록, 현재 OCR/색인 상태와 실측 결과, 원인, 다음 작업을 정리한다.
+
+## 세션 시작 트리거
+- 다음 세션에서 사용자가 **`다음 작업 진행해줘`** 라고 입력하면 아래 규칙으로 즉시 진행한다.
+- 우선순위는 본 문서의 **`다음 세션 우선 작업`** 순서를 따른다.
+- 매 작업 완료 시:
+  1. 실측/로그 근거를 남긴다.
+  2. 본 문서의 상태를 갱신한다.
+  3. 남은 작업을 다음 번호로 이어간다.
+
+## 실행 프로토콜
+1. 시작 전 확인
+- `curl -s http://localhost:8001/health/detail`
+- `curl -s http://localhost:8100/health`
+
+2. 우선 작업 실행
+- 본 문서의 `다음 세션 우선 작업` 1번부터 순차 수행
+- 각 단계마다 최소 1개 이상 정량 결과 기록
+  - 예: `elapsed_s`, `chunks`, `content_chars`, 오류 로그
+
+3. 완료 기준
+- 해당 단계의 실패 재현/원인/조치/재검증 결과가 모두 기록되어야 완료로 간주
+- 마지막에 `npm run verify:fast` 통과 확인
+
+4. 세션 종료 전 정리
+- 본 문서 하단의 `진행 로그`에 이번 세션 결과 추가
+- 남은 항목을 체크리스트로 갱신
+
+## 현재 상태 요약
+- OCR provider: `PaddleOCR-VL-1.5` 단독(`OCR_PROVIDER=paddle`)
+- OCR 가속 백엔드: `vllm-server` 경유 동작 확인
+- `ocr-worker` health에서 `paddle_vl_rec_backend=vllm-server` 확인
+- `paddle-vlm-server` 로그에서 `/v1/chat/completions` 호출 확인
+
+## 이번 세션 핵심 이슈와 조치
+1. WSL GPU + vLLM CUDA 인식 실패
+- 증상: `RuntimeError: No CUDA GPUs are available`
+- 조치: `docker-compose.gpu.yml`의 `paddle-vlm-server`에 아래 추가
+  - `LD_LIBRARY_PATH=/usr/lib/wsl/lib`
+  - `/usr/lib/wsl/lib:/usr/lib/wsl/lib:ro`
+  - `/dev/dxg:/dev/dxg`
+
+2. `web -> ocr-worker` DNS 실패
+- 증상: 이미지 PDF 업로드 시 `Temporary failure in name resolution`
+- 원인: 컨테이너가 서로 다른 docker network project에 떠 있음
+  - `synchub_web_noreload`: `sync-hub_default`
+  - `synchub_ocr`: `synchub_default`
+- 임시 복구: `docker network connect synchub_default synchub_web_noreload`
+- 주의: 임시 조치이므로 재기동 시 재발 가능
+
+## 실측 결과 (40페이지 기준)
+## 조건
+- 대상 문서:
+  - 텍스트 PDF: `uploads/AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2.pdf`
+  - 이미지 PDF: `uploads/AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2_image.pdf`
+- 측정 방식:
+  - DB/ES 초기화 후 업로드 API로 `pending -> completed`까지 시간 측정
+
+## 측정값
+1. 네트워크 복구 후 기본 업로드 측정
+- 텍스트 PDF:
+  - `elapsed=14.069s`
+  - `chunks=343`
+  - `content_chars=39101`
+- 이미지 PDF:
+  - `elapsed=6.376s`
+  - `chunks=3`
+  - `content_chars=501`
+- 해석:
+  - 이미지 PDF는 빠르지만 품질이 낮음(실질 OCR보다 preflight 경로 비중 큼)
+
+2. 이미지 PDF 강제 OCR 재색인 (`OCR_PYPDF_PREFLIGHT=false`)
+- 실행: `reindex --doc-id 2` 강제 OCR
+- 결과:
+  - `elapsed=88.68s` (40p)
+  - `chunks=64`
+  - `content_chars=16184`
+  - 페이지당 약 `2.217s/page`
+- 해석:
+  - 품질(텍스트량/청크수)은 상승하나, 총 처리시간이 크게 증가
+
+## 현 시점 진단
+- 속도만 보면 이미지 PDF 기본 경로가 빠르지만, 품질이 부족함.
+- 품질 우선이면 이미지 문서 경로에서 `pypdf preflight` 정책을 더 엄격하게 제어해야 함.
+- 현재 가장 큰 운영 리스크는 OCR 품질보다도 네트워크 분리 재발 가능성.
+
+## 코드 리뷰 반영 필요사항 (내일 우선 처리)
+1. 캐시 비활성 시 불필요한 파일 해시 계산 제거
+- 파일: `app/ocr_worker.py`
+- 이슈: `OCR_CACHE_ENABLED=false`여도 `cache_key` 생성을 위해 파일 SHA-256을 계산함.
+- 권장 수정:
+  - 캐시가 켜진 경우에만 `cache_key` 생성/로드/저장을 수행.
+  - 캐시 비활성 경로에서는 파일 해시 계산 자체를 건너뛴다.
+
+2. GLM 캐시 키에 디코딩 설정 포함
+- 파일: `app/ocr_worker.py`
+- 이슈: GLM 캐시 키에 `GLM_OCR_PROMPT`, `GLM_OCR_TEMPERATURE`, `GLM_OCR_TOP_P`가 누락됨.
+- 권장 수정:
+  - `_build_ocr_cache_key()`의 GLM payload에 위 3개 값을 포함한다.
+  - 설정 변경 시 캐시가 자동으로 무효화되도록 한다.
+
+3. 완료 기준
+- `OCR_CACHE_ENABLED=false`에서 대용량 PDF 요청 시 해시 계산이 수행되지 않음을 로그/프로파일로 확인.
+- GLM 프롬프트/temperature/top_p 변경 후 캐시 miss가 발생하고 결과가 갱신됨을 확인.
+- `npm run verify:fast` 통과.
+
+### 반영 결과 (2026-02-07 업데이트)
+- `app/ocr_worker.py` 리팩토링:
+  - `ocr()`에서 요청 해석/캐시 처리/프로바이더 호출을 보조 함수로 분리.
+  - 캐시 비활성 시 `_build_ocr_cache_key()` 호출 자체를 건너뛰도록 수정.
+- GLM 캐시 키 확장:
+  - `_build_ocr_cache_key()`의 GLM payload에 `glm_prompt`, `glm_temperature`, `glm_top_p` 포함.
+- 회귀 테스트 추가:
+  - `tests/test_ocr_worker_cache.py`
+  - `test_build_cache_key_skips_builder_when_cache_disabled`
+  - `test_glm_cache_key_changes_when_prompt_or_decoding_changes`
+- 검증:
+  - `docker exec synchub_web_noreload bash -lc 'cd /app && bash scripts/verify_fast.sh'`
+  - `Ran 23 tests ... OK`
+
+## 다음 세션 우선 작업
+1. 코드 리뷰 반영(캐시 경로 회귀 수정) [완료]
+2. Docker 네트워크 단일화(최우선) [완료]
+- 목표: `web`, `ocr-worker`, `paddle-vlm-server`가 동일 compose project/network에서 항상 기동되도록 고정
+- 권장:
+  - `docker-compose` 실행 경로/프로젝트명 통일
+  - 필요 시 `COMPOSE_PROJECT_NAME` 명시
+  - 컨테이너 이름 고정 의존 대신 서비스 DNS(`ocr-worker`) 일관 사용
+
+3. 이미지 PDF 품질 우선 정책 분기
+- 목표: 이미지 문서에서 preflight 조기 통과로 인한 저품질 색인 방지
+- 권장:
+  - 문서 타입(스캔/이미지 PDF) 감지 시 `OCR_PYPDF_PREFLIGHT=false` 강제
+  - 또는 preflight 통과 기준(`OCR_PYPDF_PREFLIGHT_MIN_CHARS`)을 이미지 문서에 더 엄격하게 적용
+
+4. 속도 보완(품질 유지 전제)
+- 목표: 이미지 PDF 강제 OCR 모드의 총 처리시간 단축
+- 후보:
+  - OCR 요청 파라미터 재튜닝(`render_dpi`, `max_tokens`, `fast_mode` 조건부)
+  - 페이지 병렬 처리 전략 점검
+  - vLLM 동시성/큐 설정 재점검(`PADDLE_VL_REC_MAX_CONCURRENCY`, `PADDLE_VLLM_MAX_NUM_SEQS`)
+
+5. 품질 비교 리포트 자동화
+- 목표: 텍스트 PDF vs 이미지 PDF 동일 페이지(특히 32p) 기준 차이를 숫자로 추적
+- 권장 지표:
+  - `content_chars`, `chunk_count`, 표(`chunk_type=table_*`) 비율
+  - 검색 질의 3~5개에 대한 top-k 재현율 비교
+
+## 체크리스트
+- [x] 1) 코드 리뷰 반영(캐시 경로 회귀 수정)
+- [x] 2) Docker 네트워크 단일화
+- [ ] 3) 이미지 PDF 품질 우선 정책 분기
+- [ ] 4) 속도 보완(품질 유지)
+- [ ] 5) 품질 비교 리포트 자동화
+
+## 다음 세션 바로 실행용 명령
+```bash
+# 1) 상태 확인
+curl -s http://localhost:8001/health/detail
+curl -s http://localhost:8100/health
+
+# 2) 코드 리뷰 반영 작업(최우선)
+# - app/ocr_worker.py 수정 후 빠른 검증
+npm run verify:fast
+
+# 3) DB/ES 초기화
+docker exec synchub_db psql -U postgres -d synchub -c "TRUNCATE TABLE dedup_audit_log, dedup_cluster_members, dedup_clusters, documents, posts RESTART IDENTITY CASCADE;"
+curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
+
+# 4) OCR cache 초기화
+docker exec synchub_ocr sh -lc 'rm -rf /app/.cache/ocr_worker/*'
+
+# 5) 업로드 색인 테스트
+curl -F "file=@uploads/AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2.pdf" http://localhost:8001/documents/upload
+curl -F "file=@uploads/AS_161723_LJ-X8000_C_635I91_KK_KR_2105_2_image.pdf" http://localhost:8001/documents/upload
+
+# 6) 이미지 강제 OCR 재색인(품질 확인용)
+docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OCR_PROFILE=quality python -m app.core.indexing.reindex --doc-id 2 --dedup off --index-policy all'
+```
+
+## 참고 문서
+- `docs/ocr-paddle-only.md`
+- `reports/ocr_paddle_vl_config_tuning_2026-02-06.md`
+
+## 진행 로그
+- 2026-02-07
+  - `web -> ocr-worker` DNS 실패를 네트워크 연결로 임시 복구(`docker network connect synchub_default synchub_web_noreload`)
+  - 40페이지 업로드 실측:
+    - 텍스트 PDF `14.069s`, `chunks=343`
+    - 이미지 PDF 기본 경로 `6.376s`, `chunks=3` (저품질)
+  - 이미지 PDF 강제 OCR 재색인 실측:
+    - `88.68s`, `chunks=64`, `content_chars=16184`
+- 2026-02-07 (세션 재개)
+  - `app/ocr_worker.py` 리팩토링(요청/캐시/프로바이더 분리) 및 코드리뷰 2건 반영 완료.
+  - 캐시 회귀 테스트 추가(`tests/test_ocr_worker_cache.py`) 및 Docker 검증 통과:
+    - `docker exec synchub_web_noreload bash -lc 'cd /app && bash scripts/verify_fast.sh'`
+    - `Ran 23 tests ... OK`
+  - 네트워크 단일화 조치:
+    - `docker-compose.yml` 기본 네트워크 이름을 `synchub_default`로 고정.
+    - `docker-compose -f docker-compose.yml -f docker-compose.gpu.yml config`에서 `networks.default.name: synchub_default` 확인.
+    - `docker run --rm --network synchub_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}' http://ocr-worker:8100/health` -> `200`
+    - `docker run --rm --network synchub_default curlimages/curl:8.12.1 -s -o /dev/null -w '%{http_code}' http://paddle-vlm-server:8000/health` -> `200`

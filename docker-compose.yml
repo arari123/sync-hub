@@ -69,3 +69,7 @@ services:
 volumes:
   postgres_data:
   es_data:
+
+networks:
+  default:
+    name: synchub_default

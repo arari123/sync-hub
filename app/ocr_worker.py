@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -8,6 +9,7 @@ import mimetypes
 import os
 import tempfile
 import uuid
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,18 @@ from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+from .ocr_parsing_utils import (
+    _extract_by_path,
+    _extract_ollama_text,
+    _extract_pages_from_prediction_item,
+    _extract_pages_recursive,
+    _extract_text_from_lite_ocr_item,
+    _extract_text_from_prediction_item,
+    _extract_text_recursive,
+    _parse_json_or_jsonl,
+    _read_json_object,
+)
 
 try:
     from pypdf import PdfReader
@@ -30,8 +44,56 @@ except ImportError:  # pragma: no cover
 
 app = FastAPI(title="Sync-Hub OCR Worker")
 
+
+def _read_float_env(name: str, default: str) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except Exception:  # noqa: BLE001
+        return float(default)
+
+
+def _read_bool_env(name: str, default: str) -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_optional_int_env(name: str, default: str = "") -> int | None:
+    raw = os.getenv(name, default).strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except Exception:  # noqa: BLE001
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def _read_optional_float_env(name: str, default: str = "") -> float | None:
+    raw = os.getenv(name, default).strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _read_optional_bool_env(name: str, default: str = "") -> bool | None:
+    raw = os.getenv(name, default).strip().lower()
+    if not raw:
+        return None
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
 OCR_ACCELERATOR = os.getenv("OCR_ACCELERATOR", "cpu").strip().lower()
 OCR_PROVIDER = os.getenv("OCR_PROVIDER", "pypdf").strip().lower()
+OCR_CACHE_ENABLED = _read_bool_env("OCR_CACHE_ENABLED", "true")
+OCR_CACHE_DIR = os.getenv("OCR_CACHE_DIR", "/app/.cache/ocr_worker").strip() or "/app/.cache/ocr_worker"
 
 GLM_OCR_ENDPOINT = os.getenv("GLM_OCR_ENDPOINT", "").strip()
 GLM_OCR_API_KEY = os.getenv("GLM_OCR_API_KEY", "").strip()
@@ -45,15 +107,17 @@ GLM_OCR_MIMETYPE_FIELD = os.getenv("GLM_OCR_MIMETYPE_FIELD", "mime_type").strip(
 GLM_OCR_MODEL = os.getenv("GLM_OCR_MODEL", "").strip()
 GLM_OCR_PROMPT = os.getenv("GLM_OCR_PROMPT", "").strip()
 GLM_OCR_TEXT_PATH = os.getenv("GLM_OCR_TEXT_PATH", "").strip()
-GLM_OCR_TIMEOUT_SECONDS = float(os.getenv("GLM_OCR_TIMEOUT_SECONDS", "30"))
+GLM_OCR_TIMEOUT_SECONDS = _read_float_env("GLM_OCR_TIMEOUT_SECONDS", "30")
 GLM_OCR_MAX_TOKENS = max(256, int(os.getenv("GLM_OCR_MAX_TOKENS", "4096")))
+GLM_OCR_TEMPERATURE = _read_float_env("GLM_OCR_TEMPERATURE", "0")
+GLM_OCR_TOP_P = _read_float_env("GLM_OCR_TOP_P", "1")
 GLM_MAX_PAGES = max(0, int(os.getenv("GLM_MAX_PAGES", "0")))
 GLM_RENDER_DPI = max(96, int(os.getenv("GLM_RENDER_DPI", "180")))
 GLM_OCR_EXTRA_HEADERS_RAW = os.getenv("GLM_OCR_EXTRA_HEADERS", "").strip()
 GLM_DEFAULT_PROMPT = (
-    "Recognize the text in the image and output in Markdown format. "
-    "Preserve the original layout (headings/paragraphs/tables/formulas). "
-    "Do not fabricate content that does not exist in the image."
+    "You are an OCR engine. Transcribe all visible Korean and English text exactly as written. "
+    "Keep original reading order and line breaks. "
+    "Do not summarize, translate, normalize, or infer missing text."
 )
 GLM_PADDLE_LITE_LANG = os.getenv("GLM_PADDLE_LITE_LANG", "korean").strip() or "korean"
 GLM_PADDLE_LITE_MAX_PAGES = max(0, int(os.getenv("GLM_PADDLE_LITE_MAX_PAGES", "4")))
@@ -74,7 +138,7 @@ OLLAMA_PROMPT = os.getenv(
 OLLAMA_MODE = os.getenv("OLLAMA_MODE", "chat").strip().lower()
 if OLLAMA_MODE not in {"chat", "generate"}:
     OLLAMA_MODE = "chat"
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "60"))
+OLLAMA_TIMEOUT_SECONDS = _read_float_env("OLLAMA_TIMEOUT_SECONDS", "60")
 OLLAMA_MAX_PAGES = max(0, int(os.getenv("OLLAMA_MAX_PAGES", "6")))
 OLLAMA_RENDER_DPI = max(96, int(os.getenv("OLLAMA_RENDER_DPI", "180")))
 OLLAMA_EXTRA_OPTIONS_RAW = os.getenv("OLLAMA_EXTRA_OPTIONS", "").strip()
@@ -94,6 +158,20 @@ PADDLE_USE_DOC_UNWARPING = (
 PADDLE_USE_TEXTLINE_ORIENTATION = (
     os.getenv("PADDLE_USE_TEXTLINE_ORIENTATION", "false").strip().lower() in {"1", "true", "yes", "on"}
 )
+PADDLE_USE_LAYOUT_DETECTION = _read_optional_bool_env("PADDLE_USE_LAYOUT_DETECTION", "")
+PADDLE_USE_CHART_RECOGNITION = _read_optional_bool_env("PADDLE_USE_CHART_RECOGNITION", "")
+PADDLE_USE_SEAL_RECOGNITION = _read_optional_bool_env("PADDLE_USE_SEAL_RECOGNITION", "")
+PADDLE_USE_OCR_FOR_IMAGE_BLOCK = _read_optional_bool_env("PADDLE_USE_OCR_FOR_IMAGE_BLOCK", "")
+PADDLE_FORMAT_BLOCK_CONTENT = _read_optional_bool_env("PADDLE_FORMAT_BLOCK_CONTENT", "")
+PADDLE_MERGE_LAYOUT_BLOCKS = _read_optional_bool_env("PADDLE_MERGE_LAYOUT_BLOCKS", "")
+PADDLE_USE_QUEUES = _read_optional_bool_env("PADDLE_USE_QUEUES", "")
+PADDLE_LAYOUT_SHAPE_MODE = os.getenv("PADDLE_LAYOUT_SHAPE_MODE", "").strip() or None
+PADDLE_PROMPT_LABEL = os.getenv("PADDLE_PROMPT_LABEL", "").strip() or None
+PADDLE_VL_REC_BACKEND = os.getenv("PADDLE_VL_REC_BACKEND", "").strip() or None
+PADDLE_VL_REC_SERVER_URL = os.getenv("PADDLE_VL_REC_SERVER_URL", "").strip() or None
+PADDLE_VL_REC_API_MODEL_NAME = os.getenv("PADDLE_VL_REC_API_MODEL_NAME", "").strip() or None
+PADDLE_VL_REC_API_KEY = os.getenv("PADDLE_VL_REC_API_KEY", "").strip() or None
+PADDLE_VL_REC_MAX_CONCURRENCY = _read_optional_int_env("PADDLE_VL_REC_MAX_CONCURRENCY", "")
 PADDLE_DISABLE_MODEL_SOURCE_CHECK = (
     os.getenv("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "true").strip().lower() in {"1", "true", "yes", "on"}
 )
@@ -115,6 +193,14 @@ PADDLE_FAST_MIN_TEXT_CHARS = max(64, int(os.getenv("PADDLE_FAST_MIN_TEXT_CHARS",
 PADDLE_SKIP_PDF_OCR_ON_CPU = (
     os.getenv("PADDLE_SKIP_PDF_OCR_ON_CPU", "true").strip().lower() in {"1", "true", "yes", "on"}
 )
+PADDLE_PRELOAD_ON_STARTUP = _read_bool_env("PADDLE_PRELOAD_ON_STARTUP", "true")
+PADDLE_PREDICT_MAX_NEW_TOKENS = _read_optional_int_env("PADDLE_PREDICT_MAX_NEW_TOKENS", "")
+PADDLE_PREDICT_MIN_PIXELS = _read_optional_int_env("PADDLE_PREDICT_MIN_PIXELS", "")
+PADDLE_PREDICT_MAX_PIXELS = _read_optional_int_env("PADDLE_PREDICT_MAX_PIXELS", "")
+PADDLE_PREDICT_TEMPERATURE = _read_optional_float_env("PADDLE_PREDICT_TEMPERATURE", "")
+PADDLE_PREDICT_TOP_P = _read_optional_float_env("PADDLE_PREDICT_TOP_P", "")
+PADDLE_PREDICT_REPETITION_PENALTY = _read_optional_float_env("PADDLE_PREDICT_REPETITION_PENALTY", "")
+PADDLE_WARMUP_ON_STARTUP = _read_bool_env("PADDLE_WARMUP_ON_STARTUP", "false")
 
 _PADDLE_PIPELINE: Any = None
 _PADDLE_PIPELINE_ERROR = ""
@@ -126,6 +212,7 @@ class OCRRequest(BaseModel):
     file_path: str
     max_pages: int | None = None
     render_dpi: int | None = None
+    max_tokens: int | None = None
     fast_mode: bool | None = None
     force_render_pdf: bool | None = None
     pypdf_preflight: bool | None = None
@@ -139,16 +226,149 @@ class OCRResponse(BaseModel):
     error: str | None = None
 
 
-def _read_json_object(raw: str) -> dict[str, Any]:
-    if not raw:
-        return {}
+@dataclass(frozen=True)
+class OCRProviderDefaults:
+    max_pages: int
+    render_dpi: int
+    max_tokens: int
+
+
+@dataclass(frozen=True)
+class OCRResolvedOptions:
+    file_path: Path
+    requested_max_pages: int
+    requested_render_dpi: int
+    requested_max_tokens: int
+    requested_fast_mode: bool
+    force_render_pdf: bool
+    use_pypdf_preflight: bool
+    should_skip_heavy_paddle_pdf: bool
+
+
+def _sha256_file(file_path: str) -> str:
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as file_obj:
+        while True:
+            chunk = file_obj.read(1024 * 1024)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _build_ocr_cache_key(
+    *,
+    file_path: str,
+    provider: str,
+    requested_max_pages: int,
+    requested_render_dpi: int,
+    requested_max_tokens: int,
+    requested_fast_mode: bool,
+    force_render_pdf: bool,
+    use_pypdf_preflight: bool,
+) -> str:
+    file_hash = _sha256_file(file_path)
+    payload: dict[str, Any] = {
+        "provider": provider,
+        "file_sha256": file_hash,
+        "max_pages": requested_max_pages,
+        "render_dpi": requested_render_dpi,
+        "max_tokens": requested_max_tokens,
+        "fast_mode": requested_fast_mode,
+        "force_render_pdf": force_render_pdf,
+        "pypdf_preflight": use_pypdf_preflight,
+    }
+    if provider == "paddle":
+        payload.update(
+            {
+                "pipeline_version": PADDLE_PIPELINE_VERSION,
+                "model_name": PADDLE_MODEL_NAME,
+                "device": _paddle_effective_device(PADDLE_DEVICE),
+                "use_layout_detection": PADDLE_USE_LAYOUT_DETECTION,
+                "use_chart_recognition": PADDLE_USE_CHART_RECOGNITION,
+                "use_seal_recognition": PADDLE_USE_SEAL_RECOGNITION,
+                "use_ocr_for_image_block": PADDLE_USE_OCR_FOR_IMAGE_BLOCK,
+                "format_block_content": PADDLE_FORMAT_BLOCK_CONTENT,
+                "merge_layout_blocks": PADDLE_MERGE_LAYOUT_BLOCKS,
+                "layout_shape_mode": PADDLE_LAYOUT_SHAPE_MODE,
+                "prompt_label": PADDLE_PROMPT_LABEL,
+                "predict_max_new_tokens": PADDLE_PREDICT_MAX_NEW_TOKENS,
+                "predict_min_pixels": PADDLE_PREDICT_MIN_PIXELS,
+                "predict_max_pixels": PADDLE_PREDICT_MAX_PIXELS,
+                "predict_repetition_penalty": PADDLE_PREDICT_REPETITION_PENALTY,
+            }
+        )
+    elif provider == "glm":
+        payload.update(
+            {
+                "glm_mode": GLM_OCR_MODE,
+                "glm_model": GLM_OCR_MODEL,
+                "glm_prompt": GLM_OCR_PROMPT,
+                "glm_max_tokens": GLM_OCR_MAX_TOKENS,
+                "glm_temperature": GLM_OCR_TEMPERATURE,
+                "glm_top_p": GLM_OCR_TOP_P,
+            }
+        )
+
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _ocr_cache_path(cache_key: str) -> Path:
+    return Path(OCR_CACHE_DIR) / f"{cache_key}.json"
+
+
+def _load_cached_ocr_response(cache_key: str) -> OCRResponse | None:
+    if not OCR_CACHE_ENABLED:
+        return None
+    cache_path = _ocr_cache_path(cache_key)
+    if not cache_path.exists():
+        return None
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return data
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+
+    text = payload.get("text")
+    engine = payload.get("engine")
+    pages = payload.get("pages")
+    used_fallback = payload.get("used_fallback")
+    error_message = payload.get("error")
+    if not isinstance(text, str) or not isinstance(engine, str):
+        return None
+    if not isinstance(pages, int):
+        return None
+    if not isinstance(used_fallback, bool):
+        used_fallback = False
+    if error_message is not None and not isinstance(error_message, str):
+        error_message = None
+
+    return OCRResponse(
+        text=text,
+        engine=engine,
+        pages=max(0, pages),
+        used_fallback=used_fallback,
+        error=error_message,
+    )
+
+
+def _store_cached_ocr_response(cache_key: str, response: OCRResponse) -> None:
+    if not OCR_CACHE_ENABLED:
+        return
+    try:
+        cache_dir = Path(OCR_CACHE_DIR)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = _ocr_cache_path(cache_key)
+        payload = {
+            "text": response.text,
+            "engine": response.engine,
+            "pages": response.pages,
+            "used_fallback": response.used_fallback,
+            "error": response.error,
+        }
+        cache_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        return
 
 
 def _read_extra_headers() -> dict[str, str]:
@@ -180,119 +400,6 @@ def _build_headers(content_type: str | None = None) -> dict[str, str]:
 
     headers.update(_read_extra_headers())
     return headers
-
-
-def _extract_by_path(data: Any, path: str) -> Any:
-    cursor = data
-    for token in path.split("."):
-        token = token.strip()
-        if not token:
-            return None
-
-        if isinstance(cursor, list):
-            if not token.isdigit():
-                return None
-            index = int(token)
-            if index < 0 or index >= len(cursor):
-                return None
-            cursor = cursor[index]
-            continue
-
-        if isinstance(cursor, dict):
-            if token not in cursor:
-                return None
-            cursor = cursor[token]
-            continue
-
-        return None
-    return cursor
-
-
-def _extract_text_recursive(payload: Any, depth: int = 0) -> str:
-    if depth > 8 or payload is None:
-        return ""
-
-    if isinstance(payload, str):
-        return payload.strip()
-
-    if isinstance(payload, dict):
-        priority_keys = (
-            "text",
-            "ocr_text",
-            "extracted_text",
-            "result_text",
-            "content",
-            "result",
-            "output",
-            "answer",
-            "response",
-        )
-        for key in priority_keys:
-            if key in payload:
-                candidate = _extract_text_recursive(payload.get(key), depth + 1)
-                if candidate:
-                    return candidate
-
-        choices = payload.get("choices")
-        if isinstance(choices, list):
-            for choice in choices:
-                candidate = _extract_text_recursive(choice, depth + 1)
-                if candidate:
-                    return candidate
-
-        for key, value in payload.items():
-            lowered = str(key).lower()
-            if "text" in lowered or "content" in lowered:
-                candidate = _extract_text_recursive(value, depth + 1)
-                if candidate:
-                    return candidate
-
-        for value in payload.values():
-            candidate = _extract_text_recursive(value, depth + 1)
-            if candidate:
-                return candidate
-        return ""
-
-    if isinstance(payload, list):
-        for item in payload:
-            candidate = _extract_text_recursive(item, depth + 1)
-            if candidate:
-                return candidate
-        return ""
-
-    return ""
-
-
-def _extract_pages_recursive(payload: Any, depth: int = 0) -> int:
-    if depth > 6 or payload is None:
-        return 0
-
-    if isinstance(payload, (int, float)):
-        if payload > 0:
-            return int(payload)
-        return 0
-
-    if isinstance(payload, dict):
-        keys = ("pages", "page_count", "num_pages", "total_pages")
-        for key in keys:
-            if key in payload:
-                value = _extract_pages_recursive(payload.get(key), depth + 1)
-                if value > 0:
-                    return value
-        for value in payload.values():
-            parsed = _extract_pages_recursive(value, depth + 1)
-            if parsed > 0:
-                return parsed
-        return 0
-
-    if isinstance(payload, list):
-        for item in payload:
-            parsed = _extract_pages_recursive(item, depth + 1)
-            if parsed > 0:
-                return parsed
-        return 0
-
-    return 0
 
 
 def _build_multipart_body(file_path: str) -> tuple[bytes, str]:
@@ -453,6 +560,8 @@ def _provider_health_snapshot() -> dict[str, Any]:
             "provider_ready": provider_ready,
             "provider_health_url": "",
             "provider_error": provider_error,
+            "paddle_pipeline_loaded": _PADDLE_PIPELINE is not None,
+            "paddle_pipeline_init_error": _PADDLE_PIPELINE_ERROR or None,
         }
 
     return {
@@ -462,54 +571,9 @@ def _provider_health_snapshot() -> dict[str, Any]:
     }
 
 
-def _parse_json_or_jsonl(response_body: str) -> Any:
-    try:
-        return json.loads(response_body)
-    except json.JSONDecodeError:
-        chunks: list[dict[str, Any]] = []
-        for line in response_body.splitlines():
-            text = line.strip()
-            if not text:
-                continue
-            try:
-                decoded = json.loads(text)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(decoded, dict):
-                chunks.append(decoded)
-
-        if chunks:
-            return {"chunks": chunks}
-        return None
-
-
-def _extract_ollama_text(payload: Any) -> str:
-    if isinstance(payload, dict):
-        message = payload.get("message")
-        if isinstance(message, dict):
-            content = message.get("content")
-            if isinstance(content, str) and content.strip():
-                return content.strip()
-
-        response = payload.get("response")
-        if isinstance(response, str) and response.strip():
-            return response.strip()
-
-        chunks = payload.get("chunks")
-        if isinstance(chunks, list):
-            parts: list[str] = []
-            for chunk in chunks:
-                part = _extract_ollama_text(chunk)
-                if part:
-                    parts.append(part)
-            if parts:
-                return "\n".join(parts).strip()
-
-    return _extract_text_recursive(payload)
-
-
-def _build_glm_openai_payload(data_url: str) -> dict[str, Any]:
+def _build_glm_openai_payload(data_url: str, max_tokens: int) -> dict[str, Any]:
     prompt = GLM_OCR_PROMPT or GLM_DEFAULT_PROMPT
+    resolved_max_tokens = max(256, int(max_tokens or GLM_OCR_MAX_TOKENS))
     payload: dict[str, Any] = {
         "messages": [
             {
@@ -526,15 +590,17 @@ def _build_glm_openai_payload(data_url: str) -> dict[str, Any]:
                 ],
             }
         ],
-        "max_tokens": GLM_OCR_MAX_TOKENS,
+        "max_tokens": resolved_max_tokens,
+        "temperature": max(0.0, min(GLM_OCR_TEMPERATURE, 2.0)),
+        "top_p": max(0.0, min(GLM_OCR_TOP_P, 1.0)),
     }
     if GLM_OCR_MODEL:
         payload["model"] = GLM_OCR_MODEL
     return payload
 
 
-def _call_glm_openai_chat(data_url: str) -> str:
-    body = json.dumps(_build_glm_openai_payload(data_url)).encode("utf-8")
+def _call_glm_openai_chat(data_url: str, max_tokens: int) -> str:
+    body = json.dumps(_build_glm_openai_payload(data_url, max_tokens=max_tokens)).encode("utf-8")
     req = request.Request(
         GLM_OCR_ENDPOINT,
         data=body,
@@ -577,7 +643,7 @@ def _file_to_data_uri(file_path: str) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
-def _call_glm(file_path: str, max_pages: int, render_dpi: int) -> tuple[str, int]:
+def _call_glm(file_path: str, max_pages: int, render_dpi: int, max_tokens: int) -> tuple[str, int]:
     if not GLM_OCR_ENDPOINT:
         raise ValueError("GLM_OCR_ENDPOINT is not configured.")
 
@@ -596,7 +662,10 @@ def _call_glm(file_path: str, max_pages: int, render_dpi: int) -> tuple[str, int
             raise ValueError("No rendered pages generated from PDF input.")
         parts: list[str] = []
         for page_base64 in page_images:
-            text = _call_glm_openai_chat(f"data:image/png;base64,{page_base64}")
+            text = _call_glm_openai_chat(
+                f"data:image/png;base64,{page_base64}",
+                max_tokens=max_tokens,
+            )
             if text.strip():
                 parts.append(text.strip())
         merged = "\n".join(parts).strip()
@@ -605,7 +674,7 @@ def _call_glm(file_path: str, max_pages: int, render_dpi: int) -> tuple[str, int
         raise ValueError("GLM response did not include extractable text.")
 
     data_url = _file_to_data_uri(file_path)
-    text = _call_glm_openai_chat(data_url).strip()
+    text = _call_glm_openai_chat(data_url, max_tokens=max_tokens).strip()
     if text:
         return text, 1
     raise ValueError("GLM response did not include extractable text.")
@@ -722,6 +791,18 @@ def _build_paddle_init_kwargs() -> dict[str, Any]:
         "use_doc_orientation_classify": PADDLE_USE_DOC_ORIENTATION_CLASSIFY,
         "use_doc_unwarping": PADDLE_USE_DOC_UNWARPING,
         "use_textline_orientation": PADDLE_USE_TEXTLINE_ORIENTATION,
+        "use_layout_detection": PADDLE_USE_LAYOUT_DETECTION,
+        "use_chart_recognition": PADDLE_USE_CHART_RECOGNITION,
+        "use_seal_recognition": PADDLE_USE_SEAL_RECOGNITION,
+        "use_ocr_for_image_block": PADDLE_USE_OCR_FOR_IMAGE_BLOCK,
+        "format_block_content": PADDLE_FORMAT_BLOCK_CONTENT,
+        "merge_layout_blocks": PADDLE_MERGE_LAYOUT_BLOCKS,
+        "use_queues": PADDLE_USE_QUEUES,
+        "vl_rec_backend": PADDLE_VL_REC_BACKEND,
+        "vl_rec_server_url": PADDLE_VL_REC_SERVER_URL,
+        "vl_rec_api_model_name": PADDLE_VL_REC_API_MODEL_NAME,
+        "vl_rec_api_key": PADDLE_VL_REC_API_KEY,
+        "vl_rec_max_concurrency": PADDLE_VL_REC_MAX_CONCURRENCY,
     }
     return {key: value for key, value in kwargs.items() if value not in {"", None}}
 
@@ -801,41 +882,6 @@ def _get_paddle_lite_ocr():
     except Exception as exc:  # noqa: BLE001
         _PADDLE_LITE_OCR_ERROR = f"PaddleOCR init failed: {exc}"
         raise RuntimeError(_PADDLE_LITE_OCR_ERROR) from exc
-
-
-def _extract_text_from_lite_ocr_item(item: Any) -> str:
-    if item is None:
-        return ""
-
-    if isinstance(item, list):
-        lines: list[str] = []
-        for row in item:
-            if (
-                isinstance(row, (list, tuple))
-                and len(row) >= 2
-                and isinstance(row[1], (list, tuple))
-                and row[1]
-                and isinstance(row[1][0], str)
-            ):
-                text = row[1][0].strip()
-                if text:
-                    lines.append(text)
-        if lines:
-            return "\n".join(lines).strip()
-
-    if isinstance(item, dict) or hasattr(item, "get"):
-        getter = item.get if hasattr(item, "get") else None
-        if getter is not None:
-            rec_texts = getter("rec_texts")
-            if isinstance(rec_texts, list):
-                lines = [str(value).strip() for value in rec_texts if str(value).strip()]
-                if lines:
-                    return "\n".join(lines).strip()
-            if isinstance(rec_texts, str) and rec_texts.strip():
-                return rec_texts.strip()
-
-    text = _extract_text_recursive(item)
-    return text.strip()
 
 
 def _call_paddle_lite(
@@ -933,68 +979,42 @@ def _call_paddle_lite(
     raise ValueError("PaddleOCR lite response did not include extractable text.")
 
 
-def _extract_text_from_prediction_item(item: Any) -> str:
-    # PaddleOCR-VL blocks keep recognized text under `content`.
-    try:
-        parsing_blocks = item.get("parsing_res_list")  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001
-        parsing_blocks = None
-
-    if isinstance(parsing_blocks, list) and parsing_blocks:
-        contents: list[str] = []
-        for block in parsing_blocks:
-            content = ""
-            if isinstance(block, dict):
-                value = block.get("content")
-                if isinstance(value, str):
-                    content = value
-            elif hasattr(block, "content"):
-                value = getattr(block, "content")
-                if isinstance(value, str):
-                    content = value
-            if content.strip():
-                contents.append(content.strip())
-        if contents:
-            return "\n".join(contents).strip()
-
-    payload: Any = item
-
-    if not isinstance(payload, (dict, list, str)):
-        if hasattr(payload, "res"):
-            payload = getattr(payload, "res")
-        elif hasattr(payload, "to_dict"):
-            try:
-                payload = payload.to_dict()
-            except Exception:  # noqa: BLE001
-                payload = str(payload)
-        else:
-            payload = str(payload)
-
-    text = _extract_text_recursive(payload)
-    return text.strip()
-
-
-def _extract_pages_from_prediction_item(item: Any) -> int:
-    for key in ("page_count", "pages", "num_pages", "total_pages"):
-        value = None
-        if isinstance(item, dict):
-            value = item.get(key)
-        elif hasattr(item, "get"):
-            try:
-                value = item.get(key)  # type: ignore[attr-defined]
-            except Exception:  # noqa: BLE001
-                value = None
-        if isinstance(value, (int, float)) and value > 0:
-            return int(value)
-    return 0
-
-
-def _call_paddle_predict(pipeline, input_path: str) -> tuple[str, int]:
+def _build_paddle_predict_kwargs(pipeline) -> dict[str, Any]:
     predict_signature = inspect.signature(pipeline.predict)
+    predict_kwargs: dict[str, Any] = {}
+    candidate_kwargs = {
+        "use_layout_detection": PADDLE_USE_LAYOUT_DETECTION,
+        "use_chart_recognition": PADDLE_USE_CHART_RECOGNITION,
+        "use_seal_recognition": PADDLE_USE_SEAL_RECOGNITION,
+        "use_ocr_for_image_block": PADDLE_USE_OCR_FOR_IMAGE_BLOCK,
+        "format_block_content": PADDLE_FORMAT_BLOCK_CONTENT,
+        "merge_layout_blocks": PADDLE_MERGE_LAYOUT_BLOCKS,
+        "use_queues": PADDLE_USE_QUEUES,
+        "layout_shape_mode": PADDLE_LAYOUT_SHAPE_MODE,
+        "prompt_label": PADDLE_PROMPT_LABEL,
+        "repetition_penalty": PADDLE_PREDICT_REPETITION_PENALTY,
+        "max_new_tokens": PADDLE_PREDICT_MAX_NEW_TOKENS,
+        "min_pixels": PADDLE_PREDICT_MIN_PIXELS,
+        "max_pixels": PADDLE_PREDICT_MAX_PIXELS,
+        "temperature": PADDLE_PREDICT_TEMPERATURE,
+        "top_p": PADDLE_PREDICT_TOP_P,
+    }
+    for key, value in candidate_kwargs.items():
+        if value is None:
+            continue
+        if key in predict_signature.parameters:
+            predict_kwargs[key] = value
+    return predict_kwargs
+
+
+def _call_paddle_predict(pipeline, input_path: str | list[str]) -> tuple[str, int]:
+    predict_signature = inspect.signature(pipeline.predict)
+    predict_kwargs = _build_paddle_predict_kwargs(pipeline)
+
     if "input" in predict_signature.parameters:
-        prediction_output = pipeline.predict(input=input_path)
+        prediction_output = pipeline.predict(input=input_path, **predict_kwargs)
     else:
-        prediction_output = pipeline.predict(input_path)
+        prediction_output = pipeline.predict(input_path, **predict_kwargs)
 
     if isinstance(prediction_output, list):
         prediction_items = prediction_output
@@ -1010,7 +1030,10 @@ def _call_paddle_predict(pipeline, input_path: str) -> tuple[str, int]:
         pages = max(pages, _extract_pages_from_prediction_item(item))
 
     if pages <= 0:
-        pages = len(prediction_items)
+        if isinstance(input_path, list):
+            pages = len(input_path)
+        else:
+            pages = len(prediction_items)
 
     return "\n".join(texts).strip(), pages
 
@@ -1045,12 +1068,10 @@ def _call_paddle(
             if not page_paths:
                 return [], 0
 
-            texts: list[str] = []
-            for page_path in page_paths:
-                chunk, _ = _call_paddle_predict(pipeline, page_path)
-                if chunk:
-                    texts.append(chunk)
-            return texts, len(page_paths)
+            chunk, _ = _call_paddle_predict(pipeline, page_paths)
+            if not chunk:
+                return [], len(page_paths)
+            return [chunk], len(page_paths)
 
     if lower_path.endswith(".pdf"):
         direct_error: Exception | None = None
@@ -1246,6 +1267,17 @@ def _resolve_requested_max_pages(payload_max_pages: int | None, default_max_page
     return max(0, int(payload_max_pages))
 
 
+def _resolve_requested_max_tokens(payload_max_tokens: int | None, default_max_tokens: int) -> int:
+    if payload_max_tokens is None and int(default_max_tokens) <= 0:
+        return 0
+    if payload_max_tokens is None:
+        return max(256, int(default_max_tokens))
+    value = int(payload_max_tokens)
+    if value <= 0:
+        return 0
+    return max(256, value)
+
+
 def _apply_page_cap(requested_max_pages: int, hard_limit_max_pages: int) -> int:
     requested = max(0, int(requested_max_pages))
     hard_limit = max(0, int(hard_limit_max_pages))
@@ -1257,6 +1289,196 @@ def _apply_page_cap(requested_max_pages: int, hard_limit_max_pages: int) -> int:
     if hard_limit == 0:
         return requested
     return min(requested, hard_limit)
+
+
+def _resolve_provider_defaults(provider: str) -> OCRProviderDefaults:
+    if provider == "glm":
+        return OCRProviderDefaults(
+            max_pages=GLM_MAX_PAGES,
+            render_dpi=GLM_RENDER_DPI,
+            max_tokens=GLM_OCR_MAX_TOKENS,
+        )
+    if provider == "ollama":
+        return OCRProviderDefaults(
+            max_pages=OLLAMA_MAX_PAGES,
+            render_dpi=OLLAMA_RENDER_DPI,
+            max_tokens=0,
+        )
+    return OCRProviderDefaults(
+        max_pages=PADDLE_MAX_PAGES,
+        render_dpi=PADDLE_RENDER_DPI,
+        max_tokens=0,
+    )
+
+
+def _resolve_ocr_options(payload: OCRRequest) -> OCRResolvedOptions:
+    defaults = _resolve_provider_defaults(OCR_PROVIDER)
+    file_path = Path(payload.file_path)
+    requested_max_pages = _resolve_requested_max_pages(payload.max_pages, defaults.max_pages)
+    requested_render_dpi = max(96, int(payload.render_dpi or defaults.render_dpi))
+    requested_max_tokens = _resolve_requested_max_tokens(payload.max_tokens, defaults.max_tokens)
+    requested_fast_mode = (
+        PADDLE_FAST_MODE_DEFAULT if payload.fast_mode is None else bool(payload.fast_mode)
+    )
+    force_render_pdf = (
+        PADDLE_FORCE_RENDER_PDF_DEFAULT
+        if payload.force_render_pdf is None
+        else bool(payload.force_render_pdf)
+    )
+    use_pypdf_preflight = True if payload.pypdf_preflight is None else bool(payload.pypdf_preflight)
+    if OCR_PROVIDER == "glm":
+        use_pypdf_preflight = False
+
+    should_skip_heavy_paddle_pdf = (
+        OCR_PROVIDER == "paddle"
+        and str(PADDLE_DEVICE).strip().lower().startswith("cpu")
+        and str(file_path).lower().endswith(".pdf")
+        and PADDLE_SKIP_PDF_OCR_ON_CPU
+    )
+    return OCRResolvedOptions(
+        file_path=file_path,
+        requested_max_pages=requested_max_pages,
+        requested_render_dpi=requested_render_dpi,
+        requested_max_tokens=requested_max_tokens,
+        requested_fast_mode=requested_fast_mode,
+        force_render_pdf=force_render_pdf,
+        use_pypdf_preflight=use_pypdf_preflight,
+        should_skip_heavy_paddle_pdf=should_skip_heavy_paddle_pdf,
+    )
+
+
+def _build_cache_key_if_enabled(options: OCRResolvedOptions) -> str | None:
+    if not OCR_CACHE_ENABLED:
+        return None
+
+    return _build_ocr_cache_key(
+        file_path=str(options.file_path),
+        provider=OCR_PROVIDER,
+        requested_max_pages=options.requested_max_pages,
+        requested_render_dpi=options.requested_render_dpi,
+        requested_max_tokens=options.requested_max_tokens,
+        requested_fast_mode=options.requested_fast_mode,
+        force_render_pdf=options.force_render_pdf,
+        use_pypdf_preflight=options.use_pypdf_preflight,
+    )
+
+
+def _store_response_if_cacheable(cache_key: str | None, response: OCRResponse) -> OCRResponse:
+    if cache_key and response.text.strip():
+        _store_cached_ocr_response(cache_key, response)
+    return response
+
+
+def _run_pypdf_preflight(options: OCRResolvedOptions) -> OCRResponse | None:
+    if not options.use_pypdf_preflight:
+        return None
+
+    pre_text, pre_pages = _extract_text_with_pypdf(str(options.file_path))
+    if len(pre_text.strip()) < OCR_PYPDF_PREFLIGHT_MIN_CHARS:
+        return None
+
+    return OCRResponse(
+        text=pre_text.strip(),
+        engine="pypdf-preflight",
+        pages=pre_pages,
+        used_fallback=OCR_PROVIDER in {"glm", "ollama", "paddle"},
+    )
+
+
+def _run_skip_heavy_paddle_fallback(options: OCRResolvedOptions) -> OCRResponse | None:
+    if not options.should_skip_heavy_paddle_pdf:
+        return None
+
+    text, pages = _extract_text_with_pypdf(str(options.file_path))
+    return OCRResponse(
+        text=text.strip(),
+        engine="pypdf-fast-skip",
+        pages=pages,
+        used_fallback=True,
+        error="Skipped heavy Paddle PDF OCR on CPU. Use GPU OCR service to enable full scanned-PDF extraction.",
+    )
+
+
+def _run_provider_ocr(options: OCRResolvedOptions) -> tuple[OCRResponse | None, str]:
+    if OCR_PROVIDER == "glm":
+        if not GLM_OCR_ENDPOINT:
+            raise HTTPException(status_code=503, detail="GLM_OCR_ENDPOINT is not configured.")
+        try:
+            text, pages = _call_glm(
+                str(options.file_path),
+                max_pages=options.requested_max_pages,
+                render_dpi=options.requested_render_dpi,
+                max_tokens=options.requested_max_tokens,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=f"GLM OCR failed: {exc}") from exc
+
+        if text.strip():
+            return (
+                OCRResponse(
+                    text=text.strip(),
+                    engine="glm-ocr",
+                    pages=pages,
+                    used_fallback=False,
+                ),
+                "",
+            )
+        raise HTTPException(status_code=502, detail="GLM OCR returned empty text.")
+
+    fallback_error = ""
+    if OCR_PROVIDER == "ollama":
+        try:
+            text, pages = _call_ollama(
+                str(options.file_path),
+                max_pages=options.requested_max_pages,
+                render_dpi=options.requested_render_dpi,
+            )
+            if text.strip():
+                return (
+                    OCRResponse(
+                        text=text.strip(),
+                        engine="ollama-ocr",
+                        pages=pages,
+                        used_fallback=False,
+                    ),
+                    "",
+                )
+        except Exception as exc:  # noqa: BLE001
+            fallback_error = str(exc)
+    elif OCR_PROVIDER == "paddle":
+        try:
+            text, pages = _call_paddle(
+                str(options.file_path),
+                max_pages=options.requested_max_pages,
+                render_dpi=options.requested_render_dpi,
+                force_render_pdf=options.force_render_pdf,
+                fast_mode=options.requested_fast_mode,
+            )
+            if text.strip():
+                return (
+                    OCRResponse(
+                        text=text.strip(),
+                        engine="paddleocr-vl",
+                        pages=pages,
+                        used_fallback=False,
+                    ),
+                    "",
+                )
+        except Exception as exc:  # noqa: BLE001
+            fallback_error = str(exc)
+
+    return None, fallback_error
+
+
+def _build_pypdf_fallback_response(options: OCRResolvedOptions, fallback_error: str) -> OCRResponse:
+    text, pages = _extract_text_with_pypdf(str(options.file_path))
+    return OCRResponse(
+        text=text.strip(),
+        engine="pypdf-fallback" if OCR_PROVIDER in {"glm", "ollama", "paddle"} else "pypdf",
+        pages=pages,
+        used_fallback=OCR_PROVIDER in {"glm", "ollama", "paddle"},
+        error=fallback_error or None,
+    )
 
 
 @app.get("/health")
@@ -1275,6 +1497,8 @@ def health():
         "service": "ocr-worker",
         "accelerator": OCR_ACCELERATOR,
         "provider": OCR_PROVIDER,
+        "ocr_cache_enabled": OCR_CACHE_ENABLED,
+        "ocr_cache_dir": OCR_CACHE_DIR,
         "gpu_runtime_ready": gpu_runtime_ready,
         "gpu_runtime_warning": gpu_runtime_warning,
         **paddle_runtime,
@@ -1287,6 +1511,9 @@ def health():
                 "glm_endpoint_configured": bool(GLM_OCR_ENDPOINT),
                 "glm_max_pages": GLM_MAX_PAGES,
                 "glm_render_dpi": GLM_RENDER_DPI,
+                "glm_max_tokens": GLM_OCR_MAX_TOKENS,
+                "glm_temperature": GLM_OCR_TEMPERATURE,
+                "glm_top_p": GLM_OCR_TOP_P,
             }
         )
     elif OCR_PROVIDER == "ollama":
@@ -1308,130 +1535,77 @@ def health():
                 "paddle_fast_first_pages": PADDLE_FAST_FIRST_PAGES,
                 "paddle_fast_render_dpi": PADDLE_FAST_RENDER_DPI,
                 "paddle_fast_min_text_chars": PADDLE_FAST_MIN_TEXT_CHARS,
+                "paddle_warmup_on_startup": PADDLE_WARMUP_ON_STARTUP,
                 "paddle_skip_pdf_ocr_on_cpu": PADDLE_SKIP_PDF_OCR_ON_CPU,
+                "paddle_use_layout_detection": PADDLE_USE_LAYOUT_DETECTION,
+                "paddle_use_chart_recognition": PADDLE_USE_CHART_RECOGNITION,
+                "paddle_use_seal_recognition": PADDLE_USE_SEAL_RECOGNITION,
+                "paddle_use_ocr_for_image_block": PADDLE_USE_OCR_FOR_IMAGE_BLOCK,
+                "paddle_format_block_content": PADDLE_FORMAT_BLOCK_CONTENT,
+                "paddle_merge_layout_blocks": PADDLE_MERGE_LAYOUT_BLOCKS,
+                "paddle_layout_shape_mode": PADDLE_LAYOUT_SHAPE_MODE,
+                "paddle_prompt_label": PADDLE_PROMPT_LABEL,
+                "paddle_vl_rec_backend": PADDLE_VL_REC_BACKEND,
+                "paddle_vl_rec_server_url": PADDLE_VL_REC_SERVER_URL,
+                "paddle_vl_rec_api_model_name": PADDLE_VL_REC_API_MODEL_NAME,
+                "paddle_vl_rec_max_concurrency": PADDLE_VL_REC_MAX_CONCURRENCY,
+                "paddle_predict_max_new_tokens": PADDLE_PREDICT_MAX_NEW_TOKENS,
+                "paddle_predict_min_pixels": PADDLE_PREDICT_MIN_PIXELS,
+                "paddle_predict_max_pixels": PADDLE_PREDICT_MAX_PIXELS,
+                "paddle_predict_repetition_penalty": PADDLE_PREDICT_REPETITION_PENALTY,
+                "paddle_predict_temperature": PADDLE_PREDICT_TEMPERATURE,
+                "paddle_predict_top_p": PADDLE_PREDICT_TOP_P,
             }
         )
     return details
 
 
+@app.on_event("startup")
+def preload_provider_models() -> None:
+    # Load heavy OCR models during startup to avoid first-request timeout.
+    if OCR_PROVIDER == "paddle" and PADDLE_PRELOAD_ON_STARTUP:
+        try:
+            pipeline = _get_paddle_pipeline()
+            print("[ocr-worker] Paddle pipeline preloaded on startup.")
+            if PADDLE_WARMUP_ON_STARTUP:
+                try:
+                    from PIL import Image  # type: ignore
+
+                    with tempfile.TemporaryDirectory(prefix="sync-hub-paddle-warmup-") as temp_dir:
+                        warmup_path = os.path.join(temp_dir, "warmup.png")
+                        Image.new("RGB", (256, 256), "white").save(warmup_path, format="PNG")
+                        _call_paddle_predict(pipeline, warmup_path)
+                    print("[ocr-worker] Paddle warmup inference completed on startup.")
+                except Exception as warmup_exc:  # noqa: BLE001
+                    print(f"[ocr-worker] Paddle warmup skipped: {warmup_exc}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ocr-worker] Paddle preload failed: {exc}")
+
+
 @app.post("/ocr", response_model=OCRResponse)
 def ocr(payload: OCRRequest):
-    file_path = Path(payload.file_path)
-    if not file_path.exists() or not file_path.is_file():
+    options = _resolve_ocr_options(payload)
+    if not options.file_path.exists() or not options.file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
 
-    if OCR_PROVIDER == "glm":
-        default_max_pages = GLM_MAX_PAGES
-        default_render_dpi = GLM_RENDER_DPI
-    elif OCR_PROVIDER == "ollama":
-        default_max_pages = OLLAMA_MAX_PAGES
-        default_render_dpi = OLLAMA_RENDER_DPI
-    else:
-        default_max_pages = PADDLE_MAX_PAGES
-        default_render_dpi = PADDLE_RENDER_DPI
+    cache_key = _build_cache_key_if_enabled(options)
+    cached_response = _load_cached_ocr_response(cache_key) if cache_key else None
+    if cached_response is not None:
+        return cached_response
 
-    requested_max_pages = _resolve_requested_max_pages(payload.max_pages, default_max_pages)
-    requested_render_dpi = max(96, int(payload.render_dpi or default_render_dpi))
-    requested_fast_mode = (
-        PADDLE_FAST_MODE_DEFAULT if payload.fast_mode is None else bool(payload.fast_mode)
-    )
-    force_render_pdf = (
-        PADDLE_FORCE_RENDER_PDF_DEFAULT
-        if payload.force_render_pdf is None
-        else bool(payload.force_render_pdf)
-    )
-    use_pypdf_preflight = True if payload.pypdf_preflight is None else bool(payload.pypdf_preflight)
-    if OCR_PROVIDER == "glm":
-        # Enforce GLM-only OCR path.
-        use_pypdf_preflight = False
-    should_skip_heavy_paddle_pdf = (
-        OCR_PROVIDER == "paddle"
-        and str(PADDLE_DEVICE).strip().lower().startswith("cpu")
-        and str(file_path).lower().endswith(".pdf")
-        and PADDLE_SKIP_PDF_OCR_ON_CPU
-    )
+    preflight_response = _run_pypdf_preflight(options)
+    if preflight_response is not None:
+        return _store_response_if_cacheable(cache_key, preflight_response)
 
-    if use_pypdf_preflight:
-        pre_text, pre_pages = _extract_text_with_pypdf(str(file_path))
-        if len(pre_text.strip()) >= OCR_PYPDF_PREFLIGHT_MIN_CHARS:
-            return OCRResponse(
-                text=pre_text.strip(),
-                engine="pypdf-preflight",
-                pages=pre_pages,
-                used_fallback=OCR_PROVIDER in {"glm", "ollama", "paddle"},
-            )
+    skip_response = _run_skip_heavy_paddle_fallback(options)
+    if skip_response is not None:
+        return _store_response_if_cacheable(cache_key, skip_response)
 
-    if should_skip_heavy_paddle_pdf:
-        text, pages = _extract_text_with_pypdf(str(file_path))
-        return OCRResponse(
-            text=text.strip(),
-            engine="pypdf-fast-skip",
-            pages=pages,
-            used_fallback=True,
-            error="Skipped heavy Paddle PDF OCR on CPU. Use GPU OCR service to enable full scanned-PDF extraction.",
-        )
+    provider_response, fallback_error = _run_provider_ocr(options)
+    if provider_response is not None:
+        return _store_response_if_cacheable(cache_key, provider_response)
 
-    if OCR_PROVIDER == "glm":
-        if not GLM_OCR_ENDPOINT:
-            raise HTTPException(status_code=503, detail="GLM_OCR_ENDPOINT is not configured.")
-        try:
-            text, pages = _call_glm(
-                str(file_path),
-                max_pages=requested_max_pages,
-                render_dpi=requested_render_dpi,
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=502, detail=f"GLM OCR failed: {exc}") from exc
-
-        if text.strip():
-            return OCRResponse(
-                text=text.strip(),
-                engine="glm-ocr",
-                pages=pages,
-                used_fallback=False,
-            )
-        raise HTTPException(status_code=502, detail="GLM OCR returned empty text.")
-    fallback_error = ""
-    if OCR_PROVIDER == "ollama":
-        try:
-            text, pages = _call_ollama(
-                str(file_path),
-                max_pages=requested_max_pages,
-                render_dpi=requested_render_dpi,
-            )
-            if text.strip():
-                return OCRResponse(
-                    text=text.strip(),
-                    engine="ollama-ocr",
-                    pages=pages,
-                    used_fallback=False,
-                )
-        except Exception as exc:  # noqa: BLE001
-            fallback_error = str(exc)
-    elif OCR_PROVIDER == "paddle":
-        try:
-            text, pages = _call_paddle(
-                str(file_path),
-                max_pages=requested_max_pages,
-                render_dpi=requested_render_dpi,
-                force_render_pdf=force_render_pdf,
-                fast_mode=requested_fast_mode,
-            )
-            if text.strip():
-                return OCRResponse(
-                    text=text.strip(),
-                    engine="paddleocr-vl",
-                    pages=pages,
-                    used_fallback=False,
-                )
-        except Exception as exc:  # noqa: BLE001
-            fallback_error = str(exc)
-
-    text, pages = _extract_text_with_pypdf(str(file_path))
-    return OCRResponse(
-        text=text.strip(),
-        engine="pypdf-fallback" if OCR_PROVIDER in {"glm", "ollama", "paddle"} else "pypdf",
-        pages=pages,
-        used_fallback=OCR_PROVIDER in {"glm", "ollama", "paddle"},
-        error=fallback_error or None,
+    return _store_response_if_cacheable(
+        cache_key,
+        _build_pypdf_fallback_response(options, fallback_error),
     )

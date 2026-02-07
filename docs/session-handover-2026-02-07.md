@@ -136,7 +136,7 @@
   - 문서 타입(스캔/이미지 PDF) 감지 시 `OCR_PYPDF_PREFLIGHT=false` 강제
   - 또는 preflight 통과 기준(`OCR_PYPDF_PREFLIGHT_MIN_CHARS`)을 이미지 문서에 더 엄격하게 적용
 
-4. 속도 보완(품질 유지 전제)
+4. 속도 보완(품질 유지 전제) [완료]
 - 목표: 이미지 PDF 강제 OCR 모드의 총 처리시간 단축
 - 후보:
   - OCR 요청 파라미터 재튜닝(`render_dpi`, `max_tokens`, `fast_mode` 조건부)
@@ -153,7 +153,7 @@
 - [x] 1) 코드 리뷰 반영(캐시 경로 회귀 수정)
 - [x] 2) Docker 네트워크 단일화
 - [x] 3) 이미지 PDF 품질 우선 정책 분기
-- [ ] 4) 속도 보완(품질 유지)
+- [x] 4) 속도 보완(품질 유지)
 - [ ] 5) 품질 비교 리포트 자동화
 
 ## 다음 세션 바로 실행용 명령
@@ -183,6 +183,7 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
 
 ## 참고 문서
 - `docs/ocr-paddle-only.md`
+- `docs/ocr-test-rules.md`
 - `reports/ocr_paddle_vl_config_tuning_2026-02-06.md`
 
 ## 진행 로그
@@ -216,3 +217,18 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - 텍스트 PDF(`..._2.pdf`): `elapsed_s=3.103`, `engine=pypdf-preflight`, `content_chars=31658`, `pages=40`
     - 이미지 PDF(`..._2_image.pdf`): `elapsed_s=48.894`, `engine=paddleocr-vl`, `content_chars=15798`, `pages=40`
     - 결과: 이미지 PDF는 preflight 우회 후 OCR 본 경로를 사용해 저품질 조기 통과를 방지.
+- 2026-02-07 (세션 재개-3)
+  - OCR 테스트 규칙 문서 추가:
+    - `docs/ocr-test-rules.md`에 OCR 고정 샘플셋(40p 텍스트/이미지, 단일 32p 텍스트/이미지) 기록.
+    - `docs/dev-setup.md` 검증 규칙에 문서 링크 추가.
+  - 속도 보완(품질 유지) 반영:
+    - `app/ocr_worker.py`에 이미지 PDF 감지 후 속도 튜닝 옵션 추가:
+      - `OCR_TUNE_IMAGE_PDF_SPEED=true`
+      - `OCR_IMAGE_PDF_TUNED_RENDER_DPI=144`
+      - `OCR_IMAGE_PDF_TUNED_FAST_MODE=false` (품질 저하 방지 기본값)
+      - `OCR_IMAGE_PDF_FORCE_RENDER_PDF=true`
+    - 헬스 노출: `ocr_tune_image_pdf_speed`, `ocr_image_pdf_tuned_*`.
+  - 실측(이미지 PDF 40p, quality 강제 파라미터, 캐시 초기화 후 `/ocr` 직접 호출):
+    - baseline(튜닝 전): `elapsed_s=66.718`, `engine=paddleocr-vl`, `pages=40`, `content_chars=15742`
+    - tuned(튜닝 후): `elapsed_s=49.825`, `engine=paddleocr-vl`, `pages=40`, `content_chars=15861`
+    - 결과: 품질(텍스트량) 유지 범위에서 약 `25.3%` 처리시간 단축.

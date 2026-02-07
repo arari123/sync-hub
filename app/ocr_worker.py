@@ -188,6 +188,10 @@ OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO = max(
     0.0,
     min(1.0, _read_float_env("OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO", "0.67")),
 )
+OCR_TUNE_IMAGE_PDF_SPEED = _read_bool_env("OCR_TUNE_IMAGE_PDF_SPEED", "true")
+OCR_IMAGE_PDF_TUNED_RENDER_DPI = max(96, int(os.getenv("OCR_IMAGE_PDF_TUNED_RENDER_DPI", "144")))
+OCR_IMAGE_PDF_TUNED_FAST_MODE = _read_bool_env("OCR_IMAGE_PDF_TUNED_FAST_MODE", "false")
+OCR_IMAGE_PDF_FORCE_RENDER_PDF = _read_bool_env("OCR_IMAGE_PDF_FORCE_RENDER_PDF", "true")
 PADDLE_FORCE_RENDER_PDF_DEFAULT = (
     os.getenv("PADDLE_FORCE_RENDER_PDF", "true").strip().lower() in {"1", "true", "yes", "on"}
 )
@@ -1414,6 +1418,7 @@ def _resolve_provider_defaults(provider: str) -> OCRProviderDefaults:
 def _resolve_ocr_options(payload: OCRRequest) -> OCRResolvedOptions:
     defaults = _resolve_provider_defaults(OCR_PROVIDER)
     file_path = Path(payload.file_path)
+    lower_file_path = str(file_path).lower()
     requested_max_pages = _resolve_requested_max_pages(payload.max_pages, defaults.max_pages)
     requested_render_dpi = max(96, int(payload.render_dpi or defaults.render_dpi))
     requested_max_tokens = _resolve_requested_max_tokens(payload.max_tokens, defaults.max_tokens)
@@ -1426,21 +1431,34 @@ def _resolve_ocr_options(payload: OCRRequest) -> OCRResolvedOptions:
         else bool(payload.force_render_pdf)
     )
     use_pypdf_preflight = True if payload.pypdf_preflight is None else bool(payload.pypdf_preflight)
+    is_image_pdf = False
+    if lower_file_path.endswith(".pdf"):
+        is_image_pdf = _is_image_pdf(str(file_path))
+
     if OCR_PROVIDER == "glm":
         use_pypdf_preflight = False
     elif (
         OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF
         and use_pypdf_preflight
-        and str(file_path).lower().endswith(".pdf")
-        and _is_image_pdf(str(file_path))
+        and is_image_pdf
     ):
         use_pypdf_preflight = False
         print("[ocr-worker] Detected image-heavy PDF; disabled pypdf preflight for quality-first OCR.")
 
+    if OCR_PROVIDER == "paddle" and is_image_pdf and OCR_TUNE_IMAGE_PDF_SPEED:
+        requested_render_dpi = min(requested_render_dpi, OCR_IMAGE_PDF_TUNED_RENDER_DPI)
+        requested_fast_mode = OCR_IMAGE_PDF_TUNED_FAST_MODE
+        if OCR_IMAGE_PDF_FORCE_RENDER_PDF:
+            force_render_pdf = True
+        print(
+            "[ocr-worker] Applied image-heavy PDF speed tuning: "
+            f"render_dpi={requested_render_dpi}, fast_mode={requested_fast_mode}, force_render_pdf={force_render_pdf}"
+        )
+
     should_skip_heavy_paddle_pdf = (
         OCR_PROVIDER == "paddle"
         and str(PADDLE_DEVICE).strip().lower().startswith("cpu")
-        and str(file_path).lower().endswith(".pdf")
+        and lower_file_path.endswith(".pdf")
         and PADDLE_SKIP_PDF_OCR_ON_CPU
     )
     return OCRResolvedOptions(
@@ -1613,6 +1631,10 @@ def health():
         "ocr_image_pdf_sample_pages": OCR_IMAGE_PDF_SAMPLE_PAGES,
         "ocr_image_pdf_max_text_chars": OCR_IMAGE_PDF_MAX_TEXT_CHARS,
         "ocr_image_pdf_min_image_page_ratio": OCR_IMAGE_PDF_MIN_IMAGE_PAGE_RATIO,
+        "ocr_tune_image_pdf_speed": OCR_TUNE_IMAGE_PDF_SPEED,
+        "ocr_image_pdf_tuned_render_dpi": OCR_IMAGE_PDF_TUNED_RENDER_DPI,
+        "ocr_image_pdf_tuned_fast_mode": OCR_IMAGE_PDF_TUNED_FAST_MODE,
+        "ocr_image_pdf_force_render_pdf": OCR_IMAGE_PDF_FORCE_RENDER_PDF,
         **paddle_runtime,
         **provider_health,
     }

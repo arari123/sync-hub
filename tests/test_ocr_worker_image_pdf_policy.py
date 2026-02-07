@@ -93,6 +93,73 @@ class OCRWorkerImagePdfPolicyTests(unittest.TestCase):
             ocr_worker.OCR_PROVIDER = original_provider
             ocr_worker.OCR_DISABLE_PREFLIGHT_FOR_IMAGE_PDF = original_toggle
 
+    def test_resolve_options_applies_speed_tuning_for_detected_image_pdf(self):
+        original_detector = ocr_worker._is_image_pdf
+        original_provider = ocr_worker.OCR_PROVIDER
+        original_tuning_toggle = ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED
+        original_tuned_dpi = ocr_worker.OCR_IMAGE_PDF_TUNED_RENDER_DPI
+        original_tuned_fast_mode = ocr_worker.OCR_IMAGE_PDF_TUNED_FAST_MODE
+        original_force_render_pdf = ocr_worker.OCR_IMAGE_PDF_FORCE_RENDER_PDF
+        try:
+            ocr_worker._is_image_pdf = lambda _path: True  # type: ignore[assignment]
+            ocr_worker.OCR_PROVIDER = "paddle"
+            ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED = True
+            ocr_worker.OCR_IMAGE_PDF_TUNED_RENDER_DPI = 144
+            ocr_worker.OCR_IMAGE_PDF_TUNED_FAST_MODE = True
+            ocr_worker.OCR_IMAGE_PDF_FORCE_RENDER_PDF = True
+
+            with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+                tmp.write(b"%PDF-1.4\n")
+                tmp.flush()
+
+                options = ocr_worker._resolve_ocr_options(
+                    ocr_worker.OCRRequest(
+                        file_path=tmp.name,
+                        render_dpi=220,
+                        fast_mode=False,
+                        force_render_pdf=False,
+                    )
+                )
+                self.assertEqual(options.requested_render_dpi, 144)
+                self.assertTrue(options.requested_fast_mode)
+                self.assertTrue(options.force_render_pdf)
+        finally:
+            ocr_worker._is_image_pdf = original_detector  # type: ignore[assignment]
+            ocr_worker.OCR_PROVIDER = original_provider
+            ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED = original_tuning_toggle
+            ocr_worker.OCR_IMAGE_PDF_TUNED_RENDER_DPI = original_tuned_dpi
+            ocr_worker.OCR_IMAGE_PDF_TUNED_FAST_MODE = original_tuned_fast_mode
+            ocr_worker.OCR_IMAGE_PDF_FORCE_RENDER_PDF = original_force_render_pdf
+
+    def test_resolve_options_skips_speed_tuning_when_disabled(self):
+        original_detector = ocr_worker._is_image_pdf
+        original_provider = ocr_worker.OCR_PROVIDER
+        original_tuning_toggle = ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED
+        try:
+            ocr_worker._is_image_pdf = lambda _path: True  # type: ignore[assignment]
+            ocr_worker.OCR_PROVIDER = "paddle"
+            ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED = False
+
+            with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+                tmp.write(b"%PDF-1.4\n")
+                tmp.flush()
+
+                options = ocr_worker._resolve_ocr_options(
+                    ocr_worker.OCRRequest(
+                        file_path=tmp.name,
+                        render_dpi=220,
+                        fast_mode=False,
+                        force_render_pdf=False,
+                    )
+                )
+                self.assertEqual(options.requested_render_dpi, 220)
+                self.assertFalse(options.requested_fast_mode)
+                self.assertFalse(options.force_render_pdf)
+        finally:
+            ocr_worker._is_image_pdf = original_detector  # type: ignore[assignment]
+            ocr_worker.OCR_PROVIDER = original_provider
+            ocr_worker.OCR_TUNE_IMAGE_PDF_SPEED = original_tuning_toggle
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,12 @@ const PROJECT_SORT_OPTIONS = [
     { value: 'name_asc', label: '이름 오름차순' },
 ];
 
+const PROJECT_TYPE_OPTIONS = [
+    { value: 'equipment', label: '설비' },
+    { value: 'parts', label: '파츠' },
+    { value: 'as', label: 'AS' },
+];
+
 const DEFAULT_PROJECT_SORT = 'updated_desc';
 
 function formatAmount(value) {
@@ -81,6 +87,10 @@ function stageBadgeClass(stage) {
     const base = 'px-3 py-1 rounded-full text-sm font-extrabold border transition-colors';
     // Simplified to use a uniform slate theme for all stages as requested
     return `${base} border-slate-200 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`;
+}
+
+function projectTypeBadgeClass() {
+    return 'px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700';
 }
 
 function toggleMultiValue(list, value) {
@@ -274,7 +284,7 @@ const BudgetManagement = () => {
                         <Button size="sm" type="submit" form="budget-filter-form" className="h-8 text-xs px-3">필터 적용</Button>
                     </div>
                 </div>
-                <form id="budget-filter-form" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" onSubmit={applyFilters}>
+                <form id="budget-filter-form" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" onSubmit={applyFilters}>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-muted-foreground/80 px-1">프로젝트 명</label>
                         <input
@@ -311,6 +321,27 @@ const BudgetManagement = () => {
                             value={draftFilters.managerName}
                             onChange={(e) => setDraftFilters(p => ({ ...p, managerName: e.target.value }))}
                         />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">프로젝트 종류</label>
+                        <div className="flex h-9 items-center gap-1 rounded-lg border bg-background px-1.5">
+                            {PROJECT_TYPE_OPTIONS.map((item) => {
+                                const isActive = draftFilters.projectTypes.includes(item.value);
+                                return (
+                                    <button
+                                        key={item.value}
+                                        type="button"
+                                        className={cn(
+                                            'h-6 flex-1 rounded-md text-[10px] font-semibold transition-colors',
+                                            isActive ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                                        )}
+                                        onClick={() => setDraftFilters((p) => ({ ...p, projectTypes: toggleMultiValue(p.projectTypes, item.value) }))}
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-muted-foreground/80 px-1">정렬 기준</label>
@@ -406,13 +437,16 @@ const ProjectCard = ({ project }) => {
                     </div>
                     <p className="text-xs text-muted-foreground font-mono">#{project.code || 'NO-CODE'}</p>
                 </div>
-                <span className={stageBadgeClass(project.current_stage)}>
-                    {project.current_stage_label}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={projectTypeBadgeClass()}>{project.project_type_label || '미분류'}</span>
+                    <span className={stageBadgeClass(project.current_stage)}>
+                        {project.current_stage_label}
+                    </span>
+                </div>
             </div>
 
             <div className="space-y-4 mb-6 flex-1">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary/30 p-2 rounded-lg">
                         <p className="text-[10px] text-muted-foreground font-medium mb-0.5">담당자</p>
                         <p className="text-xs font-semibold">{project.manager_name || '미지정'}</p>
@@ -420,10 +454,6 @@ const ProjectCard = ({ project }) => {
                     <div className="bg-secondary/30 p-2 rounded-lg">
                         <p className="text-[10px] text-muted-foreground font-medium mb-0.5">고객사</p>
                         <p className="text-xs font-semibold truncate">{project.customer_name || '-'}</p>
-                    </div>
-                    <div className="bg-secondary/30 p-2 rounded-lg">
-                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">프로젝트 종류</p>
-                        <p className="text-xs font-semibold truncate">{project.project_type_label || '-'}</p>
                     </div>
                 </div>
 

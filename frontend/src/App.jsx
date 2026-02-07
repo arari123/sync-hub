@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import SearchResults from './pages/SearchResults';
 import BudgetManagement from './pages/BudgetManagement';
+import BudgetProjectCreate from './pages/BudgetProjectCreate';
+import BudgetProjectEditor from './pages/BudgetProjectEditor';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
@@ -20,6 +22,8 @@ function App() {
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
           <Route path="/budget-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
+          <Route path="/budget-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />
+          <Route path="/budget-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
         </Routes>
       </Layout>
     </BrowserRouter>

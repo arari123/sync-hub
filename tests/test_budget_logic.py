@@ -1,6 +1,12 @@
 import unittest
 
-from app.core.budget_logic import normalize_stage, stage_label, summarize_costs
+from app.core.budget_logic import (
+    aggregate_equipment_costs_from_detail,
+    normalize_stage,
+    parse_detail_payload,
+    stage_label,
+    summarize_costs,
+)
 
 
 class _Item:
@@ -48,6 +54,54 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(totals["fab_total"], 187)
         self.assertEqual(totals["install_total"], 78)
         self.assertEqual(totals["grand_total"], 265)
+
+    def test_parse_detail_payload_handles_invalid_json(self):
+        parsed = parse_detail_payload("not-json")
+        self.assertEqual(parsed["material_items"], [])
+        self.assertEqual(parsed["labor_items"], [])
+        self.assertEqual(parsed["expense_items"], [])
+
+    def test_aggregate_equipment_costs_from_detail(self):
+        payload = {
+            "material_items": [
+                {
+                    "equipment_name": "검사기A",
+                    "quantity": 2,
+                    "unit_price": 15000,
+                    "phase": "fabrication",
+                },
+                {
+                    "equipment_name": "검사기A",
+                    "quantity": 1,
+                    "unit_price": 5000,
+                    "phase": "installation",
+                },
+            ],
+            "labor_items": [
+                {
+                    "equipment_name": "검사기A",
+                    "quantity": 2,
+                    "hourly_rate": 30000,
+                    "unit": "D",
+                    "phase": "installation",
+                },
+            ],
+            "expense_items": [
+                {
+                    "equipment_name": "검사기A",
+                    "amount": 120000,
+                    "phase": "fabrication",
+                },
+            ],
+        }
+        results = aggregate_equipment_costs_from_detail(payload)
+        self.assertEqual(len(results), 1)
+        item = results[0]
+        self.assertEqual(item["equipment_name"], "검사기A")
+        self.assertEqual(item["material_fab_cost"], 30000)
+        self.assertEqual(item["material_install_cost"], 5000)
+        self.assertEqual(item["labor_install_cost"], 480000)
+        self.assertEqual(item["expense_fab_cost"], 120000)
 
 
 if __name__ == "__main__":

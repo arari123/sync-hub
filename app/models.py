@@ -126,6 +126,7 @@ class BudgetVersion(Base):
     revision_no = Column(Integer, nullable=False, default=0, index=True)
     parent_version_id = Column(Integer, ForeignKey("budget_versions.id"), nullable=True, index=True)
     change_reason = Column(String(500), nullable=True)
+    budget_detail_json = Column(String, nullable=True)
     is_current = Column(Boolean, nullable=False, default=True, index=True)
     confirmed_at = Column(String, nullable=True, index=True)
     created_at = Column(String, nullable=False, index=True)

@@ -9,7 +9,16 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..core.auth_utils import to_iso, utcnow
-from ..core.budget_logic import normalize_stage, stage_label, summarize_costs, to_number
+from ..core.budget_logic import (
+    aggregate_equipment_costs_from_detail,
+    default_detail_payload,
+    detail_payload_to_json,
+    normalize_stage,
+    parse_detail_payload,
+    stage_label,
+    summarize_costs,
+    to_number,
+)
 from ..database import get_db
 
 router = APIRouter(prefix="/budget", tags=["budget"])
@@ -44,6 +53,43 @@ class EquipmentBulkPayload(BaseModel):
     items: list[EquipmentItemPayload]
 
 
+class MaterialDetailItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    unit_name: str = Field(default="", max_length=180)
+    part_name: str = Field(default="", max_length=180)
+    spec: str = Field(default="", max_length=180)
+    quantity: float = 0.0
+    unit_price: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
+class LaborDetailItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    task_name: str = Field(default="", max_length=180)
+    worker_type: str = Field(default="", max_length=120)
+    unit: str = Field(default="H", max_length=8)
+    quantity: float = 0.0
+    hourly_rate: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
+class ExpenseDetailItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    expense_name: str = Field(default="", max_length=180)
+    basis: str = Field(default="", max_length=180)
+    amount: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
+class BudgetDetailPayload(BaseModel):
+    material_items: list[MaterialDetailItem] = Field(default_factory=list)
+    labor_items: list[LaborDetailItem] = Field(default_factory=list)
+    expense_items: list[ExpenseDetailItem] = Field(default_factory=list)
+
+
 def _get_project_or_404(project_id: int, db: Session) -> models.BudgetProject:
     project = db.query(models.BudgetProject).filter(models.BudgetProject.id == project_id).first()
     if not project:
@@ -67,9 +113,41 @@ def _version_equipments(version_id: int, db: Session) -> list[models.BudgetEquip
     )
 
 
+def _replace_equipments_from_aggregate(
+    version: models.BudgetVersion,
+    aggregated_items: list[dict],
+    db: Session,
+    now_iso: str,
+) -> None:
+    (
+        db.query(models.BudgetEquipment)
+        .filter(models.BudgetEquipment.version_id == version.id)
+        .delete(synchronize_session=False)
+    )
+
+    for index, item in enumerate(aggregated_items):
+        db.add(
+            models.BudgetEquipment(
+                version_id=version.id,
+                equipment_name=(item.get("equipment_name") or "").strip() or "미지정 설비",
+                material_fab_cost=to_number(item.get("material_fab_cost")),
+                material_install_cost=to_number(item.get("material_install_cost")),
+                labor_fab_cost=to_number(item.get("labor_fab_cost")),
+                labor_install_cost=to_number(item.get("labor_install_cost")),
+                expense_fab_cost=to_number(item.get("expense_fab_cost")),
+                expense_install_cost=to_number(item.get("expense_install_cost")),
+                currency=(item.get("currency") or "KRW").strip() or "KRW",
+                sort_order=index,
+                created_at=now_iso,
+                updated_at=now_iso,
+            )
+        )
+
+
 def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
     equipments = _version_equipments(version.id, db)
     totals = summarize_costs(equipments)
+    detail_payload = parse_detail_payload(version.budget_detail_json or "")
     return {
         "id": int(version.id),
         "project_id": int(version.project_id),
@@ -85,6 +163,9 @@ def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
         "created_at": version.created_at,
         "updated_at": version.updated_at,
         "equipment_count": len(equipments),
+        "material_item_count": len(detail_payload.get("material_items", [])),
+        "labor_item_count": len(detail_payload.get("labor_items", [])),
+        "expense_item_count": len(detail_payload.get("expense_items", [])),
         "totals": totals,
     }
 
@@ -229,6 +310,7 @@ def create_version(project_id: int, payload: BudgetVersionCreate, db: Session = 
         revision_no=0,
         parent_version_id=None,
         change_reason="",
+        budget_detail_json=detail_payload_to_json(default_detail_payload()),
         is_current=True,
         confirmed_at=None,
         created_at=now_iso,
@@ -289,6 +371,7 @@ def create_revision(version_id: int, payload: BudgetRevisionCreate, db: Session 
         revision_no=int(source.revision_no or 0) + 1,
         parent_version_id=source.id,
         change_reason=reason,
+        budget_detail_json=source.budget_detail_json or detail_payload_to_json(default_detail_payload()),
         is_current=True,
         confirmed_at=None,
         created_at=now_iso,
@@ -358,36 +441,64 @@ def replace_equipments(version_id: int, payload: EquipmentBulkPayload, db: Sessi
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
 
     now_iso = to_iso(utcnow())
-    (
-        db.query(models.BudgetEquipment)
-        .filter(models.BudgetEquipment.version_id == version.id)
-        .delete(synchronize_session=False)
-    )
-
+    aggregated_items = []
     for index, item in enumerate(payload.items):
         name = (item.equipment_name or "").strip()
         if not name:
             continue
-        db.add(
-            models.BudgetEquipment(
-                version_id=version.id,
-                equipment_name=name,
-                material_fab_cost=to_number(item.material_fab_cost),
-                material_install_cost=to_number(item.material_install_cost),
-                labor_fab_cost=to_number(item.labor_fab_cost),
-                labor_install_cost=to_number(item.labor_install_cost),
-                expense_fab_cost=to_number(item.expense_fab_cost),
-                expense_install_cost=to_number(item.expense_install_cost),
-                currency=(item.currency or "KRW").strip() or "KRW",
-                sort_order=index,
-                created_at=now_iso,
-                updated_at=now_iso,
-            )
+        aggregated_items.append(
+            {
+                "equipment_name": name,
+                "material_fab_cost": to_number(item.material_fab_cost),
+                "material_install_cost": to_number(item.material_install_cost),
+                "labor_fab_cost": to_number(item.labor_fab_cost),
+                "labor_install_cost": to_number(item.labor_install_cost),
+                "expense_fab_cost": to_number(item.expense_fab_cost),
+                "expense_install_cost": to_number(item.expense_install_cost),
+                "currency": (item.currency or "KRW").strip() or "KRW",
+                "sort_order": index,
+            }
         )
+
+    _replace_equipments_from_aggregate(version, aggregated_items=aggregated_items, db=db, now_iso=now_iso)
 
     version.updated_at = now_iso
     db.commit()
     return list_equipments(version_id=version.id, db=db)
+
+
+@router.get("/versions/{version_id}/details")
+def get_version_details(version_id: int, db: Session = Depends(get_db)):
+    version = _get_version_or_404(version_id, db)
+    payload = parse_detail_payload(version.budget_detail_json or "")
+    totals = summarize_costs(_version_equipments(version.id, db))
+    return {
+        "version": _serialize_version(version, db),
+        "details": payload,
+        "totals": totals,
+    }
+
+
+@router.put("/versions/{version_id}/details")
+def upsert_version_details(version_id: int, payload: BudgetDetailPayload, db: Session = Depends(get_db)):
+    version = _get_version_or_404(version_id, db)
+    if version.status == "confirmed":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
+
+    now_iso = to_iso(utcnow())
+    detail_dict = {
+        "material_items": [item.model_dump() for item in payload.material_items],
+        "labor_items": [item.model_dump() for item in payload.labor_items],
+        "expense_items": [item.model_dump() for item in payload.expense_items],
+    }
+    version.budget_detail_json = detail_payload_to_json(detail_dict)
+    aggregated = aggregate_equipment_costs_from_detail(detail_dict)
+    _replace_equipments_from_aggregate(version, aggregated_items=aggregated, db=db, now_iso=now_iso)
+
+    version.updated_at = now_iso
+    db.commit()
+    db.refresh(version)
+    return get_version_details(version_id=version.id, db=db)
 
 
 @router.get("/projects/{project_id}/summary")

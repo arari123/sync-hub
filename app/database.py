@@ -25,6 +25,10 @@ _DOCUMENT_COLUMN_SPECS = {
     "ai_summary_short": "VARCHAR(512)",
 }
 
+_BUDGET_VERSION_COLUMN_SPECS = {
+    "budget_detail_json": "TEXT",
+}
+
 def _run_schema_statement(connection, sql: str) -> None:
     try:
         connection.execute(text(sql))
@@ -39,46 +43,54 @@ def ensure_runtime_schema() -> None:
     with engine.begin() as connection:
         inspector = inspect(connection)
         table_names = set(inspector.get_table_names())
-        if "documents" not in table_names:
-            return
+        if "documents" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("documents")}
 
-        existing_columns = {column["name"] for column in inspector.get_columns("documents")}
+            for column_name, column_spec in _DOCUMENT_COLUMN_SPECS.items():
+                if column_name in existing_columns:
+                    continue
+                _run_schema_statement(
+                    connection,
+                    f"ALTER TABLE documents ADD COLUMN {column_name} {column_spec}",
+                )
 
-        for column_name, column_spec in _DOCUMENT_COLUMN_SPECS.items():
-            if column_name in existing_columns:
-                continue
+            # Fill null status to preserve policy checks.
             _run_schema_statement(
                 connection,
-                f"ALTER TABLE documents ADD COLUMN {column_name} {column_spec}",
+                "UPDATE documents SET dedup_status='unique' WHERE dedup_status IS NULL",
             )
 
-        # Fill null status to preserve policy checks.
-        _run_schema_statement(
-            connection,
-            "UPDATE documents SET dedup_status='unique' WHERE dedup_status IS NULL",
-        )
+            # Add indexes for dedup lookups.
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_file_sha256 ON documents (file_sha256)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_normalized_text_sha256 ON documents (normalized_text_sha256)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_dedup_status ON documents (dedup_status)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_dedup_primary_doc_id ON documents (dedup_primary_doc_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_dedup_cluster_id ON documents (dedup_cluster_id)",
+            )
 
-        # Add indexes for dedup lookups.
-        _run_schema_statement(
-            connection,
-            "CREATE INDEX IF NOT EXISTS idx_documents_file_sha256 ON documents (file_sha256)",
-        )
-        _run_schema_statement(
-            connection,
-            "CREATE INDEX IF NOT EXISTS idx_documents_normalized_text_sha256 ON documents (normalized_text_sha256)",
-        )
-        _run_schema_statement(
-            connection,
-            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_status ON documents (dedup_status)",
-        )
-        _run_schema_statement(
-            connection,
-            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_primary_doc_id ON documents (dedup_primary_doc_id)",
-        )
-        _run_schema_statement(
-            connection,
-            "CREATE INDEX IF NOT EXISTS idx_documents_dedup_cluster_id ON documents (dedup_cluster_id)",
-        )
+        if "budget_versions" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("budget_versions")}
+            for column_name, column_spec in _BUDGET_VERSION_COLUMN_SPECS.items():
+                if column_name in existing_columns:
+                    continue
+                _run_schema_statement(
+                    connection,
+                    f"ALTER TABLE budget_versions ADD COLUMN {column_name} {column_spec}",
+                )
 
 
 def get_db():

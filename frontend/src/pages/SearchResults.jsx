@@ -1,11 +1,59 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import SearchInput from '../components/SearchInput';
 import ResultList from '../components/ResultList';
 import ProjectResultList from '../components/ProjectResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import { api, getErrorMessage } from '../lib/api';
-import { Loader2, AlertCircle, FolderKanban } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+
+function tokenizeQuery(query) {
+    return String(query || '')
+        .toLowerCase()
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2);
+}
+
+function scoreProject(project, queryTokens, queryLower) {
+    const name = String(project?.name || '').toLowerCase();
+    const description = String(project?.description || '').toLowerCase();
+    const customer = String(project?.customer_name || '').toLowerCase();
+    const manager = String(project?.manager_name || project?.author_name || '').toLowerCase();
+    const code = String(project?.code || '').toLowerCase();
+    const haystack = `${name} ${description} ${customer} ${manager} ${code}`.trim();
+    if (!haystack) return 0;
+
+    let score = 0;
+    if (queryLower && haystack.includes(queryLower)) score += 3;
+    if (queryLower && name.includes(queryLower)) score += 4;
+    if (queryLower && code.includes(queryLower)) score += 3;
+    if (queryLower && customer.includes(queryLower)) score += 2;
+    if (queryLower && manager.includes(queryLower)) score += 2;
+
+    for (const token of queryTokens) {
+        if (name.includes(token)) score += 1.5;
+        if (description.includes(token)) score += 1.0;
+        if (customer.includes(token)) score += 1.0;
+        if (manager.includes(token)) score += 1.0;
+        if (code.includes(token)) score += 1.2;
+    }
+    return score;
+}
+
+function searchProjectsLocally(projects, query, limit = 8) {
+    const list = Array.isArray(projects) ? projects : [];
+    const queryLower = String(query || '').trim().toLowerCase();
+    if (!queryLower) return [];
+    const queryTokens = tokenizeQuery(queryLower);
+
+    const scored = list
+        .map((project) => ({ ...project, score: scoreProject(project, queryTokens, queryLower) }))
+        .filter((project) => project.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, limit);
+}
 
 const SearchResults = () => {
     const [searchParams] = useSearchParams();
@@ -45,10 +93,19 @@ const SearchResults = () => {
                 }
 
                 const docData = Array.isArray(docResult.value?.data) ? docResult.value.data : [];
-                const projectData =
+                let projectData =
                     projectResult.status === 'fulfilled' && Array.isArray(projectResult.value?.data)
                         ? projectResult.value.data
                         : [];
+
+                if (!projectData.length) {
+                    try {
+                        const fallbackResp = await api.get('/budget/projects');
+                        projectData = searchProjectsLocally(fallbackResp.data, query, 8);
+                    } catch (_fallbackErr) {
+                        projectData = [];
+                    }
+                }
                 setResults(docData);
                 setProjectResults(projectData);
             } catch (err) {
@@ -66,17 +123,8 @@ const SearchResults = () => {
     return (
         <div className="space-y-6">
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md pb-4 pt-2 -mt-2 border-b">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="w-full md:flex-1">
-                        <SearchInput initialQuery={query} />
-                    </div>
-                    <Link
-                        to="/budget-management"
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                        <FolderKanban className="h-4 w-4" />
-                        프로젝트 관리 접속
-                    </Link>
+                <div className="w-full">
+                    <SearchInput initialQuery={query} />
                 </div>
             </div>
 

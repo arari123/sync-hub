@@ -161,26 +161,25 @@ const BudgetProjectEditor = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [currentPhase, setCurrentPhase] = useState('fabrication');
-    const [budgetEditMode, setBudgetEditMode] = useState(false);
+    const [budgetViewMode, setBudgetViewMode] = useState(false);
 
     const canEditProject = project?.can_edit !== false;
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
 
-    const activeMode = isExecutionStage && !budgetEditMode ? 'execution' : 'budget';
+    const activeMode = isExecutionStage && !budgetViewMode ? 'execution' : 'budget';
     const activeKey = activeMode === 'execution' ? SECTION_META[section].executionKey : SECTION_META[section].budgetKey;
     const rows = details[activeKey] || [];
 
     const canEditExecutionFields = canEditProject && isExecutionStage;
-    const canEditBudgetFields = canEditProject && !isConfirmed && (!isExecutionStage || budgetEditMode);
-    const canSave = canEditBudgetFields || canEditExecutionFields;
+    const canEditBudgetFields = canEditProject && !isConfirmed && !isExecutionStage;
 
     const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
-    const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
+    const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : (isExecutionStage ? '예산 조회 모드' : '예산 입력 모드');
 
     useEffect(() => {
-        setBudgetEditMode(false);
+        setBudgetViewMode(false);
     }, [projectId, section, currentStage]);
 
     const displayRows = useMemo(
@@ -279,6 +278,7 @@ const BudgetProjectEditor = () => {
 
     const columns = activeMode === 'execution' ? executionColumnsBySection[section] : budgetColumnsBySection[section];
     const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
+    const canSave = canEditActiveRows;
 
     const load = async () => {
         if (!projectId) return;
@@ -511,22 +511,9 @@ const BudgetProjectEditor = () => {
         }
     };
 
-    const toggleBudgetEditMode = async () => {
-        if (!isExecutionStage || !canEditProject) return;
-
-        if (budgetEditMode) {
-            setBudgetEditMode(false);
-            return;
-        }
-
-        if (isConfirmed) {
-            const reason = window.prompt('확정 버전입니다. 예산 변경을 위해 리비전을 생성합니다. 변경 사유를 입력해 주세요.');
-            if (!reason || !String(reason).trim()) return;
-            const nextVersion = await createRevision(String(reason).trim());
-            if (!nextVersion) return;
-        }
-
-        setBudgetEditMode(true);
+    const switchMode = (mode) => {
+        if (!isExecutionStage) return;
+        setBudgetViewMode(mode === 'budget');
     };
 
     const handleScroll = (event) => {
@@ -677,25 +664,35 @@ const BudgetProjectEditor = () => {
                                 </div>
 
                                 {isExecutionStage && (
-                                    <button
-                                        type="button"
-                                        onClick={toggleBudgetEditMode}
-                                        className={cn(
-                                            'h-8 rounded-lg px-3 text-[11px] font-black transition-colors border',
-                                            budgetEditMode
-                                                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                                        )}
-                                    >
-                                        {budgetEditMode ? '집행 입력으로 복귀' : '예산 변경'}
-                                    </button>
+                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                                        <button
+                                            type="button"
+                                            onClick={() => switchMode('execution')}
+                                            className={cn(
+                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
+                                                !budgetViewMode ? 'bg-white text-blue-700 ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-800',
+                                            )}
+                                        >
+                                            집행 입력
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => switchMode('budget')}
+                                            className={cn(
+                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
+                                                budgetViewMode ? 'bg-white text-amber-700 ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-800',
+                                            )}
+                                        >
+                                            예산 보기
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
                                     <ClipboardPaste size={12} />
-                                    <span>엑셀 붙여넣기 가능</span>
+                                    <span>{canEditActiveRows ? '엑셀 붙여넣기 가능' : '예산 보기 모드(수정 불가)'}</span>
                                 </div>
                             </div>
                         </div>

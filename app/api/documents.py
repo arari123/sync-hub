@@ -32,6 +32,7 @@ SEARCH_CLUSTER_DIVERSITY = (
     in {"1", "true", "yes", "on"}
 )
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?。！？])\s+|\s+\|\s+|\n+")
+_QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
 
 
 def _start_document_pipeline_async(doc_id: int) -> None:
@@ -46,8 +47,14 @@ def _start_document_pipeline_async(doc_id: int) -> None:
 def _tokenize_query(query: str) -> list[str]:
     tokens = []
     seen = set()
-    for token in re.split(r"\s+", (query or "").strip()):
+    raw_query = (query or "").strip()
+    raw_tokens = re.split(r"\s+", raw_query)
+    raw_tokens.extend(_QUERY_TOKEN_PATTERN.findall(raw_query))
+
+    for token in raw_tokens:
         if not token:
+            continue
+        if len(token.strip()) < 2:
             continue
         lowered = token.lower()
         if lowered in seen:

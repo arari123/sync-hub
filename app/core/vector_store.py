@@ -1,5 +1,6 @@
 import math
 import os
+import re
 from typing import Dict, List, Tuple
 
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ HYBRID_REQUIRE_KEYWORD_MATCH = (
     os.getenv("HYBRID_REQUIRE_KEYWORD_MATCH", "true").strip().lower()
     in {"1", "true", "yes", "on"}
 )
+QUERY_TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 try:
     from elasticsearch import Elasticsearch
@@ -300,6 +302,15 @@ class VectorStore:
 
         normalized_query = query_text.strip()
         wildcard_query = normalized_query.replace("*", " ").replace("?", " ").strip()
+        query_terms = []
+        seen_terms = set()
+        for term in [normalized_query, *QUERY_TERM_RE.findall(normalized_query)]:
+            cleaned = (term or "").strip()
+            lowered = cleaned.lower()
+            if not cleaned or len(cleaned) < 2 or lowered in seen_terms:
+                continue
+            seen_terms.add(lowered)
+            query_terms.append(cleaned)
 
         should_clauses: List[dict] = [
             {
@@ -353,6 +364,42 @@ class VectorStore:
                 }
             },
         ]
+
+        for token in query_terms:
+            if token == normalized_query:
+                continue
+            safe_token = token.replace("*", " ").replace("?", " ").strip()
+            if not safe_token:
+                continue
+            should_clauses.extend(
+                [
+                    {
+                        "match_phrase": {
+                            "content": {
+                                "query": token,
+                                "boost": 1.6,
+                            }
+                        }
+                    },
+                    {
+                        "match_phrase": {
+                            "ai_title": {
+                                "query": token,
+                                "boost": 1.4,
+                            }
+                        }
+                    },
+                    {
+                        "wildcard": {
+                            "filename": {
+                                "value": f"*{safe_token}*",
+                                "case_insensitive": True,
+                                "boost": 2.0,
+                            }
+                        }
+                    },
+                ]
+            )
 
         if wildcard_query:
             should_clauses.append(

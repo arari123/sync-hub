@@ -315,6 +315,15 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 확인:
     - `GET /documents/search?q=Basler_Data_Sheet.pdf&limit=10`에서 `doc_id=3` 반환 확인
     - `GET /documents/search?q=Basler&limit=10`에서 `doc_id=3` 반환 확인
+- 2026-02-07 (세션 재개-13)
+  - 영문+조사 결합 질의 보정:
+    - 사례: `basler로` 질의에서 조사(단문 토큰) 영향으로 랭킹 노이즈 발생.
+    - 조치:
+      - `app/api/documents.py` `_tokenize_query()`에서 1글자 토큰 제외.
+      - `app/core/vector_store.py` `_keyword_search()`에서 질의 내 영문 핵심 토큰(예: `basler`)을 추가 should 절에 반영.
+  - 확인:
+    - `GET /documents/search?q=basler&limit=10`에서 `doc_id=3` 반환 확인
+    - `GET /documents/search?q=basler로&limit=10`에서 `doc_id=3` 반환 확인
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

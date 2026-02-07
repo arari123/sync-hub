@@ -23,6 +23,7 @@ _DOCUMENT_COLUMN_SPECS = {
     "document_types": "VARCHAR(255)",
     "ai_title": "VARCHAR(255)",
     "ai_summary_short": "VARCHAR(512)",
+    "project_id": "INTEGER",
 }
 
 _BUDGET_VERSION_COLUMN_SPECS = {
@@ -88,6 +89,10 @@ def ensure_runtime_schema() -> None:
             _run_schema_statement(
                 connection,
                 "CREATE INDEX IF NOT EXISTS idx_documents_dedup_cluster_id ON documents (dedup_cluster_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_project_id ON documents (project_id)",
             )
 
         if "budget_versions" in table_names:

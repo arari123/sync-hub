@@ -24,6 +24,7 @@ class Document(Base):
     ai_title = Column(String, nullable=True)
     ai_summary_short = Column(String, nullable=True)
     created_at = Column(String)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=True, index=True)
 
     file_sha256 = Column(String(64), nullable=True, index=True)
     normalized_text_sha256 = Column(String(64), nullable=True, index=True)

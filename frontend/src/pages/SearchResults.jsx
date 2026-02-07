@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SearchInput from '../components/SearchInput';
 import ResultList from '../components/ResultList';
+import ProjectResultList from '../components/ProjectResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import { api, getErrorMessage } from '../lib/api';
 import { Loader2, AlertCircle, FolderKanban } from 'lucide-react';
@@ -11,6 +12,7 @@ const SearchResults = () => {
     const query = searchParams.get('q') || '';
 
     const [results, setResults] = useState([]);
+    const [projectResults, setProjectResults] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [selectedResult, setSelectedResult] = useState(null);
@@ -19,6 +21,8 @@ const SearchResults = () => {
         const fetchResults = async () => {
             if (!query.trim()) {
                 setResults([]);
+                setProjectResults([]);
+                setSelectedResult(null);
                 return;
             }
 
@@ -27,16 +31,21 @@ const SearchResults = () => {
             setSelectedResult(null);
 
             try {
-                const response = await api.get('/documents/search', {
-                    params: { q: query, limit: 10 },
-                });
-                const data = Array.isArray(response.data) ? response.data : [];
-                setResults(data);
-                if (data.length > 0) {
-                    // Optional: auto-select first result? No, let user choose.
-                }
+                const [docResponse, projectResponse] = await Promise.all([
+                    api.get('/documents/search', {
+                        params: { q: query, limit: 10 },
+                    }),
+                    api.get('/budget/projects/search', {
+                        params: { q: query, limit: 8 },
+                    }),
+                ]);
+                const docData = Array.isArray(docResponse.data) ? docResponse.data : [];
+                const projectData = Array.isArray(projectResponse.data) ? projectResponse.data : [];
+                setResults(docData);
+                setProjectResults(projectData);
             } catch (err) {
                 setResults([]);
+                setProjectResults([]);
                 setError(getErrorMessage(err, '검색 요청을 처리하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.'));
             } finally {
                 setIsLoading(false);
@@ -87,14 +96,29 @@ const SearchResults = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     <div className="lg:col-span-7">
                         <h2 className="text-sm font-semibold text-muted-foreground mb-4">
-                            총 {results.length}건 검색됨
+                            총 {projectResults.length + results.length}건 검색됨 (프로젝트 {projectResults.length}건 · 문서 {results.length}건)
                         </h2>
-                        <ResultList
-                            results={results}
-                            query={query}
-                            selectedResult={selectedResult}
-                            onSelect={setSelectedResult}
-                        />
+                        {projectResults.length > 0 && (
+                            <section className="mb-5 space-y-2">
+                                <h3 className="text-sm font-semibold">프로젝트 결과</h3>
+                                <ProjectResultList results={projectResults} />
+                            </section>
+                        )}
+                        <section className="space-y-2">
+                            <h3 className="text-sm font-semibold">문서 결과</h3>
+                            {results.length > 0 || projectResults.length === 0 ? (
+                                <ResultList
+                                    results={results}
+                                    query={query}
+                                    selectedResult={selectedResult}
+                                    onSelect={setSelectedResult}
+                                />
+                            ) : (
+                                <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                                    문서 검색 결과는 없습니다.
+                                </div>
+                            )}
+                        </section>
                     </div>
                     <div className="hidden lg:block lg:col-span-5 sticky top-24">
                         <DocumentDetail result={selectedResult} />

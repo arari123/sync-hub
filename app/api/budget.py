@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -39,6 +40,8 @@ _PROJECT_TYPE_TO_CODE = {
     "parts": "parts",
     "as": "as",
 }
+
+_SEARCH_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
 
 
 class BudgetProjectCreate(BaseModel):
@@ -413,6 +416,71 @@ def _matches_project_filters(
     return True
 
 
+def _tokenize_search_query(query: str) -> list[str]:
+    raw_query = (query or "").strip()
+    if not raw_query:
+        return []
+    tokens = []
+    seen = set()
+    for token in _SEARCH_TOKEN_PATTERN.findall(raw_query):
+        lowered = token.strip().lower()
+        if len(lowered) < 2 or lowered in seen:
+            continue
+        seen.add(lowered)
+        tokens.append(lowered)
+    return tokens
+
+
+def _project_search_score(project_payload: dict, query: str, tokens: list[str]) -> float:
+    name = (project_payload.get("name") or "").strip()
+    description = (project_payload.get("description") or "").strip()
+    code = (project_payload.get("code") or "").strip()
+    customer_name = (project_payload.get("customer_name") or "").strip()
+    manager_name = (project_payload.get("manager_name") or "").strip()
+
+    query_lower = (query or "").strip().lower()
+    name_lower = name.lower()
+    description_lower = description.lower()
+    code_lower = code.lower()
+    customer_lower = customer_name.lower()
+    manager_lower = manager_name.lower()
+
+    haystack = " ".join(
+        part for part in (name, description, code, customer_name, manager_name) if part
+    ).lower()
+    if not haystack:
+        return 0.0
+
+    score = 0.0
+    if query_lower:
+        if query_lower in name_lower:
+            score += 4.0
+        if query_lower in code_lower:
+            score += 3.5
+        if query_lower in customer_lower:
+            score += 2.8
+        if query_lower in manager_lower:
+            score += 2.2
+        if query_lower in description_lower:
+            score += 2.0
+        if query_lower in haystack:
+            score += 1.0
+
+    for token in tokens:
+        if token in name_lower:
+            score += 1.5
+        if token in code_lower:
+            score += 1.2
+        if token in customer_lower:
+            score += 1.0
+        if token in manager_lower:
+            score += 0.9
+        if token in description_lower:
+            score += 0.8
+
+    return score
+
+
 @router.get("/projects")
 def list_projects(
     project_name: Optional[str] = Query(default=None, max_length=120),
@@ -459,6 +527,52 @@ def list_projects(
             continue
         visible_projects.append(payload)
     return visible_projects
+
+
+@router.get("/projects/search")
+def search_projects(
+    q: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    query = (q or "").strip()
+    if not query:
+        return []
+
+    tokens = _tokenize_search_query(query)
+    all_projects = (
+        db.query(models.BudgetProject)
+        .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
+        .all()
+    )
+
+    scored_results: list[dict] = []
+    for project in all_projects:
+        current_version = _get_current_version_for_project(project, db)
+        if not _is_project_visible_to_user(project, current_version=current_version, user=user):
+            continue
+
+        payload = _serialize_project(project, db, user=user, current_version=current_version)
+        score = _project_search_score(payload, query, tokens)
+        if score <= 0:
+            continue
+
+        scored_results.append(
+            {
+                "project_id": payload.get("id"),
+                "name": payload.get("name") or "",
+                "description": payload.get("description") or "",
+                "customer_name": payload.get("customer_name") or "",
+                "manager_name": payload.get("manager_name") or "",
+                "current_stage": payload.get("current_stage") or "",
+                "current_stage_label": payload.get("current_stage_label") or "",
+                "score": score,
+            }
+        )
+
+    scored_results.sort(key=lambda item: (item.get("score") or 0.0), reverse=True)
+    return scored_results[:limit]
 
 
 @router.post("/projects")

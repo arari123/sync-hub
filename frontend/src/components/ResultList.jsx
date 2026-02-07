@@ -42,6 +42,26 @@ function toTypeLabel(type) {
     return DOCUMENT_TYPE_LABELS[type] || type;
 }
 
+function parseFailureReportSummary(summaryText) {
+    const text = String(summaryText || '').trim();
+    if (!text) return null;
+
+    const parsed = {};
+    const pattern = /(작업내용|작성자|작업장소)\s*:\s*(.*?)(?=(?:,\s*(?:작업내용|작성자|작업장소)\s*:)|$)/g;
+    let match = pattern.exec(text);
+    while (match) {
+        const key = match[1];
+        const value = String(match[2] || '').trim();
+        if (value) parsed[key] = value;
+        match = pattern.exec(text);
+    }
+
+    if (!parsed['작업내용'] && !parsed['작성자'] && !parsed['작업장소']) {
+        return null;
+    }
+    return parsed;
+}
+
 const ResultList = ({ results, query, selectedResult, onSelect }) => {
     if (!results.length) {
         return (
@@ -66,6 +86,8 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                 const pageText = typeof result.page === 'number' ? `p.${result.page}` : 'p.-';
                 const documentTypes = normalizeDocumentTypes(result.document_types);
                 const visibleDocumentTypes = documentTypes.length ? documentTypes : ['unclassified'];
+                const isFailureReport = visibleDocumentTypes.includes('equipment_failure_report');
+                const failureSummary = isFailureReport ? parseFailureReportSummary(summaryText) : null;
 
                 return (
                     <div
@@ -95,7 +117,15 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                         </div>
 
                         <div className="space-y-2 text-sm text-foreground/80">
-                            <p className="line-clamp-2">{summaryText}</p>
+                            {failureSummary ? (
+                                <div className="space-y-1 rounded-md bg-muted/25 px-2 py-2 text-[11px]">
+                                    <SummaryRow label="작업내용" value={failureSummary['작업내용'] || '-'} />
+                                    <SummaryRow label="작성자" value={failureSummary['작성자'] || '-'} />
+                                    <SummaryRow label="작업장소" value={failureSummary['작업장소'] || '-'} />
+                                </div>
+                            ) : (
+                                <p className="line-clamp-2">{summaryText}</p>
+                            )}
                             <div className="flex flex-wrap items-center gap-2 pt-1">
                                 {visibleDocumentTypes.map((type) => (
                                     <span
@@ -122,5 +152,12 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
         </div>
     );
 };
+
+const SummaryRow = ({ label, value }) => (
+    <div className="flex items-center gap-2">
+        <span className="min-w-[44px] text-[10px] font-semibold text-foreground/75">{label}</span>
+        <span className="truncate text-[11px] text-foreground/85">{value}</span>
+    </div>
+);
 
 export default ResultList;

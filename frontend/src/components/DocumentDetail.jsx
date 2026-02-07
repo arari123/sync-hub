@@ -46,12 +46,34 @@ function toStatusLabel(status) {
     return '알 수 없음';
 }
 
+function parseFailureReportSummary(summaryText) {
+    const text = String(summaryText || '').trim();
+    if (!text) return null;
+
+    const parsed = {};
+    const pattern = /(작업내용|작성자|작업장소)\s*:\s*(.*?)(?=(?:,\s*(?:작업내용|작성자|작업장소)\s*:)|$)/g;
+    let match = pattern.exec(text);
+    while (match) {
+        const key = match[1];
+        const value = String(match[2] || '').trim();
+        if (value) parsed[key] = value;
+        match = pattern.exec(text);
+    }
+
+    if (!parsed['작업내용'] && !parsed['작성자'] && !parsed['작업장소']) {
+        return null;
+    }
+    return parsed;
+}
+
 const DocumentDetail = ({ result }) => {
     const [docDetails, setDocDetails] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const documentTypes = normalizeDocumentTypes(result?.document_types || docDetails?.document_types);
     const visibleDocumentTypes = documentTypes.length ? documentTypes : ['unclassified'];
+    const isFailureReport = visibleDocumentTypes.includes('equipment_failure_report');
+    const failureSummary = isFailureReport ? parseFailureReportSummary(result?.summary) : null;
 
     useEffect(() => {
         if (!result) return;
@@ -128,7 +150,15 @@ const DocumentDetail = ({ result }) => {
 
                         <div className="grid gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">문서 요약</span>
-                            <p className="text-sm leading-relaxed">{result.summary || '요약 정보가 없습니다.'}</p>
+                            {failureSummary ? (
+                                <div className="space-y-1 rounded-md bg-muted/25 px-2 py-2 text-[11px]">
+                                    <SummaryRow label="작업내용" value={failureSummary['작업내용'] || '-'} />
+                                    <SummaryRow label="작성자" value={failureSummary['작성자'] || '-'} />
+                                    <SummaryRow label="작업장소" value={failureSummary['작업장소'] || '-'} />
+                                </div>
+                            ) : (
+                                <p className="text-sm leading-relaxed">{result.summary || '요약 정보가 없습니다.'}</p>
+                            )}
                         </div>
 
                         <div className="grid gap-2">
@@ -183,5 +213,12 @@ const DocumentDetail = ({ result }) => {
         </div>
     );
 };
+
+const SummaryRow = ({ label, value }) => (
+    <div className="flex items-center gap-2">
+        <span className="min-w-[50px] text-[10px] font-semibold text-foreground/75">{label}</span>
+        <span className="truncate text-[11px] text-foreground/85">{value}</span>
+    </div>
+);
 
 export default DocumentDetail;

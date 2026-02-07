@@ -238,6 +238,17 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 프론트 검색 장애 수정:
     - `frontend/src/lib/api.js` 기본 API URL을 `http://localhost:8001`로 수정.
     - `docker-compose.yml` frontend `VITE_API_URL` 기본값을 `http://localhost:8001`로 조정.
+- 2026-02-07 (세션 재개-5)
+  - 웹 접속 장애 복구:
+    - `docker-compose.yml` 포트 정렬: Frontend `8000:3000`, API `8001:8000`.
+    - 확인: `curl -i http://localhost:8000` -> `200`, `curl -i http://localhost:8001/health` -> `200`.
+  - 네트워크 정리:
+    - `synchub_db`, `synchub_es`를 중복 네트워크(`sync-hub_default`)에서 분리하고 `synchub_default` 단일화.
+    - 확인: `synchub_db/synchub_es/synchub_web` 모두 `synchub_default` 소속.
+  - 프론트 검은 화면 원인/조치:
+    - 원인: `react-router-dom`, `clsx`, `tailwind-merge` 의존성 누락으로 Vite import resolve 실패.
+    - 조치: 프론트 의존성 동기화 + dev 서버 재시작.
+    - 확인: `GET /src/App.jsx`, `GET /src/pages/SearchResults.jsx` 모두 `200`.
   - 메인 페이지 업로드 기능 강화(디자인 톤 유지):
     - `frontend/src/pages/Home.jsx`에서 검색창 바로 아래 `UploadWidget`을 전면 배치.
     - 기존 스타일(카드/타이포/애니메이션 계열) 유지.

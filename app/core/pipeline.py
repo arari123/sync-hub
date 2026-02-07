@@ -81,6 +81,7 @@ model, EMBEDDING_BACKEND, EMBEDDING_MODEL_NAME, EMBEDDING_MODEL_VERSION = _load_
 PIPELINE_MAX_RETRIES = max(0, int(os.getenv("PIPELINE_MAX_RETRIES", "2")))
 PIPELINE_RETRY_BACKOFF_SECONDS = float(os.getenv("PIPELINE_RETRY_BACKOFF_SECONDS", "1.5"))
 OCR_MIN_TEXT_LENGTH = int(os.getenv("OCR_MIN_TEXT_LENGTH", "24"))
+OCR_SKIP_MIN_CHARS = max(0, int(os.getenv("OCR_SKIP_MIN_CHARS", "220")))
 _NON_INDEXABLE_PREFIXES = (
     "[ocr pending]",
     "[ocr placeholder]",
@@ -127,8 +128,13 @@ def _embed_texts(texts: Sequence[str]) -> List[List[float]]:
     return [_normalize_embedding_vector(vector) for vector in encoded]
 
 
-def _needs_ocr(text: str) -> bool:
-    return len((text or "").strip()) < OCR_MIN_TEXT_LENGTH
+def _needs_ocr(raw_text: str, clean_text: str = "") -> bool:
+    body = (clean_text or raw_text or "").strip()
+    if len(body) < OCR_MIN_TEXT_LENGTH:
+        return True
+    if OCR_SKIP_MIN_CHARS > 0 and len(body) < OCR_SKIP_MIN_CHARS:
+        return True
+    return False
 
 
 def _is_non_indexable_text(text: str) -> bool:
@@ -299,6 +305,7 @@ def _build_segments_from_reflow(file_path: str) -> Tuple[str, str, List[SourceSe
                         raw_text=raw_text,
                     )
                 )
+                clean_text_parts.append(table_raw)
 
             for row_sentence in row_sentences:
                 cleaned_row = normalize_text(row_sentence)
@@ -327,6 +334,7 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
     table_groups, paragraph_lines = _simple_table_groups_from_lines(lines)
 
     paragraph_text = normalize_text(merge_soft_linebreaks(paragraph_lines))
+    clean_text_parts: List[str] = []
     segments: List[SourceSegment] = []
 
     if paragraph_text:
@@ -338,6 +346,7 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
                 raw_text="\n".join(paragraph_lines).strip(),
             )
         )
+        clean_text_parts.append(paragraph_text)
 
     for table_lines in table_groups:
         table_raw, row_sentences = table_group_to_structured_text(table_lines)
@@ -353,6 +362,7 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
                     raw_text=raw_text,
                 )
             )
+            clean_text_parts.append(table_raw)
 
         for row_sentence in row_sentences:
             cleaned_row = normalize_text(row_sentence)
@@ -367,14 +377,14 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
                 )
             )
 
-    clean_text = paragraph_text
+    clean_text = normalize_text("\n\n".join(part for part in clean_text_parts if part))
     return body, clean_text, segments
 
 
 def generate_chunk_records(file_path: str) -> Tuple[str, str, List[ChunkRecord]]:
     raw_text, clean_text, segments = _build_segments_from_reflow(file_path)
 
-    if _needs_ocr(raw_text) or not segments:
+    if _needs_ocr(raw_text, clean_text) or not segments:
         ocr_text = perform_ocr(file_path)
         if ocr_text.strip():
             raw_text, clean_text, segments = _build_segments_from_plain_text(ocr_text)

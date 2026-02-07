@@ -8,6 +8,8 @@ services:
       - ocr-worker
 
   sglang:
+    profiles:
+      - glm
     build:
       context: .
       dockerfile: Dockerfile.sglang
@@ -33,6 +35,33 @@ services:
       --served-model-name ${GLM_OCR_MODEL:-glm-ocr}
       --trust-remote-code
 
+  paddle-vlm-server:
+    image: vllm/vllm-openai:latest
+    container_name: synchub_paddle_vlm
+    runtime: nvidia
+    restart: always
+    ports:
+      - "8118:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      - LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/usr/lib/wsl/lib}
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - paddle_vllm_hf_cache:/root/.cache/huggingface
+      - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro
+    devices:
+      - /dev/dxg:/dev/dxg
+    command: >
+      --host 0.0.0.0
+      --port 8000
+      --model ${PADDLE_VLLM_MODEL_ID:-PaddlePaddle/PaddleOCR-VL-1.5}
+      --served-model-name ${PADDLE_VLLM_SERVED_MODEL_NAME:-PaddlePaddle/PaddleOCR-VL-1.5}
+      --trust-remote-code
+      --gpu-memory-utilization ${PADDLE_VLLM_GPU_MEMORY_UTILIZATION:-0.85}
+      --max-num-seqs ${PADDLE_VLLM_MAX_NUM_SEQS:-64}
+
   ocr-worker:
     build:
       context: .
@@ -48,7 +77,9 @@ services:
       - "8100:8100"
     environment:
       - OCR_ACCELERATOR=${OCR_ACCELERATOR:-gpu}
-      - OCR_PROVIDER=${OCR_PROVIDER:-pypdf}
+      - OCR_PROVIDER=${OCR_PROVIDER:-paddle}
+      - OCR_CACHE_ENABLED=${OCR_CACHE_ENABLED:-true}
+      - OCR_CACHE_DIR=${OCR_CACHE_DIR:-/app/.cache/ocr_worker}
       - LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/usr/lib/wsl/lib}
       - GLM_OCR_ENDPOINT=${GLM_OCR_ENDPOINT:-}
       - GLM_OCR_API_KEY=${GLM_OCR_API_KEY:-}
@@ -90,16 +121,39 @@ services:
       - PADDLE_USE_DOC_ORIENTATION_CLASSIFY=${PADDLE_USE_DOC_ORIENTATION_CLASSIFY:-true}
       - PADDLE_USE_DOC_UNWARPING=${PADDLE_USE_DOC_UNWARPING:-false}
       - PADDLE_USE_TEXTLINE_ORIENTATION=${PADDLE_USE_TEXTLINE_ORIENTATION:-false}
+      - PADDLE_USE_LAYOUT_DETECTION=${PADDLE_USE_LAYOUT_DETECTION:-}
+      - PADDLE_USE_CHART_RECOGNITION=${PADDLE_USE_CHART_RECOGNITION:-}
+      - PADDLE_USE_SEAL_RECOGNITION=${PADDLE_USE_SEAL_RECOGNITION:-}
+      - PADDLE_USE_OCR_FOR_IMAGE_BLOCK=${PADDLE_USE_OCR_FOR_IMAGE_BLOCK:-}
+      - PADDLE_FORMAT_BLOCK_CONTENT=${PADDLE_FORMAT_BLOCK_CONTENT:-}
+      - PADDLE_MERGE_LAYOUT_BLOCKS=${PADDLE_MERGE_LAYOUT_BLOCKS:-}
+      - PADDLE_USE_QUEUES=${PADDLE_USE_QUEUES:-}
+      - PADDLE_LAYOUT_SHAPE_MODE=${PADDLE_LAYOUT_SHAPE_MODE:-}
+      - PADDLE_PROMPT_LABEL=${PADDLE_PROMPT_LABEL:-}
+      - PADDLE_VL_REC_BACKEND=${PADDLE_VL_REC_BACKEND:-}
+      - PADDLE_VL_REC_SERVER_URL=${PADDLE_VL_REC_SERVER_URL:-}
+      - PADDLE_VL_REC_API_MODEL_NAME=${PADDLE_VL_REC_API_MODEL_NAME:-}
+      - PADDLE_VL_REC_API_KEY=${PADDLE_VL_REC_API_KEY:-}
+      - PADDLE_VL_REC_MAX_CONCURRENCY=${PADDLE_VL_REC_MAX_CONCURRENCY:-}
       - PADDLE_FORCE_RENDER_PDF=${PADDLE_FORCE_RENDER_PDF:-true}
       - PADDLE_FAST_MODE=${PADDLE_FAST_MODE:-true}
       - PADDLE_FAST_FIRST_PAGES=${PADDLE_FAST_FIRST_PAGES:-2}
       - PADDLE_FAST_RENDER_DPI=${PADDLE_FAST_RENDER_DPI:-120}
       - PADDLE_FAST_MIN_TEXT_CHARS=${PADDLE_FAST_MIN_TEXT_CHARS:-180}
       - PADDLE_SKIP_PDF_OCR_ON_CPU=${PADDLE_SKIP_PDF_OCR_ON_CPU:-true}
+      - PADDLE_PRELOAD_ON_STARTUP=${PADDLE_PRELOAD_ON_STARTUP:-true}
+      - PADDLE_WARMUP_ON_STARTUP=${PADDLE_WARMUP_ON_STARTUP:-false}
+      - PADDLE_PREDICT_MAX_NEW_TOKENS=${PADDLE_PREDICT_MAX_NEW_TOKENS:-}
+      - PADDLE_PREDICT_MIN_PIXELS=${PADDLE_PREDICT_MIN_PIXELS:-}
+      - PADDLE_PREDICT_MAX_PIXELS=${PADDLE_PREDICT_MAX_PIXELS:-}
+      - PADDLE_PREDICT_REPETITION_PENALTY=${PADDLE_PREDICT_REPETITION_PENALTY:-}
+      - PADDLE_PREDICT_TEMPERATURE=${PADDLE_PREDICT_TEMPERATURE:-}
+      - PADDLE_PREDICT_TOP_P=${PADDLE_PREDICT_TOP_P:-}
       - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=${PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK:-true}
     volumes:
       - .:/app
       - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro
+      - paddle_model_cache:/root/.paddlex
     devices:
       - /dev/dxg:/dev/dxg
     extra_hosts:
@@ -107,7 +161,9 @@ services:
     depends_on:
       - db
       - elasticsearch
-      - sglang
+      - paddle-vlm-server
 
 volumes:
   sglang_hf_cache:
+  paddle_model_cache:
+  paddle_vllm_hf_cache:

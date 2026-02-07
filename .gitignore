@@ -26,6 +26,7 @@ frontend/.vite/
 uploads/
 reports/
 *.log
+.cache/
 
 # OS / editor
 .DS_Store

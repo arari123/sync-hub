@@ -11,15 +11,15 @@
 3. GPU OCR 포함 표준 기동 명령을 사용한다.
    - `docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
 4. 프론트엔드 API 대상 포트를 실행 환경과 일치시킨다.
-   - 기본 권장: `VITE_API_URL=http://localhost:8001` (`synchub_web_noreload` 기준)
-   - `synchub_web` 단독 실행 시: `VITE_API_URL=http://localhost:8000`
+   - 기본값: `VITE_API_URL=http://localhost:8001`
+   - 포트 기준: Frontend `8000`, API `8001`
 
 ## 3) 필수 서비스
 - `synchub_db` (PostgreSQL)
 - `synchub_es` (Elasticsearch)
 - `synchub_ocr` (OCR Worker)
 - `synchub_paddle_vlm` (PaddleOCR-VL vLLM 가속 서버)
-- `synchub_web` 또는 `synchub_web_noreload` (API)
+- `synchub_web` (API)
 - `synchub_frontend` (웹 UI)
 
 ## 4) 상태 확인

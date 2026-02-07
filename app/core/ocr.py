@@ -21,6 +21,7 @@ def _read_non_negative_int(name: str, default: str) -> int:
 
 OCR_MAX_PAGES = _read_non_negative_int("OCR_MAX_PAGES", "4")
 OCR_RENDER_DPI = max(96, int(os.getenv("OCR_RENDER_DPI", "144")))
+OCR_MAX_TOKENS = _read_non_negative_int("OCR_MAX_TOKENS", "2048")
 OCR_FAST_MODE = (
     os.getenv("OCR_FAST_MODE", "true").strip().lower()
     in {"1", "true", "yes", "on"}
@@ -39,6 +40,7 @@ if OCR_PROFILE not in {"speed", "balanced", "quality"}:
 
 OCR_SPEED_MAX_PAGES = _read_non_negative_int("OCR_SPEED_MAX_PAGES", "2")
 OCR_SPEED_RENDER_DPI = max(96, int(os.getenv("OCR_SPEED_RENDER_DPI", "120")))
+OCR_SPEED_MAX_TOKENS = _read_non_negative_int("OCR_SPEED_MAX_TOKENS", "640")
 OCR_SPEED_FAST_MODE = (
     os.getenv("OCR_SPEED_FAST_MODE", "true").strip().lower()
     in {"1", "true", "yes", "on"}
@@ -50,6 +52,10 @@ OCR_SPEED_FORCE_RENDER_PDF = (
 
 OCR_QUALITY_MAX_PAGES = _read_non_negative_int("OCR_QUALITY_MAX_PAGES", str(OCR_MAX_PAGES))
 OCR_QUALITY_RENDER_DPI = max(96, int(os.getenv("OCR_QUALITY_RENDER_DPI", "180")))
+OCR_QUALITY_MAX_TOKENS = _read_non_negative_int(
+    "OCR_QUALITY_MAX_TOKENS",
+    str(max(OCR_MAX_TOKENS, 1024)),
+)
 OCR_QUALITY_FAST_MODE = (
     os.getenv("OCR_QUALITY_FAST_MODE", "false").strip().lower()
     in {"1", "true", "yes", "on"}
@@ -65,6 +71,7 @@ def _resolve_ocr_request_options() -> dict:
         return {
             "max_pages": OCR_SPEED_MAX_PAGES,
             "render_dpi": OCR_SPEED_RENDER_DPI,
+            "max_tokens": OCR_SPEED_MAX_TOKENS,
             "fast_mode": OCR_SPEED_FAST_MODE,
             "force_render_pdf": OCR_SPEED_FORCE_RENDER_PDF,
             "pypdf_preflight": OCR_PYPDF_PREFLIGHT,
@@ -74,6 +81,7 @@ def _resolve_ocr_request_options() -> dict:
         return {
             "max_pages": OCR_QUALITY_MAX_PAGES,
             "render_dpi": OCR_QUALITY_RENDER_DPI,
+            "max_tokens": OCR_QUALITY_MAX_TOKENS,
             "fast_mode": OCR_QUALITY_FAST_MODE,
             "force_render_pdf": OCR_QUALITY_FORCE_RENDER_PDF,
             "pypdf_preflight": OCR_PYPDF_PREFLIGHT,
@@ -82,6 +90,7 @@ def _resolve_ocr_request_options() -> dict:
     return {
         "max_pages": OCR_MAX_PAGES,
         "render_dpi": OCR_RENDER_DPI,
+        "max_tokens": OCR_MAX_TOKENS,
         "fast_mode": OCR_FAST_MODE,
         "force_render_pdf": OCR_FORCE_RENDER_PDF,
         "pypdf_preflight": OCR_PYPDF_PREFLIGHT,

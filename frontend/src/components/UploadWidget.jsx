@@ -1,0 +1,166 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { UploadCloud, CheckCircle2, CircleDashed, FileWarning, FileSearch } from 'lucide-react';
+import { api, getErrorMessage, POLLING_INTERVAL_MS } from '../lib/api';
+import { cn } from '../lib/utils';
+
+const TERMINAL_STATUSES = new Set(['completed', 'failed']);
+
+const STATUS_META = {
+    uploading: { label: 'Uploading', color: 'text-blue-500' },
+    pending: { label: 'Pending', color: 'text-gray-500' },
+    processing: { label: 'Processing', color: 'text-orange-500' },
+    completed: { label: 'Completed', color: 'text-green-500' },
+    failed: { label: 'Failed', color: 'text-red-500' },
+};
+
+function getStatusMeta(status) {
+    return STATUS_META[status] || { label: status || 'unknown', color: 'text-gray-400' };
+}
+
+const UploadWidget = () => {
+    const fileInputRef = useRef(null);
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+    const [uploadJobs, setUploadJobs] = useState([]);
+
+    const updateUploadJob = (id, updater) => {
+        setUploadJobs((prev) => prev.map((job) => (job.id === id ? updater(job) : job)));
+    };
+
+    const uploadFile = async (file) => {
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+            setUploadError('PDF files only.');
+            return;
+        }
+
+        const temporaryId = `temp-${Date.now()}`;
+        setUploadError('');
+        setUploadJobs((prev) => [
+            { id: temporaryId, filename: file.name, status: 'uploading', createdAt: new Date().toISOString() },
+            ...prev,
+        ]);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await api.post('/documents/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            setUploadJobs((prev) =>
+                prev.map((job) =>
+                    job.id === temporaryId
+                        ? { ...job, id: response.data.id, status: response.data.status || 'pending' }
+                        : job
+                )
+            );
+        } catch (error) {
+            updateUploadJob(temporaryId, (job) => ({
+                ...job,
+                status: 'failed',
+                error: getErrorMessage(error, 'Upload failed'),
+            }));
+            setUploadError(getErrorMessage(error, 'Cannot upload file'));
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        uploadFile(file);
+    };
+
+    useEffect(() => {
+        const activeJobs = uploadJobs.filter(
+            (job) => typeof job.id === 'number' && !TERMINAL_STATUSES.has(job.status)
+        );
+
+        if (!activeJobs.length) return;
+
+        const pollStatuses = async () => {
+            const responses = await Promise.allSettled(
+                activeJobs.map(async (job) => {
+                    const response = await api.get(`/documents/${job.id}`);
+                    return { id: job.id, payload: response.data };
+                })
+            );
+
+            const nextById = new Map();
+            responses.forEach((result) => {
+                if (result.status === 'fulfilled') {
+                    nextById.set(result.value.id, result.value.payload);
+                }
+            });
+
+            if (!nextById.size) return;
+
+            setUploadJobs((prev) => {
+                let changed = false;
+                const nextJobs = prev.map((job) => {
+                    const nextItem = nextById.get(job.id);
+                    if (!nextItem) return job;
+                    const nextStatus = nextItem.status || job.status;
+                    if (nextStatus === job.status) return job; // strict equality check might need expansion if other fields change
+                    changed = true;
+                    return { ...job, status: nextStatus, filePath: nextItem.file_path };
+                });
+                return changed ? nextJobs : prev;
+            });
+        };
+
+        pollStatuses();
+        const interval = setInterval(pollStatuses, POLLING_INTERVAL_MS);
+        return () => clearInterval(interval);
+    }, [uploadJobs]);
+
+    return (
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-sm">Upload PDF</h3>
+            </div>
+
+            <div
+                className={cn(
+                    "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/50 hover:bg-muted",
+                    isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                )}
+                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground font-medium">Drag PDF here or click to upload</p>
+                <input ref={fileInputRef} type="file" accept=".pdf" hidden onChange={(e) => uploadFile(e.target.files?.[0])} />
+            </div>
+
+            {uploadError && <p className="text-xs text-destructive mt-2">{uploadError}</p>}
+
+            {uploadJobs.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                    {uploadJobs.map((job) => {
+                        const statusMeta = getStatusMeta(job.status);
+                        return (
+                            <li key={job.id} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    {job.status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
+                                    {job.status === 'processing' && <CircleDashed className="h-3 w-3 animate-spin text-orange-500" />}
+                                    {job.status === 'failed' && <FileWarning className="h-3 w-3 text-red-500" />}
+                                    {job.status === 'pending' && <FileSearch className="h-3 w-3 text-gray-400" />}
+                                    <span className="truncate max-w-[150px]" title={job.filename}>{job.filename}</span>
+                                </div>
+                                <span className={cn("font-medium", statusMeta.color)}>{statusMeta.label}</span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+};
+
+export default UploadWidget;

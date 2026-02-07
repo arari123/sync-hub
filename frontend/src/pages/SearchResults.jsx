@@ -55,10 +55,10 @@ const SearchResults = () => {
                     </div>
                     <Link
                         to="/budget-management"
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                         <FolderKanban className="h-4 w-4" />
-                        프로젝트 예산관리
+                        예산관리 웹 접속
                     </Link>
                 </div>
             </div>

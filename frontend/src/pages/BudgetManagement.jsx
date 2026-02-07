@@ -9,10 +9,30 @@ function formatAmount(value) {
     return `${number.toLocaleString('ko-KR')}원`;
 }
 
+function normalizeNumericFilter(value) {
+    return String(value || '').replace(/,/g, '').trim();
+}
+
+function formatNumericFilterInput(value) {
+    const digitsOnly = String(value || '').replace(/[^\d]/g, '');
+    if (!digitsOnly) return '';
+    const normalized = digitsOnly.replace(/^0+(?=\d)/, '');
+    return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function extractCustomerOptions(projectList) {
+    const options = new Set();
+    for (const project of Array.isArray(projectList) ? projectList : []) {
+        const name = String(project?.customer_name || '').trim();
+        if (name) options.add(name);
+    }
+    return Array.from(options).sort((a, b) => a.localeCompare(b, 'ko-KR'));
+}
+
 function buildProjectFilterParams(filters) {
     const params = {};
-    const minTotal = (filters.minTotal || '').trim();
-    const maxTotal = (filters.maxTotal || '').trim();
+    const minTotal = normalizeNumericFilter(filters.minTotal);
+    const maxTotal = normalizeNumericFilter(filters.maxTotal);
     const customerName = (filters.customerName || '').trim();
     const authorName = (filters.authorName || '').trim();
     const projectType = (filters.projectType || '').trim();
@@ -55,6 +75,7 @@ const BudgetManagement = () => {
     const [error, setError] = useState('');
     const [draftFilters, setDraftFilters] = useState(emptyFilters);
     const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
+    const [customerOptions, setCustomerOptions] = useState([]);
 
     const loadProjects = useCallback(async () => {
         setIsLoading(true);
@@ -75,9 +96,31 @@ const BudgetManagement = () => {
         loadProjects();
     }, [loadProjects]);
 
+    useEffect(() => {
+        const loadCustomerOptions = async () => {
+            try {
+                const response = await api.get('/budget/projects');
+                setCustomerOptions(extractCustomerOptions(response.data));
+            } catch (_err) {
+                setCustomerOptions([]);
+            }
+        };
+        loadCustomerOptions();
+    }, []);
+
     const applyFilters = (event) => {
         event.preventDefault();
         setAppliedFilters({ ...draftFilters });
+    };
+
+    const handleMinTotalChange = (event) => {
+        const value = formatNumericFilterInput(event.target.value);
+        setDraftFilters((prev) => ({ ...prev, minTotal: value }));
+    };
+
+    const handleMaxTotalChange = (event) => {
+        const value = formatNumericFilterInput(event.target.value);
+        setDraftFilters((prev) => ({ ...prev, maxTotal: value }));
     };
 
     const resetFilters = () => {
@@ -141,15 +184,16 @@ const BudgetManagement = () => {
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="최소 금액(원)"
                             value={draftFilters.minTotal}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
+                            onChange={handleMinTotalChange}
                         />
                         <input
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="최대 금액(원)"
                             value={draftFilters.maxTotal}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
+                            onChange={handleMaxTotalChange}
                         />
                         <input
+                            list="budget-customer-options"
                             className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="고객사"
                             value={draftFilters.customerName}
@@ -187,6 +231,11 @@ const BudgetManagement = () => {
                             </button>
                         </div>
                     </form>
+                    <datalist id="budget-customer-options">
+                        {customerOptions.map((name) => (
+                            <option key={name} value={name} />
+                        ))}
+                    </datalist>
                 </section>
             </div>
 

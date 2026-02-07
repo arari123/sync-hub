@@ -5,7 +5,7 @@ const ROADMAP_ITEMS = [
     { label: 'Phase 1', value: '버전 수명주기 + 예산 요약 대시보드' },
     { label: 'Phase 2', value: '재료비/인건비/경비 상세 입력 및 계산 엔진' },
     { label: 'Phase 3', value: '엑셀 내보내기/재업로드 및 검증 리포트' },
-    { label: 'Phase 4', value: 'PDF 내보내기 + 권한/감사 로그 고도화' },
+    { label: 'Phase 4', value: 'PDF 내보내기 + 운영/감사 로그 고도화' },
 ];
 
 const BudgetManagement = () => {

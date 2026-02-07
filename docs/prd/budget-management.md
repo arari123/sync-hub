@@ -9,16 +9,10 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
   - 재료비/인건비/경비 입력 및 자동 합계 계산
   - 엑셀 업로드/다운로드(양식 수식 포함)
   - 문서화(PDF 내보내기) 지원
-  - 권한(Role) 기반 편집/확정 제어
 - 제외
   - 그룹웨어 결재 시스템 자체 구현(외부 결재 사용)
 
-## 3. 사용자 및 권한
-- PM: 예산 작성/수정, 리비전 생성
-- Reviewer(상급자): 검토 단계 확정
-- Admin: 단가/공식/권한 정책 관리
-
-## 4. 핵심 요구사항
+## 3. 핵심 요구사항
 
 ### BM-REQ-001: 단계 기반 버전 관리
 - [AC-1] 예산 버전 상태는 `draft`, `confirmed`, `revision`을 가진다.
@@ -55,7 +49,7 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
 - [AC-1] 버전별 예산 요약/상세를 PDF로 내보낼 수 있다.
 - [AC-2] 외부 결재용 출력물로 사용 가능한 레이아웃을 제공한다.
 
-## 5. 데이터 모델(초안)
+## 4. 데이터 모델(초안)
 - `projects`: 프로젝트 기본 정보
 - `budget_versions`: 단계/상태/리비전/변경사유
 - `budget_equipment`: 설비 단위 예산
@@ -64,7 +58,7 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
 - `budget_expense_items`: 경비 항목(공식 버전 포함)
 - `budget_exports`: 엑셀/PDF 산출 기록
 
-## 6. 화면 구성
+## 5. 화면 구성
 - `/budget-management` 대시보드
   - 프로젝트 선택
   - 현재 단계/버전 카드
@@ -75,7 +69,7 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
   - 실시간 계산 및 검증
   - 엑셀 업로드/다운로드
 
-## 7. API 초안
+## 6. API 초안
 - `GET /budget/projects`
 - `GET /budget/projects/{project_id}/versions`
 - `POST /budget/projects/{project_id}/versions`
@@ -85,14 +79,13 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
 - `GET /budget/versions/{version_id}/export-excel`
 - `GET /budget/versions/{version_id}/export-pdf`
 
-## 8. 비기능 요구사항
+## 7. 비기능 요구사항
 - 감사 추적: 주요 변경(확정/리비전/삭제) 로그 필수
 - 동시성: 동일 버전 동시 수정 충돌 감지
 - 성능: 엑셀 5,000행 업로드 기준 30초 이내 파싱/검증
-- 보안: 프로젝트 접근 권한 및 역할 기반 제어
 
-## 9. 단계별 구현 제안
+## 8. 단계별 구현 제안
 1. Phase 1: 대시보드/버전 수명주기/요약 집계
 2. Phase 2: 재료비/인건비/경비 상세 입력 및 계산 엔진
 3. Phase 3: 엑셀 왕복(내보내기/업로드) + 검증 리포트
-4. Phase 4: PDF 출력 + 운영 로그/권한 고도화
+4. Phase 4: PDF 출력 + 운영 로그 고도화

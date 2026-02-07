@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SearchInput from '../components/SearchInput';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import { api, getErrorMessage } from '../lib/api';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, FolderKanban } from 'lucide-react';
 
 const SearchResults = () => {
     const [searchParams] = useSearchParams();
@@ -49,7 +49,18 @@ const SearchResults = () => {
     return (
         <div className="space-y-6">
             <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md pb-4 pt-2 -mt-2 border-b">
-                <SearchInput initialQuery={query} />
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="w-full md:flex-1">
+                        <SearchInput initialQuery={query} />
+                    </div>
+                    <Link
+                        to="/budget-management"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                        <FolderKanban className="h-4 w-4" />
+                        프로젝트 예산관리
+                    </Link>
+                </div>
             </div>
 
             {isLoading ? (

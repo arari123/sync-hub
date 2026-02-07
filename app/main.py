@@ -1,14 +1,12 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from sqlalchemy.orm import Session
-from typing import List
 
-from . import models, schemas
+from . import models
 from .core.ocr import get_ocr_worker_health
 from .core.vector_store import vector_store
-from .database import engine, ensure_runtime_schema, get_db
+from .database import engine, ensure_runtime_schema
 from .api import admin_debug, admin_dedup, auth, budget, documents
 
 # Create tables
@@ -86,16 +84,3 @@ def health_detail():
         "status": "healthy" if required_ok else "degraded",
         "dependencies": dependencies,
     }
-
-@app.post("/posts/", response_model=schemas.Post)
-def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
-    db_post = models.Post(**post.dict())
-    db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
-    return db_post
-
-@app.get("/posts/", response_model=List[schemas.Post])
-def read_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    posts = db.query(models.Post).offset(skip).limit(limit).all()
-    return posts

@@ -1,5 +1,8 @@
 # 세션 핸드오버 (2026-02-07)
 
+> 아카이브 문서입니다.  
+> 다음 세션부터는 `docs/session-handover-2026-02-08.md`를 재개 기준으로 사용합니다.
+
 ## 목적
 - 다음 세션에서 바로 이어서 작업할 수 있도록, 현재 OCR/색인 상태와 실측 결과, 원인, 다음 작업을 정리한다.
 
@@ -122,7 +125,7 @@
   - `Ran 23 tests ... OK`
 
 ## 다음 세션 우선 작업
-1. AI 문서화 후속: 레거시 `posts` API 정리 방향 확정 [대기]
+1. AI 문서화 후속: 레거시 `posts` API 정리 방향 확정 [완료]
 - 대상: `app/main.py`의 `POST /posts`, `GET /posts`
 - 목표: 제거 여부 결정(삭제 또는 별도 샘플 API로 분리) 및 관련 테스트/문서 정리
 
@@ -145,7 +148,7 @@
 9. 품질 비교 리포트 자동화 [완료]
 
 ## 체크리스트
-- [ ] 1) 레거시 posts API 정리 방향 확정
+- [x] 1) 레거시 posts API 정리 방향 확정
 - [ ] 2) 프로젝트/문서 목록 pagination 표준화
 - [ ] 3) 검색 품질 E2E 스모크 자동화
 - [ ] 4) 디자인 토큰/컴포넌트 규칙 lint 가이드화
@@ -166,7 +169,7 @@ curl -s http://localhost:8100/health
 npm run verify:fast
 
 # 3) DB/ES 초기화
-docker exec synchub_db psql -U postgres -d synchub -c "TRUNCATE TABLE dedup_audit_log, dedup_cluster_members, dedup_clusters, documents, posts RESTART IDENTITY CASCADE;"
+docker exec synchub_db psql -U postgres -d synchub -c "TRUNCATE TABLE dedup_audit_log, dedup_cluster_members, dedup_clusters, documents RESTART IDENTITY CASCADE;"
 curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
 
 # 4) OCR cache 초기화

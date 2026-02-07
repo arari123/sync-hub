@@ -4,7 +4,7 @@
 - 시스템 컨텍스트: `docs/ai-system-context.md`
 - 프론트 구현 가이드: `docs/ai-frontend-guide.md`
 - 디자인 가이드: `docs/ai-design-guide.md`
-- 세션 재개 기준: `docs/session-handover-2026-02-07.md`
+- 세션 재개 기준: `docs/session-handover-2026-02-08.md`
 
 ## Core Folders
 - `app/`: FastAPI backend application.

@@ -304,6 +304,17 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 검증:
     - `docker exec synchub_frontend npm run build` 통과
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
+- 2026-02-07 (세션 재개-12)
+  - 신규 업로드 문서 검색 누락 보정:
+    - 사례: `Basler_Data_Sheet.pdf`는 `status=completed`, 색인 문서 존재(`doc_id=3`) 상태였으나 파일명 기반 질의에서 누락 가능.
+    - 조치: `app/core/vector_store.py`의 ES 키워드 검색 조건 확장
+      - `filename` exact term(boost)
+      - `filename` wildcard(case_insensitive)
+      - `ai_title` match_phrase
+      - `ai_summary_short` match
+  - 확인:
+    - `GET /documents/search?q=Basler_Data_Sheet.pdf&limit=10`에서 `doc_id=3` 반환 확인
+    - `GET /documents/search?q=Basler&limit=10`에서 `doc_id=3` 반환 확인
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

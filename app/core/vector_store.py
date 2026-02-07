@@ -298,38 +298,80 @@ class VectorStore:
         if not query_text.strip():
             return []
 
+        normalized_query = query_text.strip()
+        wildcard_query = normalized_query.replace("*", " ").replace("?", " ").strip()
+
+        should_clauses: List[dict] = [
+            {
+                "term": {
+                    "filename": {
+                        "value": normalized_query,
+                        "boost": 6.0,
+                    }
+                }
+            },
+            {
+                "match_phrase": {
+                    "content": {
+                        "query": normalized_query,
+                        "boost": 4.0,
+                    }
+                }
+            },
+            {
+                "match_phrase": {
+                    "ai_title": {
+                        "query": normalized_query,
+                        "boost": 3.0,
+                    }
+                }
+            },
+            {
+                "match": {
+                    "ai_summary_short": {
+                        "query": normalized_query,
+                        "boost": 2.0,
+                    }
+                }
+            },
+            {
+                "match": {
+                    "content": {
+                        "query": normalized_query,
+                        "operator": "and",
+                        "minimum_should_match": "70%",
+                        "boost": 2.0,
+                    }
+                }
+            },
+            {
+                "match": {
+                    "content": {
+                        "query": normalized_query,
+                        "boost": 1.0,
+                    }
+                }
+            },
+        ]
+
+        if wildcard_query:
+            should_clauses.append(
+                {
+                    "wildcard": {
+                        "filename": {
+                            "value": f"*{wildcard_query}*",
+                            "case_insensitive": True,
+                            "boost": 3.5,
+                        }
+                    }
+                }
+            )
+
         body = {
             "size": size,
             "query": {
                 "bool": {
-                    "should": [
-                        {
-                            "match_phrase": {
-                                "content": {
-                                    "query": query_text,
-                                    "boost": 4.0,
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "content": {
-                                    "query": query_text,
-                                    "operator": "and",
-                                    "minimum_should_match": "70%",
-                                    "boost": 2.0,
-                                }
-                            }
-                        },
-                        {
-                            "match": {
-                                "content": {
-                                    "query": query_text,
-                                    "boost": 1.0,
-                                }
-                            }
-                        },
-                    ],
+                    "should": should_clauses,
                     "minimum_should_match": 1,
                 }
             },

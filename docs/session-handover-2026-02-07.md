@@ -258,6 +258,24 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - 색인 문서에 `ai_title`, `ai_summary_short` 저장.
     - `/documents/search` 응답에서 문서 카드용 제목/요약을 우선 노출.
     - `page` 필드는 기존대로 포함되어 매칭 페이지 표시 가능.
+- 2026-02-07 (세션 재개-7)
+  - LLM 요약 품질 보정(강제 템플릿 제거 + 유도형):
+    - `app/core/document_summary.py`에서 KEYENCE 고정 템플릿 분기 제거.
+    - 출력 예시를 고정 문구가 아닌 자리표시자 형식으로 변경.
+    - `DOC_SUMMARY_LLM_MAX_RETRIES`(기본 3) 도입, 실패/기준미달 시 재시도 피드백 루프 추가.
+    - KEYENCE/LJ 카탈로그 문서 품질 게이트 추가(브랜드/시리즈 키워드 확인).
+    - 너무 짧거나 `~에 대한 요약` 형태 출력은 후처리로 문서 맥락 기반 보정.
+  - 테스트/검증:
+    - `tests/test_document_summary.py`에 재시도/유도형/품질게이트 회귀 테스트 추가.
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과(`Ran 34 tests ... OK`).
+  - 재인덱싱 및 결과(문서 2종):
+    - 실행: `docker exec -e DOC_SUMMARY_OLLAMA_MODEL=llama3.2:1b ... python -m app.core.indexing.reindex --doc-id 1 --doc-id 2 --dedup off --index-policy all`
+    - 검색 확인: `curl -s 'http://localhost:8001/documents/search?q=LJ-X8000&limit=5'`
+    - 반영 결과:
+      - doc1 title: `LJ-X8000 시리즈 인라인 3D 검사`
+      - doc1 summary: `KEYENCE사의 LJ-X8000 기반 인라인 3D 검사 시스템의 특징과 적용 용도를 소개하는 문서입니다.`
+      - doc2 title: `LJ-X8000 시리즈 광시야·고정도 타입 3D 검사 시스템`
+      - doc2 summary: `LJ-X8000 시리즈는 인라인 3D 검사로 대상 물체의 형상을 정확하게 표현할 수 있습니다. 다양한 대상 물체, 다양한 범위를 커버하는 폭넓은 대응력으로 인라인에 대응할 수 있습니다.`
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

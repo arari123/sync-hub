@@ -304,6 +304,15 @@ const BudgetManagement = () => {
                         />
                     </div>
                     <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">담당자</label>
+                        <input
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            placeholder="성함 입력"
+                            value={draftFilters.managerName}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, managerName: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-1">
                         <label className="text-[10px] font-bold text-muted-foreground/80 px-1">정렬 기준</label>
                         <select
                             className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none"
@@ -314,15 +323,6 @@ const BudgetManagement = () => {
                                 <option key={item.value} value={item.value}>{item.label}</option>
                             ))}
                         </select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">담당자</label>
-                        <input
-                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                            placeholder="성함 입력"
-                            value={draftFilters.managerName}
-                            onChange={(e) => setDraftFilters(p => ({ ...p, managerName: e.target.value }))}
-                        />
                     </div>
                 </form>
             </section>

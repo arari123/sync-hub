@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Logo from './ui/Logo';
 import { clearSession, getCurrentUser, isAuthenticated } from '../lib/session';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const authed = isAuthenticated();
     const user = getCurrentUser();
 
@@ -23,6 +24,14 @@ const Layout = ({ children }) => {
                             <span className="hidden text-xs text-muted-foreground md:inline">
                                 {user?.email || '로그인 사용자'}
                             </span>
+                            {location.pathname !== '/budget-management' && (
+                                <Link
+                                    to="/budget-management"
+                                    className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                >
+                                    예산관리
+                                </Link>
+                            )}
                             <button
                                 type="button"
                                 onClick={logout}

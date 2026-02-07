@@ -26,6 +26,7 @@ DOC_SUMMARY_TIMEOUT_SECONDS = max(1, int(os.getenv("DOC_SUMMARY_TIMEOUT_SECONDS"
 DOC_SUMMARY_MAX_INPUT_CHARS = max(800, int(os.getenv("DOC_SUMMARY_MAX_INPUT_CHARS", "12000")))
 DOC_SUMMARY_TITLE_MAX_CHARS = max(24, int(os.getenv("DOC_SUMMARY_TITLE_MAX_CHARS", "80")))
 DOC_SUMMARY_SHORT_MAX_CHARS = max(80, int(os.getenv("DOC_SUMMARY_SHORT_MAX_CHARS", "220")))
+DOC_SUMMARY_LLM_MAX_RETRIES = max(1, int(os.getenv("DOC_SUMMARY_LLM_MAX_RETRIES", "3")))
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?。！？])\s+|\n+")
 _MODEL_LINE_RE = re.compile(r"\bLJ[-\s]?[A-Z]?\d{3,4}\b", re.IGNORECASE)
@@ -159,20 +160,37 @@ def _contains_catalog_signals(text: str) -> bool:
     return hit_count >= 3
 
 
-def _keyence_lj_catalog_template(text: str) -> Optional[Tuple[str, str]]:
+def _is_keyence_lj_catalog(text: str) -> bool:
     body = (text or "")
     lowered = body.lower()
     has_keyence = "keyence" in lowered or "키엔스" in body
     has_lj = bool(_MODEL_LINE_RE.search(body)) or "lj-x" in lowered
-    if not (has_keyence and has_lj and _contains_catalog_signals(body)):
-        return None
+    return has_keyence and has_lj and _contains_catalog_signals(body)
 
-    title = "KEYENCE LJ시리즈 라인 프로파일 센서 카탈로그"
-    summary = (
-        "3D 검사를 위한 라인 프로파일 센서 카탈로그로서 "
-        "KEYENCE사의 LJ시리즈에 대해 소개하는 문서"
-    )
-    return title, summary
+
+def _keyword_hit_count(text: str, keywords: tuple[str, ...]) -> int:
+    body = (text or "").lower()
+    return sum(1 for keyword in keywords if keyword in body)
+
+
+def _is_high_quality_llm_summary(title: str, summary: str, source_text: str) -> bool:
+    if len(title.strip()) < 6 or len(summary.strip()) < 16:
+        return False
+    if _NOISE_ONLY_RE.match(title.strip()) or _NOISE_ONLY_RE.match(summary.strip()):
+        return False
+
+    if _is_keyence_lj_catalog(source_text):
+        merged = f"{title} {summary}".lower()
+        has_brand = "keyence" in merged or "키엔스" in f"{title} {summary}"
+        has_series = bool(re.search(r"\blj(?:[-\s]?[a-z]?\d{0,4})?\b", merged))
+        if not (has_brand or has_series):
+            return False
+
+        catalog_keywords = ("keyence", "lj", "카탈로그", "라인 프로파일", "3d", "센서")
+        hit_count = _keyword_hit_count(merged, catalog_keywords)
+        if hit_count < 2:
+            return False
+    return True
 
 
 def _extractive_summary(filename: str, text: str) -> Tuple[str, str]:
@@ -198,6 +216,51 @@ def _extractive_summary(filename: str, text: str) -> Tuple[str, str]:
     summary = re.sub(r"\s{2,}", " ", summary).strip()
     summary = _truncate(summary, DOC_SUMMARY_SHORT_MAX_CHARS)
     return title, summary
+
+
+def _pick_series_token(text: str) -> str:
+    match = _MODEL_LINE_RE.search(text or "")
+    if not match:
+        return "LJ 시리즈"
+    return re.sub(r"\s+", "", match.group(0)).upper()
+
+
+def _postprocess_summary_text(value: str) -> str:
+    body = (value or "").strip()
+    replacements = {
+        "inlining": "인라인",
+        "in-line": "인라인",
+        "인lining": "인라인",
+    }
+    for src, dst in replacements.items():
+        body = body.replace(src, dst)
+    body = re.sub(r"\s{2,}", " ", body).strip()
+    return body
+
+
+def _normalize_llm_summary(title: str, summary: str, source_text: str) -> str:
+    body = _postprocess_summary_text(summary)
+    lowered = body.lower()
+
+    needs_rewrite = (
+        len(body) < 28
+        or "에 대한 요약" in body
+        or lowered in {"요약", "문서 요약"}
+    )
+    if not needs_rewrite:
+        return _truncate(body, DOC_SUMMARY_SHORT_MAX_CHARS)
+
+    if _is_keyence_lj_catalog(source_text):
+        series_token = _pick_series_token(f"{title} {source_text}")
+        has_keyence = "keyence" in (source_text or "").lower() or "키엔스" in (source_text or "")
+        prefix = "KEYENCE사의 " if has_keyence else ""
+        rewritten = (
+            f"{prefix}{series_token} 기반 인라인 3D 검사 시스템의 특징과 적용 용도를 소개하는 문서입니다."
+        )
+        return _truncate(_postprocess_summary_text(rewritten), DOC_SUMMARY_SHORT_MAX_CHARS)
+
+    rewritten = f"{title.strip()}의 핵심 특징과 적용 내용을 소개하는 문서입니다."
+    return _truncate(_postprocess_summary_text(rewritten), DOC_SUMMARY_SHORT_MAX_CHARS)
 
 
 def _extract_json_from_response(response_text: str) -> Optional[dict]:
@@ -236,74 +299,86 @@ def _summarize_with_local_llm(filename: str, text: str) -> Optional[Tuple[str, s
     if not clipped:
         return None
 
-    prompt = (
+    base_prompt = (
         "너는 OCR 노이즈가 섞인 기술 문서를 요약하는 전문가다. "
         "문서의 '전체 주제'를 요약해야 하며 특정 페이지 조각만 요약하면 안 된다. "
         "표/수치/치수/깨진 문자는 노이즈로 보고 무시한다. "
         "JSON으로만 답하고 키는 title, summary만 사용한다. "
         f"title은 {DOC_SUMMARY_TITLE_MAX_CHARS}자 이내의 명사형 문장으로 작성한다. "
         f"summary는 한국어 1~2문장, {DOC_SUMMARY_SHORT_MAX_CHARS}자 이내로 작성한다. "
-        "문서가 제품 소개/카탈로그 성격이면 제품군과 용도를 명확히 포함한다.\n\n"
-        "[출력 예시]\n"
-        "{\"title\":\"KEYENCE LJ시리즈 라인 프로파일 센서 카탈로그\","
-        "\"summary\":\"3D 검사를 위한 라인 프로파일 센서 카탈로그로서 KEYENCE사의 LJ시리즈에 대해 소개하는 문서\"}\n\n"
+        "문서가 제품 소개/카탈로그 성격이면 제품군과 용도를 명확히 포함한다. "
+        "본문에 등장한 회사명/제품군(예: KEYENCE, LJ 시리즈 등) 고유명사는 가능한 한 유지한다. "
+        "파일명/페이지 번호를 제목으로 그대로 쓰지 않는다.\n\n"
+        "[출력 형식]\n"
+        "{\"title\":\"<문서 전체 주제>\",\"summary\":\"<문서 핵심 요약>\"}\n"
+        "위는 자리표시자이며 문구를 그대로 복사하지 않는다.\n\n"
         f"[파일명]\n{filename}\n\n"
         f"[본문]\n{clipped}"
     )
+    feedback = ""
+    for attempt in range(1, DOC_SUMMARY_LLM_MAX_RETRIES + 1):
+        prompt = base_prompt
+        if feedback:
+            prompt = f"{base_prompt}\n\n[재시도 피드백]\n{feedback}"
 
-    body = {
-        "model": DOC_SUMMARY_OLLAMA_MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "format": "json",
-        "options": {
-            "temperature": 0.1,
-        },
-    }
+        body = {
+            "model": DOC_SUMMARY_OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+            "options": {
+                "temperature": 0.2,
+                "top_p": 0.9,
+            },
+        }
 
-    request = urllib.request.Request(
-        DOC_SUMMARY_OLLAMA_URL,
-        data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+        request = urllib.request.Request(
+            DOC_SUMMARY_OLLAMA_URL,
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
 
-    try:
-        with urllib.request.urlopen(request, timeout=DOC_SUMMARY_TIMEOUT_SECONDS) as response:
-            raw = response.read().decode("utf-8", errors="ignore")
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        print(f"[doc-summary] local LLM call failed: {exc}")
-        return None
+        try:
+            with urllib.request.urlopen(request, timeout=DOC_SUMMARY_TIMEOUT_SECONDS) as response:
+                raw = response.read().decode("utf-8", errors="ignore")
+        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+            print(f"[doc-summary] local LLM call failed (attempt={attempt}): {exc}")
+            if attempt >= DOC_SUMMARY_LLM_MAX_RETRIES:
+                return None
+            feedback = (
+                "이전 요청은 응답 오류 또는 시간 초과로 실패했다. "
+                "반드시 JSON 형식(title, summary)으로 다시 작성하라."
+            )
+            continue
 
-    envelope = _extract_json_from_response(raw) or {}
-    content = envelope.get("response", "")
-    if isinstance(content, dict):
-        parsed = content
-    else:
-        parsed = _extract_json_from_response(str(content)) or {}
+        envelope = _extract_json_from_response(raw) or {}
+        content = envelope.get("response", "")
+        if isinstance(content, dict):
+            parsed = content
+        else:
+            parsed = _extract_json_from_response(str(content)) or {}
 
-    title = _truncate(str(parsed.get("title") or "").strip(), DOC_SUMMARY_TITLE_MAX_CHARS)
-    summary = _truncate(str(parsed.get("summary") or "").strip(), DOC_SUMMARY_SHORT_MAX_CHARS)
-    if not title or not summary:
-        return None
-    return title, summary
+        title = _truncate(str(parsed.get("title") or "").strip(), DOC_SUMMARY_TITLE_MAX_CHARS)
+        summary = _truncate(str(parsed.get("summary") or "").strip(), DOC_SUMMARY_SHORT_MAX_CHARS)
+        summary = _normalize_llm_summary(title, summary, text)
+        if title and summary and _is_high_quality_llm_summary(title, summary, text):
+            return title, summary
+
+        feedback = (
+            "이전 출력이 기준 미달이었다. "
+            "문서 전체 주제를 더 명확히 표현하고, 제품군/용도 키워드를 포함해 다시 작성하라."
+        )
+
+    return None
 
 
 def build_document_summary(filename: str, content_text: str) -> Tuple[str, str]:
     if not DOC_SUMMARY_ENABLED:
         return _title_from_filename(filename), ""
 
-    template_result = _keyence_lj_catalog_template(content_text)
-    if template_result:
-        return template_result
-
     llm_result = _summarize_with_local_llm(filename=filename, text=content_text)
     if llm_result:
-        tuned_title, tuned_summary = llm_result
-        if _contains_catalog_signals(content_text):
-            guardrail = _keyence_lj_catalog_template(content_text)
-            if guardrail:
-                return guardrail
-        return tuned_title, tuned_summary
+        return llm_result
 
     return _extractive_summary(filename=filename, text=content_text)

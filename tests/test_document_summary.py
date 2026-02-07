@@ -66,7 +66,14 @@ class DocumentSummaryTests(unittest.TestCase):
             document_summary.DOC_SUMMARY_OLLAMA_URL = "http://localhost:11434/api/generate"
             document_summary.DOC_SUMMARY_OLLAMA_MODEL = "llama3.1"
 
-            envelope = {"response": json.dumps({"title": "LLM 제목", "summary": "LLM 요약 문장입니다."})}
+            envelope = {
+                "response": json.dumps(
+                    {
+                        "title": "LLM 제목",
+                        "summary": "LLM이 생성한 문서 전체 요약 문장으로 주요 내용을 설명합니다.",
+                    }
+                )
+            }
             with patch("urllib.request.urlopen", return_value=_DummyHttpResponse(json.dumps(envelope))):
                 title, summary = document_summary.build_document_summary(
                     filename="any.pdf",
@@ -74,27 +81,104 @@ class DocumentSummaryTests(unittest.TestCase):
                 )
 
             self.assertEqual(title, "LLM 제목")
-            self.assertEqual(summary, "LLM 요약 문장입니다.")
+            self.assertEqual(summary, "LLM이 생성한 문서 전체 요약 문장으로 주요 내용을 설명합니다.")
         finally:
             document_summary.DOC_SUMMARY_ENABLED = original_enabled
             document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
             document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
             document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
 
-    def test_keyence_lj_catalog_uses_domain_template(self):
-        text = (
-            "KEYENCE LJ-X8000 시리즈 카탈로그\n"
-            "라인 프로파일 센서 기반 3D 검사 솔루션 소개 문서\n"
-            "LJ-X8000 series for 3D inspection and measurement."
-        )
+    def test_catalog_document_prefers_llm_style_but_not_hardcoded_template(self):
+        original_enabled = document_summary.DOC_SUMMARY_ENABLED
+        original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
+        original_url = document_summary.DOC_SUMMARY_OLLAMA_URL
+        original_model = document_summary.DOC_SUMMARY_OLLAMA_MODEL
+        try:
+            document_summary.DOC_SUMMARY_ENABLED = True
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = True
+            document_summary.DOC_SUMMARY_OLLAMA_URL = "http://localhost:11434/api/generate"
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = "llama3.1"
 
-        title, summary = document_summary.build_document_summary(
-            filename="AS_161723_LJ-X8000_sample.pdf",
-            content_text=text,
-        )
+            envelope = {
+                "response": json.dumps(
+                    {
+                        "title": "KEYENCE LJ-X8000 라인 프로파일 센서 제품 카탈로그",
+                        "summary": "3D 검사 용도의 라인 프로파일 센서 제품군을 소개하는 카탈로그 문서입니다.",
+                    }
+                )
+            }
+            with patch("urllib.request.urlopen", return_value=_DummyHttpResponse(json.dumps(envelope))):
+                title, summary = document_summary.build_document_summary(
+                    filename="AS_161723_LJ-X8000_sample.pdf",
+                    content_text="KEYENCE LJ-X8000 시리즈 카탈로그, 3D 검사 라인 프로파일 센서 소개",
+                )
 
-        self.assertEqual(title, "KEYENCE LJ시리즈 라인 프로파일 센서 카탈로그")
-        self.assertEqual(
-            summary,
-            "3D 검사를 위한 라인 프로파일 센서 카탈로그로서 KEYENCE사의 LJ시리즈에 대해 소개하는 문서",
+            self.assertEqual(title, "KEYENCE LJ-X8000 라인 프로파일 센서 제품 카탈로그")
+            self.assertIn("카탈로그", summary)
+            self.assertIn("3D", summary)
+        finally:
+            document_summary.DOC_SUMMARY_ENABLED = original_enabled
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
+            document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
+
+    def test_local_llm_retries_until_quality_passes(self):
+        original_enabled = document_summary.DOC_SUMMARY_ENABLED
+        original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
+        original_url = document_summary.DOC_SUMMARY_OLLAMA_URL
+        original_model = document_summary.DOC_SUMMARY_OLLAMA_MODEL
+        original_retries = document_summary.DOC_SUMMARY_LLM_MAX_RETRIES
+        try:
+            document_summary.DOC_SUMMARY_ENABLED = True
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = True
+            document_summary.DOC_SUMMARY_OLLAMA_URL = "http://localhost:11434/api/generate"
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = "llama3.1"
+            document_summary.DOC_SUMMARY_LLM_MAX_RETRIES = 2
+
+            bad = {"response": json.dumps({"title": "요약", "summary": "짧음"})}
+            good = {
+                "response": json.dumps(
+                    {
+                        "title": "KEYENCE LJ 시리즈 센서 카탈로그",
+                        "summary": "3D 검사 라인 프로파일 센서 제품군을 소개하는 카탈로그 문서입니다.",
+                    }
+                )
+            }
+
+            with patch(
+                "urllib.request.urlopen",
+                side_effect=[
+                    _DummyHttpResponse(json.dumps(bad)),
+                    _DummyHttpResponse(json.dumps(good)),
+                ],
+            ):
+                title, summary = document_summary.build_document_summary(
+                    filename="sample.pdf",
+                    content_text="KEYENCE LJ-X8000 series catalog for 3D line profile sensor inspection",
+                )
+
+            self.assertIn("KEYENCE", title)
+            self.assertIn("카탈로그", summary)
+        finally:
+            document_summary.DOC_SUMMARY_ENABLED = original_enabled
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
+            document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
+            document_summary.DOC_SUMMARY_LLM_MAX_RETRIES = original_retries
+
+    def test_keyence_catalog_quality_requires_brand_and_series_mentions(self):
+        source = "KEYENCE LJ-X8000 series catalog for 3D line profile sensor inspection"
+        self.assertFalse(
+            document_summary._is_high_quality_llm_summary(
+                "산업용 라인 프로파일 센서 제품 카탈로그",
+                "3D 검사용 라인 프로파일 센서 제품군의 특징과 적용 용도를 소개하는 문서입니다.",
+                source,
+            )
+        )
+        self.assertTrue(
+            document_summary._is_high_quality_llm_summary(
+                "KEYENCE LJ 시리즈 라인 프로파일 센서 카탈로그",
+                "KEYENCE사의 LJ 시리즈를 중심으로 3D 검사 용도의 라인 프로파일 센서 제품군을 소개하는 문서입니다.",
+                source,
+            )
         )

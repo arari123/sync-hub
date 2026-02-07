@@ -122,7 +122,17 @@ const BudgetProjectOverview = () => {
 
     const monitoring = project?.monitoring || {};
     const projectGrandTotal = Math.max(toNumber(totals?.grand_total), 0);
-    const projectActualSpentTotal = Math.max(toNumber(monitoring.actual_spent_total), 0);
+    const confirmedMaterial = Math.max(toNumber(monitoring.confirmed_budget_material), toNumber(totals?.material_total));
+    const confirmedLabor = Math.max(toNumber(monitoring.confirmed_budget_labor), toNumber(totals?.labor_total));
+    const confirmedExpense = Math.max(toNumber(monitoring.confirmed_budget_expense), toNumber(totals?.expense_total));
+    const confirmedTotal = Math.max(toNumber(monitoring.confirmed_budget_total), projectGrandTotal);
+
+    const spentMaterial = Math.max(toNumber(monitoring.actual_spent_material), 0);
+    const spentLabor = Math.max(toNumber(monitoring.actual_spent_labor), 0);
+    const spentExpense = Math.max(toNumber(monitoring.actual_spent_expense), 0);
+    const spentTotalFromParts = spentMaterial + spentLabor + spentExpense;
+    const projectActualSpentTotal = Math.max(toNumber(monitoring.actual_spent_total), spentTotalFromParts, 0);
+    const remainingTotal = confirmedTotal - projectActualSpentTotal;
 
     const equipmentCards = useMemo(
         () =>
@@ -280,32 +290,32 @@ const BudgetProjectOverview = () => {
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                         <AmountCell
                             label="재료비"
-                            value={formatAmount(monitoring.confirmed_budget_material ?? totals?.material_total)}
+                            value={formatAmount(confirmedMaterial)}
                             subLabel="집행 금액"
-                            subValue={formatAmount(monitoring.actual_spent_material)}
+                            subValue={formatAmount(spentMaterial)}
                         />
                         <AmountCell
                             label="인건비"
-                            value={formatAmount(monitoring.confirmed_budget_labor ?? totals?.labor_total)}
+                            value={formatAmount(confirmedLabor)}
                             subLabel="집행 금액"
-                            subValue={formatAmount(monitoring.actual_spent_labor)}
+                            subValue={formatAmount(spentLabor)}
                         />
                         <AmountCell
                             label="경비"
-                            value={formatAmount(monitoring.confirmed_budget_expense ?? totals?.expense_total)}
+                            value={formatAmount(confirmedExpense)}
                             subLabel="집행 금액"
-                            subValue={formatAmount(monitoring.actual_spent_expense)}
+                            subValue={formatAmount(spentExpense)}
                         />
                         <AmountCell
                             label="확정 예산"
-                            value={formatAmount(monitoring.confirmed_budget_total ?? totals?.grand_total)}
+                            value={formatAmount(confirmedTotal)}
                             subLabel="집행 금액 합계"
-                            subValue={formatAmount(monitoring.actual_spent_total)}
+                            subValue={formatAmount(projectActualSpentTotal)}
                             strong
                         />
                         <AmountCell
                             label="잔액"
-                            value={formatAmount(monitoring.variance_total)}
+                            value={formatAmount(remainingTotal)}
                             note="확정예산 - 집행금액 = 잔액"
                             strong
                         />

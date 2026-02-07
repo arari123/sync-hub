@@ -5,6 +5,8 @@ import HealthStatus from '../components/HealthStatus';
 import { UploadCloud } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 
+const SHOW_TEMP_PDF_UPLOAD = true;
+
 const Home = () => {
     return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] gap-12">
@@ -21,15 +23,23 @@ const Home = () => {
                 <SearchInput className="shadow-lg" autoFocus />
             </div>
 
-            <div className="w-full max-w-3xl px-4 opacity-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-250 fill-mode-forwards">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                        <UploadCloud size={16} />
-                        <h3 className="text-sm font-medium uppercase tracking-wider">PDF Upload</h3>
+            {SHOW_TEMP_PDF_UPLOAD && (
+                <div className="w-full max-w-3xl px-4 opacity-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-250 fill-mode-forwards">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <UploadCloud size={16} />
+                            <h3 className="text-sm font-medium uppercase tracking-wider">PDF Upload</h3>
+                            <span className="rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Temporary
+                            </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground -mt-1">
+                            Temporary upload area on home page. It can be moved or removed later.
+                        </p>
+                        <UploadWidget />
                     </div>
-                    <UploadWidget />
                 </div>
-            </div>
+            )}
 
             <div className="w-full max-w-4xl mt-6 px-4 opacity-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-forwards">
                 <div className="space-y-4">

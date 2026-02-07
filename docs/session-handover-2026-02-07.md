@@ -283,6 +283,13 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - 기본 질의 5개: `LJ-X8000`, `라인 프로파일 센서`, `인라인 3D 검사`, `광시야 고정도 타입`, `KEYENCE LJ 시리즈`
   - 테스트 규칙 문서 갱신:
     - `docs/ocr-test-rules.md`에 자동 리포트 실행 명령/산출물 경로/지표 항목 추가
+- 2026-02-07 (세션 재개-9)
+  - 메인 페이지 업로드 영역 정리:
+    - `frontend/src/pages/Home.jsx`에 임시 업로드 토글(`SHOW_TEMP_PDF_UPLOAD`) 추가
+    - 업로드 섹션에 `Temporary` 배지/안내 문구 추가(추후 이동/제거 용이)
+  - 검증:
+    - `docker exec synchub_frontend npm run build` 통과
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

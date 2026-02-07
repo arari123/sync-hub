@@ -18,6 +18,15 @@ const PROJECT_STAGE_OPTIONS = [
     { value: 'closure', label: '종료' },
 ];
 
+const PROJECT_SORT_OPTIONS = [
+    { value: 'updated_desc', label: '업데이트 내림차순' },
+    { value: 'updated_asc', label: '업데이트 오름차순' },
+    { value: 'name_desc', label: '이름 내림차순' },
+    { value: 'name_asc', label: '이름 오름차순' },
+];
+
+const DEFAULT_PROJECT_SORT = 'updated_desc';
+
 function formatAmount(value) {
     const number = Number(value || 0);
     return `${number.toLocaleString('ko-KR')}원`;
@@ -56,6 +65,7 @@ function buildProjectFilterParams(filters) {
     const managerName = (filters.managerName || '').trim();
     const projectTypes = Array.isArray(filters.projectTypes) ? filters.projectTypes.filter(Boolean) : [];
     const stages = Array.isArray(filters.stages) ? filters.stages.filter(Boolean) : [];
+    const sortBy = (filters.sortBy || DEFAULT_PROJECT_SORT).trim();
 
     if (projectName) params.project_name = projectName;
     if (projectCode) params.project_code = projectCode;
@@ -63,6 +73,7 @@ function buildProjectFilterParams(filters) {
     if (managerName) params.manager_name = managerName;
     if (projectTypes.length) params.project_types = projectTypes.join(',');
     if (stages.length) params.stages = stages.join(',');
+    if (sortBy) params.sort_by = sortBy;
     return params;
 }
 
@@ -98,6 +109,7 @@ const BudgetManagement = () => {
         managerName: '',
         projectTypes: [],
         stages: [],
+        sortBy: DEFAULT_PROJECT_SORT,
     };
 
     const [projects, setProjects] = useState([]);
@@ -255,6 +267,17 @@ const BudgetManagement = () => {
                             value={draftFilters.managerName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, managerName: event.target.value }))}
                         />
+                        <select
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            value={draftFilters.sortBy}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, sortBy: event.target.value }))}
+                        >
+                            {PROJECT_SORT_OPTIONS.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
                         <div className="sm:col-span-2 lg:col-span-3 xl:col-span-2">
                             <p className="mb-1 text-[10px] text-muted-foreground">프로젝트 종류(복수 선택)</p>
                             <div className="flex flex-wrap gap-1">

@@ -42,6 +42,18 @@ _PROJECT_TYPE_TO_CODE = {
 }
 
 _SEARCH_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
+_DEFAULT_PROJECT_SORT = "updated_desc"
+_ALLOWED_PROJECT_SORTS = {
+    "updated_desc",
+    "updated_asc",
+    "name_desc",
+    "name_asc",
+}
+_PROJECT_SORT_ALIASES = {
+    "updated": "updated_desc",
+    "updated_at_desc": "updated_desc",
+    "updated_at_asc": "updated_asc",
+}
 
 
 class BudgetProjectCreate(BaseModel):
@@ -280,6 +292,53 @@ def _collect_stage_filters(stages: Optional[str]) -> set[str]:
     for token in _split_csv_query_values(stages):
         selected.add(normalize_stage(token))
     return selected
+
+
+def _normalize_project_sort(sort_by: Optional[str]) -> str:
+    token = (sort_by or "").strip().lower()
+    if not token:
+        return _DEFAULT_PROJECT_SORT
+    normalized = _PROJECT_SORT_ALIASES.get(token, token)
+    if normalized not in _ALLOWED_PROJECT_SORTS:
+        raise ValueError(f"Unsupported sort_by: {sort_by}")
+    return normalized
+
+
+def _sort_project_payloads(projects: list[dict], sort_by: str) -> list[dict]:
+    if sort_by == "updated_asc":
+        return sorted(
+            projects,
+            key=lambda item: (
+                str(item.get("updated_at") or ""),
+                int(item.get("id") or 0),
+            ),
+        )
+    if sort_by == "name_desc":
+        return sorted(
+            projects,
+            key=lambda item: (
+                str(item.get("name") or "").lower(),
+                int(item.get("id") or 0),
+            ),
+            reverse=True,
+        )
+    if sort_by == "name_asc":
+        return sorted(
+            projects,
+            key=lambda item: (
+                str(item.get("name") or "").lower(),
+                int(item.get("id") or 0),
+            ),
+        )
+
+    return sorted(
+        projects,
+        key=lambda item: (
+            str(item.get("updated_at") or ""),
+            int(item.get("id") or 0),
+        ),
+        reverse=True,
+    )
 
 
 def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
@@ -554,6 +613,7 @@ def list_projects(
     author_name: Optional[str] = Query(default=None, max_length=180),
     min_total: Optional[float] = Query(default=None),
     max_total: Optional[float] = Query(default=None),
+    sort_by: Optional[str] = Query(default=_DEFAULT_PROJECT_SORT, max_length=32),
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -570,6 +630,10 @@ def list_projects(
 
     try:
         selected_stages = _collect_stage_filters(stages=stages)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    try:
+        normalized_sort = _normalize_project_sort(sort_by)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -597,7 +661,7 @@ def list_projects(
         ):
             continue
         visible_projects.append(payload)
-    return visible_projects
+    return _sort_project_payloads(visible_projects, sort_by=normalized_sort)
 
 
 @router.get("/projects/search")

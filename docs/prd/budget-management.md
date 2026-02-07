@@ -59,7 +59,7 @@ PM(Project Manager)이 설비 제작/설치 프로젝트의 예산을 단계별�
 - `budget_exports`: 엑셀/PDF 산출 기록
 
 ## 5. 화면 구성
-- `/budget-management` 대시보드
+- `/project-management` 대시보드
   - 프로젝트 선택
   - 현재 단계/버전 카드
   - 예산 요약(총액, 항목 비중)

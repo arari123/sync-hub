@@ -18,7 +18,7 @@ const ProjectResultList = ({ results }) => {
             {results.map((project) => (
                 <Link
                     key={project.project_id}
-                    to={`/budget-management/projects/${project.project_id}`}
+                    to={`/project-management/projects/${project.project_id}`}
                     className={cn(
                         'block rounded-lg border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md'
                     )}

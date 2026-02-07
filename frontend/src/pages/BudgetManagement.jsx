@@ -193,7 +193,7 @@ const BudgetManagement = () => {
                             </p>
                         </div>
                         <Link
-                            to="/budget-management/projects/new"
+                            to="/project-management/projects/new"
                             className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-accent"
                         >
                             <Plus className="h-3.5 w-3.5" />
@@ -332,7 +332,7 @@ const BudgetManagement = () => {
                     <div className="rounded-md border border-dashed px-4 py-8 text-center">
                         <p className="text-sm text-muted-foreground">등록된 프로젝트가 없습니다.</p>
                         <Link
-                            to="/budget-management/projects/new"
+                            to="/project-management/projects/new"
                             className="mt-3 inline-flex h-9 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
                         >
                             <Plus className="h-3.5 w-3.5" />
@@ -379,7 +379,7 @@ const BudgetManagement = () => {
                                                 {project.current_stage_label}
                                             </span>
                                             <Link
-                                                to={`/budget-management/projects/${project.id}`}
+                                                to={`/project-management/projects/${project.id}`}
                                                 className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
                                             >
                                                 상세

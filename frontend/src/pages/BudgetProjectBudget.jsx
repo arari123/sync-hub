@@ -94,8 +94,8 @@ const BudgetProjectBudget = () => {
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
-                    { label: '프로젝트 관리', to: '/budget-management' },
-                    { label: project.name || '프로젝트', to: `/budget-management/projects/${project.id}` },
+                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: '예산 관리' },
                 ]}
             />
@@ -111,7 +111,7 @@ const BudgetProjectBudget = () => {
                         </p>
                     </div>
                     <Link
-                        to={`/budget-management/projects/${project.id}`}
+                        to={`/project-management/projects/${project.id}`}
                         className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent"
                     >
                         프로젝트 상세
@@ -132,7 +132,7 @@ const BudgetProjectBudget = () => {
                     {EDIT_SECTIONS.map((item) => (
                         <Link
                             key={item.key}
-                            to={`/budget-management/projects/${project.id}/edit/${item.key}`}
+                            to={`/project-management/projects/${project.id}/edit/${item.key}`}
                             className={`inline-flex h-9 items-center justify-center gap-1 rounded-md border px-3 text-sm ${
                                 project?.can_edit
                                     ? 'border-input bg-background hover:bg-accent'

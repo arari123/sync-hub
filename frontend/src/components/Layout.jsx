@@ -24,9 +24,9 @@ const Layout = ({ children }) => {
                             <span className="hidden text-xs text-muted-foreground md:inline">
                                 {user?.email || '로그인 사용자'}
                             </span>
-                            {location.pathname !== '/budget-management' && (
+                            {location.pathname !== '/project-management' && (
                                 <Link
-                                    to="/budget-management"
+                                    to="/project-management"
                                     className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                                 >
                                     프로젝트 관리

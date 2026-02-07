@@ -60,7 +60,7 @@ const BudgetProjectEditor = () => {
     const { projectId, section = 'material' } = useParams();
 
     if (!SECTION_META[section]) {
-        return <Navigate to={`/budget-management/projects/${projectId}/edit/material`} replace />;
+        return <Navigate to={`/project-management/projects/${projectId}/edit/material`} replace />;
     }
 
     const [project, setProject] = useState(null);
@@ -205,9 +205,9 @@ const BudgetProjectEditor = () => {
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
-                    { label: '프로젝트 관리', to: '/budget-management' },
-                    { label: project?.name || '프로젝트', to: `/budget-management/projects/${projectId}` },
-                    { label: '예산 관리', to: `/budget-management/projects/${projectId}/budget` },
+                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
+                    { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
                     { label: `${SECTION_META[section].label} 입력` },
                 ]}
             />
@@ -224,7 +224,7 @@ const BudgetProjectEditor = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Link
-                            to={`/budget-management/projects/${projectId}/budget`}
+                            to={`/project-management/projects/${projectId}/budget`}
                             className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
                         >
                             예산 관리로
@@ -281,7 +281,7 @@ const BudgetProjectEditor = () => {
                         <button
                             key={tab.key}
                             type="button"
-                            onClick={() => navigate(`/budget-management/projects/${projectId}/edit/${tab.key}`)}
+                            onClick={() => navigate(`/project-management/projects/${projectId}/edit/${tab.key}`)}
                             className={`inline-flex h-9 items-center justify-center rounded-md px-3 text-sm ${
                                 section === tab.key
                                     ? 'bg-primary text-primary-foreground'

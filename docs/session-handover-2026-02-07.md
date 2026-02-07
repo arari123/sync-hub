@@ -406,7 +406,7 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - `frontend/src/pages/Login.jsx`, `frontend/src/pages/Signup.jsx`, `frontend/src/pages/VerifyEmail.jsx` 추가.
     - `frontend/src/components/ProtectedRoute.jsx`로 보호 라우트 적용.
     - `frontend/src/lib/session.js` + `frontend/src/lib/api.js` 인터셉터로 Bearer 토큰 자동 첨부/401 세션 정리.
-    - 보호 라우트: `/`, `/search`, `/budget-management` (비로그인 시 `/login` 리다이렉트).
+    - 보호 라우트: `/`, `/search`, `/project-management` (비로그인 시 `/login` 리다이렉트).
   - 도메인 제한 설정:
     - `.env.example`에 `AUTH_ALLOWED_EMAIL_DOMAINS` 및 SMTP/세션/토큰 만료 설정 추가.
   - 검증:

@@ -82,7 +82,7 @@ const BudgetProjectCreate = () => {
             }
 
             await api.post(`/budget/projects/${projectId}/versions`, { stage: 'review' });
-            navigate(`/budget-management/projects/${projectId}`);
+            navigate(`/project-management/projects/${projectId}`);
         } catch (err) {
             setError(getErrorMessage(err, '프로젝트 생성에 실패했습니다.'));
         } finally {
@@ -94,7 +94,7 @@ const BudgetProjectCreate = () => {
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
-                    { label: '프로젝트 관리', to: '/budget-management' },
+                    { label: '프로젝트 관리', to: '/project-management' },
                     { label: '프로젝트 생성' },
                 ]}
             />
@@ -109,7 +109,7 @@ const BudgetProjectCreate = () => {
                         </p>
                     </div>
                     <Link
-                        to="/budget-management"
+                        to="/project-management"
                         className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />

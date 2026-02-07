@@ -91,7 +91,7 @@ const BudgetProjectOverview = () => {
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
-                    { label: '프로젝트 관리', to: '/budget-management' },
+                    { label: '프로젝트 관리', to: '/project-management' },
                     { label: project.name || '프로젝트' },
                 ]}
             />
@@ -107,7 +107,7 @@ const BudgetProjectOverview = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <Link
-                            to={`/budget-management/projects/${project.id}/budget`}
+                            to={`/project-management/projects/${project.id}/budget`}
                             className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent"
                         >
                             예산 관리

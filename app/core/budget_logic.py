@@ -14,7 +14,9 @@ COST_FIELDS = (
 
 ALLOWED_STAGES = {
     "review": "검토",
-    "progress": "진행",
+    "fabrication": "제작",
+    "installation": "설치",
+    "warranty": "워런티",
     "closure": "종료",
 }
 
@@ -22,8 +24,16 @@ ALLOWED_STATUSES = {"draft", "confirmed", "revision"}
 
 _KOREAN_STAGE_TO_CODE = {
     "검토": "review",
-    "진행": "progress",
+    "진행": "fabrication",
+    "제작": "fabrication",
+    "설치": "installation",
+    "워런티": "warranty",
+    "보증": "warranty",
     "종료": "closure",
+}
+
+_LEGACY_STAGE_ALIAS = {
+    "progress": "fabrication",
 }
 
 _PHASE_MAP = {
@@ -45,6 +55,8 @@ _LABOR_UNIT_HOURS = {
 
 def normalize_stage(stage: str) -> str:
     value = (stage or "").strip().lower()
+    if value in _LEGACY_STAGE_ALIAS:
+        value = _LEGACY_STAGE_ALIAS[value]
     if value in ALLOWED_STAGES:
         return value
     if stage in _KOREAN_STAGE_TO_CODE:
@@ -53,7 +65,10 @@ def normalize_stage(stage: str) -> str:
 
 
 def stage_label(stage: str) -> str:
-    return ALLOWED_STAGES.get((stage or "").strip().lower(), stage or "-")
+    value = (stage or "").strip().lower()
+    if value in _LEGACY_STAGE_ALIAS:
+        value = _LEGACY_STAGE_ALIAS[value]
+    return ALLOWED_STAGES.get(value, stage or "-")
 
 
 def to_number(value) -> float:  # noqa: ANN001

@@ -31,7 +31,13 @@ class BudgetLogicTests(unittest.TestCase):
     def test_normalize_stage_supports_korean_and_code(self):
         self.assertEqual(normalize_stage("review"), "review")
         self.assertEqual(normalize_stage("검토"), "review")
-        self.assertEqual(normalize_stage("진행"), "progress")
+        self.assertEqual(normalize_stage("진행"), "fabrication")
+        self.assertEqual(normalize_stage("progress"), "fabrication")
+        self.assertEqual(normalize_stage("제작"), "fabrication")
+        self.assertEqual(normalize_stage("installation"), "installation")
+        self.assertEqual(normalize_stage("설치"), "installation")
+        self.assertEqual(normalize_stage("warranty"), "warranty")
+        self.assertEqual(normalize_stage("워런티"), "warranty")
 
     def test_normalize_stage_rejects_unknown(self):
         with self.assertRaises(ValueError):
@@ -39,6 +45,10 @@ class BudgetLogicTests(unittest.TestCase):
 
     def test_stage_label(self):
         self.assertEqual(stage_label("review"), "검토")
+        self.assertEqual(stage_label("fabrication"), "제작")
+        self.assertEqual(stage_label("progress"), "제작")
+        self.assertEqual(stage_label("installation"), "설치")
+        self.assertEqual(stage_label("warranty"), "워런티")
         self.assertEqual(stage_label("closure"), "종료")
         self.assertEqual(stage_label("custom"), "custom")
 

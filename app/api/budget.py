@@ -246,6 +246,42 @@ def _project_type_code_or_empty(value: Optional[str]) -> str:
         return ""
 
 
+def _split_csv_query_values(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    output = []
+    seen = set()
+    for token in str(value).split(","):
+        item = token.strip()
+        if not item:
+            continue
+        lowered = item.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        output.append(item)
+    return output
+
+
+def _collect_project_type_filters(
+    project_type: Optional[str],
+    project_types: Optional[str],
+) -> set[str]:
+    selected = set()
+    for token in _split_csv_query_values(project_types):
+        selected.add(_normalize_project_type(token))
+    if project_type:
+        selected.add(_normalize_project_type(project_type))
+    return selected
+
+
+def _collect_stage_filters(stages: Optional[str]) -> set[str]:
+    selected = set()
+    for token in _split_csv_query_values(stages):
+        selected.add(normalize_stage(token))
+    return selected
+
+
 def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
     if not user:
         return False
@@ -377,7 +413,8 @@ def _matches_project_filters(
     project_payload: dict,
     project_name: Optional[str],
     project_code: Optional[str],
-    project_type: Optional[str],
+    project_types: set[str],
+    stages: set[str],
     customer_name: Optional[str],
     manager_name: Optional[str],
     min_total: Optional[float],
@@ -393,9 +430,16 @@ def _matches_project_filters(
         if code_filter not in (project_payload.get("code") or "").lower():
             return False
 
-    if project_type:
-        normalized_filter = _normalize_project_type(project_type)
-        if (project_payload.get("project_type") or "") != normalized_filter:
+    if project_types:
+        if (project_payload.get("project_type") or "") not in project_types:
+            return False
+
+    if stages:
+        try:
+            normalized_stage = normalize_stage(project_payload.get("current_stage") or "")
+        except ValueError:
+            normalized_stage = (project_payload.get("current_stage") or "").strip().lower()
+        if normalized_stage not in stages:
             return False
 
     customer_filter = (customer_name or "").strip().lower()
@@ -503,6 +547,8 @@ def list_projects(
     project_name: Optional[str] = Query(default=None, max_length=120),
     project_code: Optional[str] = Query(default=None, max_length=64),
     project_type: Optional[str] = Query(default=None, max_length=32),
+    project_types: Optional[str] = Query(default=None, max_length=255),
+    stages: Optional[str] = Query(default=None, max_length=255),
     customer_name: Optional[str] = Query(default=None, max_length=180),
     manager_name: Optional[str] = Query(default=None, max_length=180),
     author_name: Optional[str] = Query(default=None, max_length=180),
@@ -514,11 +560,18 @@ def list_projects(
     if min_total is not None and max_total is not None and to_number(min_total) > to_number(max_total):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="min_total cannot exceed max_total.")
 
-    if project_type:
-        try:
-            _normalize_project_type(project_type)
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    try:
+        selected_project_types = _collect_project_type_filters(
+            project_type=project_type,
+            project_types=project_types,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    try:
+        selected_stages = _collect_stage_filters(stages=stages)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     all_projects = (
         db.query(models.BudgetProject)
@@ -535,7 +588,8 @@ def list_projects(
             payload,
             project_name=project_name,
             project_code=project_code,
-            project_type=project_type,
+            project_types=selected_project_types,
+            stages=selected_stages,
             customer_name=customer_name,
             manager_name=(manager_name or author_name),
             min_total=min_total,
@@ -931,7 +985,7 @@ def project_summary(
     project = _get_project_or_404(project_id, db)
     stage_summaries = {}
 
-    for stage_code in ("review", "progress", "closure"):
+    for stage_code in ("review", "fabrication", "installation", "warranty", "closure"):
         current_version = (
             db.query(models.BudgetVersion)
             .filter(

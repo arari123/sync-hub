@@ -126,7 +126,7 @@ class BudgetVersion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
-    stage = Column(String(32), nullable=False, index=True)  # review|progress|closure
+    stage = Column(String(32), nullable=False, index=True)  # review|fabrication|installation|warranty|closure
     status = Column(String(32), nullable=False, index=True)  # draft|confirmed|revision
     version_no = Column(Integer, nullable=False, default=1, index=True)
     revision_no = Column(Integer, nullable=False, default=0, index=True)

@@ -4,6 +4,20 @@ import { Plus, ArrowRight } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
+const PROJECT_TYPE_OPTIONS = [
+    { value: 'equipment', label: '설비' },
+    { value: 'parts', label: '파츠' },
+    { value: 'as', label: 'AS' },
+];
+
+const PROJECT_STAGE_OPTIONS = [
+    { value: 'review', label: '검토' },
+    { value: 'fabrication', label: '제작' },
+    { value: 'installation', label: '설치' },
+    { value: 'warranty', label: '워런티' },
+    { value: 'closure', label: '종료' },
+];
+
 function formatAmount(value) {
     const number = Number(value || 0);
     return `${number.toLocaleString('ko-KR')}원`;
@@ -40,24 +54,40 @@ function buildProjectFilterParams(filters) {
     const projectCode = (filters.projectCode || '').trim();
     const customerName = (filters.customerName || '').trim();
     const managerName = (filters.managerName || '').trim();
-    const projectType = (filters.projectType || '').trim();
+    const projectTypes = Array.isArray(filters.projectTypes) ? filters.projectTypes.filter(Boolean) : [];
+    const stages = Array.isArray(filters.stages) ? filters.stages.filter(Boolean) : [];
 
     if (projectName) params.project_name = projectName;
     if (projectCode) params.project_code = projectCode;
     if (customerName) params.customer_name = customerName;
     if (managerName) params.manager_name = managerName;
-    if (projectType) params.project_type = projectType;
+    if (projectTypes.length) params.project_types = projectTypes.join(',');
+    if (stages.length) params.stages = stages.join(',');
     return params;
 }
 
 function stageBadgeClass(stage) {
-    if (stage === 'progress') {
+    if (stage === 'fabrication' || stage === 'progress') {
         return 'border-amber-200 bg-amber-50 text-amber-700';
+    }
+    if (stage === 'installation') {
+        return 'border-sky-200 bg-sky-50 text-sky-700';
+    }
+    if (stage === 'warranty') {
+        return 'border-teal-200 bg-teal-50 text-teal-700';
     }
     if (stage === 'closure') {
         return 'border-emerald-200 bg-emerald-50 text-emerald-700';
     }
     return 'border-blue-200 bg-blue-50 text-blue-700';
+}
+
+function toggleMultiValue(list, value) {
+    const source = Array.isArray(list) ? list : [];
+    if (source.includes(value)) {
+        return source.filter((item) => item !== value);
+    }
+    return [...source, value];
 }
 
 const BudgetManagement = () => {
@@ -66,7 +96,8 @@ const BudgetManagement = () => {
         projectCode: '',
         customerName: '',
         managerName: '',
-        projectType: '',
+        projectTypes: [],
+        stages: [],
     };
 
     const [projects, setProjects] = useState([]);
@@ -125,8 +156,12 @@ const BudgetManagement = () => {
     const summary = projects.reduce(
         (acc, project) => {
             acc.projectCount += 1;
-            if (project?.current_stage === 'progress') {
-                acc.progressCount += 1;
+            if (project?.current_stage === 'fabrication' || project?.current_stage === 'progress') {
+                acc.fabricationCount += 1;
+            } else if (project?.current_stage === 'installation') {
+                acc.installationCount += 1;
+            } else if (project?.current_stage === 'warranty') {
+                acc.warrantyCount += 1;
             } else if (project?.current_stage === 'closure') {
                 acc.closureCount += 1;
             } else {
@@ -137,7 +172,9 @@ const BudgetManagement = () => {
         {
             projectCount: 0,
             reviewCount: 0,
-            progressCount: 0,
+            fabricationCount: 0,
+            installationCount: 0,
+            warrantyCount: 0,
             closureCount: 0,
         }
     );
@@ -164,7 +201,7 @@ const BudgetManagement = () => {
                         </Link>
                     </div>
                     <p className="mt-2 text-[11px] text-muted-foreground">
-                        전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 진행 {summary.progressCount}개 · 종료 {summary.closureCount}개
+                        전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 제작 {summary.fabricationCount}개 · 설치 {summary.installationCount}개 · 워런티 {summary.warrantyCount}개 · 종료 {summary.closureCount}개
                     </p>
                 </section>
 
@@ -218,16 +255,60 @@ const BudgetManagement = () => {
                             value={draftFilters.managerName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, managerName: event.target.value }))}
                         />
-                        <select
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            value={draftFilters.projectType}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
-                        >
-                            <option value="">프로젝트 종류(전체)</option>
-                            <option value="equipment">설비</option>
-                            <option value="parts">파츠</option>
-                            <option value="as">AS</option>
-                        </select>
+                        <div className="sm:col-span-2 lg:col-span-3 xl:col-span-2">
+                            <p className="mb-1 text-[10px] text-muted-foreground">프로젝트 종류(복수 선택)</p>
+                            <div className="flex flex-wrap gap-1">
+                                {PROJECT_TYPE_OPTIONS.map((item) => {
+                                    const selected = draftFilters.projectTypes.includes(item.value);
+                                    return (
+                                        <button
+                                            key={item.value}
+                                            type="button"
+                                            onClick={() =>
+                                                setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    projectTypes: toggleMultiValue(prev.projectTypes, item.value),
+                                                }))
+                                            }
+                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] ${
+                                                selected
+                                                    ? 'border-primary/60 bg-primary/10 text-primary'
+                                                    : 'border-input bg-background text-foreground'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-3 xl:col-span-2">
+                            <p className="mb-1 text-[10px] text-muted-foreground">프로젝트 상태(복수 선택)</p>
+                            <div className="flex flex-wrap gap-1">
+                                {PROJECT_STAGE_OPTIONS.map((item) => {
+                                    const selected = draftFilters.stages.includes(item.value);
+                                    return (
+                                        <button
+                                            key={item.value}
+                                            type="button"
+                                            onClick={() =>
+                                                setDraftFilters((prev) => ({
+                                                    ...prev,
+                                                    stages: toggleMultiValue(prev.stages, item.value),
+                                                }))
+                                            }
+                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] ${
+                                                selected
+                                                    ? 'border-primary/60 bg-primary/10 text-primary'
+                                                    : 'border-input bg-background text-foreground'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </form>
                     <datalist id="budget-customer-options">
                         {customerOptions.map((name) => (

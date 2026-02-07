@@ -1,10 +1,9 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Logo from './ui/Logo';
 import { clearSession, getCurrentUser, isAuthenticated } from '../lib/session';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
-    const location = useLocation();
     const authed = isAuthenticated();
     const user = getCurrentUser();
 
@@ -24,14 +23,6 @@ const Layout = ({ children }) => {
                             <span className="hidden text-xs text-muted-foreground md:inline">
                                 {user?.email || '로그인 사용자'}
                             </span>
-                            {location.pathname !== '/search' && (
-                                <Link
-                                    to="/search"
-                                    className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent hover:text-accent-foreground"
-                                >
-                                    검색
-                                </Link>
-                            )}
                             <button
                                 type="button"
                                 onClick={logout}

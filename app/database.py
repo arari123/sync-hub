@@ -36,6 +36,8 @@ _BUDGET_PROJECT_COLUMN_SPECS = {
     "project_type": "VARCHAR(32)",
     "customer_name": "VARCHAR(180)",
     "installation_site": "VARCHAR(180)",
+    "cover_image_url": "VARCHAR(500)",
+    "summary_milestones_json": "TEXT",
 }
 
 def _run_schema_statement(connection, sql: str) -> None:

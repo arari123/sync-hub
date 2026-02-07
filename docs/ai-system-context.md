@@ -53,6 +53,7 @@ curl -s http://localhost:8100/health
   - 파일 메타 + 본문 텍스트 + 문서타입(`document_types`) + AI 제목/요약 + dedup 상태 + 프로젝트 연결(`project_id`)
 - `BudgetProject`
   - 프로젝트 기본정보 + 담당자(`manager_user_id`) + 프로젝트 종류 + 현재 단계
+  - 대표 이미지(`cover_image_url`) + 요약 일정(`summary_milestones_json`, 기본값은 설계-제작-설치 가상 일정)
 - `BudgetVersion`
   - 단계(`review|fabrication|installation|warranty|closure`), 상태(`draft|confirmed|revision`), 버전/리비전
 - `BudgetEquipment`
@@ -88,9 +89,10 @@ curl -s http://localhost:8100/health
 ### 5.4 프로젝트 관리 플로우
 1. 프로젝트 목록: `GET /budget/projects` (+ 필터/정렬 파라미터)
 2. 프로젝트 생성: `POST /budget/projects` 후 `POST /budget/projects/{id}/versions`
-3. 상세 모니터링: `GET /budget/projects/{id}/versions` + `GET /budget/versions/{id}/equipments`
-4. 예산 입력: `PUT /budget/versions/{id}/details`
-5. 버전 확정/리비전: `POST /budget/versions/{id}/confirm`, `POST /budget/versions/{id}/revision`
+3. 프로젝트 기본정보 수정: `PUT /budget/projects/{id}`
+4. 상세 모니터링: `GET /budget/projects/{id}/versions` + `GET /budget/versions/{id}/equipments`
+5. 예산 입력: `PUT /budget/versions/{id}/details`
+6. 버전 확정/리비전: `POST /budget/versions/{id}/confirm`, `POST /budget/versions/{id}/revision`
 
 ## 6. API 그룹 요약
 
@@ -112,6 +114,7 @@ curl -s http://localhost:8100/health
 - `GET /budget/projects`
 - `GET /budget/projects/search`
 - `POST /budget/projects`
+- `PUT /budget/projects/{project_id}`
 - `GET /budget/projects/{project_id}/versions`
 - `POST /budget/projects/{project_id}/versions`
 - `GET/PUT /budget/versions/{version_id}/details`

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
+from datetime import timedelta
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -9,7 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..core.auth_utils import to_iso, utcnow
+from ..core.auth_utils import parse_iso, to_iso, utcnow
 from ..core.budget_logic import (
     aggregate_equipment_costs_from_detail,
     default_detail_payload,
@@ -64,6 +67,17 @@ class BudgetProjectCreate(BaseModel):
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
     manager_user_id: Optional[int] = Field(default=None, ge=1)
+
+
+class BudgetProjectUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    code: Optional[str] = Field(default=None, max_length=64)
+    description: Optional[str] = Field(default=None, max_length=500)
+    project_type: Optional[str] = Field(default=None, max_length=32)
+    customer_name: Optional[str] = Field(default=None, max_length=180)
+    installation_site: Optional[str] = Field(default=None, max_length=180)
+    manager_user_id: Optional[int] = Field(default=None, ge=1)
+    cover_image_url: Optional[str] = Field(default=None, max_length=500)
 
 
 class BudgetVersionCreate(BaseModel):
@@ -258,6 +272,159 @@ def _project_type_code_or_empty(value: Optional[str]) -> str:
         return ""
 
 
+def _project_stage_rank(stage: Optional[str]) -> int:
+    order = {
+        "review": 0,
+        "fabrication": 1,
+        "installation": 2,
+        "warranty": 3,
+        "closure": 4,
+    }
+    return order.get((stage or "").strip().lower(), 0)
+
+
+def _project_spent_ratio(stage: Optional[str], project_id: int) -> float:
+    base = {
+        "review": 0.12,
+        "fabrication": 0.48,
+        "installation": 0.82,
+        "warranty": 0.94,
+        "closure": 1.0,
+    }.get((stage or "").strip().lower(), 0.12)
+    variation = ((int(project_id) % 9) - 4) * 0.015
+    return max(0.0, min(1.15, base + variation))
+
+
+def _build_monitoring_payload(project: models.BudgetProject, totals: dict) -> dict:
+    confirmed_budget_total = to_number(totals.get("grand_total"))
+    if confirmed_budget_total <= 0:
+        return {
+            "confirmed_budget_total": 0.0,
+            "actual_spent_total": 0.0,
+            "variance_total": 0.0,
+        }
+
+    spent_ratio = _project_spent_ratio(project.current_stage, int(project.id or 0))
+    actual_spent_total = round(confirmed_budget_total * spent_ratio, 2)
+    variance_total = round(confirmed_budget_total - actual_spent_total, 2)
+    return {
+        "confirmed_budget_total": confirmed_budget_total,
+        "actual_spent_total": actual_spent_total,
+        "variance_total": variance_total,
+    }
+
+
+def _svg_safe_text(value: str) -> str:
+    text = (value or "").strip()
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _build_generated_cover_image(project: models.BudgetProject) -> str:
+    project_name = _svg_safe_text(project.name or "프로젝트")
+    project_type = _svg_safe_text(_project_type_label(project.project_type))
+    customer_name = _svg_safe_text(project.customer_name or "고객사 미지정")
+
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'>"
+        "<defs>"
+        "<linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>"
+        "<stop offset='0%' stop-color='#0ea5e9'/>"
+        "<stop offset='100%' stop-color='#1d4ed8'/>"
+        "</linearGradient>"
+        "</defs>"
+        "<rect width='640' height='360' fill='url(#g)'/>"
+        "<circle cx='560' cy='80' r='90' fill='rgba(255,255,255,0.16)'/>"
+        "<circle cx='80' cy='300' r='120' fill='rgba(255,255,255,0.12)'/>"
+        "<text x='36' y='64' font-size='22' fill='white' font-family='Pretendard, Apple SD Gothic Neo, sans-serif'>"
+        f"{project_type} 프로젝트"
+        "</text>"
+        "<text x='36' y='130' font-size='36' fill='white' font-weight='700' "
+        "font-family='Pretendard, Apple SD Gothic Neo, sans-serif'>"
+        f"{project_name}"
+        "</text>"
+        "<text x='36' y='176' font-size='20' fill='rgba(255,255,255,0.92)' "
+        "font-family='Pretendard, Apple SD Gothic Neo, sans-serif'>"
+        f"{customer_name}"
+        "</text>"
+        "</svg>"
+    )
+    return f"data:image/svg+xml;utf8,{quote(svg)}"
+
+
+def _coerce_milestone_status(status: str) -> str:
+    value = (status or "").strip().lower()
+    if value in {"done", "active", "planned"}:
+        return value
+    return "planned"
+
+
+def _parse_custom_milestones(raw_json: Optional[str]) -> Optional[list[dict]]:
+    text = (raw_json or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = json.loads(text)
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(parsed, list):
+        return None
+
+    normalized = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        if not label:
+            continue
+        status = _coerce_milestone_status(str(item.get("status") or "planned"))
+        normalized.append(
+            {
+                "key": str(item.get("key") or label),
+                "label": label,
+                "date": str(item.get("date") or "").strip(),
+                "status": status,
+                "status_label": {"done": "완료", "active": "진행중", "planned": "예정"}[status],
+            }
+        )
+    if not normalized:
+        return None
+    return normalized[:5]
+
+
+def _build_default_milestones(project: models.BudgetProject) -> list[dict]:
+    try:
+        base_date = parse_iso(project.created_at).date()
+    except Exception:  # noqa: BLE001
+        base_date = utcnow().date()
+
+    stage_rank = _project_stage_rank(project.current_stage)
+    blueprint = [
+        ("design", "설계", 0),
+        ("fabrication", "제작", 14),
+        ("installation", "설치", 28),
+    ]
+
+    output = []
+    for index, (key, label, offset_days) in enumerate(blueprint):
+        if stage_rank > index:
+            status = "done"
+        elif stage_rank == index:
+            status = "active"
+        else:
+            status = "planned"
+        target_date = (base_date + timedelta(days=offset_days)).isoformat()
+        output.append(
+            {
+                "key": key,
+                "label": label,
+                "date": target_date,
+                "status": status,
+                "status_label": {"done": "완료", "active": "진행중", "planned": "예정"}[status],
+            }
+        )
+    return output
+
+
 def _split_csv_query_values(value: Optional[str]) -> list[str]:
     if not value:
         return []
@@ -426,14 +593,14 @@ def _serialize_project(
         totals = summarize_costs([])
         current_version_id = None
 
-    monitoring = {
-        "confirmed_budget_total": totals.get("grand_total", 0.0),
-        "actual_spent_total": None,
-        "variance_total": None,
-    }
+    monitoring = _build_monitoring_payload(project, totals)
     manager = _project_manager(project, db)
     owner = _project_owner(project, db)
     manager_name = _user_display_name(manager, empty_label="담당자 미지정")
+    custom_cover_image_url = (project.cover_image_url or "").strip()
+    generated_cover_image_url = _build_generated_cover_image(project)
+    custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
+    summary_milestones = custom_milestones or _build_default_milestones(project)
 
     version_count = (
         db.query(func.count(models.BudgetVersion.id))
@@ -451,6 +618,11 @@ def _serialize_project(
         "project_type_label": _project_type_label(project.project_type),
         "customer_name": project.customer_name or "",
         "installation_site": project.installation_site or "",
+        "cover_image_url": custom_cover_image_url,
+        "cover_image_fallback_url": generated_cover_image_url,
+        "cover_image_display_url": custom_cover_image_url or generated_cover_image_url,
+        "summary_milestones": summary_milestones,
+        "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
         "current_stage": project.current_stage,
         "current_stage_label": stage_label(project.current_stage),
         "current_version_id": current_version_id,
@@ -760,6 +932,96 @@ def create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+    return _serialize_project(project, db, user=user)
+
+
+@router.put("/projects/{project_id}")
+def update_project(
+    project_id: int,
+    payload: BudgetProjectUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    _require_project_edit_permission(project, user)
+    fields_set = payload.model_fields_set
+    if not fields_set:
+        return _serialize_project(project, db, user=user)
+
+    changed = False
+
+    if "name" in fields_set and payload.name is not None:
+        name = (payload.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project name is required.")
+        if name != (project.name or ""):
+            project.name = name
+            changed = True
+
+    if "code" in fields_set:
+        code = (payload.code or "").strip() or None
+        if code != (project.code or None):
+            if code:
+                conflict = (
+                    db.query(models.BudgetProject)
+                    .filter(
+                        models.BudgetProject.code == code,
+                        models.BudgetProject.id != project.id,
+                    )
+                    .first()
+                )
+                if conflict:
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project code already exists.")
+            project.code = code
+            changed = True
+
+    if "description" in fields_set:
+        description = (payload.description or "").strip() or None
+        if description != (project.description or None):
+            project.description = description
+            changed = True
+
+    if "project_type" in fields_set and payload.project_type is not None:
+        try:
+            normalized_type = _normalize_project_type(payload.project_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        if normalized_type != (project.project_type or ""):
+            project.project_type = normalized_type
+            changed = True
+
+    if "customer_name" in fields_set:
+        customer_name = (payload.customer_name or "").strip() or None
+        if customer_name != (project.customer_name or None):
+            project.customer_name = customer_name
+            changed = True
+
+    if "installation_site" in fields_set:
+        installation_site = (payload.installation_site or "").strip() or None
+        if installation_site != (project.installation_site or None):
+            project.installation_site = installation_site
+            changed = True
+
+    if "cover_image_url" in fields_set:
+        cover_image_url = (payload.cover_image_url or "").strip() or None
+        if cover_image_url != (project.cover_image_url or None):
+            project.cover_image_url = cover_image_url
+            changed = True
+
+    if "manager_user_id" in fields_set and payload.manager_user_id is not None:
+        manager_user_id = int(payload.manager_user_id)
+        manager = db.query(models.User).filter(models.User.id == manager_user_id).first()
+        if not manager or not manager.is_active or not manager.email_verified:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid manager_user_id.")
+        if manager_user_id != int(_project_manager_user_id(project) or 0):
+            project.manager_user_id = manager_user_id
+            changed = True
+
+    if changed:
+        project.updated_at = to_iso(utcnow())
+        db.commit()
+        db.refresh(project)
+
     return _serialize_project(project, db, user=user)
 
 

@@ -105,6 +105,8 @@ class BudgetProject(Base):
     project_type = Column(String(32), nullable=True, index=True)
     customer_name = Column(String(180), nullable=True)
     installation_site = Column(String(180), nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
+    summary_milestones_json = Column(String, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     manager_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     current_stage = Column(String(32), nullable=False, default="review", index=True)

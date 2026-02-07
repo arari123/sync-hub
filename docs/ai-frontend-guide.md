@@ -69,11 +69,16 @@
 ### 4.5 Project Overview (`pages/BudgetProjectOverview.jsx`)
 - 목적: 프로젝트 전체 요약 모니터링
 - 표시 항목
-  - 기본 정보(이름/종류/고객사/장소/담당자/업데이트/코드/개요)
-  - 전체 예산 요약
-  - 설비별 그래프(재료비/인건비/경비)
+  - 헤더 배지(단계/버전/마지막 업데이트)
+  - 기본 정보(간소 필드 + 개요 + 대표 이미지)
+  - 요약 일정 마일스톤(설계-제작-설치)
+  - 전체 예산 요약(확정 예산/집행 금액/차액 포함)
+  - 설비별 그래프(재료비/인건비/경비/집행)
 - 액션
   - `예산 관리` 이동 버튼
+  - `기본 정보 수정` 모달 저장 (`PUT /budget/projects/{project_id}`)
+- 참고
+  - 상세 일정 작성은 추후 구현 예정(별도 지시 시 구현)
 
 ### 4.6 Budget Management (`pages/BudgetProjectBudget.jsx`)
 - 목적: 프로젝트 예산 현황 확인 + 입력 페이지 진입
@@ -117,6 +122,8 @@
   - `doc_id`, `filename`, `title`, `summary`, `page`, `score`, `document_types`
 - 프로젝트 검색 결과 주요 필드
   - `project_id`, `name`, `description`, `customer_name`, `manager_name`, `current_stage_label`, `score`
+- 프로젝트 상세 주요 필드
+  - `cover_image_display_url`, `summary_milestones[]`, `monitoring.confirmed_budget_total`, `monitoring.actual_spent_total`, `monitoring.variance_total`
 - 프로젝트 목록 필터 파라미터(주요)
   - `project_name`, `project_code`, `customer_name`, `manager_name`, `project_types`, `stages`, `sort_by`
 

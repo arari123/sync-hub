@@ -89,10 +89,6 @@ function stageBadgeClass(stage) {
     return `${base} border-slate-200 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`;
 }
 
-function projectTypeBadgeClass() {
-    return 'px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700';
-}
-
 function toggleMultiValue(list, value) {
     const source = Array.isArray(list) ? list : [];
     if (source.includes(value)) {
@@ -438,7 +434,7 @@ const ProjectCard = ({ project }) => {
                     <p className="text-xs text-muted-foreground font-mono">#{project.code || 'NO-CODE'}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={projectTypeBadgeClass()}>{project.project_type_label || '미분류'}</span>
+                    <span className={stageBadgeClass(project.current_stage)}>{project.project_type_label || '미분류'}</span>
                     <span className={stageBadgeClass(project.current_stage)}>
                         {project.current_stage_label}
                     </span>

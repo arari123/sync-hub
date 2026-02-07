@@ -192,22 +192,16 @@ def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]
     return int(project.created_by_user_id) == int(user.id)
 
 
-def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
-    if project.created_by_user_id is None:
-        project.created_by_user_id = int(user.id)
-        project.updated_at = to_iso(utcnow())
-        return
-    if int(project.created_by_user_id) != int(user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No edit permission for this project.")
+def _is_my_project(project: models.BudgetProject, user: Optional[models.User]) -> bool:
+    if not user or project.created_by_user_id is None:
+        return False
+    return int(project.created_by_user_id) == int(user.id)
 
 
-def _require_version_edit_permission(version: models.BudgetVersion, user: models.User, db: Session) -> models.BudgetProject:
-    project = _get_project_or_404(version.project_id, db)
-    _require_project_edit_permission(project, user)
-    return project
-
-
-def _serialize_project(project: models.BudgetProject, db: Session, user: Optional[models.User] = None) -> dict:
+def _get_current_version_for_project(
+    project: models.BudgetProject,
+    db: Session,
+) -> Optional[models.BudgetVersion]:
     current_version = (
         db.query(models.BudgetVersion)
         .filter(
@@ -225,10 +219,48 @@ def _serialize_project(project: models.BudgetProject, db: Session, user: Optiona
             .order_by(models.BudgetVersion.updated_at.desc(), models.BudgetVersion.id.desc())
             .first()
         )
+    return current_version
 
-    if current_version:
-        totals = summarize_costs(_version_equipments(current_version.id, db))
-        current_version_id = int(current_version.id)
+
+def _is_project_visible_to_user(
+    project: models.BudgetProject,
+    current_version: Optional[models.BudgetVersion],
+    user: Optional[models.User],
+) -> bool:
+    if _project_can_edit(project, user):
+        return True
+    if project.current_stage != "review":
+        return True
+    if current_version is None:
+        return False
+    return current_version.status == "confirmed"
+
+
+def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
+    if project.created_by_user_id is None:
+        project.created_by_user_id = int(user.id)
+        project.updated_at = to_iso(utcnow())
+        return
+    if int(project.created_by_user_id) != int(user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No edit permission for this project.")
+
+
+def _require_version_edit_permission(version: models.BudgetVersion, user: models.User, db: Session) -> models.BudgetProject:
+    project = _get_project_or_404(version.project_id, db)
+    _require_project_edit_permission(project, user)
+    return project
+
+
+def _serialize_project(
+    project: models.BudgetProject,
+    db: Session,
+    user: Optional[models.User] = None,
+    current_version: Optional[models.BudgetVersion] = None,
+) -> dict:
+    current = current_version or _get_current_version_for_project(project, db)
+    if current:
+        totals = summarize_costs(_version_equipments(current.id, db))
+        current_version_id = int(current.id)
     else:
         totals = summarize_costs([])
         current_version_id = None
@@ -258,6 +290,7 @@ def _serialize_project(project: models.BudgetProject, db: Session, user: Optiona
         "version_count": int(version_count),
         "author_name": _user_display_name(owner),
         "can_edit": _project_can_edit(project, user),
+        "is_mine": _is_my_project(project, user),
         "totals": totals,
         "monitoring": monitoring,
         "created_at": project.created_at,
@@ -270,12 +303,18 @@ def list_projects(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    projects = (
+    all_projects = (
         db.query(models.BudgetProject)
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
         .all()
     )
-    return [_serialize_project(project, db, user=user) for project in projects]
+    visible_projects = []
+    for project in all_projects:
+        current_version = _get_current_version_for_project(project, db)
+        if not _is_project_visible_to_user(project, current_version=current_version, user=user):
+            continue
+        visible_projects.append(_serialize_project(project, db, user=user, current_version=current_version))
+    return visible_projects
 
 
 @router.post("/projects")

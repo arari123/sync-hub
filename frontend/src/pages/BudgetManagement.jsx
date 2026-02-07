@@ -117,10 +117,24 @@ const BudgetManagement = () => {
                             const showExecutionPanel = project?.current_stage !== 'review';
 
                             return (
-                                <article key={project.id} className="rounded-xl border bg-muted/10 p-4">
+                                <article
+                                    key={project.id}
+                                    className={`rounded-xl border p-4 ${
+                                        project?.is_mine
+                                            ? 'border-primary/40 bg-primary/5'
+                                            : 'bg-muted/10'
+                                    }`}
+                                >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-semibold">{project.name}</p>
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="truncate text-sm font-semibold">{project.name}</p>
+                                                {project?.is_mine && (
+                                                    <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                                        내 프로젝트
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">작성자: {project.author_name || '작성자 미지정'}</p>
                                         </div>
@@ -130,13 +144,13 @@ const BudgetManagement = () => {
                                             </span>
                                             {project.can_edit ? (
                                                 <Link
-                                                    to={`/budget-management/projects/${project.id}/edit/material`}
-                                                    className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
-                                                >
-                                                    입력
-                                                    <ArrowRight className="h-3 w-3" />
-                                                </Link>
-                                            ) : (
+                                                to={`/budget-management/projects/${project.id}/edit/material`}
+                                                className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
+                                            >
+                                                상세
+                                                <ArrowRight className="h-3 w-3" />
+                                            </Link>
+                                        ) : (
                                                 <span className="inline-flex h-6 items-center rounded-md border border-border px-2 text-[11px] text-muted-foreground">
                                                     읽기전용
                                                 </span>

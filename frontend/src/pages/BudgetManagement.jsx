@@ -43,10 +43,6 @@ const BudgetManagement = () => {
     const summary = projects.reduce(
         (acc, project) => {
             acc.projectCount += 1;
-            acc.materialTotal += Number(project?.totals?.material_total || 0);
-            acc.laborTotal += Number(project?.totals?.labor_total || 0);
-            acc.expenseTotal += Number(project?.totals?.expense_total || 0);
-            acc.grandTotal += Number(project?.totals?.grand_total || 0);
             if (project?.current_stage === 'progress') {
                 acc.progressCount += 1;
             } else if (project?.current_stage === 'closure') {
@@ -61,10 +57,6 @@ const BudgetManagement = () => {
             reviewCount: 0,
             progressCount: 0,
             closureCount: 0,
-            materialTotal: 0,
-            laborTotal: 0,
-            expenseTotal: 0,
-            grandTotal: 0,
         }
     );
 
@@ -86,14 +78,9 @@ const BudgetManagement = () => {
                         프로젝트 생성
                     </Link>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-                    <SummaryTile label="전체 프로젝트" value={`${summary.projectCount}개`} />
-                    <SummaryTile label="검토" value={`${summary.reviewCount}개`} />
-                    <SummaryTile label="진행" value={`${summary.progressCount}개`} />
-                    <SummaryTile label="종료" value={`${summary.closureCount}개`} />
-                    <SummaryTile label="총 예산 합계" value={formatAmount(summary.grandTotal)} />
-                    <SummaryTile label="프로젝트 평균" value={formatAmount(summary.projectCount ? summary.grandTotal / summary.projectCount : 0)} />
-                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                    전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 진행 {summary.progressCount}개 · 종료 {summary.closureCount}개
+                </p>
             </section>
 
             {error && (
@@ -136,9 +123,18 @@ const BudgetManagement = () => {
                                             <p className="truncate text-sm font-semibold">{project.name}</p>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
                                         </div>
-                                        <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
-                                            {project.current_stage_label}
-                                        </span>
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
+                                                {project.current_stage_label}
+                                            </span>
+                                            <Link
+                                                to={`/budget-management/projects/${project.id}/edit/material`}
+                                                className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
+                                            >
+                                                입력
+                                                <ArrowRight className="h-3 w-3" />
+                                            </Link>
+                                        </div>
                                     </div>
 
                                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -156,25 +152,13 @@ const BudgetManagement = () => {
                                             <AmountCell label="집행 금액" value={hasActual ? formatAmount(actualSpent) : '-'} />
                                             <AmountCell label="차액" value={hasActual ? formatAmount(variance) : '-'} strong={hasActual} />
                                         </div>
-                                    ) : (
-                                        <p className="rounded-md border border-dashed px-2 py-2 text-xs text-muted-foreground">
-                                            검토 단계는 예산 수립 중심입니다. 진행 단계부터 확정 예산/집행 금액/차액 모니터링이 표시됩니다.
-                                        </p>
-                                    )}
+                                    ) : null}
 
                                     {showExecutionPanel && !hasActual && (
                                         <p className="mt-2 text-[11px] text-muted-foreground">
                                             집행 금액 연동 전: 현재는 확정 예산 기준으로 모니터링 구조만 제공됩니다.
                                         </p>
                                     )}
-
-                                    <Link
-                                        to={`/budget-management/projects/${project.id}/edit/material`}
-                                        className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent hover:text-accent-foreground"
-                                    >
-                                        상세 입력으로 이동
-                                        <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
                                 </article>
                             );
                         })}
@@ -184,13 +168,6 @@ const BudgetManagement = () => {
         </div>
     );
 };
-
-const SummaryTile = ({ label, value }) => (
-    <div className="rounded-md border bg-muted/10 px-3 py-2">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="mt-1 text-sm font-semibold">{value}</p>
-    </div>
-);
 
 const AmountCell = ({ label, value, strong = false }) => (
     <div className={`rounded-md border px-2 py-2 ${strong ? 'border-primary/30 bg-primary/5' : 'bg-background'}`}>

@@ -128,6 +128,9 @@ def default_detail_payload() -> dict:
         "material_items": [],
         "labor_items": [],
         "expense_items": [],
+        "execution_material_items": [],
+        "execution_labor_items": [],
+        "execution_expense_items": [],
     }
 
 
@@ -143,7 +146,14 @@ def parse_detail_payload(raw_text: str) -> dict:
     if not isinstance(parsed, dict):
         return base
 
-    for key in ("material_items", "labor_items", "expense_items"):
+    for key in (
+        "material_items",
+        "labor_items",
+        "expense_items",
+        "execution_material_items",
+        "execution_labor_items",
+        "execution_expense_items",
+    ):
         value = parsed.get(key)
         if isinstance(value, list):
             base[key] = value
@@ -156,6 +166,9 @@ def detail_payload_to_json(payload: dict) -> str:
             "material_items": payload.get("material_items", []),
             "labor_items": payload.get("labor_items", []),
             "expense_items": payload.get("expense_items", []),
+            "execution_material_items": payload.get("execution_material_items", []),
+            "execution_labor_items": payload.get("execution_labor_items", []),
+            "execution_expense_items": payload.get("execution_expense_items", []),
         },
         ensure_ascii=False,
     )
@@ -224,7 +237,16 @@ def summarize_executed_costs_from_detail(payload: dict) -> dict[str, float]:
         "expense_install_executed": 0.0,
     }
 
-    for item in payload.get("material_items", []):
+    execution_material_items = payload.get("execution_material_items", []) or []
+    execution_labor_items = payload.get("execution_labor_items", []) or []
+    execution_expense_items = payload.get("execution_expense_items", []) or []
+    has_execution_rows = bool(execution_material_items or execution_labor_items or execution_expense_items)
+
+    source_material_items = execution_material_items if has_execution_rows else (payload.get("material_items", []) or [])
+    source_labor_items = execution_labor_items if has_execution_rows else (payload.get("labor_items", []) or [])
+    source_expense_items = execution_expense_items if has_execution_rows else (payload.get("expense_items", []) or [])
+
+    for item in source_material_items:
         amount = to_number(item.get("executed_amount"))
         phase = normalize_phase(item.get("phase") or "fabrication")
         if phase == "installation":
@@ -232,7 +254,7 @@ def summarize_executed_costs_from_detail(payload: dict) -> dict[str, float]:
         else:
             summary["material_fab_executed"] += amount
 
-    for item in payload.get("labor_items", []):
+    for item in source_labor_items:
         amount = to_number(item.get("executed_amount"))
         phase = normalize_phase(item.get("phase") or "fabrication")
         if phase == "installation":
@@ -240,7 +262,7 @@ def summarize_executed_costs_from_detail(payload: dict) -> dict[str, float]:
         else:
             summary["labor_fab_executed"] += amount
 
-    for item in payload.get("expense_items", []):
+    for item in source_expense_items:
         amount = to_number(item.get("executed_amount"))
         phase = normalize_phase(item.get("phase") or "fabrication")
         if phase == "installation":

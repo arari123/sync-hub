@@ -147,10 +147,41 @@ class ExpenseDetailItem(BaseModel):
     memo: str = Field(default="", max_length=300)
 
 
+class MaterialExecutionItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    unit_name: str = Field(default="", max_length=180)
+    part_name: str = Field(default="", max_length=180)
+    spec: str = Field(default="", max_length=180)
+    executed_amount: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
+class LaborExecutionItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    task_name: str = Field(default="", max_length=180)
+    worker_type: str = Field(default="", max_length=120)
+    executed_amount: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
+class ExpenseExecutionItem(BaseModel):
+    equipment_name: str = Field(..., min_length=1, max_length=180)
+    expense_name: str = Field(default="", max_length=180)
+    basis: str = Field(default="", max_length=180)
+    executed_amount: float = 0.0
+    phase: str = Field(default="fabrication", max_length=32)
+    memo: str = Field(default="", max_length=300)
+
+
 class BudgetDetailPayload(BaseModel):
     material_items: list[MaterialDetailItem] = Field(default_factory=list)
     labor_items: list[LaborDetailItem] = Field(default_factory=list)
     expense_items: list[ExpenseDetailItem] = Field(default_factory=list)
+    execution_material_items: list[MaterialExecutionItem] = Field(default_factory=list)
+    execution_labor_items: list[LaborExecutionItem] = Field(default_factory=list)
+    execution_expense_items: list[ExpenseExecutionItem] = Field(default_factory=list)
 
 
 def _get_project_or_404(project_id: int, db: Session) -> models.BudgetProject:
@@ -229,6 +260,9 @@ def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
         "material_item_count": len(detail_payload.get("material_items", [])),
         "labor_item_count": len(detail_payload.get("labor_items", [])),
         "expense_item_count": len(detail_payload.get("expense_items", [])),
+        "execution_material_item_count": len(detail_payload.get("execution_material_items", [])),
+        "execution_labor_item_count": len(detail_payload.get("execution_labor_items", [])),
+        "execution_expense_item_count": len(detail_payload.get("execution_expense_items", [])),
         "totals": totals,
     }
 
@@ -1416,6 +1450,9 @@ def upsert_version_details(
         "material_items": [item.model_dump() for item in payload.material_items],
         "labor_items": [item.model_dump() for item in payload.labor_items],
         "expense_items": [item.model_dump() for item in payload.expense_items],
+        "execution_material_items": [item.model_dump() for item in payload.execution_material_items],
+        "execution_labor_items": [item.model_dump() for item in payload.execution_labor_items],
+        "execution_expense_items": [item.model_dump() for item in payload.execution_expense_items],
     }
 
     if version.status == "confirmed":

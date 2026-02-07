@@ -30,7 +30,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 2,
             'unit_price': 1800000,
             'phase': 'fabrication',
-            'executed_amount': round(2 * 1800000 * execution_ratio),
             'memo': '핵심 구동 파츠',
         },
         {
@@ -41,7 +40,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 3,
             'unit_price': 950000,
             'phase': 'installation',
-            'executed_amount': round(3 * 950000 * execution_ratio),
             'memo': '정렬 캘리브레이션 포함',
         },
         {
@@ -52,7 +50,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 4,
             'unit_price': 640000,
             'phase': 'fabrication',
-            'executed_amount': round(4 * 640000 * execution_ratio),
             'memo': '축 제어용',
         },
         {
@@ -63,7 +60,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 2,
             'unit_price': 520000,
             'phase': 'installation',
-            'executed_amount': round(2 * 520000 * execution_ratio),
             'memo': '현장 배선 포함',
         },
     ]
@@ -77,7 +73,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 56,
             'hourly_rate': 42000,
             'phase': 'fabrication',
-            'executed_amount': round(56 * 42000 * execution_ratio),
             'memo': '2인 3.5일 기준',
         },
         {
@@ -88,7 +83,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 32,
             'hourly_rate': 65000,
             'phase': 'installation',
-            'executed_amount': round(32 * 65000 * execution_ratio),
             'memo': '현장 설치',
         },
         {
@@ -99,7 +93,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 48,
             'hourly_rate': 46000,
             'phase': 'fabrication',
-            'executed_amount': round(48 * 46000 * execution_ratio),
             'memo': '제작동 작업',
         },
         {
@@ -110,7 +103,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'quantity': 20,
             'hourly_rate': 59000,
             'phase': 'installation',
-            'executed_amount': round(20 * 59000 * execution_ratio),
             'memo': '설치 후 검수',
         },
     ]
@@ -122,7 +114,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'basis': '프레임 CNC',
             'amount': 2300000,
             'phase': 'fabrication',
-            'executed_amount': round(2300000 * execution_ratio),
             'memo': '외주 가공처 1곳',
         },
         {
@@ -131,7 +122,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'basis': '5톤 트럭 1회',
             'amount': 640000,
             'phase': 'installation',
-            'executed_amount': round(640000 * execution_ratio),
             'memo': '왕복 기준',
         },
         {
@@ -140,7 +130,6 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'basis': '안전장구+체결류',
             'amount': 420000,
             'phase': 'fabrication',
-            'executed_amount': round(420000 * execution_ratio),
             'memo': '월간 패키지',
         },
         {
@@ -149,8 +138,116 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
             'basis': '리프트 2일',
             'amount': 510000,
             'phase': 'installation',
-            'executed_amount': round(510000 * execution_ratio),
             'memo': '현장 반입',
+        },
+    ]
+
+    execution_material_items = [
+        {
+            'equipment_name': equip_a,
+            'unit_name': 'FEED-실집행',
+            'part_name': '리니어 블록',
+            'spec': 'LM-220A',
+            'executed_amount': round(3250000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '예산 파츠와 다르게 집행',
+        },
+        {
+            'equipment_name': equip_a,
+            'unit_name': 'VISION-현장',
+            'part_name': '카메라 브라켓',
+            'spec': 'BRK-12',
+            'executed_amount': round(860000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '현장 추가 구매',
+        },
+        {
+            'equipment_name': equip_b,
+            'unit_name': 'ROBOT-실집행',
+            'part_name': '감속기 세트',
+            'spec': 'RG-90',
+            'executed_amount': round(2410000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '유닛/파츠 구조 변경',
+        },
+        {
+            'equipment_name': equip_b,
+            'unit_name': 'SITE-ADAPTER',
+            'part_name': '배선 어댑터',
+            'spec': 'ADP-24',
+            'executed_amount': round(490000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '설치 대응 부품',
+        },
+    ]
+
+    execution_labor_items = [
+        {
+            'equipment_name': equip_a,
+            'task_name': '사전 셋업',
+            'worker_type': '현장기술',
+            'executed_amount': round(2100000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '예산 작업명과 상이',
+        },
+        {
+            'equipment_name': equip_a,
+            'task_name': '현장 안정화',
+            'worker_type': '제어튜닝',
+            'executed_amount': round(1680000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '추가 튜닝 반영',
+        },
+        {
+            'equipment_name': equip_b,
+            'task_name': '배관/배선 변경',
+            'worker_type': '전장협력사',
+            'executed_amount': round(1940000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '협력사 투입',
+        },
+        {
+            'equipment_name': equip_b,
+            'task_name': '인터락 재검증',
+            'worker_type': '안전점검',
+            'executed_amount': round(1080000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '재검증 2회',
+        },
+    ]
+
+    execution_expense_items = [
+        {
+            'equipment_name': equip_a,
+            'expense_name': '긴급 가공비',
+            'basis': '변경도면 반영',
+            'executed_amount': round(1980000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '예산 대비 구조 변경',
+        },
+        {
+            'equipment_name': equip_a,
+            'expense_name': '추가 물류비',
+            'basis': '야간 반입',
+            'executed_amount': round(520000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '야간작업',
+        },
+        {
+            'equipment_name': equip_b,
+            'expense_name': '외주 공임비',
+            'basis': '현장 개조',
+            'executed_amount': round(640000 * execution_ratio),
+            'phase': 'fabrication',
+            'memo': '개조 작업 반영',
+        },
+        {
+            'equipment_name': equip_b,
+            'expense_name': '장비 대여비',
+            'basis': '리프트 추가 1일',
+            'executed_amount': round(430000 * execution_ratio),
+            'phase': 'installation',
+            'memo': '추가 일수 발생',
         },
     ]
 
@@ -158,6 +255,9 @@ def _build_detail_payload(project_name: str, execution_ratio: float) -> dict:
         'material_items': material_items,
         'labor_items': labor_items,
         'expense_items': expense_items,
+        'execution_material_items': execution_material_items,
+        'execution_labor_items': execution_labor_items,
+        'execution_expense_items': execution_expense_items,
     }
 
 
@@ -177,7 +277,7 @@ def _write_standard_excel(path: Path, detail: dict) -> None:
             item['quantity'],
             item['unit_price'],
             '제작' if item['phase'] == 'fabrication' else '설치',
-            item['executed_amount'],
+            '',
         ])
 
     for item in detail['labor_items']:
@@ -190,7 +290,7 @@ def _write_standard_excel(path: Path, detail: dict) -> None:
             item['quantity'],
             item['hourly_rate'],
             '제작' if item['phase'] == 'fabrication' else '설치',
-            item['executed_amount'],
+            '',
         ])
 
     for item in detail['expense_items']:
@@ -203,6 +303,45 @@ def _write_standard_excel(path: Path, detail: dict) -> None:
             1,
             item['amount'],
             '제작' if item['phase'] == 'fabrication' else '설치',
+            '',
+        ])
+
+    for item in detail['execution_material_items']:
+        ws.append([
+            '재료비-집행',
+            item['equipment_name'],
+            item['unit_name'],
+            item['part_name'],
+            item['spec'],
+            '',
+            '',
+            '제작' if item['phase'] == 'fabrication' else '설치',
+            item['executed_amount'],
+        ])
+
+    for item in detail['execution_labor_items']:
+        ws.append([
+            '인건비-집행',
+            item['equipment_name'],
+            item['worker_type'],
+            item['task_name'],
+            '-',
+            '',
+            '',
+            '제작' if item['phase'] == 'fabrication' else '설치',
+            item['executed_amount'],
+        ])
+
+    for item in detail['execution_expense_items']:
+        ws.append([
+            '경비-집행',
+            item['equipment_name'],
+            '-',
+            item['expense_name'],
+            item['basis'],
+            '',
+            '',
+            '제작' if item['phase'] == 'fabrication' else '설치',
             item['executed_amount'],
         ])
 
@@ -213,9 +352,10 @@ def _write_multisheet_excel(path: Path, detail: dict) -> None:
     wb = Workbook()
     ws_material = wb.active
     ws_material.title = 'Material'
-    ws_material.append(['설비', '유닛', '부품', '규격', '수량', '단가', '단계', '집행'])
+    ws_material.append(['구분', '설비', '유닛', '부품/작업', '규격', '수량', '단가', '단계', '집행'])
     for item in detail['material_items']:
         ws_material.append([
+            'budget',
             item['equipment_name'],
             item['unit_name'],
             item['part_name'],
@@ -223,13 +363,26 @@ def _write_multisheet_excel(path: Path, detail: dict) -> None:
             item['quantity'],
             item['unit_price'],
             item['phase'],
+            '',
+        ])
+    for item in detail['execution_material_items']:
+        ws_material.append([
+            'execution',
+            item['equipment_name'],
+            item['unit_name'],
+            item['part_name'],
+            item['spec'],
+            '',
+            '',
+            item['phase'],
             item['executed_amount'],
         ])
 
     ws_labor = wb.create_sheet('Labor')
-    ws_labor.append(['설비', '작업명', '직군', '단위', '수량', '단가', '단계', '집행'])
+    ws_labor.append(['구분', '설비', '작업명', '직군', '단위', '수량', '단가', '단계', '집행'])
     for item in detail['labor_items']:
         ws_labor.append([
+            'budget',
             item['equipment_name'],
             item['task_name'],
             item['worker_type'],
@@ -237,17 +390,40 @@ def _write_multisheet_excel(path: Path, detail: dict) -> None:
             item['quantity'],
             item['hourly_rate'],
             item['phase'],
+            '',
+        ])
+    for item in detail['execution_labor_items']:
+        ws_labor.append([
+            'execution',
+            item['equipment_name'],
+            item['task_name'],
+            item['worker_type'],
+            '-',
+            '',
+            '',
+            item['phase'],
             item['executed_amount'],
         ])
 
     ws_expense = wb.create_sheet('Expense')
-    ws_expense.append(['설비', '경비명', '산정기준', '예산금액', '단계', '집행'])
+    ws_expense.append(['구분', '설비', '경비명', '산정기준', '예산금액', '단계', '집행'])
     for item in detail['expense_items']:
         ws_expense.append([
+            'budget',
             item['equipment_name'],
             item['expense_name'],
             item['basis'],
             item['amount'],
+            item['phase'],
+            '',
+        ])
+    for item in detail['execution_expense_items']:
+        ws_expense.append([
+            'execution',
+            item['equipment_name'],
+            item['expense_name'],
+            item['basis'],
+            '',
             item['phase'],
             item['executed_amount'],
         ])
@@ -265,24 +441,22 @@ def _write_merged_header_excel(path: Path, detail: dict) -> None:
     ws['D1'] = '금액 정보'
     ws.append(['설비', '항목', '단계', '예산', '집행', '비고'])
 
-    for item in detail['material_items'][:2]:
-        budget_amount = item['quantity'] * item['unit_price']
+    for item in detail['execution_material_items'][:2]:
         ws.append([
             item['equipment_name'],
             item['part_name'],
             item['phase'],
-            budget_amount,
+            '',
             item['executed_amount'],
             item['memo'],
         ])
 
-    for item in detail['labor_items'][:2]:
-        budget_amount = item['quantity'] * item['hourly_rate']
+    for item in detail['execution_labor_items'][:2]:
         ws.append([
             item['equipment_name'],
             item['task_name'],
             item['phase'],
-            budget_amount,
+            '',
             item['executed_amount'],
             item['memo'],
         ])
@@ -293,32 +467,65 @@ def _write_merged_header_excel(path: Path, detail: dict) -> None:
 def _write_csv(path: Path, detail: dict) -> None:
     with path.open('w', encoding='utf-8', newline='') as fp:
         writer = csv.writer(fp)
-        writer.writerow(['category', 'equipment', 'name', 'phase', 'budget', 'executed'])
+        writer.writerow(['category', 'row_type', 'equipment', 'name', 'phase', 'budget', 'executed'])
         for item in detail['material_items']:
             writer.writerow([
                 'material',
+                'budget',
                 item['equipment_name'],
                 item['part_name'],
                 item['phase'],
                 item['quantity'] * item['unit_price'],
+                '',
+            ])
+        for item in detail['execution_material_items']:
+            writer.writerow([
+                'material',
+                'execution',
+                item['equipment_name'],
+                item['part_name'],
+                item['phase'],
+                '',
                 item['executed_amount'],
             ])
         for item in detail['labor_items']:
             writer.writerow([
                 'labor',
+                'budget',
                 item['equipment_name'],
                 item['task_name'],
                 item['phase'],
                 item['quantity'] * item['hourly_rate'],
+                '',
+            ])
+        for item in detail['execution_labor_items']:
+            writer.writerow([
+                'labor',
+                'execution',
+                item['equipment_name'],
+                item['task_name'],
+                item['phase'],
+                '',
                 item['executed_amount'],
             ])
         for item in detail['expense_items']:
             writer.writerow([
                 'expense',
+                'budget',
                 item['equipment_name'],
                 item['expense_name'],
                 item['phase'],
                 item['amount'],
+                '',
+            ])
+        for item in detail['execution_expense_items']:
+            writer.writerow([
+                'expense',
+                'execution',
+                item['equipment_name'],
+                item['expense_name'],
+                item['phase'],
+                '',
                 item['executed_amount'],
             ])
 

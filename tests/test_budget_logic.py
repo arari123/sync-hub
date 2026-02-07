@@ -71,6 +71,9 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(parsed["material_items"], [])
         self.assertEqual(parsed["labor_items"], [])
         self.assertEqual(parsed["expense_items"], [])
+        self.assertEqual(parsed["execution_material_items"], [])
+        self.assertEqual(parsed["execution_labor_items"], [])
+        self.assertEqual(parsed["execution_expense_items"], [])
 
     def test_aggregate_equipment_costs_from_detail(self):
         payload = {
@@ -134,6 +137,21 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(summary["fab_executed_total"], 4500)
         self.assertEqual(summary["install_executed_total"], 3700)
         self.assertEqual(summary["grand_executed_total"], 8200)
+
+    def test_summarize_executed_costs_prefers_execution_rows(self):
+        payload = {
+            "material_items": [{"executed_amount": 9999, "phase": "fabrication"}],
+            "labor_items": [{"executed_amount": 9999, "phase": "fabrication"}],
+            "expense_items": [{"executed_amount": 9999, "phase": "fabrication"}],
+            "execution_material_items": [{"executed_amount": 1000, "phase": "fabrication"}],
+            "execution_labor_items": [{"executed_amount": 2000, "phase": "installation"}],
+            "execution_expense_items": [{"executed_amount": 3000, "phase": "fabrication"}],
+        }
+        summary = summarize_executed_costs_from_detail(payload)
+        self.assertEqual(summary["material_executed_total"], 1000)
+        self.assertEqual(summary["labor_executed_total"], 2000)
+        self.assertEqual(summary["expense_executed_total"], 3000)
+        self.assertEqual(summary["grand_executed_total"], 6000)
 
 
 if __name__ == "__main__":

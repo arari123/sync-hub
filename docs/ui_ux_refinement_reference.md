@@ -24,11 +24,14 @@
   - 기본 모드는 집행금액 입력
   - 예산 변경은 "예산 변경" 버튼으로 명시적 전환 후 수행
   - 확정 버전에서 예산 변경 시 리비전 생성 후 변경
+  - 집행 입력은 예산 항목(`material_items/labor_items/expense_items`)과 분리된 독립 행(`execution_*_items`)으로 관리
+  - 집행 화면에서는 설비 축만 유지하고 유닛/파츠/작업명은 집행 기준으로 별도 입력 가능
 
 ## 3. 데이터 저장 규칙
-- `material_items / labor_items / expense_items`에 `executed_amount` 사용
+- 예산 데이터: `material_items / labor_items / expense_items`
+- 집행 데이터: `execution_material_items / execution_labor_items / execution_expense_items`
 - 모니터링 `actual_spent_*`는 입력된 `executed_amount`를 우선 반영
-- 확정 버전(`confirmed`)에서는 예산 필드 변경 차단, 집행금액/메모 업데이트만 허용
+- 확정 버전(`confirmed`)에서는 예산 필드 변경 차단, 집행 배열 업데이트만 허용
 
 ## 4. 테스트/검증 포인트
 - 셀 클릭/포커스/입력 가능 여부

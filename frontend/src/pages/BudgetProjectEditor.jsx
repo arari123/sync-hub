@@ -8,24 +8,10 @@ import { cn } from '../lib/utils';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
 
-function isRowEmpty(row, section) {
-    if (!row) return true;
-    if (section === 'material') {
-        const hasValue = row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.executed_amount || row.memo;
-        return !hasValue;
-    }
-    if (section === 'labor') {
-        const hasValue = row.equipment_name || row.task_name || row.worker_type || row.quantity || row.hourly_rate || row.executed_amount || row.memo;
-        return !hasValue;
-    }
-    const hasValue = row.equipment_name || row.expense_name || row.basis || row.amount || row.executed_amount || row.memo;
-    return !hasValue;
-}
-
 const SECTION_META = {
-    material: { label: '재료비', key: 'material_items' },
-    labor: { label: '인건비', key: 'labor_items' },
-    expense: { label: '경비', key: 'expense_items' },
+    material: { label: '재료비', budgetKey: 'material_items', executionKey: 'execution_material_items' },
+    labor: { label: '인건비', budgetKey: 'labor_items', executionKey: 'execution_labor_items' },
+    expense: { label: '경비', budgetKey: 'expense_items', executionKey: 'execution_expense_items' },
 };
 
 function toNumber(value) {
@@ -33,7 +19,29 @@ function toNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
-function buildEmptyRow(section, phase = 'fabrication') {
+function isBudgetRowEmpty(row, section) {
+    if (!row) return true;
+    if (section === 'material') {
+        return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.memo);
+    }
+    if (section === 'labor') {
+        return !(row.equipment_name || row.task_name || row.worker_type || row.unit || row.quantity || row.hourly_rate || row.memo);
+    }
+    return !(row.equipment_name || row.expense_name || row.basis || row.amount || row.memo);
+}
+
+function isExecutionRowEmpty(row, section) {
+    if (!row) return true;
+    if (section === 'material') {
+        return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.executed_amount || row.memo);
+    }
+    if (section === 'labor') {
+        return !(row.equipment_name || row.task_name || row.worker_type || row.executed_amount || row.memo);
+    }
+    return !(row.equipment_name || row.expense_name || row.basis || row.executed_amount || row.memo);
+}
+
+function buildEmptyBudgetRow(section, phase = 'fabrication') {
     if (section === 'material') {
         return {
             equipment_name: '',
@@ -42,8 +50,7 @@ function buildEmptyRow(section, phase = 'fabrication') {
             spec: '',
             quantity: 0,
             unit_price: 0,
-            executed_amount: 0,
-            phase: phase || 'fabrication',
+            phase,
             memo: '',
         };
     }
@@ -55,8 +62,7 @@ function buildEmptyRow(section, phase = 'fabrication') {
             unit: 'H',
             quantity: 0,
             hourly_rate: 0,
-            executed_amount: 0,
-            phase: phase || 'fabrication',
+            phase,
             memo: '',
         };
     }
@@ -65,28 +71,64 @@ function buildEmptyRow(section, phase = 'fabrication') {
         expense_name: '',
         basis: '',
         amount: 0,
-        executed_amount: 0,
-        phase: phase || 'fabrication',
+        phase,
         memo: '',
     };
 }
 
+function buildEmptyExecutionRow(section, phase = 'fabrication') {
+    if (section === 'material') {
+        return {
+            equipment_name: '',
+            unit_name: '',
+            part_name: '',
+            spec: '',
+            executed_amount: 0,
+            phase,
+            memo: '',
+        };
+    }
+    if (section === 'labor') {
+        return {
+            equipment_name: '',
+            task_name: '',
+            worker_type: '',
+            executed_amount: 0,
+            phase,
+            memo: '',
+        };
+    }
+    return {
+        equipment_name: '',
+        expense_name: '',
+        basis: '',
+        executed_amount: 0,
+        phase,
+        memo: '',
+    };
+}
+
+function _injectKeyBuffers(list, builder) {
+    const rows = (list || []).map((item) => ({ ...item, phase: item.phase || 'fabrication' }));
+    const fabCount = rows.filter((item) => item.phase === 'fabrication').length;
+    const instCount = rows.filter((item) => item.phase === 'installation').length;
+    const fabBuffer = Array.from({ length: Math.max(0, 50 - fabCount) }, () => builder('fabrication'));
+    const instBuffer = Array.from({ length: Math.max(0, 50 - instCount) }, () => builder('installation'));
+    return [...rows, ...fabBuffer, ...instBuffer];
+}
+
 function injectBuffers(detailsObj) {
     const result = { ...detailsObj };
-    Object.keys(SECTION_META).forEach((key) => {
-        const listKey = SECTION_META[key].key;
-        const existing = (result[listKey] || []).map((row) => ({
-            ...row,
-            phase: row.phase || 'fabrication',
-            executed_amount: toNumber(row.executed_amount),
-        }));
-
-        const fabCount = existing.filter((row) => row.phase === 'fabrication').length;
-        const instCount = existing.filter((row) => row.phase === 'installation').length;
-
-        const fabBuffer = Array.from({ length: Math.max(0, 50 - fabCount) }).map(() => buildEmptyRow(key, 'fabrication'));
-        const instBuffer = Array.from({ length: Math.max(0, 50 - instCount) }).map(() => buildEmptyRow(key, 'installation'));
-        result[listKey] = [...existing, ...fabBuffer, ...instBuffer];
+    Object.keys(SECTION_META).forEach((section) => {
+        const meta = SECTION_META[section];
+        result[meta.budgetKey] = _injectKeyBuffers(
+            result[meta.budgetKey],
+            (phase) => buildEmptyBudgetRow(section, phase),
+        );
+        result[meta.executionKey] = _injectKeyBuffers(
+            result[meta.executionKey],
+            (phase) => buildEmptyExecutionRow(section, phase),
+        );
     });
     return result;
 }
@@ -110,8 +152,10 @@ const BudgetProjectEditor = () => {
         material_items: [],
         labor_items: [],
         expense_items: [],
+        execution_material_items: [],
+        execution_labor_items: [],
+        execution_expense_items: [],
     }));
-    const [totals, setTotals] = useState(null);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -119,121 +163,122 @@ const BudgetProjectEditor = () => {
     const [currentPhase, setCurrentPhase] = useState('fabrication');
     const [budgetEditMode, setBudgetEditMode] = useState(false);
 
-    const rows = details[SECTION_META[section].key] || [];
     const canEditProject = project?.can_edit !== false;
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
+
+    const activeMode = isExecutionStage && !budgetEditMode ? 'execution' : 'budget';
+    const activeKey = activeMode === 'execution' ? SECTION_META[section].executionKey : SECTION_META[section].budgetKey;
+    const rows = details[activeKey] || [];
+
     const canEditExecutionFields = canEditProject && isExecutionStage;
     const canEditBudgetFields = canEditProject && !isConfirmed && (!isExecutionStage || budgetEditMode);
     const canSave = canEditBudgetFields || canEditExecutionFields;
 
-    const aggregationModeLabel = isExecutionStage && !budgetEditMode ? '집행금액' : '예산';
-    const entryModeLabel = isExecutionStage && !budgetEditMode ? '집행금액 입력 모드' : '예산 입력 모드';
+    const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
+    const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
 
     useEffect(() => {
         setBudgetEditMode(false);
     }, [projectId, section, currentStage]);
 
+    const displayRows = useMemo(
+        () => rows
+            .map((row, index) => ({ ...row, originalIndex: index }))
+            .filter((row) => (row.phase || 'fabrication') === currentPhase),
+        [rows, currentPhase],
+    );
+
     const aggregation = useMemo(() => {
         const result = { total: 0, equipments: [] };
-        const eqMap = {};
+        const equipmentMap = {};
 
         rows.forEach((row) => {
-            const amount = isExecutionStage && !budgetEditMode
+            const amount = activeMode === 'execution'
                 ? toNumber(row.executed_amount)
                 : calcBudgetAmount(row, section);
 
             result.total += amount;
-
-            const eqName = (row.equipment_name || '미지정 설비').trim() || '미지정 설비';
+            const equipmentName = (row.equipment_name || '미지정 설비').trim() || '미지정 설비';
             const unitName = section === 'material'
-                ? ((row.unit_name || '미지정 유닛').trim() || '미지정 유닛')
+                ? ((row.unit_name || row.part_name || '미지정').trim() || '미지정')
                 : ((row.phase || 'fabrication') === 'installation' ? '설치' : '제작');
 
-            if (!eqMap[eqName]) {
-                eqMap[eqName] = { name: eqName, total: 0, units: {}, unitOrder: [] };
-                result.equipments.push(eqMap[eqName]);
+            if (!equipmentMap[equipmentName]) {
+                equipmentMap[equipmentName] = { name: equipmentName, total: 0, units: {}, unitOrder: [] };
+                result.equipments.push(equipmentMap[equipmentName]);
             }
-            eqMap[eqName].total += amount;
+            equipmentMap[equipmentName].total += amount;
 
-            if (!eqMap[eqName].units[unitName]) {
-                eqMap[eqName].units[unitName] = { name: unitName, total: 0 };
-                eqMap[eqName].unitOrder.push(eqMap[eqName].units[unitName]);
+            if (!equipmentMap[equipmentName].units[unitName]) {
+                equipmentMap[equipmentName].units[unitName] = { name: unitName, total: 0 };
+                equipmentMap[equipmentName].unitOrder.push(equipmentMap[equipmentName].units[unitName]);
             }
-            eqMap[eqName].units[unitName].total += amount;
+            equipmentMap[equipmentName].units[unitName].total += amount;
         });
 
-        result.equipments.forEach((eq) => {
-            eq.units = eq.unitOrder;
+        result.equipments.forEach((item) => {
+            item.units = item.unitOrder;
         });
-
         return result;
-    }, [rows, section, isExecutionStage, budgetEditMode]);
+    }, [rows, section, activeMode]);
 
-    const displayRows = useMemo(() => {
-        return rows
-            .map((row, index) => ({ ...row, originalIndex: index }))
-            .filter((row) => (row.phase || 'fabrication') === currentPhase);
-    }, [rows, currentPhase]);
+    const budgetColumnsBySection = useMemo(() => ({
+        material: [
+            { key: 'equipment_name', label: '설비', width: 'w-32' },
+            { key: 'unit_name', label: '유닛', width: 'w-32' },
+            { key: 'part_name', label: '부품명', width: 'w-40' },
+            { key: 'spec', label: '규격/모델명', width: 'w-48' },
+            { key: 'quantity', label: '수량', width: 'w-24', type: 'number' },
+            { key: 'unit_price', label: '단가', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+        labor: [
+            { key: 'equipment_name', label: '설비', width: 'w-32' },
+            { key: 'task_name', label: '작업명', width: 'w-40' },
+            { key: 'worker_type', label: '직군', width: 'w-32' },
+            { key: 'unit', label: '단위', width: 'w-20' },
+            { key: 'quantity', label: '수량', width: 'w-24', type: 'number' },
+            { key: 'hourly_rate', label: '단가', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+        expense: [
+            { key: 'equipment_name', label: '설비', width: 'w-40' },
+            { key: 'expense_name', label: '경비 항목', width: 'w-48' },
+            { key: 'basis', label: '산정 기준', width: 'w-48' },
+            { key: 'amount', label: '예산금액', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+    }), []);
 
-    const materialColumns = useMemo(() => {
-        const base = [
-            { key: 'equipment_name', label: '설비', width: 'w-32', editScope: 'budget' },
-            { key: 'unit_name', label: '유닛', width: 'w-32', editScope: 'budget' },
-            { key: 'part_name', label: '부품명', width: 'w-40', editScope: 'budget' },
-            { key: 'spec', label: '규격/모델명', width: 'w-48', editScope: 'budget' },
-            { key: 'quantity', label: '수량', width: 'w-24', type: 'number', editScope: 'budget' },
-            { key: 'unit_price', label: '단가', width: 'w-32', type: 'number', editScope: 'budget' },
-        ];
+    const executionColumnsBySection = useMemo(() => ({
+        material: [
+            { key: 'equipment_name', label: '설비', width: 'w-32' },
+            { key: 'unit_name', label: '유닛(집행)', width: 'w-32' },
+            { key: 'part_name', label: '파츠(집행)', width: 'w-40' },
+            { key: 'spec', label: '규격/메모', width: 'w-48' },
+            { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+        labor: [
+            { key: 'equipment_name', label: '설비', width: 'w-32' },
+            { key: 'task_name', label: '작업명(집행)', width: 'w-40' },
+            { key: 'worker_type', label: '직군(집행)', width: 'w-32' },
+            { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+        expense: [
+            { key: 'equipment_name', label: '설비', width: 'w-40' },
+            { key: 'expense_name', label: '경비 항목(집행)', width: 'w-48' },
+            { key: 'basis', label: '산정 기준(집행)', width: 'w-48' },
+            { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
+            { key: 'memo', label: '비고', width: 'w-48' },
+        ],
+    }), []);
 
-        if (isExecutionStage) {
-            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
-        }
-
-        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
-        return base;
-    }, [isExecutionStage]);
-
-    const laborColumns = useMemo(() => {
-        const base = [
-            { key: 'equipment_name', label: '설비', width: 'w-32', editScope: 'budget' },
-            { key: 'task_name', label: '작업명', width: 'w-40', editScope: 'budget' },
-            { key: 'worker_type', label: '직군', width: 'w-32', editScope: 'budget' },
-            { key: 'unit', label: '단위', width: 'w-20', editScope: 'budget' },
-            { key: 'quantity', label: '수량', width: 'w-24', type: 'number', editScope: 'budget' },
-            { key: 'hourly_rate', label: '단가', width: 'w-32', type: 'number', editScope: 'budget' },
-        ];
-
-        if (isExecutionStage) {
-            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
-        }
-
-        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
-        return base;
-    }, [isExecutionStage]);
-
-    const expenseColumns = useMemo(() => {
-        const base = [
-            { key: 'equipment_name', label: '설비', width: 'w-40', editScope: 'budget' },
-            { key: 'expense_name', label: '경비 항목', width: 'w-48', editScope: 'budget' },
-            { key: 'basis', label: '산정 기준', width: 'w-48', editScope: 'budget' },
-            { key: 'amount', label: '예산금액', width: 'w-32', type: 'number', editScope: 'budget' },
-        ];
-
-        if (isExecutionStage) {
-            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
-        }
-
-        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
-        return base;
-    }, [isExecutionStage]);
-
-    const canEditColumn = (column) => {
-        if (!canEditProject) return false;
-        if ((column.editScope || 'budget') === 'execution') return canEditExecutionFields;
-        return canEditBudgetFields;
-    };
+    const columns = activeMode === 'execution' ? executionColumnsBySection[section] : budgetColumnsBySection[section];
+    const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
 
     const load = async () => {
         if (!projectId) return;
@@ -252,10 +297,16 @@ const BudgetProjectEditor = () => {
             setVersion(currentVersion || null);
 
             const detailResp = await api.get(`/budget/versions/${currentVersion.id}/details`);
-            const loadedDetails = detailResp?.data?.details || { material_items: [], labor_items: [], expense_items: [] };
+            const loadedDetails = detailResp?.data?.details || {
+                material_items: [],
+                labor_items: [],
+                expense_items: [],
+                execution_material_items: [],
+                execution_labor_items: [],
+                execution_expense_items: [],
+            };
 
             setDetails(injectBuffers(loadedDetails));
-            setTotals(detailResp?.data?.totals || null);
         } catch (err) {
             setError(getErrorMessage(err, '예산 상세 데이터를 불러오지 못했습니다.'));
         } finally {
@@ -269,15 +320,48 @@ const BudgetProjectEditor = () => {
     }, [projectId]);
 
     const handlePaste = (event) => {
-        if (!canEditBudgetFields) return;
+        if (!canEditActiveRows) return;
 
         event.preventDefault();
         const clipboardData = event.clipboardData || window.clipboardData;
         const pastedData = clipboardData.getData('text');
         const pasteRows = pastedData.split(/\r\n|\n/).filter((line) => line.trim() !== '');
 
-        const newItems = pasteRows.map((rowText) => {
+        const parsedRows = pasteRows.map((rowText) => {
             const cols = rowText.split('\t');
+
+            if (activeMode === 'execution') {
+                if (section === 'material') {
+                    return {
+                        equipment_name: cols[0] || '',
+                        unit_name: cols[1] || '',
+                        part_name: cols[2] || '',
+                        spec: cols[3] || '',
+                        executed_amount: toNumber(cols[4]),
+                        phase: (cols[5] || '').includes('설치') ? 'installation' : currentPhase,
+                        memo: cols[6] || '',
+                    };
+                }
+                if (section === 'labor') {
+                    return {
+                        equipment_name: cols[0] || '',
+                        task_name: cols[1] || '',
+                        worker_type: cols[2] || '',
+                        executed_amount: toNumber(cols[3]),
+                        phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
+                        memo: cols[5] || '',
+                    };
+                }
+                return {
+                    equipment_name: cols[0] || '',
+                    expense_name: cols[1] || '',
+                    basis: cols[2] || '',
+                    executed_amount: toNumber(cols[3]),
+                    phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
+                    memo: cols[5] || '',
+                };
+            }
+
             if (section === 'material') {
                 return {
                     equipment_name: cols[0] || '',
@@ -286,9 +370,8 @@ const BudgetProjectEditor = () => {
                     spec: cols[3] || '',
                     quantity: toNumber(cols[4]),
                     unit_price: toNumber(cols[5]),
-                    phase: (cols[6] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                    phase: (cols[6] || '').includes('설치') ? 'installation' : currentPhase,
                     memo: cols[7] || '',
-                    executed_amount: toNumber(cols[8]),
                 };
             }
             if (section === 'labor') {
@@ -299,9 +382,8 @@ const BudgetProjectEditor = () => {
                     unit: cols[3] || 'H',
                     quantity: toNumber(cols[4]),
                     hourly_rate: toNumber(cols[5]),
-                    phase: (cols[6] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                    phase: (cols[6] || '').includes('설치') ? 'installation' : currentPhase,
                     memo: cols[7] || '',
-                    executed_amount: toNumber(cols[8]),
                 };
             }
             return {
@@ -309,31 +391,30 @@ const BudgetProjectEditor = () => {
                 expense_name: cols[1] || '',
                 basis: cols[2] || '',
                 amount: toNumber(cols[3]),
-                phase: (cols[4] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
                 memo: cols[5] || '',
-                executed_amount: toNumber(cols[6]),
             };
         });
 
-        const targetKey = SECTION_META[section].key;
         setDetails((prev) => {
-            const currentPhaseExisting = (prev[targetKey] || []).filter((row) => row.phase === currentPhase && !isRowEmpty(row, section));
-            const otherPhaseExisting = (prev[targetKey] || []).filter((row) => row.phase !== currentPhase);
-            const combinedList = [...currentPhaseExisting, ...newItems, ...otherPhaseExisting];
+            const currentRows = prev[activeKey] || [];
+            const currentPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') === currentPhase);
+            const otherPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') !== currentPhase);
+            const mergedCurrent = [...currentPhaseExisting.filter((row) => !(activeMode === 'execution'
+                ? isExecutionRowEmpty(row, section)
+                : isBudgetRowEmpty(row, section))), ...parsedRows];
 
             return injectBuffers({
                 ...prev,
-                [targetKey]: combinedList,
+                [activeKey]: [...mergedCurrent, ...otherPhaseExisting],
             });
         });
     };
 
     const updateRow = (index, key, value) => {
-        const targetKey = SECTION_META[section].key;
         setDetails((prev) => {
-            const newList = [...(prev[targetKey] || [])];
+            const newList = [...(prev[activeKey] || [])];
             const row = { ...newList[index] };
-
             if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
@@ -347,22 +428,24 @@ const BudgetProjectEditor = () => {
             newList.forEach((item, itemIndex) => {
                 if ((item.phase || 'fabrication') === currentPhase) filteredIndices.push(itemIndex);
             });
-
             const positionInDisplay = filteredIndices.indexOf(index);
             if (positionInDisplay >= filteredIndices.length - 3) {
-                const buffer = Array.from({ length: 20 }).map(() => buildEmptyRow(section, currentPhase));
+                const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+                const buffer = Array.from({ length: 20 }, () => builder(section, currentPhase));
                 newList.push(...buffer);
             }
 
-            return { ...prev, [targetKey]: newList };
+            return {
+                ...prev,
+                [activeKey]: newList,
+            };
         });
     };
 
     const removeRow = (index) => {
-        const targetKey = SECTION_META[section].key;
         setDetails((prev) => ({
             ...prev,
-            [targetKey]: (prev[targetKey] || []).filter((_, rowIndex) => rowIndex !== index),
+            [activeKey]: (prev[activeKey] || []).filter((_, rowIndex) => rowIndex !== index),
         }));
     };
 
@@ -373,15 +456,15 @@ const BudgetProjectEditor = () => {
         setError('');
         try {
             const cleanDetails = {};
-            Object.keys(SECTION_META).forEach((key) => {
-                const listKey = SECTION_META[key].key;
-                cleanDetails[listKey] = (details[listKey] || []).filter((row) => !isRowEmpty(row, key));
+            Object.keys(SECTION_META).forEach((sectionKey) => {
+                const meta = SECTION_META[sectionKey];
+                cleanDetails[meta.budgetKey] = (details[meta.budgetKey] || []).filter((row) => !isBudgetRowEmpty(row, sectionKey));
+                cleanDetails[meta.executionKey] = (details[meta.executionKey] || []).filter((row) => !isExecutionRowEmpty(row, sectionKey));
             });
 
             const response = await api.put(`/budget/versions/${version.id}/details`, cleanDetails);
             const savedDetails = response?.data?.details || cleanDetails;
             setDetails(injectBuffers(savedDetails));
-            setTotals(response?.data?.totals || totals);
             setVersion(response?.data?.version || version);
         } catch (err) {
             setError(getErrorMessage(err, '상세 저장에 실패했습니다.'));
@@ -407,8 +490,7 @@ const BudgetProjectEditor = () => {
 
     const createRevision = async (reasonInput = null) => {
         if (!version?.id) return null;
-
-        const reason = (reasonInput ?? window.prompt('리비전 사유를 입력해 주세요.'));
+        const reason = reasonInput ?? window.prompt('리비전 사유를 입력해 주세요.');
         if (!reason || !String(reason).trim()) return null;
 
         setError('');
@@ -422,7 +504,6 @@ const BudgetProjectEditor = () => {
             setVersion(nextVersion);
             const detailResp = await api.get(`/budget/versions/${nextVersion.id}/details`);
             setDetails(injectBuffers(detailResp?.data?.details || details));
-            setTotals(detailResp?.data?.totals || totals);
             return nextVersion;
         } catch (err) {
             setError(getErrorMessage(err, '리비전 생성에 실패했습니다.'));
@@ -451,14 +532,11 @@ const BudgetProjectEditor = () => {
     const handleScroll = (event) => {
         const { scrollTop, scrollHeight, clientHeight } = event.target;
         if (scrollHeight - scrollTop <= clientHeight + 100) {
-            const targetKey = SECTION_META[section].key;
-            setDetails((prev) => {
-                const buffer = Array.from({ length: 50 }).map(() => buildEmptyRow(section, currentPhase));
-                return {
-                    ...prev,
-                    [targetKey]: [...(prev[targetKey] || []), ...buffer],
-                };
-            });
+            const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+            setDetails((prev) => ({
+                ...prev,
+                [activeKey]: [...(prev[activeKey] || []), ...Array.from({ length: 50 }, () => builder(section, currentPhase))],
+            }));
         }
     };
 
@@ -569,8 +647,7 @@ const BudgetProjectEditor = () => {
                                             section === 'labor' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600',
                                     )}
                                     >
-                                        {section === 'material' ? <Package size={20} /> :
-                                            section === 'labor' ? <Users size={20} /> : <Wallet size={20} />}
+                                        {section === 'material' ? <Package size={20} /> : section === 'labor' ? <Users size={20} /> : <Wallet size={20} />}
                                     </div>
                                     <div>
                                         <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
@@ -586,7 +663,7 @@ const BudgetProjectEditor = () => {
                                             currentPhase === 'fabrication' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
                                         )}
                                     >
-                                        제작비용 제어
+                                        제작
                                     </button>
                                     <button
                                         onClick={() => setCurrentPhase('installation')}
@@ -595,7 +672,7 @@ const BudgetProjectEditor = () => {
                                             currentPhase === 'installation' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
                                         )}
                                     >
-                                        설치비용 제어
+                                        설치
                                     </button>
                                 </div>
 
@@ -618,24 +695,8 @@ const BudgetProjectEditor = () => {
                             <div className="flex items-center gap-2">
                                 <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
                                     <ClipboardPaste size={12} />
-                                    <span>{canEditBudgetFields ? '외부 엑셀 데이터 붙여넣기 가능' : '현재 모드에서는 붙여넣기 비활성화'}</span>
+                                    <span>엑셀 붙여넣기 가능</span>
                                 </div>
-                                {canSave && (
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={saveDetail}
-                                            disabled={isSaving}
-                                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-black text-white shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all disabled:opacity-50"
-                                        >
-                                            {isSaving ? (
-                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                            ) : (
-                                                <Save size={14} />
-                                            )}
-                                            입력 데이터 저장
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
@@ -646,36 +707,14 @@ const BudgetProjectEditor = () => {
                         )}
 
                         <div className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative">
-                            {section === 'material' && (
-                                <ExcelTable
-                                    columns={materialColumns}
-                                    rows={displayRows}
-                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
-                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
-                                    canEditColumn={canEditColumn}
-                                    allowRowDelete={canEditBudgetFields}
-                                />
-                            )}
-                            {section === 'labor' && (
-                                <ExcelTable
-                                    columns={laborColumns}
-                                    rows={displayRows}
-                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
-                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
-                                    canEditColumn={canEditColumn}
-                                    allowRowDelete={canEditBudgetFields}
-                                />
-                            )}
-                            {section === 'expense' && (
-                                <ExcelTable
-                                    columns={expenseColumns}
-                                    rows={displayRows}
-                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
-                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
-                                    canEditColumn={canEditColumn}
-                                    allowRowDelete={canEditBudgetFields}
-                                />
-                            )}
+                            <ExcelTable
+                                columns={columns}
+                                rows={displayRows}
+                                onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
+                                onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
+                                editable={canEditActiveRows}
+                                allowRowDelete={canEditActiveRows}
+                            />
                         </div>
                     </section>
                 </div>
@@ -684,7 +723,7 @@ const BudgetProjectEditor = () => {
     );
 };
 
-const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRowDelete }) => {
+const ExcelTable = ({ columns, rows, onChange, onRemove, editable, allowRowDelete }) => {
     const tableRef = useRef(null);
 
     const handleKeyDown = (event, rowIndex, colIndex) => {
@@ -700,7 +739,7 @@ const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRow
         else if (event.key === 'ArrowLeft') nextCol = Math.max(0, colIndex - 1);
         else if (event.key === 'ArrowRight') nextCol = Math.min(colCount - 1, colIndex + 1);
 
-        const nextTarget = tableRef.current?.querySelector(`[data-row="${nextRow}"][data-col="${nextCol}"] input, [data-row="${nextRow}"][data-col="${nextCol}"] select`);
+        const nextTarget = tableRef.current?.querySelector(`[data-row="${nextRow}"][data-col="${nextCol}"] input`);
         if (!nextTarget) return;
 
         event.preventDefault();
@@ -724,7 +763,6 @@ const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRow
                 {rows.map((row, rowIndex) => (
                     <tr key={rowIndex} className="border-b border-slate-100 hover:bg-slate-50/50 focus-within:bg-blue-50/30 group transition-colors">
                         {columns.map((col, colIndex) => {
-                            const editable = Boolean(canEditColumn(col));
                             const rawValue = row[col.key];
                             const displayValue = col.type === 'number'
                                 ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
@@ -732,44 +770,25 @@ const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRow
 
                             return (
                                 <td key={colIndex} className="p-0 border-r border-slate-100 last:border-0" data-row={rowIndex} data-col={colIndex}>
-                                    {col.type === 'select' ? (
-                                        <select
-                                            className={cn(
-                                                'w-full h-8 px-2 outline-none transition-all appearance-none text-slate-700 font-bold text-[10.5px]',
-                                                editable ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary' : 'bg-slate-50 text-slate-400 cursor-default',
-                                            )}
-                                            value={row[col.key] || 'fabrication'}
-                                            onChange={(event) => {
-                                                if (!editable) return;
-                                                onChange(rowIndex, col.key, event.target.value);
-                                            }}
-                                            onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
-                                            disabled={!editable}
-                                        >
-                                            <option value="fabrication">제작</option>
-                                            <option value="installation">설치</option>
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            className={cn(
-                                                'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
-                                                editable
-                                                    ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
-                                                    : 'bg-slate-50 text-slate-400 cursor-text',
-                                            )}
-                                            value={displayValue}
-                                            onChange={(event) => {
-                                                if (!editable) return;
-                                                let val = event.target.value;
-                                                if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
-                                                onChange(rowIndex, col.key, val);
-                                            }}
-                                            onFocus={(event) => event.target.select()}
-                                            onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
-                                            readOnly={!editable}
-                                        />
-                                    )}
+                                    <input
+                                        type="text"
+                                        className={cn(
+                                            'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
+                                            editable
+                                                ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
+                                                : 'bg-slate-50 text-slate-400',
+                                        )}
+                                        value={displayValue}
+                                        onChange={(event) => {
+                                            if (!editable) return;
+                                            let val = event.target.value;
+                                            if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
+                                            onChange(rowIndex, col.key, val);
+                                        }}
+                                        onFocus={(event) => event.target.select()}
+                                        onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                        readOnly={!editable}
+                                    />
                                 </td>
                             );
                         })}
@@ -789,7 +808,7 @@ const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRow
                 {!rows.length && (
                     <tr>
                         <td colSpan={columns.length + (allowRowDelete ? 1 : 0)} className="p-12 text-center text-slate-400 font-bold italic bg-white">
-                            입력된 데이터가 없습니다. 검토 단계에서 예산을 입력하거나 제작/설치/AS 단계에서 집행금액을 입력해 주세요.
+                            입력된 데이터가 없습니다.
                         </td>
                     </tr>
                 )}

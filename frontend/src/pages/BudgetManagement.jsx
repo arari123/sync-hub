@@ -8,6 +8,16 @@ function formatAmount(value) {
     return `${number.toLocaleString('ko-KR')}원`;
 }
 
+function stageBadgeClass(stage) {
+    if (stage === 'progress') {
+        return 'border-amber-200 bg-amber-50 text-amber-700';
+    }
+    if (stage === 'closure') {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    }
+    return 'border-blue-200 bg-blue-50 text-blue-700';
+}
+
 const BudgetManagement = () => {
     const [projects, setProjects] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +40,34 @@ const BudgetManagement = () => {
         loadProjects();
     }, [loadProjects]);
 
+    const summary = projects.reduce(
+        (acc, project) => {
+            acc.projectCount += 1;
+            acc.materialTotal += Number(project?.totals?.material_total || 0);
+            acc.laborTotal += Number(project?.totals?.labor_total || 0);
+            acc.expenseTotal += Number(project?.totals?.expense_total || 0);
+            acc.grandTotal += Number(project?.totals?.grand_total || 0);
+            if (project?.current_stage === 'progress') {
+                acc.progressCount += 1;
+            } else if (project?.current_stage === 'closure') {
+                acc.closureCount += 1;
+            } else {
+                acc.reviewCount += 1;
+            }
+            return acc;
+        },
+        {
+            projectCount: 0,
+            reviewCount: 0,
+            progressCount: 0,
+            closureCount: 0,
+            materialTotal: 0,
+            laborTotal: 0,
+            expenseTotal: 0,
+            grandTotal: 0,
+        }
+    );
+
     return (
         <div className="space-y-6">
             <section className="rounded-xl border bg-card p-6 shadow-sm">
@@ -37,16 +75,24 @@ const BudgetManagement = () => {
                     <div>
                         <h1 className="text-2xl font-bold">예산관리</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            프로젝트별 요약 예산 현황을 확인하고 상세 예산 입력 화면으로 이동할 수 있습니다.
+                            전체 프로젝트 예산 현황을 모니터링하고 상세 입력으로 이동할 수 있습니다.
                         </p>
                     </div>
                     <Link
                         to="/budget-management/projects/new"
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-accent"
                     >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3.5 w-3.5" />
                         프로젝트 생성
                     </Link>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+                    <SummaryTile label="전체 프로젝트" value={`${summary.projectCount}개`} />
+                    <SummaryTile label="검토" value={`${summary.reviewCount}개`} />
+                    <SummaryTile label="진행" value={`${summary.progressCount}개`} />
+                    <SummaryTile label="종료" value={`${summary.closureCount}개`} />
+                    <SummaryTile label="총 예산 합계" value={formatAmount(summary.grandTotal)} />
+                    <SummaryTile label="프로젝트 평균" value={formatAmount(summary.projectCount ? summary.grandTotal / summary.projectCount : 0)} />
                 </div>
             </section>
 
@@ -57,7 +103,7 @@ const BudgetManagement = () => {
             )}
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">프로젝트 예산 현황</h2>
+                <h2 className="mb-4 text-base font-semibold">프로젝트 모니터링</h2>
                 {isLoading ? (
                     <p className="text-sm text-muted-foreground">불러오는 중...</p>
                 ) : projects.length === 0 ? (
@@ -72,54 +118,85 @@ const BudgetManagement = () => {
                         </Link>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                        <table className="min-w-[1100px] w-full text-sm">
-                            <thead className="bg-muted/30">
-                                <tr className="text-left text-xs text-muted-foreground">
-                                    <th className="px-3 py-3 font-medium">프로젝트</th>
-                                    <th className="px-3 py-3 font-medium">단계</th>
-                                    <th className="px-3 py-3 font-medium text-right">재료비</th>
-                                    <th className="px-3 py-3 font-medium text-right">인건비</th>
-                                    <th className="px-3 py-3 font-medium text-right">경비</th>
-                                    <th className="px-3 py-3 font-medium text-right">총액</th>
-                                    <th className="px-3 py-3 font-medium text-center">입력</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {projects.map((project) => (
-                                    <tr key={project.id} className="border-t">
-                                        <td className="px-3 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <FolderKanban className="h-4 w-4 text-primary" />
-                                                <div>
-                                                    <p className="font-semibold">{project.name}</p>
-                                                    <p className="text-xs text-muted-foreground">코드: {project.code || '-'}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-3 text-xs">{project.current_stage_label}</td>
-                                        <td className="px-3 py-3 text-right text-xs">{formatAmount(project.totals?.material_total)}</td>
-                                        <td className="px-3 py-3 text-right text-xs">{formatAmount(project.totals?.labor_total)}</td>
-                                        <td className="px-3 py-3 text-right text-xs">{formatAmount(project.totals?.expense_total)}</td>
-                                        <td className="px-3 py-3 text-right text-xs font-semibold">{formatAmount(project.totals?.grand_total)}</td>
-                                        <td className="px-3 py-3 text-center">
-                                            <Link
-                                                to={`/budget-management/projects/${project.id}/edit/material`}
-                                                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent hover:text-accent-foreground"
-                                            >
-                                                상세 입력
-                                                <ArrowRight className="h-3.5 w-3.5" />
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                        {projects.map((project) => {
+                            const confirmedBudget = Number(project?.monitoring?.confirmed_budget_total ?? project?.totals?.grand_total ?? 0);
+                            const actualSpentRaw = project?.monitoring?.actual_spent_total;
+                            const hasActual = actualSpentRaw !== null && actualSpentRaw !== undefined;
+                            const actualSpent = hasActual ? Number(actualSpentRaw) : 0;
+                            const variance = hasActual
+                                ? Number(project?.monitoring?.variance_total ?? confirmedBudget - actualSpent)
+                                : null;
+                            const showExecutionPanel = project?.current_stage !== 'review';
+
+                            return (
+                                <article key={project.id} className="rounded-xl border bg-muted/10 p-4">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold">{project.name}</p>
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
+                                        </div>
+                                        <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
+                                            {project.current_stage_label}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                        <AmountCell label="재료비" value={formatAmount(project.totals?.material_total)} />
+                                        <AmountCell label="인건비" value={formatAmount(project.totals?.labor_total)} />
+                                        <AmountCell label="경비" value={formatAmount(project.totals?.expense_total)} />
+                                        <AmountCell label="총 예산" value={formatAmount(project.totals?.grand_total)} strong />
+                                    </div>
+
+                                    <div className="my-3 border-t" />
+
+                                    {showExecutionPanel ? (
+                                        <div className="grid grid-cols-3 gap-2 text-xs">
+                                            <AmountCell label="확정 예산" value={formatAmount(confirmedBudget)} />
+                                            <AmountCell label="집행 금액" value={hasActual ? formatAmount(actualSpent) : '-'} />
+                                            <AmountCell label="차액" value={hasActual ? formatAmount(variance) : '-'} strong={hasActual} />
+                                        </div>
+                                    ) : (
+                                        <p className="rounded-md border border-dashed px-2 py-2 text-xs text-muted-foreground">
+                                            검토 단계는 예산 수립 중심입니다. 진행 단계부터 확정 예산/집행 금액/차액 모니터링이 표시됩니다.
+                                        </p>
+                                    )}
+
+                                    {showExecutionPanel && !hasActual && (
+                                        <p className="mt-2 text-[11px] text-muted-foreground">
+                                            집행 금액 연동 전: 현재는 확정 예산 기준으로 모니터링 구조만 제공됩니다.
+                                        </p>
+                                    )}
+
+                                    <Link
+                                        to={`/budget-management/projects/${project.id}/edit/material`}
+                                        className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent hover:text-accent-foreground"
+                                    >
+                                        상세 입력으로 이동
+                                        <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </article>
+                            );
+                        })}
                     </div>
                 )}
             </section>
         </div>
     );
 };
+
+const SummaryTile = ({ label, value }) => (
+    <div className="rounded-md border bg-muted/10 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
+);
+
+const AmountCell = ({ label, value, strong = false }) => (
+    <div className={`rounded-md border px-2 py-2 ${strong ? 'border-primary/30 bg-primary/5' : 'bg-background'}`}>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className={`mt-1 text-xs ${strong ? 'font-bold' : 'font-semibold'}`}>{value}</p>
+    </div>
+);
 
 export default BudgetManagement;

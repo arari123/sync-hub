@@ -196,6 +196,12 @@ def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
         totals = summarize_costs([])
         current_version_id = None
 
+    monitoring = {
+        "confirmed_budget_total": totals.get("grand_total", 0.0),
+        "actual_spent_total": None,
+        "variance_total": None,
+    }
+
     version_count = (
         db.query(func.count(models.BudgetVersion.id))
         .filter(models.BudgetVersion.project_id == project.id)
@@ -213,6 +219,7 @@ def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
         "current_version_id": current_version_id,
         "version_count": int(version_count),
         "totals": totals,
+        "monitoring": monitoring,
         "created_at": project.created_at,
         "updated_at": project.updated_at,
     }

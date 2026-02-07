@@ -109,84 +109,86 @@ const BudgetManagement = () => {
         <div className="space-y-6">
             <BudgetBreadcrumb items={[{ label: '예산관리' }]} />
 
-            <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold">예산관리</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            전체 프로젝트 예산 현황을 모니터링하고 프로젝트별 요약 화면으로 이동할 수 있습니다.
-                        </p>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <section className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h1 className="text-xl font-bold">예산관리</h1>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                전체 프로젝트 예산 현황을 모니터링하고 프로젝트별 요약 화면으로 이동할 수 있습니다.
+                            </p>
+                        </div>
+                        <Link
+                            to="/budget-management/projects/new"
+                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-accent"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            프로젝트 생성
+                        </Link>
                     </div>
-                    <Link
-                        to="/budget-management/projects/new"
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-accent"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        프로젝트 생성
-                    </Link>
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                    전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 진행 {summary.progressCount}개 · 종료 {summary.closureCount}개
-                </p>
-            </section>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                        전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 진행 {summary.progressCount}개 · 종료 {summary.closureCount}개
+                    </p>
+                </section>
 
-            <section className="rounded-xl border bg-card p-4 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">필터</h2>
-                    <p className="text-[11px] text-muted-foreground">조건에 맞는 프로젝트만 표시</p>
-                </div>
-                <form className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6" onSubmit={applyFilters}>
-                    <input
-                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
-                        placeholder="최소 금액(원)"
-                        value={draftFilters.minTotal}
-                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
-                    />
-                    <input
-                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
-                        placeholder="최대 금액(원)"
-                        value={draftFilters.maxTotal}
-                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
-                    />
-                    <input
-                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
-                        placeholder="고객사"
-                        value={draftFilters.customerName}
-                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
-                    />
-                    <input
-                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
-                        placeholder="작성자"
-                        value={draftFilters.authorName}
-                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
-                    />
-                    <select
-                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
-                        value={draftFilters.projectType}
-                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
-                    >
-                        <option value="">프로젝트 종류(전체)</option>
-                        <option value="equipment">설비</option>
-                        <option value="parts">파츠</option>
-                        <option value="as">AS</option>
-                    </select>
-                    <div className="flex gap-2">
-                        <button
-                            type="submit"
-                            className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
-                        >
-                            적용
-                        </button>
-                        <button
-                            type="button"
-                            onClick={resetFilters}
-                            className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
-                        >
-                            초기화
-                        </button>
+                <section className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h2 className="text-sm font-semibold">필터</h2>
+                        <p className="text-[11px] text-muted-foreground">조건에 맞는 프로젝트만 표시</p>
                     </div>
-                </form>
-            </section>
+                    <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3" onSubmit={applyFilters}>
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2.5 text-[11px]"
+                            placeholder="최소 금액(원)"
+                            value={draftFilters.minTotal}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
+                        />
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2.5 text-[11px]"
+                            placeholder="최대 금액(원)"
+                            value={draftFilters.maxTotal}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
+                        />
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2.5 text-[11px]"
+                            placeholder="고객사"
+                            value={draftFilters.customerName}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
+                        />
+                        <input
+                            className="h-7 rounded-md border border-input bg-background px-2.5 text-[11px]"
+                            placeholder="작성자"
+                            value={draftFilters.authorName}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
+                        />
+                        <select
+                            className="h-7 rounded-md border border-input bg-background px-2.5 text-[11px]"
+                            value={draftFilters.projectType}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
+                        >
+                            <option value="">프로젝트 종류(전체)</option>
+                            <option value="equipment">설비</option>
+                            <option value="parts">파츠</option>
+                            <option value="as">AS</option>
+                        </select>
+                        <div className="flex gap-2">
+                            <button
+                                type="submit"
+                                className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                            >
+                                적용
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
+                            >
+                                초기화
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            </div>
 
             {error && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

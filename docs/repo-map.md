@@ -1,5 +1,11 @@
 # Sync-Hub Repository Map
 
+## AI Quick Links
+- 시스템 컨텍스트: `docs/ai-system-context.md`
+- 프론트 구현 가이드: `docs/ai-frontend-guide.md`
+- 디자인 가이드: `docs/ai-design-guide.md`
+- 세션 재개 기준: `docs/session-handover-2026-02-07.md`
+
 ## Core Folders
 - `app/`: FastAPI backend application.
   - `main.py`: Entry point for the API.
@@ -24,8 +30,15 @@
   - `core/ocr.py`: Web -> OCR worker adapter.
   - `ocr_worker.py`: External OCR worker API (GLM/Ollama/Paddle + pypdf fallback).
 - `frontend/`: React UI.
-  - `src/App.jsx`: 검색/결과/상세/업로드/헬스 패널 UI 및 답변형 결과 카드 렌더링(요약+근거).
-  - `src/App.css`: 결과 카드/상태 패널/하이라이트/매칭포인트 스타일.
+  - `src/App.jsx`: 라우팅 엔트리(`/search`, `/project-management`, 인증 라우트).
+  - `src/components/Layout.jsx`: 인증 상태별 레이아웃 분기(사이드바/비사이드바).
+  - `src/components/Sidebar.jsx`: 1차 네비게이션, 사용자 정보, 로그아웃.
+  - `src/pages/Home.jsx`: 홈 대시보드/검색 진입/업로드 위젯.
+  - `src/pages/SearchResults.jsx`: 프로젝트+문서 통합 검색 결과 화면.
+  - `src/pages/BudgetManagement.jsx`: 프로젝트 관리 메인(필터/정렬/모니터링 카드).
+  - `src/pages/BudgetProjectOverview.jsx`: 프로젝트 상세 모니터링 화면.
+  - `src/pages/BudgetProjectBudget.jsx`: 예산 관리 요약/입력 진입 화면.
+  - `src/pages/BudgetProjectEditor.jsx`: 재료비/인건비/경비 상세 입력 화면.
 - `docs/`: Project documentation and PRD.
   - `dev-setup.md`: Docker/비도커 개발 환경 구성 및 종속성 점검 가이드.
   - `reflow-chunking.md`: 리플로우/문장 청킹/표 분리/디버그 API/재색인 CLI 운영 가이드.
@@ -45,15 +58,16 @@
 - `requirements.ocr-worker.txt`: OCR worker 최소 의존성.
 
 ## Key Entry Points
-- API Root: `http://localhost:8000/`
-- API Health: `http://localhost:8000/health`
-- API Health Detail: `http://localhost:8000/health/detail`
-- API Search: `http://localhost:8000/documents/search?q=...&limit=...`
+- Frontend: `http://localhost:8000/`
+- API Root: `http://localhost:8001/`
+- API Health: `http://localhost:8001/health`
+- API Health Detail: `http://localhost:8001/health/detail`
+- API Search: `http://localhost:8001/documents/search?q=...&limit=...`
   - 반환 필드: `score`, `raw_score`, `summary`, `snippet`, `evidence`, `match_points`, `page`, `chunk_id`, `chunk_type`, `dedup_status`, `dedup_primary_doc_id`, `dedup_cluster_id`
-- Admin Search Debug: `http://localhost:8000/api/admin/search_debug?q=...&limit=...`
+- Admin Search Debug: `http://localhost:8001/api/admin/search_debug?q=...&limit=...`
   - 반환 필드: `request_id`, `vector_topk`, `bm25_topk`, `fused_topk`, `search_mode`
-- Admin Dedup: `http://localhost:8000/api/admin/dedup/clusters`
+- Admin Dedup: `http://localhost:8001/api/admin/dedup/clusters`
   - 대표 변경: `POST /api/admin/dedup/clusters/{cluster_id}/set_primary`
   - 문서 제외: `POST /api/admin/dedup/documents/{doc_id}/ignore`
   - 감사 로그: `GET /api/admin/dedup/audit?limit=50`
-- API Docs: `http://localhost:8000/docs`
+- API Docs: `http://localhost:8001/docs`

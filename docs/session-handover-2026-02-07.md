@@ -122,39 +122,38 @@
   - `Ran 23 tests ... OK`
 
 ## 다음 세션 우선 작업
-1. 코드 리뷰 반영(캐시 경로 회귀 수정) [완료]
-2. Docker 네트워크 단일화(최우선) [완료]
-- 목표: `web`, `ocr-worker`, `paddle-vlm-server`가 동일 compose project/network에서 항상 기동되도록 고정
-- 권장:
-  - `docker-compose` 실행 경로/프로젝트명 통일
-  - 필요 시 `COMPOSE_PROJECT_NAME` 명시
-  - 컨테이너 이름 고정 의존 대신 서비스 DNS(`ocr-worker`) 일관 사용
+1. AI 문서화 후속: 레거시 `posts` API 정리 방향 확정 [대기]
+- 대상: `app/main.py`의 `POST /posts`, `GET /posts`
+- 목표: 제거 여부 결정(삭제 또는 별도 샘플 API로 분리) 및 관련 테스트/문서 정리
 
-3. 이미지 PDF 품질 우선 정책 분기 [완료]
-- 목표: 이미지 문서에서 preflight 조기 통과로 인한 저품질 색인 방지
-- 권장:
-  - 문서 타입(스캔/이미지 PDF) 감지 시 `OCR_PYPDF_PREFLIGHT=false` 강제
-  - 또는 preflight 통과 기준(`OCR_PYPDF_PREFLIGHT_MIN_CHARS`)을 이미지 문서에 더 엄격하게 적용
+2. AI 문서화 후속: 프로젝트/문서 목록 pagination 표준화 [대기]
+- 대상: `GET /budget/projects`, `GET /documents/search`
+- 목표: `page`, `page_size`, `total` 형태의 공통 응답 규격 수립
 
-4. 속도 보완(품질 유지 전제) [완료]
-- 목표: 이미지 PDF 강제 OCR 모드의 총 처리시간 단축
-- 후보:
-  - OCR 요청 파라미터 재튜닝(`render_dpi`, `max_tokens`, `fast_mode` 조건부)
-  - 페이지 병렬 처리 전략 점검
-  - vLLM 동시성/큐 설정 재점검(`PADDLE_VL_REC_MAX_CONCURRENCY`, `PADDLE_VLLM_MAX_NUM_SEQS`)
+3. AI 문서화 후속: 검색 품질 E2E 스모크 자동화 [대기]
+- 대상: 문서 검색 + 프로젝트 검색 동작 시나리오
+- 목표: 주요 질의(`라인 프로파일 센서`, `basler`, 장애조치 키워드) 회귀 자동 검증
 
-5. 품질 비교 리포트 자동화 [완료]
-- 목표: 텍스트 PDF vs 이미지 PDF 동일 페이지(특히 32p) 기준 차이를 숫자로 추적
-- 권장 지표:
-  - `content_chars`, `chunk_count`, 표(`chunk_type=table_*`) 비율
-  - 검색 질의 3~5개에 대한 top-k 재현율 비교
+4. AI 문서화 후속: 디자인 토큰/컴포넌트 규칙 lint 가이드화 [대기]
+- 대상: `frontend/src/index.css`, `frontend/src/components/ui/*`
+- 목표: 토큰 미사용 하드코딩 색상/크기 남발 방지 체크리스트 추가
+
+5. 코드 리뷰 반영(캐시 경로 회귀 수정) [완료]
+6. Docker 네트워크 단일화(최우선) [완료]
+7. 이미지 PDF 품질 우선 정책 분기 [완료]
+8. 속도 보완(품질 유지 전제) [완료]
+9. 품질 비교 리포트 자동화 [완료]
 
 ## 체크리스트
-- [x] 1) 코드 리뷰 반영(캐시 경로 회귀 수정)
-- [x] 2) Docker 네트워크 단일화
-- [x] 3) 이미지 PDF 품질 우선 정책 분기
-- [x] 4) 속도 보완(품질 유지)
-- [x] 5) 품질 비교 리포트 자동화
+- [ ] 1) 레거시 posts API 정리 방향 확정
+- [ ] 2) 프로젝트/문서 목록 pagination 표준화
+- [ ] 3) 검색 품질 E2E 스모크 자동화
+- [ ] 4) 디자인 토큰/컴포넌트 규칙 lint 가이드화
+- [x] 5) 코드 리뷰 반영(캐시 경로 회귀 수정)
+- [x] 6) Docker 네트워크 단일화
+- [x] 7) 이미지 PDF 품질 우선 정책 분기
+- [x] 8) 속도 보완(품질 유지)
+- [x] 9) 품질 비교 리포트 자동화
 
 ## 다음 세션 바로 실행용 명령
 ```bash
@@ -187,6 +186,22 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
 - `reports/ocr_paddle_vl_config_tuning_2026-02-06.md`
 
 ## 진행 로그
+- 2026-02-08 (AI 문서화 정비-2)
+  - 프론트 변경 반영 문서화:
+    - `docs/ai-frontend-guide.md` 신규 추가(라우팅/페이지별 책임/API 계약/검증 시나리오).
+    - `docs/ai-system-context.md`를 최신 구조 기준으로 재정리(인증/통합검색/프로젝트 관리 플로우 반영).
+    - `docs/ai-design-guide.md`를 현재 토큰/레이아웃/컴포넌트 계약 기준으로 정합화.
+  - 저장소 맵 업데이트:
+    - `docs/repo-map.md`에 프론트 구현 가이드 링크 및 핵심 프론트 파일 설명 보강.
+  - 다음 세션 작업 준비:
+    - 문서 기반 후속 과제(`posts API`, `pagination`, `search E2E`, `design lint`)는 기존 우선순위 유지.
+- 2026-02-08 (AI 문서화 정비)
+  - 신규 문서 추가:
+    - `docs/ai-system-context.md` (아키텍처/도메인/API/운영 규칙/확장 포인트)
+    - `docs/ai-design-guide.md` (디자인 토큰/레이아웃/컴포넌트/접근성 가이드)
+  - 문서 정합성 업데이트:
+    - `docs/repo-map.md`에 AI Quick Links 추가 및 API 엔드포인트 포트(`8001`) 최신화
+  - 다음 세션 우선 작업을 AI 문서화 기반 대기 항목 4건으로 재정렬
 - 2026-02-07
   - `web -> ocr-worker` DNS 실패를 네트워크 연결로 임시 복구(`docker network connect synchub_default synchub_web_noreload`)
   - 40페이지 업로드 실측:

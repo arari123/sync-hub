@@ -101,3 +101,50 @@ class AuthSession(Base):
     expires_at = Column(String, nullable=False, index=True)
     revoked_at = Column(String, nullable=True, index=True)
     created_at = Column(String, nullable=False, index=True)
+
+
+class BudgetProject(Base):
+    __tablename__ = "budget_projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False, index=True)
+    code = Column(String(64), nullable=True, unique=True, index=True)
+    description = Column(String(500), nullable=True)
+    current_stage = Column(String(32), nullable=False, default="review", index=True)
+    created_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False, index=True)
+
+
+class BudgetVersion(Base):
+    __tablename__ = "budget_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    stage = Column(String(32), nullable=False, index=True)  # review|progress|closure
+    status = Column(String(32), nullable=False, index=True)  # draft|confirmed|revision
+    version_no = Column(Integer, nullable=False, default=1, index=True)
+    revision_no = Column(Integer, nullable=False, default=0, index=True)
+    parent_version_id = Column(Integer, ForeignKey("budget_versions.id"), nullable=True, index=True)
+    change_reason = Column(String(500), nullable=True)
+    is_current = Column(Boolean, nullable=False, default=True, index=True)
+    confirmed_at = Column(String, nullable=True, index=True)
+    created_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False, index=True)
+
+
+class BudgetEquipment(Base):
+    __tablename__ = "budget_equipments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    version_id = Column(Integer, ForeignKey("budget_versions.id"), nullable=False, index=True)
+    equipment_name = Column(String(180), nullable=False, index=True)
+    material_fab_cost = Column(Float, nullable=False, default=0.0)
+    material_install_cost = Column(Float, nullable=False, default=0.0)
+    labor_fab_cost = Column(Float, nullable=False, default=0.0)
+    labor_install_cost = Column(Float, nullable=False, default=0.0)
+    expense_fab_cost = Column(Float, nullable=False, default=0.0)
+    expense_install_cost = Column(Float, nullable=False, default=0.0)
+    currency = Column(String(8), nullable=False, default="KRW")
+    sort_order = Column(Integer, nullable=False, default=0, index=True)
+    created_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False, index=True)

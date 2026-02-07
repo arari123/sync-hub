@@ -415,3 +415,19 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - 실동작 확인:
       - 허용 도메인 가입 성공 + 인증 후 로그인 성공.
       - 비허용 도메인 가입 요청 시 `HTTP 403` 확인.
+- 2026-02-07 (세션 재개-18)
+  - 예산관리 Phase 1 구현:
+    - 백엔드 모델 추가: `budget_projects`, `budget_versions`, `budget_equipments`.
+    - API 추가: `/budget/projects`, `/budget/projects/{id}/versions`, `/budget/versions/{id}/confirm`, `/budget/versions/{id}/revision`, `/budget/versions/{id}/equipments`, `/budget/projects/{id}/summary`.
+    - 집계 로직 모듈: `app/core/budget_logic.py` (단계 정규화, 비용 합계 계산).
+  - 프론트 구현:
+    - `frontend/src/pages/BudgetManagement.jsx`를 정적 안내에서 실데이터 편집 화면으로 전환.
+    - 프로젝트 생성/선택, 버전 생성/확정/리비전, 설비 예산 입력/저장, 합계 카드 제공.
+  - 문서 갱신:
+    - `docs/프로젝트 예산관리.md`에 Phase 1 구현 상태 반영.
+    - 실행계획 문서 추가: `.agent/execplans/2026-02-07-budget-management-phase1.md`.
+  - 검증:
+    - `docker exec synchub_web bash -lc 'cd /app && ./scripts/verify_fast.sh'` 통과 (`Ran 51 tests ... OK`).
+    - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과.
+    - 실동작 확인:
+      - 프로젝트 생성 -> 버전 생성 -> 설비 예산 저장 -> 버전 확정 -> 프로젝트 요약 조회까지 API 호출 성공.

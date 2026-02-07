@@ -20,6 +20,22 @@ class _DummyHttpResponse:
 
 
 class DocumentSummaryTests(unittest.TestCase):
+    def test_classify_document_types_supports_multiple_labels(self):
+        filename = "Basler_Catalog_Data_Sheet_Manual.pdf"
+        text = (
+            "This document includes technical data, electrical characteristics, and installation steps. "
+            "사용설명서와 설치 가이드를 포함하며 제품 카탈로그 정보도 제공합니다."
+        )
+
+        doc_types = document_summary.classify_document_types(
+            filename=filename,
+            content_text=text,
+        )
+
+        self.assertIn(document_summary.DOC_TYPE_DATASHEET, doc_types)
+        self.assertIn(document_summary.DOC_TYPE_MANUAL, doc_types)
+        self.assertIn(document_summary.DOC_TYPE_CATALOG, doc_types)
+
     def test_extractive_summary_uses_whole_document_body(self):
         original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
         text = (
@@ -165,6 +181,52 @@ class DocumentSummaryTests(unittest.TestCase):
             document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
             document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
             document_summary.DOC_SUMMARY_LLM_MAX_RETRIES = original_retries
+
+    def test_local_llm_prompt_includes_document_type_hints(self):
+        original_enabled = document_summary.DOC_SUMMARY_ENABLED
+        original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
+        original_url = document_summary.DOC_SUMMARY_OLLAMA_URL
+        original_model = document_summary.DOC_SUMMARY_OLLAMA_MODEL
+
+        captured_prompt = {}
+
+        def _fake_urlopen(request, timeout=None):
+            payload = json.loads(request.data.decode("utf-8"))
+            captured_prompt["value"] = payload.get("prompt", "")
+            response_envelope = {
+                "response": json.dumps(
+                    {
+                        "title": "산업용 카메라 기술 문서",
+                        "summary": "센서 기반 카메라 제품의 핵심 사양과 사용 정보를 정리한 문서입니다.",
+                    }
+                )
+            }
+            return _DummyHttpResponse(json.dumps(response_envelope))
+
+        try:
+            document_summary.DOC_SUMMARY_ENABLED = True
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = True
+            document_summary.DOC_SUMMARY_OLLAMA_URL = "http://localhost:11434/api/generate"
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = "llama3.1"
+
+            with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+                title, summary = document_summary.build_document_summary(
+                    filename="sample.pdf",
+                    content_text="camera data sheet and installation manual",
+                    document_types=[document_summary.DOC_TYPE_DATASHEET, document_summary.DOC_TYPE_MANUAL],
+                )
+
+            self.assertTrue(title)
+            self.assertTrue(summary)
+            prompt = captured_prompt.get("value", "")
+            self.assertIn("[문서 타입 힌트]", prompt)
+            self.assertIn(document_summary.DOC_TYPE_DATASHEET, prompt)
+            self.assertIn(document_summary.DOC_TYPE_MANUAL, prompt)
+        finally:
+            document_summary.DOC_SUMMARY_ENABLED = original_enabled
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
+            document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
 
     def test_keyence_catalog_quality_requires_brand_and_series_mentions(self):
         source = "KEYENCE LJ-X8000 series catalog for 3D line profile sensor inspection"

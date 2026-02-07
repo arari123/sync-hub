@@ -20,6 +20,7 @@ _DOCUMENT_COLUMN_SPECS = {
     "dedup_status": "VARCHAR(32) DEFAULT 'unique'",
     "dedup_primary_doc_id": "INTEGER",
     "dedup_cluster_id": "INTEGER",
+    "document_types": "VARCHAR(255)",
     "ai_title": "VARCHAR(255)",
     "ai_summary_short": "VARCHAR(512)",
 }

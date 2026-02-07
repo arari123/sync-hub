@@ -5,7 +5,7 @@ import os
 import re
 import urllib.error
 import urllib.request
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 
 DOC_SUMMARY_ENABLED = os.getenv("DOC_SUMMARY_ENABLED", "true").strip().lower() in {
@@ -27,11 +27,170 @@ DOC_SUMMARY_MAX_INPUT_CHARS = max(800, int(os.getenv("DOC_SUMMARY_MAX_INPUT_CHAR
 DOC_SUMMARY_TITLE_MAX_CHARS = max(24, int(os.getenv("DOC_SUMMARY_TITLE_MAX_CHARS", "80")))
 DOC_SUMMARY_SHORT_MAX_CHARS = max(80, int(os.getenv("DOC_SUMMARY_SHORT_MAX_CHARS", "220")))
 DOC_SUMMARY_LLM_MAX_RETRIES = max(1, int(os.getenv("DOC_SUMMARY_LLM_MAX_RETRIES", "3")))
+DOC_TYPE_MAX_LABELS = max(1, int(os.getenv("DOC_TYPE_MAX_LABELS", "3")))
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?。！？])\s+|\n+")
 _MODEL_LINE_RE = re.compile(r"\bLJ[-\s]?[A-Z]?\d{3,4}\b", re.IGNORECASE)
 _URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
 _NOISE_ONLY_RE = re.compile(r"^[\|\-_=+*/\\\s\d\.,()%:;]+$")
+
+DOC_TYPE_CATALOG = "catalog"
+DOC_TYPE_MANUAL = "manual"
+DOC_TYPE_DATASHEET = "datasheet"
+
+_DOC_TYPE_PRIORITY = (
+    DOC_TYPE_DATASHEET,
+    DOC_TYPE_MANUAL,
+    DOC_TYPE_CATALOG,
+)
+_DOC_TYPE_RULES = {
+    DOC_TYPE_CATALOG: (
+        "catalog",
+        "catalogue",
+        "brochure",
+        "lineup",
+        "product guide",
+        "product catalog",
+        "카탈로그",
+        "브로셔",
+        "라인업",
+        "제품 소개",
+    ),
+    DOC_TYPE_MANUAL: (
+        "manual",
+        "user guide",
+        "instruction",
+        "installation",
+        "maintenance",
+        "operation",
+        "troubleshooting",
+        "설명서",
+        "사용설명서",
+        "매뉴얼",
+        "설치",
+        "유지보수",
+        "운용",
+    ),
+    DOC_TYPE_DATASHEET: (
+        "datasheet",
+        "data sheet",
+        "technical data",
+        "specification",
+        "specifications",
+        "electrical characteristics",
+        "absolute maximum ratings",
+        "ordering information",
+        "사양서",
+        "데이터시트",
+        "규격",
+        "정격",
+    ),
+}
+_DOC_TYPE_PROMPT_GUIDE = {
+    DOC_TYPE_CATALOG: "카탈로그 문서로 보고 제품군 라인업, 대표 특징, 적용 용도를 중심으로 요약하라.",
+    DOC_TYPE_MANUAL: "설명서 문서로 보고 사용 목적, 핵심 절차, 주의사항/제약을 중심으로 요약하라.",
+    DOC_TYPE_DATASHEET: "데이터시트 문서로 보고 모델군과 핵심 사양(성능/인터페이스/정격)을 중심으로 요약하라.",
+}
+
+
+def _normalize_document_type_token(value: str) -> str:
+    token = (value or "").strip().lower()
+    alias_map = {
+        "catalogue": DOC_TYPE_CATALOG,
+        "brochure": DOC_TYPE_CATALOG,
+        "guide": DOC_TYPE_MANUAL,
+        "user_guide": DOC_TYPE_MANUAL,
+        "instructions": DOC_TYPE_MANUAL,
+        "spec": DOC_TYPE_DATASHEET,
+        "specs": DOC_TYPE_DATASHEET,
+        "data_sheet": DOC_TYPE_DATASHEET,
+    }
+    return alias_map.get(token, token)
+
+
+def _normalize_document_types(document_types: Sequence[str] | None) -> list[str]:
+    if not document_types:
+        return []
+    output: list[str] = []
+    seen = set()
+    for item in document_types:
+        token = _normalize_document_type_token(str(item))
+        if token not in _DOC_TYPE_PRIORITY:
+            continue
+        if token in seen:
+            continue
+        seen.add(token)
+        output.append(token)
+    output.sort(key=lambda value: _DOC_TYPE_PRIORITY.index(value))
+    return output
+
+
+def serialize_document_types(document_types: Sequence[str] | None) -> str:
+    normalized = _normalize_document_types(document_types)
+    if not normalized:
+        return ""
+    return json.dumps(normalized, ensure_ascii=False)
+
+
+def parse_document_types(value: str | Sequence[str] | None) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return _normalize_document_types([str(item) for item in value])
+
+    raw = str(value).strip()
+    if not raw:
+        return []
+
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return _normalize_document_types([str(item) for item in parsed])
+    except json.JSONDecodeError:
+        pass
+
+    return _normalize_document_types([item.strip() for item in raw.split(",") if item.strip()])
+
+
+def classify_document_types(filename: str, content_text: str) -> list[str]:
+    normalized_filename = re.sub(r"[_\-]+", " ", (filename or "")).lower()
+    normalized_text = _sanitize_summary_input(content_text).lower()
+
+    scores = {}
+    for doc_type, keywords in _DOC_TYPE_RULES.items():
+        score = 0
+        for keyword in keywords:
+            if keyword in normalized_filename:
+                score += 3
+            elif keyword in normalized_text:
+                score += 1
+        if score > 0:
+            scores[doc_type] = score
+
+    if _is_keyence_lj_catalog(content_text):
+        scores[DOC_TYPE_CATALOG] = scores.get(DOC_TYPE_CATALOG, 0) + 2
+
+    selected = [
+        doc_type
+        for doc_type, score in sorted(
+            scores.items(),
+            key=lambda item: (item[1], -_DOC_TYPE_PRIORITY.index(item[0])),
+            reverse=True,
+        )
+        if score >= 2
+    ]
+    return _normalize_document_types(selected[:DOC_TYPE_MAX_LABELS])
+
+
+def _document_type_prompt_guidance(document_types: Sequence[str] | None) -> str:
+    normalized = _normalize_document_types(document_types)
+    if not normalized:
+        return ""
+
+    labels = ", ".join(normalized)
+    lines = [f"[문서 타입 힌트]\n{labels}"]
+    lines.extend(_DOC_TYPE_PROMPT_GUIDE[item] for item in normalized if item in _DOC_TYPE_PROMPT_GUIDE)
+    return "\n".join(lines)
 
 
 def _clean_text(value: str) -> str:
@@ -289,7 +448,11 @@ def _extract_json_from_response(response_text: str) -> Optional[dict]:
     return None
 
 
-def _summarize_with_local_llm(filename: str, text: str) -> Optional[Tuple[str, str]]:
+def _summarize_with_local_llm(
+    filename: str,
+    text: str,
+    document_types: Sequence[str] | None = None,
+) -> Optional[Tuple[str, str]]:
     if not DOC_SUMMARY_USE_LOCAL_LLM:
         return None
     if not DOC_SUMMARY_OLLAMA_URL or not DOC_SUMMARY_OLLAMA_MODEL:
@@ -299,6 +462,7 @@ def _summarize_with_local_llm(filename: str, text: str) -> Optional[Tuple[str, s
     if not clipped:
         return None
 
+    type_guidance = _document_type_prompt_guidance(document_types)
     base_prompt = (
         "너는 OCR 노이즈가 섞인 기술 문서를 요약하는 전문가다. "
         "문서의 '전체 주제'를 요약해야 하며 특정 페이지 조각만 요약하면 안 된다. "
@@ -312,6 +476,7 @@ def _summarize_with_local_llm(filename: str, text: str) -> Optional[Tuple[str, s
         "[출력 형식]\n"
         "{\"title\":\"<문서 전체 주제>\",\"summary\":\"<문서 핵심 요약>\"}\n"
         "위는 자리표시자이며 문구를 그대로 복사하지 않는다.\n\n"
+        f"{type_guidance}\n\n"
         f"[파일명]\n{filename}\n\n"
         f"[본문]\n{clipped}"
     )
@@ -373,11 +538,23 @@ def _summarize_with_local_llm(filename: str, text: str) -> Optional[Tuple[str, s
     return None
 
 
-def build_document_summary(filename: str, content_text: str) -> Tuple[str, str]:
+def build_document_summary(
+    filename: str,
+    content_text: str,
+    document_types: Sequence[str] | None = None,
+) -> Tuple[str, str]:
     if not DOC_SUMMARY_ENABLED:
         return _title_from_filename(filename), ""
 
-    llm_result = _summarize_with_local_llm(filename=filename, text=content_text)
+    normalized_types = _normalize_document_types(document_types)
+    if not normalized_types:
+        normalized_types = classify_document_types(filename=filename, content_text=content_text)
+
+    llm_result = _summarize_with_local_llm(
+        filename=filename,
+        text=content_text,
+        document_types=normalized_types,
+    )
     if llm_result:
         return llm_result
 

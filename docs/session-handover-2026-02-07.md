@@ -324,6 +324,22 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 확인:
     - `GET /documents/search?q=basler&limit=10`에서 `doc_id=3` 반환 확인
     - `GET /documents/search?q=basler로&limit=10`에서 `doc_id=3` 반환 확인
+- 2026-02-07 (세션 재개-14)
+  - 문서 타입 다중 분류 + 타입별 요약 프롬프트 분기 구현:
+    - 신규 타입 라벨: `catalog`, `manual`, `datasheet` (복수 저장 허용)
+    - 저장 컬럼 추가: `documents.document_types` (JSON 문자열)
+    - 업로드 파이프라인에서 타입 분류 후 저장:
+      - `app/core/document_summary.py`: `classify_document_types`, `serialize_document_types`, `parse_document_types`
+      - `app/core/pipeline.py`: 분류 결과를 `doc.document_types`에 저장하고 요약 생성 시 전달
+    - 요약 프롬프트 분기:
+      - 문서 타입 힌트(`document_types`)를 LLM 프롬프트에 주입
+      - 타입별 지시문(카탈로그/설명서/데이터시트)을 추가해 요약 방향 분기
+    - 검색 응답 확장:
+      - `/documents/search` 응답에 `document_types` 포함
+      - ES 색인 문서에도 `document_types` 필드 저장
+  - 검증:
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 36 tests ... OK`)
+    - `Basler_Data_Sheet.pdf` 재색인 후 `document_types=["datasheet"]` 저장 확인
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

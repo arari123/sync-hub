@@ -13,7 +13,12 @@ from .chunking.chunker import (
     chunker_from_env,
     table_group_to_structured_text,
 )
-from .document_summary import build_document_summary
+from .document_summary import (
+    build_document_summary,
+    classify_document_types,
+    parse_document_types,
+    serialize_document_types,
+)
 from .dedup.policies import resolve_policy, should_index_document
 from .dedup.service import (
     compute_document_hashes,
@@ -438,6 +443,7 @@ def _index_chunks(doc, chunk_records: Sequence[ChunkRecord]) -> None:
         vector_store.index_document(
             doc_id=doc.id,
             filename=doc.filename,
+            document_types=parse_document_types(getattr(doc, "document_types", "")),
             ai_title=doc.ai_title or "",
             ai_summary_short=doc.ai_summary_short or "",
             content=record.content,
@@ -540,9 +546,15 @@ def _process_document_once(
         raise ValueError("No indexable chunks created from document text.")
 
     doc.content_text = clean_text or raw_text
+    doc_types = classify_document_types(
+        filename=doc.filename or "",
+        content_text=doc.content_text or "",
+    )
+    doc.document_types = serialize_document_types(doc_types)
     doc.ai_title, doc.ai_summary_short = build_document_summary(
         filename=doc.filename or "",
         content_text=doc.content_text or "",
+        document_types=doc_types,
     )
     should_index, reason, _ = _apply_dedup_policy(
         doc=doc,

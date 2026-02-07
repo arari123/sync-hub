@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
+from ..core.document_summary import parse_document_types
 from ..core.dedup.policies import resolve_policy, search_penalty_for_non_primary
 from ..core.dedup.service import compute_document_hashes
 from ..core.pipeline import EMBEDDING_BACKEND, process_document, model
@@ -416,6 +417,9 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
             or (db_doc.ai_summary_short if db_doc else "")
             or ""
         )
+        source_doc_types = parse_document_types(source.get("document_types"))
+        db_doc_types = parse_document_types(db_doc.document_types if db_doc else "")
+        document_types = source_doc_types or db_doc_types
         if not doc_summary:
             doc_summary = result["summary"]
 
@@ -429,6 +433,7 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
             "dedup_status": source.get("dedup_status"),
             "dedup_primary_doc_id": source.get("dedup_primary_doc_id"),
             "dedup_cluster_id": source.get("dedup_cluster_id"),
+            "document_types": document_types,
             "snippet": result["snippet"],
             "summary": doc_summary,
             "evidence": result["evidence"],

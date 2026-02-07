@@ -39,9 +39,26 @@ class BudgetProjectMetadataTests(unittest.TestCase):
 
     def test_monitoring_payload_has_spent_and_variance(self):
         project = self._sample_project(current_stage="warranty")
-        monitoring = _build_monitoring_payload(project, {"grand_total": 1000000})
+        monitoring = _build_monitoring_payload(
+            project,
+            {
+                "material_total": 500000,
+                "labor_total": 300000,
+                "expense_total": 200000,
+                "grand_total": 1000000,
+            },
+        )
         self.assertEqual(monitoring["confirmed_budget_total"], 1000000)
+        self.assertEqual(monitoring["confirmed_budget_material"], 500000)
+        self.assertEqual(monitoring["confirmed_budget_labor"], 300000)
+        self.assertEqual(monitoring["confirmed_budget_expense"], 200000)
+        self.assertGreater(monitoring["actual_spent_material"], 0)
+        self.assertGreater(monitoring["actual_spent_labor"], 0)
+        self.assertGreater(monitoring["actual_spent_expense"], 0)
         self.assertGreater(monitoring["actual_spent_total"], 0)
+        self.assertIsNotNone(monitoring["variance_material"])
+        self.assertIsNotNone(monitoring["variance_labor"])
+        self.assertIsNotNone(monitoring["variance_expense"])
         self.assertIsNotNone(monitoring["variance_total"])
 
     def test_custom_milestone_parser_normalizes_status(self):

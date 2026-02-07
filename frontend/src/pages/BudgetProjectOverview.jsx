@@ -277,12 +277,32 @@ const BudgetProjectOverview = () => {
 
                 <section className="rounded-xl border bg-card p-6 shadow-sm">
                     <h2 className="mb-4 text-base font-semibold">전체 예산 요약</h2>
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                        <AmountCell label="재료비" value={formatAmount(totals?.material_total)} />
-                        <AmountCell label="인건비" value={formatAmount(totals?.labor_total)} />
-                        <AmountCell label="경비" value={formatAmount(totals?.expense_total)} />
-                        <AmountCell label="확정 예산" value={formatAmount(monitoring.confirmed_budget_total ?? totals?.grand_total)} strong />
-                        <AmountCell label="집행 금액" value={formatAmount(monitoring.actual_spent_total)} />
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                        <AmountCell
+                            label="재료비"
+                            value={formatAmount(monitoring.confirmed_budget_material ?? totals?.material_total)}
+                            subLabel="집행"
+                            subValue={formatAmount(monitoring.actual_spent_material)}
+                        />
+                        <AmountCell
+                            label="인건비"
+                            value={formatAmount(monitoring.confirmed_budget_labor ?? totals?.labor_total)}
+                            subLabel="집행"
+                            subValue={formatAmount(monitoring.actual_spent_labor)}
+                        />
+                        <AmountCell
+                            label="경비"
+                            value={formatAmount(monitoring.confirmed_budget_expense ?? totals?.expense_total)}
+                            subLabel="집행"
+                            subValue={formatAmount(monitoring.actual_spent_expense)}
+                        />
+                        <AmountCell
+                            label="확정 예산"
+                            value={formatAmount(monitoring.confirmed_budget_total ?? totals?.grand_total)}
+                            subLabel="집행 합계"
+                            subValue={formatAmount(monitoring.actual_spent_total)}
+                            strong
+                        />
                         <AmountCell label="차액" value={formatAmount(monitoring.variance_total)} strong />
                     </div>
                 </section>
@@ -363,10 +383,15 @@ const InfoCell = ({ label, value, compact = false }) => (
     </div>
 );
 
-const AmountCell = ({ label, value, strong = false }) => (
+const AmountCell = ({ label, value, subLabel = '', subValue = '', strong = false }) => (
     <div className={`rounded-md border p-3 ${strong ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}>
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className={`mt-1 text-sm ${strong ? 'font-bold' : 'font-semibold'}`}>{value}</p>
+        {subLabel && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+                {subLabel}: <span className="font-semibold text-foreground">{subValue || '-'}</span>
+            </p>
+        )}
     </div>
 );
 

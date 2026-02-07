@@ -296,20 +296,47 @@ def _project_spent_ratio(stage: Optional[str], project_id: int) -> float:
 
 
 def _build_monitoring_payload(project: models.BudgetProject, totals: dict) -> dict:
+    confirmed_material = to_number(totals.get("material_total"))
+    confirmed_labor = to_number(totals.get("labor_total"))
+    confirmed_expense = to_number(totals.get("expense_total"))
     confirmed_budget_total = to_number(totals.get("grand_total"))
     if confirmed_budget_total <= 0:
         return {
+            "confirmed_budget_material": 0.0,
+            "confirmed_budget_labor": 0.0,
+            "confirmed_budget_expense": 0.0,
             "confirmed_budget_total": 0.0,
+            "actual_spent_material": 0.0,
+            "actual_spent_labor": 0.0,
+            "actual_spent_expense": 0.0,
             "actual_spent_total": 0.0,
+            "variance_material": 0.0,
+            "variance_labor": 0.0,
+            "variance_expense": 0.0,
             "variance_total": 0.0,
         }
 
     spent_ratio = _project_spent_ratio(project.current_stage, int(project.id or 0))
+    actual_spent_material = round(confirmed_material * spent_ratio, 2)
+    actual_spent_labor = round(confirmed_labor * spent_ratio, 2)
+    actual_spent_expense = round(confirmed_expense * spent_ratio, 2)
     actual_spent_total = round(confirmed_budget_total * spent_ratio, 2)
+    variance_material = round(confirmed_material - actual_spent_material, 2)
+    variance_labor = round(confirmed_labor - actual_spent_labor, 2)
+    variance_expense = round(confirmed_expense - actual_spent_expense, 2)
     variance_total = round(confirmed_budget_total - actual_spent_total, 2)
     return {
+        "confirmed_budget_material": confirmed_material,
+        "confirmed_budget_labor": confirmed_labor,
+        "confirmed_budget_expense": confirmed_expense,
         "confirmed_budget_total": confirmed_budget_total,
+        "actual_spent_material": actual_spent_material,
+        "actual_spent_labor": actual_spent_labor,
+        "actual_spent_expense": actual_spent_expense,
         "actual_spent_total": actual_spent_total,
+        "variance_material": variance_material,
+        "variance_labor": variance_labor,
+        "variance_expense": variance_expense,
         "variance_total": variance_total,
     }
 

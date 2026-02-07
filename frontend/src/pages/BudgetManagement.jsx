@@ -439,11 +439,18 @@ const ProjectCard = ({ project }) => {
                     </div>
                     <p className="text-xs text-muted-foreground font-mono">#{project.code || 'NO-CODE'}</p>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={stageBadgeClass(project.current_stage)}>{project.project_type_label || '미분류'}</span>
-                    <span className={stageBadgeClass(project.current_stage)}>
-                        {project.current_stage_label}
-                    </span>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Link to={`/project-management/projects/${project.id}`}>
+                        <Button size="sm" variant="ghost" className="h-7 text-[11px] gap-1 hover:bg-primary/10 hover:text-primary px-2.5">
+                            상세보기 <ArrowRight size={12} />
+                        </Button>
+                    </Link>
+                    <div className="flex items-center gap-1.5">
+                        <span className={stageBadgeClass(project.current_stage)}>{project.project_type_label || '미분류'}</span>
+                        <span className={stageBadgeClass(project.current_stage)}>
+                            {project.current_stage_label}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -473,28 +480,18 @@ const ProjectCard = ({ project }) => {
                 </div>
 
                 <div className="grid grid-cols-[minmax(0,1fr)_132px] grid-rows-2 gap-x-2 gap-y-1 rounded-lg border bg-secondary/20 p-2">
-                    <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-medium">
-                            총 실행 예산 <span className="ml-1 text-foreground font-semibold">{formatAmount(confirmedBudget)}</span>
-                        </p>
+                    <div className="min-w-0 flex items-center justify-between gap-2">
+                        <p className="text-[10px] text-muted-foreground font-medium">총 실행 예산</p>
+                        <p className="text-[11px] font-semibold text-foreground whitespace-nowrap">{formatAmount(confirmedBudget)}</p>
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-medium">
-                            총 집행 금액 <span className="ml-1 text-foreground font-semibold">{formatAmount(actualSpent)}</span>
-                        </p>
+                    <div className="min-w-0 flex items-center justify-between gap-2">
+                        <p className="text-[10px] text-muted-foreground font-medium">총 집행 금액</p>
+                        <p className="text-[11px] font-semibold text-foreground whitespace-nowrap">{formatAmount(actualSpent)}</p>
                     </div>
                     <div className="row-span-2 col-start-2 rounded-md border bg-background/70 px-2 py-1.5 flex flex-col justify-center">
                         <p className="text-[10px] text-muted-foreground font-medium leading-none">잔액</p>
                         <p className="mt-1 text-sm font-bold leading-none">{formatAmount(remaining)}</p>
                     </div>
-                </div>
-
-                <div className="flex justify-end">
-                    <Link to={`/project-management/projects/${project.id}`}>
-                        <Button size="sm" variant="ghost" className="h-8 text-[11px] gap-1 hover:bg-primary/10 hover:text-primary">
-                            상세보기 <ArrowRight size={12} />
-                        </Button>
-                    </Link>
                 </div>
             </div>
         </article>

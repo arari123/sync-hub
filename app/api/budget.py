@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import timedelta
 from typing import Optional
@@ -58,6 +59,12 @@ _PROJECT_SORT_ALIASES = {
     "updated": "updated_desc",
     "updated_at_desc": "updated_desc",
     "updated_at_asc": "updated_asc",
+}
+_RAW_ADMIN_IDENTIFIERS = os.getenv("BUDGET_ADMIN_IDENTIFIERS", "admin,admin@example.com")
+_ADMIN_IDENTIFIERS = {
+    token.strip().lower()
+    for token in _RAW_ADMIN_IDENTIFIERS.split(",")
+    if token.strip()
 }
 
 
@@ -562,6 +569,14 @@ def _is_my_project(project: models.BudgetProject, user: Optional[models.User]) -
     return manager_user_id == int(user.id)
 
 
+def _is_admin_user(user: Optional[models.User]) -> bool:
+    if not user:
+        return False
+    email = (user.email or "").strip().lower()
+    local_part = email.split("@", 1)[0] if "@" in email else email
+    return email in _ADMIN_IDENTIFIERS or local_part in _ADMIN_IDENTIFIERS
+
+
 def _get_current_version_for_project(
     project: models.BudgetProject,
     db: Session,
@@ -591,6 +606,8 @@ def _is_project_visible_to_user(
     current_version: Optional[models.BudgetVersion],
     user: Optional[models.User],
 ) -> bool:
+    if _is_admin_user(user):
+        return True
     if _project_can_edit(project, user):
         return True
     if project.current_stage != "review":

@@ -412,7 +412,7 @@ const ProjectCard = ({ project }) => {
             </div>
 
             <div className="space-y-4 mb-6 flex-1">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                     <div className="bg-secondary/30 p-2 rounded-lg">
                         <p className="text-[10px] text-muted-foreground font-medium mb-0.5">담당자</p>
                         <p className="text-xs font-semibold">{project.manager_name || '미지정'}</p>
@@ -420,6 +420,10 @@ const ProjectCard = ({ project }) => {
                     <div className="bg-secondary/30 p-2 rounded-lg">
                         <p className="text-[10px] text-muted-foreground font-medium mb-0.5">고객사</p>
                         <p className="text-xs font-semibold truncate">{project.customer_name || '-'}</p>
+                    </div>
+                    <div className="bg-secondary/30 p-2 rounded-lg">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">프로젝트 종류</p>
+                        <p className="text-xs font-semibold truncate">{project.project_type_label || '-'}</p>
                     </div>
                 </div>
 

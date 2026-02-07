@@ -3,6 +3,7 @@ import { api, API_BASE_URL, getErrorMessage } from '../lib/api';
 import { Loader2, File, Download, Tag } from 'lucide-react';
 
 const DOCUMENT_TYPE_LABELS = {
+    equipment_failure_report: '설비 장애 조치보고서',
     catalog: '카탈로그',
     manual: '설명서',
     datasheet: '데이터시트',

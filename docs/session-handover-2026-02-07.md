@@ -362,3 +362,22 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 검증:
     - 프론트 빌드(Docker): `docker run --rm -v /home/arari123/sync-hub:/repo node:20-bullseye ... npm run build` 성공.
     - 백엔드 빠른 검증: `docker exec synchub_web_noreload bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과.
+- 2026-02-07 (세션 재개-15)
+  - 설비 장애 조치보고서 타입 추가:
+    - `app/core/document_summary.py`에 `equipment_failure_report` 타입/키워드/프롬프트 가이드 추가.
+    - PDF/Excel 공통 본문에서 `고객사/대상설비/작업일/작업내용/작성자/작업장소` 필드 추출 로직 추가.
+  - 검색 카드 제목/요약 포맷 고정:
+    - 제목: `고객사 / 대상설비 / 작업일`
+    - 요약: `작업내용: ... , 작성자: ... , 작업장소: ...`
+    - 해당 타입은 LLM 요약보다 구조화 추출 결과를 우선 사용.
+  - 프론트 타입 라벨 확장:
+    - `frontend/src/components/ResultList.jsx`, `frontend/src/components/DocumentDetail.jsx`
+    - `equipment_failure_report` -> `설비 장애 조치보고서`
+  - 재색인/확인:
+    - `reindex --doc-id 4~14` 수행 후 샘플 보고서 문서에서 제목/요약/타입 반영 확인.
+    - 검색 응답 예시(`미래오토메이션`, `Pioneer Glass`, `우진로지스`)에서
+      - `document_types=["equipment_failure_report"]`
+      - 제목/요약 포맷 반영 확인.
+  - 검증:
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 41 tests ... OK`)
+    - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과

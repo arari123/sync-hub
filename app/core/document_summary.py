@@ -37,13 +37,30 @@ _NOISE_ONLY_RE = re.compile(r"^[\|\-_=+*/\\\s\d\.,()%:;]+$")
 DOC_TYPE_CATALOG = "catalog"
 DOC_TYPE_MANUAL = "manual"
 DOC_TYPE_DATASHEET = "datasheet"
+DOC_TYPE_FAILURE_REPORT = "equipment_failure_report"
 
 _DOC_TYPE_PRIORITY = (
+    DOC_TYPE_FAILURE_REPORT,
     DOC_TYPE_DATASHEET,
     DOC_TYPE_MANUAL,
     DOC_TYPE_CATALOG,
 )
 _DOC_TYPE_RULES = {
+    DOC_TYPE_FAILURE_REPORT: (
+        "설비 장애",
+        "장애 조치",
+        "장애조치",
+        "조치 보고서",
+        "조치보고서",
+        "장애 보고서",
+        "장애처리",
+        "트러블 슈팅",
+        "failure report",
+        "incident report",
+        "corrective action",
+        "maintenance report",
+        "troubleshooting report",
+    ),
     DOC_TYPE_CATALOG: (
         "catalog",
         "catalogue",
@@ -87,6 +104,9 @@ _DOC_TYPE_RULES = {
     ),
 }
 _DOC_TYPE_PROMPT_GUIDE = {
+    DOC_TYPE_FAILURE_REPORT: (
+        "설비 장애 조치보고서 문서로 보고 고객사/대상설비/작업일/작업내용/작성자/작업장소를 우선 추출해 요약하라."
+    ),
     DOC_TYPE_CATALOG: "카탈로그 문서로 보고 제품군 라인업, 대표 특징, 적용 용도를 중심으로 요약하라.",
     DOC_TYPE_MANUAL: "설명서 문서로 보고 사용 목적, 핵심 절차, 주의사항/제약을 중심으로 요약하라.",
     DOC_TYPE_DATASHEET: "데이터시트 문서로 보고 모델군과 핵심 사양(성능/인터페이스/정격)을 중심으로 요약하라.",
@@ -96,6 +116,10 @@ _DOC_TYPE_PROMPT_GUIDE = {
 def _normalize_document_type_token(value: str) -> str:
     token = (value or "").strip().lower()
     alias_map = {
+        "failure_report": DOC_TYPE_FAILURE_REPORT,
+        "incident_report": DOC_TYPE_FAILURE_REPORT,
+        "trouble_report": DOC_TYPE_FAILURE_REPORT,
+        "equipment_incident_report": DOC_TYPE_FAILURE_REPORT,
         "catalogue": DOC_TYPE_CATALOG,
         "brochure": DOC_TYPE_CATALOG,
         "guide": DOC_TYPE_MANUAL,
@@ -154,7 +178,7 @@ def parse_document_types(value: str | Sequence[str] | None) -> list[str]:
 
 def classify_document_types(filename: str, content_text: str) -> list[str]:
     normalized_filename = re.sub(r"[_\-]+", " ", (filename or "")).lower()
-    normalized_text = _sanitize_summary_input(content_text).lower()
+    normalized_text = _clean_text(content_text).lower()
 
     scores = {}
     for doc_type, keywords in _DOC_TYPE_RULES.items():
@@ -169,6 +193,11 @@ def classify_document_types(filename: str, content_text: str) -> list[str]:
 
     if _is_keyence_lj_catalog(content_text):
         scores[DOC_TYPE_CATALOG] = scores.get(DOC_TYPE_CATALOG, 0) + 2
+
+    failure_fields = _extract_failure_report_fields(content_text)
+    failure_field_count = sum(1 for value in failure_fields.values() if value)
+    if failure_field_count >= 3:
+        scores[DOC_TYPE_FAILURE_REPORT] = scores.get(DOC_TYPE_FAILURE_REPORT, 0) + 4
 
     selected = [
         doc_type
@@ -298,6 +327,236 @@ def _sanitize_summary_input(text: str) -> str:
         return cleaned[:DOC_SUMMARY_MAX_INPUT_CHARS]
 
     return "\n".join(selected)[:DOC_SUMMARY_MAX_INPUT_CHARS]
+
+
+_FAILURE_REPORT_FIELD_ALIASES = {
+    "customer": (
+        "고객사",
+        "customer",
+        "client",
+        "업체",
+        "거래처",
+    ),
+    "equipment": (
+        "대상설비",
+        "대상 설비",
+        "설비",
+        "equipment",
+        "targetequipment",
+        "target_device",
+        "targetdevice",
+    ),
+    "work_date": (
+        "작업일자",
+        "작업 일자",
+        "작업일",
+        "workdate",
+        "work_date",
+    ),
+    "work_detail": (
+        "작업내용",
+        "작업 내용",
+        "조치내용",
+        "작업내역",
+        "workdetail",
+        "actiondetail",
+        "taskdetail",
+    ),
+    "author": (
+        "작성자",
+        "담당자",
+        "author",
+        "engineer",
+    ),
+    "work_site": (
+        "작업장소",
+        "작업 장소",
+        "worksite",
+        "work_site",
+        "site",
+        "location",
+    ),
+}
+
+
+def _normalize_failure_field_label(value: str) -> str:
+    text = (value or "").strip().lower()
+    text = re.sub(r"[\s_\-/()]+", "", text)
+    text = text.replace(":", "").replace("=", "")
+    return text
+
+
+_FAILURE_REPORT_ALIAS_TO_KEY = {
+    _normalize_failure_field_label(alias): key
+    for key, aliases in _FAILURE_REPORT_FIELD_ALIASES.items()
+    for alias in aliases
+}
+_FAILURE_REPORT_LOOSE_PREFIXES = sorted(
+    {alias for aliases in _FAILURE_REPORT_FIELD_ALIASES.values() for alias in aliases},
+    key=len,
+    reverse=True,
+)
+
+
+def _map_failure_field_label(label: str) -> Optional[str]:
+    normalized = _normalize_failure_field_label(label)
+    if not normalized:
+        return None
+    return _FAILURE_REPORT_ALIAS_TO_KEY.get(normalized)
+
+
+def _clean_failure_field_value(value: str) -> str:
+    body = (value or "").strip().strip("|").strip()
+    body = re.sub(r"\s{2,}", " ", body)
+    body = body.strip(",-/ ")
+    if body in {"", "-", "--", "---", "n/a", "N/A", "값"}:
+        return ""
+    return body
+
+
+def _parse_failure_loose_segment(segment: str) -> tuple[Optional[str], str]:
+    body = (segment or "").strip()
+    if not body:
+        return None, ""
+
+    lowered = body.lower()
+    for alias in _FAILURE_REPORT_LOOSE_PREFIXES:
+        alias_lower = alias.lower()
+        if not lowered.startswith(alias_lower):
+            continue
+
+        remainder = body[len(alias):].strip()
+        if remainder.startswith(("-", ":", "=")):
+            remainder = remainder[1:].strip()
+        if not remainder:
+            continue
+        if "|" in remainder:
+            continue
+
+        key = _map_failure_field_label(alias)
+        if key:
+            return key, _clean_failure_field_value(remainder)
+    return None, ""
+
+
+def _extract_failure_report_fields(text: str) -> dict[str, str]:
+    fields: dict[str, str] = {
+        "customer": "",
+        "equipment": "",
+        "work_date": "",
+        "work_detail": "",
+        "author": "",
+        "work_site": "",
+    }
+    raw = _clean_text(text)
+    if not raw:
+        return fields
+
+    table_headers: list[Optional[str]] | None = None
+    for line in raw.splitlines():
+        body = line.strip()
+        if not body:
+            continue
+
+        # 1) key:value / key=value 형태
+        for segment in re.split(r"\s+/\s+|,\s*", body):
+            normalized_segment = segment.strip().strip("|").strip()
+            if not normalized_segment:
+                continue
+
+            matched = re.match(r"^\s*([^:=|]{2,40})\s*[:=]\s*(.+?)\s*$", normalized_segment)
+            if not matched:
+                key, value = _parse_failure_loose_segment(normalized_segment)
+                if key and value and not fields[key]:
+                    fields[key] = value
+                continue
+            else:
+                label = matched.group(1).strip()
+                value = _clean_failure_field_value(matched.group(2))
+
+            key = _map_failure_field_label(label)
+            if not key and ":" in normalized_segment:
+                nested_part = normalized_segment.split(":", 1)[1].strip()
+                nested_key, nested_value = _parse_failure_loose_segment(nested_part)
+                if nested_key and nested_value and not fields[nested_key]:
+                    fields[nested_key] = nested_value
+            if key and value and not fields[key]:
+                fields[key] = value
+
+        # 2) markdown row (| label | value |)
+        if "|" not in body:
+            continue
+
+        cells = [cell.strip() for cell in body.split("|") if cell.strip()]
+        if not cells:
+            continue
+        if all(set(cell) <= {"-"} for cell in cells):
+            continue
+
+        # 2-1) 다열 헤더를 기억했다가 다음 row 값과 매핑
+        mapped_headers = [_map_failure_field_label(cell) for cell in cells]
+        recognized_count = sum(1 for item in mapped_headers if item)
+        if recognized_count >= 2 and recognized_count >= max(2, len(cells) // 2):
+            table_headers = mapped_headers
+            continue
+
+        if table_headers and len(cells) == len(table_headers):
+            for header, value in zip(table_headers, cells):
+                cleaned = _clean_failure_field_value(value)
+                if header and cleaned and not fields[header]:
+                    fields[header] = cleaned
+            table_headers = None
+            continue
+
+        # 2-2) 2열 key-value 또는 인접 key-value
+        for index in range(len(cells) - 1):
+            key = _map_failure_field_label(cells[index])
+            value = _clean_failure_field_value(cells[index + 1])
+            if key and value and not fields[key]:
+                fields[key] = value
+
+    date_candidate = fields.get("work_date", "")
+    if date_candidate:
+        matched_date = re.search(r"\d{4}[./-]\d{1,2}[./-]\d{1,2}", date_candidate)
+        if matched_date:
+            fields["work_date"] = matched_date.group(0).replace(".", "-").replace("/", "-")
+
+    equipment_candidate = fields.get("equipment", "")
+    if equipment_candidate:
+        cleaned_equipment = re.split(r"\s+(?:상태|점검|측정|확인)\b", equipment_candidate, maxsplit=1)[0].strip()
+        if cleaned_equipment:
+            fields["equipment"] = cleaned_equipment
+
+    return fields
+
+
+def _summarize_failure_work_detail(detail: str) -> str:
+    body = _clean_failure_field_value(detail)
+    if not body:
+        return ""
+
+    sentences = _split_sentences(body)
+    if sentences:
+        body = sentences[0].strip()
+    return _truncate(body, 96)
+
+
+def _build_failure_report_summary(filename: str, text: str) -> Tuple[str, str]:
+    fields = _extract_failure_report_fields(text)
+
+    customer = fields.get("customer") or "고객사 미상"
+    equipment = fields.get("equipment") or "대상설비 미상"
+    work_date = fields.get("work_date") or "작업일 미상"
+    author = fields.get("author") or "작성자 미상"
+    work_site = fields.get("work_site") or "작업장소 미상"
+    work_detail = _summarize_failure_work_detail(fields.get("work_detail") or "")
+
+    title = f"{customer} / {equipment} / {work_date}"
+    if not work_detail:
+        work_detail = f"{_title_from_filename(filename)} 관련 조치 내용"
+
+    summary = f"작업내용: {work_detail}, 작성자: {author}, 작업장소: {work_site}"
+    return _truncate(title, DOC_SUMMARY_TITLE_MAX_CHARS), _truncate(summary, DOC_SUMMARY_SHORT_MAX_CHARS)
 
 
 def _contains_catalog_signals(text: str) -> bool:
@@ -549,6 +808,9 @@ def build_document_summary(
     normalized_types = _normalize_document_types(document_types)
     if not normalized_types:
         normalized_types = classify_document_types(filename=filename, content_text=content_text)
+
+    if DOC_TYPE_FAILURE_REPORT in normalized_types:
+        return _build_failure_report_summary(filename=filename, text=content_text)
 
     llm_result = _summarize_with_local_llm(
         filename=filename,

@@ -244,3 +244,62 @@ class DocumentSummaryTests(unittest.TestCase):
                 source,
             )
         )
+
+    def test_classify_document_types_detects_equipment_failure_report(self):
+        filename = "설비_장애_조치보고서_2026_01_09.xlsx"
+        text = (
+            "고객사: 한빛정밀\n"
+            "작성자: 김서준\n"
+            "작업장소: 인천 3공장\n"
+            "대상설비: LJ-X8200\n"
+            "작업 일자: 2026-01-09\n"
+            "작업 내용: 라인 프로파일 센서 초기 교정 및 노이즈 맵 재측정\n"
+        )
+
+        doc_types = document_summary.classify_document_types(
+            filename=filename,
+            content_text=text,
+        )
+
+        self.assertIn(document_summary.DOC_TYPE_FAILURE_REPORT, doc_types)
+
+    def test_build_document_summary_for_failure_report_uses_structured_format(self):
+        text = (
+            "고객사: 미래오토메이션\n"
+            "작성자: 이재민\n"
+            "작업장소: 평택 라인 B\n"
+            "대상설비: VisionFlex-Cam-12\n"
+            "작업 일자: 2026-01-11\n"
+            "작업 시간: 13:10-15:00\n"
+            "작업 내용: 카메라 노출값 재튜닝 및 광원 플리커 점검\n"
+        )
+
+        title, summary = document_summary.build_document_summary(
+            filename="report.pdf",
+            content_text=text,
+            document_types=[document_summary.DOC_TYPE_FAILURE_REPORT],
+        )
+
+        self.assertEqual(title, "미래오토메이션 / VisionFlex-Cam-12 / 2026-01-11")
+        self.assertIn("작업내용:", summary)
+        self.assertIn("작성자: 이재민", summary)
+        self.assertIn("작업장소: 평택 라인 B", summary)
+
+    def test_build_document_summary_for_failure_report_timeline_style(self):
+        text = (
+            "Start: 고객사 우진로지스 / 작업장소 군포 물류센터\n"
+            "T+20m: 대상설비 Sorter-LiDAR-9 상태 점검\n"
+            "T+70m: 작업 내용 분류기 LiDAR 축 정렬 및 야간 모드 감도 조정\n"
+            "Meta: 작성자 문지훈 / 작업 일자 2026-01-21 / 작업 시간 14:00-17:10\n"
+        )
+
+        title, summary = document_summary.build_document_summary(
+            filename="timeline_report.pdf",
+            content_text=text,
+            document_types=[document_summary.DOC_TYPE_FAILURE_REPORT],
+        )
+
+        self.assertEqual(title, "우진로지스 / Sorter-LiDAR-9 / 2026-01-21")
+        self.assertIn("작업내용:", summary)
+        self.assertIn("작성자: 문지훈", summary)
+        self.assertIn("작업장소: 군포 물류센터", summary)

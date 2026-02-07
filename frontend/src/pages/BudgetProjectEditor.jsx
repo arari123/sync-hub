@@ -205,8 +205,9 @@ const BudgetProjectEditor = () => {
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
-                    { label: '예산관리', to: '/budget-management' },
+                    { label: '프로젝트 관리', to: '/budget-management' },
                     { label: project?.name || '프로젝트', to: `/budget-management/projects/${projectId}` },
+                    { label: '예산 관리', to: `/budget-management/projects/${projectId}/budget` },
                     { label: `${SECTION_META[section].label} 입력` },
                 ]}
             />
@@ -223,10 +224,10 @@ const BudgetProjectEditor = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Link
-                            to={`/budget-management/projects/${projectId}`}
+                            to={`/budget-management/projects/${projectId}/budget`}
                             className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
                         >
-                            요약으로
+                            예산 관리로
                         </Link>
                         {canEditProject && !isConfirmed && (
                             <button

@@ -29,7 +29,7 @@ const Layout = ({ children }) => {
                                     to="/budget-management"
                                     className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
                                 >
-                                    예산관리
+                                    프로젝트 관리
                                 </Link>
                             )}
                             <button

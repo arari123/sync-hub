@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, PencilLine } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
@@ -13,14 +13,13 @@ function formatAmount(value) {
     return `${toNumber(value).toLocaleString('ko-KR')}원`;
 }
 
-function formatDate(value) {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString('ko-KR', { hour12: false });
-}
+const EDIT_SECTIONS = [
+    { key: 'material', label: '재료비 입력' },
+    { key: 'labor', label: '인건비 입력' },
+    { key: 'expense', label: '경비 입력' },
+];
 
-const BudgetProjectOverview = () => {
+const BudgetProjectBudget = () => {
     const { projectId } = useParams();
     const [project, setProject] = useState(null);
     const [version, setVersion] = useState(null);
@@ -54,7 +53,7 @@ const BudgetProjectOverview = () => {
                 setEquipments(itemList);
                 setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
             } catch (err) {
-                setError(getErrorMessage(err, '프로젝트 예산 요약을 불러오지 못했습니다.'));
+                setError(getErrorMessage(err, '예산 관리 데이터를 불러오지 못했습니다.'));
             } finally {
                 setIsLoading(false);
             }
@@ -63,21 +62,23 @@ const BudgetProjectOverview = () => {
         load();
     }, [projectId]);
 
-    const equipmentCards = useMemo(() => (
-        equipments.map((item) => {
-            const material = toNumber(item.material_fab_cost) + toNumber(item.material_install_cost);
-            const labor = toNumber(item.labor_fab_cost) + toNumber(item.labor_install_cost);
-            const expense = toNumber(item.expense_fab_cost) + toNumber(item.expense_install_cost);
-            const maxValue = Math.max(material, labor, expense, 1);
-            return {
-                equipment_name: item.equipment_name || '미지정 설비',
-                material,
-                labor,
-                expense,
-                maxValue,
-            };
-        })
-    ), [equipments]);
+    const equipmentCards = useMemo(
+        () =>
+            equipments.map((item) => {
+                const material = toNumber(item.material_fab_cost) + toNumber(item.material_install_cost);
+                const labor = toNumber(item.labor_fab_cost) + toNumber(item.labor_install_cost);
+                const expense = toNumber(item.expense_fab_cost) + toNumber(item.expense_install_cost);
+                const maxValue = Math.max(material, labor, expense, 1);
+                return {
+                    equipment_name: item.equipment_name || '미지정 설비',
+                    material,
+                    labor,
+                    expense,
+                    maxValue,
+                };
+            }),
+        [equipments]
+    );
 
     if (isLoading) {
         return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
@@ -87,38 +88,35 @@ const BudgetProjectOverview = () => {
         return <p className="text-sm text-muted-foreground">프로젝트를 찾을 수 없습니다.</p>;
     }
 
+    const monitoring = project?.monitoring || {};
+
     return (
         <div className="space-y-5">
             <BudgetBreadcrumb
                 items={[
                     { label: '프로젝트 관리', to: '/budget-management' },
-                    { label: project.name || '프로젝트' },
+                    { label: project.name || '프로젝트', to: `/budget-management/projects/${project.id}` },
+                    { label: '예산 관리' },
                 ]}
             />
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold">{project.name}</h1>
+                        <p className="text-xs text-muted-foreground">프로젝트 예산 운영</p>
+                        <h1 className="text-2xl font-bold">예산 관리</h1>
                         <p className="mt-1 text-xs text-muted-foreground">
-                            단계: {project.current_stage_label} · 버전 {version?.version_no || '-'}
+                            {project.name} · 단계: {project.current_stage_label} · 버전 {version?.version_no || '-'}
                             {version?.revision_no > 0 ? `-r${version.revision_no}` : ''}
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            to={`/budget-management/projects/${project.id}/budget`}
-                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent"
-                        >
-                            예산 관리
-                            <ArrowRight className="h-3.5 w-3.5" />
-                        </Link>
-                        {!project.can_edit && (
-                            <span className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2.5 text-xs text-muted-foreground">
-                                읽기 전용
-                            </span>
-                        )}
-                    </div>
+                    <Link
+                        to={`/budget-management/projects/${project.id}`}
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent"
+                    >
+                        프로젝트 상세
+                        <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
                 </div>
             </section>
 
@@ -128,32 +126,54 @@ const BudgetProjectOverview = () => {
                 </div>
             )}
 
-            <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">프로젝트 기본 정보</h2>
-                <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                    <InfoCell label="프로젝트 이름" value={project.name || '-'} />
-                    <InfoCell label="프로젝트 종류" value={project.project_type_label || '-'} />
-                    <InfoCell label="고객사" value={project.customer_name || '-'} />
-                    <InfoCell label="설치 장소" value={project.installation_site || '-'} />
-                    <InfoCell label="작성자" value={project.author_name || '작성자 미지정'} />
-                    <InfoCell label="마지막 업데이트" value={formatDate(project.updated_at)} />
-                    <InfoCell label="프로젝트 코드" value={project.code || '-'} />
-                    <InfoCell label="개요" value={project.description || '-'} className="md:col-span-2" />
+            <section className="rounded-xl border bg-card p-5 shadow-sm">
+                <h2 className="mb-3 text-base font-semibold">입력 페이지 이동</h2>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {EDIT_SECTIONS.map((item) => (
+                        <Link
+                            key={item.key}
+                            to={`/budget-management/projects/${project.id}/edit/${item.key}`}
+                            className={`inline-flex h-9 items-center justify-center gap-1 rounded-md border px-3 text-sm ${
+                                project?.can_edit
+                                    ? 'border-input bg-background hover:bg-accent'
+                                    : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/30'
+                            }`}
+                        >
+                            <PencilLine className="h-3.5 w-3.5" />
+                            {item.label}
+                        </Link>
+                    ))}
                 </div>
+                {!project?.can_edit && (
+                    <p className="mt-2 text-xs text-muted-foreground">읽기 전용 권한입니다. 입력 페이지에서는 수정할 수 없습니다.</p>
+                )}
             </section>
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">전체 예산 요약</h2>
+                <h2 className="mb-4 text-base font-semibold">예산 요약</h2>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <AmountCell label="재료비" value={formatAmount(totals?.material_total)} />
                     <AmountCell label="인건비" value={formatAmount(totals?.labor_total)} />
                     <AmountCell label="경비" value={formatAmount(totals?.expense_total)} />
                     <AmountCell label="총액" value={formatAmount(totals?.grand_total)} strong />
                 </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <AmountCell label="확정 예산" value={formatAmount(monitoring.confirmed_budget_total)} />
+                    <AmountCell
+                        label="집행 금액"
+                        value={monitoring.actual_spent_total === null || monitoring.actual_spent_total === undefined ? '-' : formatAmount(monitoring.actual_spent_total)}
+                    />
+                    <AmountCell
+                        label="차액"
+                        value={monitoring.variance_total === null || monitoring.variance_total === undefined ? '-' : formatAmount(monitoring.variance_total)}
+                        strong={monitoring.variance_total !== null && monitoring.variance_total !== undefined}
+                    />
+                </div>
             </section>
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">설비별 재료비/인건비/경비</h2>
+                <h2 className="mb-4 text-base font-semibold">설비별 예산 현황</h2>
                 {!equipmentCards.length ? (
                     <p className="text-sm text-muted-foreground">설비 예산 데이터가 아직 없습니다.</p>
                 ) : (
@@ -161,24 +181,9 @@ const BudgetProjectOverview = () => {
                         {equipmentCards.map((item) => (
                             <article key={item.equipment_name} className="rounded-lg border bg-muted/10 p-4">
                                 <p className="mb-3 text-sm font-semibold">{item.equipment_name}</p>
-                                <GraphRow
-                                    label="재료비"
-                                    value={item.material}
-                                    maxValue={item.maxValue}
-                                    barClass="bg-blue-500"
-                                />
-                                <GraphRow
-                                    label="인건비"
-                                    value={item.labor}
-                                    maxValue={item.maxValue}
-                                    barClass="bg-emerald-500"
-                                />
-                                <GraphRow
-                                    label="경비"
-                                    value={item.expense}
-                                    maxValue={item.maxValue}
-                                    barClass="bg-amber-500"
-                                />
+                                <GraphRow label="재료비" value={item.material} maxValue={item.maxValue} barClass="bg-blue-500" />
+                                <GraphRow label="인건비" value={item.labor} maxValue={item.maxValue} barClass="bg-emerald-500" />
+                                <GraphRow label="경비" value={item.expense} maxValue={item.maxValue} barClass="bg-amber-500" />
                             </article>
                         ))}
                     </div>
@@ -187,13 +192,6 @@ const BudgetProjectOverview = () => {
         </div>
     );
 };
-
-const InfoCell = ({ label, value, className = '' }) => (
-    <div className={`rounded-md border bg-muted/10 p-3 ${className}`}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-sm font-medium break-words">{value}</p>
-    </div>
-);
 
 const AmountCell = ({ label, value, strong = false }) => (
     <div className={`rounded-md border p-3 ${strong ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}>
@@ -217,4 +215,4 @@ const GraphRow = ({ label, value, maxValue, barClass }) => {
     );
 };
 
-export default BudgetProjectOverview;
+export default BudgetProjectBudget;

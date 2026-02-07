@@ -6,6 +6,7 @@ import SearchResults from './pages/SearchResults';
 import BudgetManagement from './pages/BudgetManagement';
 import BudgetProjectCreate from './pages/BudgetProjectCreate';
 import BudgetProjectOverview from './pages/BudgetProjectOverview';
+import BudgetProjectBudget from './pages/BudgetProjectBudget';
 import BudgetProjectEditor from './pages/BudgetProjectEditor';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -25,6 +26,7 @@ function App() {
           <Route path="/budget-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
           <Route path="/budget-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />
           <Route path="/budget-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />
+          <Route path="/budget-management/projects/:projectId/budget" element={<ProtectedRoute><BudgetProjectBudget /></ProtectedRoute>} />
           <Route path="/budget-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
         </Routes>
       </Layout>

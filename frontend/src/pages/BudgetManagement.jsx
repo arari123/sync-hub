@@ -144,15 +144,15 @@ const BudgetManagement = () => {
 
     return (
         <div className="space-y-6">
-            <BudgetBreadcrumb items={[{ label: '예산관리' }]} />
+            <BudgetBreadcrumb items={[{ label: '프로젝트 관리' }]} />
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <section className="rounded-xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h1 className="text-xl font-bold">예산관리</h1>
+                            <h1 className="text-xl font-bold">프로젝트 관리</h1>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                전체 프로젝트 예산 현황을 모니터링하고 프로젝트별 요약 화면으로 이동할 수 있습니다.
+                                전체 프로젝트의 진행 현황과 예산 상태를 통합 모니터링하고 프로젝트 상세 화면으로 이동할 수 있습니다.
                             </p>
                         </div>
                         <Link

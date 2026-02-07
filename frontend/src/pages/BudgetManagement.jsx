@@ -136,33 +136,33 @@ const BudgetManagement = () => {
                         <h2 className="text-xs font-semibold">필터</h2>
                         <p className="text-[11px] text-muted-foreground">조건에 맞는 프로젝트만 표시</p>
                     </div>
-                    <form className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6" onSubmit={applyFilters}>
+                    <form className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" onSubmit={applyFilters}>
                         <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="최소 금액(원)"
                             value={draftFilters.minTotal}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
                         />
                         <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="최대 금액(원)"
                             value={draftFilters.maxTotal}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
                         />
                         <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="고객사"
                             value={draftFilters.customerName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
                         />
                         <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             placeholder="작성자"
                             value={draftFilters.authorName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
                         />
                         <select
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
+                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                             value={draftFilters.projectType}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
                         >
@@ -171,17 +171,17 @@ const BudgetManagement = () => {
                             <option value="parts">파츠</option>
                             <option value="as">AS</option>
                         </select>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-2">
                             <button
                                 type="submit"
-                                className="inline-flex h-6 items-center justify-center rounded-md bg-primary px-2 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
                             >
                                 적용
                             </button>
                             <button
                                 type="button"
                                 onClick={resetFilters}
-                                className="inline-flex h-6 items-center justify-center rounded-md border border-input bg-background px-2 text-[10px] hover:bg-accent"
+                                className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
                             >
                                 초기화
                             </button>

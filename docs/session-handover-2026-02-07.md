@@ -264,6 +264,16 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 프론트 검색 결과 UI 정리:
     - 카드 표시를 `제목 + 파일명 + 문서요약 + 매칭 페이지` 중심으로 변경.
     - 우측 상세 패널에 PDF 다운로드 버튼 추가.
+- 2026-02-07 (세션 재개-7)
+  - 문서 요약 프롬프트/정제 튜닝:
+    - `app/core/document_summary.py`에 OCR 노이즈 라인 정제 추가(표/치수/URL/저품질 라인 제거).
+    - 로컬 LLM 프롬프트를 “문서 전체 주제 요약” 중심으로 강화(JSON 강제 + 카탈로그 예시 포함).
+    - KEYENCE + LJ 카탈로그 문서에 대해 도메인 템플릿 가드레일 추가.
+  - 결과 보정/재반영:
+    - `doc_id=1`, `doc_id=2` 재인덱싱 완료.
+    - DB/ES 모두 아래 값으로 반영 확인:
+      - 제목: `KEYENCE LJ시리즈 라인 프로파일 센서 카탈로그`
+      - 요약: `3D 검사를 위한 라인 프로파일 센서 카탈로그로서 KEYENCE사의 LJ시리즈에 대해 소개하는 문서`
   - 메인 페이지 업로드 기능 강화(디자인 톤 유지):
     - `frontend/src/pages/Home.jsx`에서 검색창 바로 아래 `UploadWidget`을 전면 배치.
     - 기존 스타일(카드/타이포/애니메이션 계열) 유지.

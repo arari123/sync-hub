@@ -80,3 +80,21 @@ class DocumentSummaryTests(unittest.TestCase):
             document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
             document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
             document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
+
+    def test_keyence_lj_catalog_uses_domain_template(self):
+        text = (
+            "KEYENCE LJ-X8000 시리즈 카탈로그\n"
+            "라인 프로파일 센서 기반 3D 검사 솔루션 소개 문서\n"
+            "LJ-X8000 series for 3D inspection and measurement."
+        )
+
+        title, summary = document_summary.build_document_summary(
+            filename="AS_161723_LJ-X8000_sample.pdf",
+            content_text=text,
+        )
+
+        self.assertEqual(title, "KEYENCE LJ시리즈 라인 프로파일 센서 카탈로그")
+        self.assertEqual(
+            summary,
+            "3D 검사를 위한 라인 프로파일 센서 카탈로그로서 KEYENCE사의 LJ시리즈에 대해 소개하는 문서",
+        )

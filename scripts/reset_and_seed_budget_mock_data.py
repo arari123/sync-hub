@@ -328,13 +328,13 @@ def main() -> None:
     ensure_runtime_schema()
     session = SessionLocal()
     try:
-        manager = (
+        active_users = (
             session.query(models.User)
             .filter(models.User.is_active.is_(True), models.User.email_verified.is_(True))
             .order_by(models.User.id.asc())
-            .first()
+            .all()
         )
-        if not manager:
+        if not active_users:
             raise RuntimeError('활성/인증된 사용자 계정을 찾을 수 없습니다.')
 
         now_iso = to_iso(utcnow())
@@ -347,7 +347,7 @@ def main() -> None:
             for file_path in UPLOAD_DIR.glob(ext):
                 file_path.unlink(missing_ok=True)
 
-        seed_projects = [
+        seed_templates = [
             {
                 'name': '반도체 검사라인 A 개선',
                 'code': 'MOCK-REV-001',
@@ -356,7 +356,7 @@ def main() -> None:
                 'customer_name': '가상반도체',
                 'installation_site': '화성 1공장',
                 'stage': 'review',
-                'status': 'draft',
+                'status': 'confirmed',
                 'execution_ratio': 0.0,
             },
             {
@@ -394,6 +394,20 @@ def main() -> None:
             },
         ]
 
+        seed_projects = []
+        for index, user in enumerate(active_users):
+            template = seed_templates[index % len(seed_templates)]
+            email_prefix = (user.email or f'user{user.id}').split('@', 1)[0][:12]
+            seed_projects.append(
+                {
+                    **template,
+                    'name': f"{template['name']} ({email_prefix})",
+                    'code': f"{template['code']}-U{int(user.id):02d}",
+                    'manager_user_id': int(user.id),
+                    'created_by_user_id': int(user.id),
+                }
+            )
+
         created_projects: list[tuple[models.BudgetProject, dict]] = []
         for item in seed_projects:
             project = models.BudgetProject(
@@ -403,8 +417,8 @@ def main() -> None:
                 project_type=item['project_type'],
                 customer_name=item['customer_name'],
                 installation_site=item['installation_site'],
-                created_by_user_id=int(manager.id),
-                manager_user_id=int(manager.id),
+                created_by_user_id=int(item['created_by_user_id']),
+                manager_user_id=int(item['manager_user_id']),
                 current_stage=item['stage'],
                 created_at=now_iso,
                 updated_at=now_iso,
@@ -486,7 +500,8 @@ def main() -> None:
         version_count = session.query(models.BudgetVersion).count()
         document_count = session.query(models.Document).count()
 
-        print(f'[seed] manager_user_id={manager.id}')
+        manager_ids = sorted({int(item['manager_user_id']) for item in seed_projects})
+        print(f'[seed] manager_user_ids={manager_ids}')
         print(f'[seed] projects={project_count}, versions={version_count}, documents={document_count}')
         print('[seed] files:', ', '.join(name for name, _ in spreadsheet_specs))
     finally:

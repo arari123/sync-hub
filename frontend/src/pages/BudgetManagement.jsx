@@ -97,7 +97,7 @@ const BudgetManagement = () => {
         projectCode: '',
         customerName: '',
         managerName: '',
-        onlyMine: false,
+        onlyMine: true,
         projectTypes: [],
         stages: [],
         sortBy: DEFAULT_PROJECT_SORT,
@@ -263,12 +263,12 @@ const BudgetManagement = () => {
                     <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">상세 필터</h2>
                     <div className="flex gap-2">
                         <Button
-                            variant={draftFilters.onlyMine ? 'default' : 'outline'}
+                            variant={draftFilters.onlyMine ? 'outline' : 'default'}
                             size="sm"
                             className="h-8 text-xs px-3"
                             onClick={toggleOnlyMine}
                         >
-                            내 프로젝트만
+                            {draftFilters.onlyMine ? '전체 프로젝트 보기' : '내 프로젝트만 보기'}
                         </Button>
                         <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={resetFilters}>초기화</Button>
                         <Button size="sm" type="submit" form="budget-filter-form" className="h-8 text-xs px-3">필터 적용</Button>

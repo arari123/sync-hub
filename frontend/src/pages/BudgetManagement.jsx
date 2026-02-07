@@ -191,70 +191,63 @@ const BudgetManagement = () => {
                             <button
                                 type="submit"
                                 form="budget-filter-form"
-                                className="inline-flex h-7 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                className="inline-flex h-6 items-center justify-center rounded-md bg-primary px-2 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90"
                             >
                                 적용
                             </button>
                             <button
                                 type="button"
                                 onClick={resetFilters}
-                                className="inline-flex h-7 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
+                                className="inline-flex h-6 items-center justify-center rounded-md border border-input bg-background px-2 text-[10px] hover:bg-accent"
                             >
                                 초기화
                             </button>
                         </div>
                     </div>
-                    <form id="budget-filter-form" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" onSubmit={applyFilters}>
+                    <form id="budget-filter-form" className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" onSubmit={applyFilters}>
                         <input
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             placeholder="프로젝트 이름"
                             value={draftFilters.projectName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectName: event.target.value }))}
                         />
                         <input
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             placeholder="프로젝트 코드"
                             value={draftFilters.projectCode}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectCode: event.target.value }))}
                         />
                         <input
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             placeholder="최소 금액(원)"
                             value={draftFilters.minTotal}
                             onChange={handleMinTotalChange}
                         />
                         <input
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             placeholder="최대 금액(원)"
                             value={draftFilters.maxTotal}
                             onChange={handleMaxTotalChange}
                         />
-                        <div className="space-y-1">
-                            <input
-                                list="budget-customer-options"
-                                className={`h-7 w-full rounded-md border px-2 text-[11px] ${
-                                    selectedCustomer
-                                        ? 'border-primary/70 bg-primary/5 ring-1 ring-primary/30'
-                                        : 'border-input bg-background'
-                                }`}
-                                placeholder="고객사"
-                                value={draftFilters.customerName}
-                                onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
-                            />
-                            <p className={`text-[10px] ${selectedCustomer ? 'font-medium text-primary' : 'text-muted-foreground'}`}>
-                                {selectedCustomer
-                                    ? `선택됨: ${selectedCustomer}`
-                                    : '고객사 일부 입력 시 아래 목록에서 선택'}
-                            </p>
-                        </div>
                         <input
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            list="budget-customer-options"
+                            className={`h-6 w-full rounded-md border px-2 text-[10px] ${
+                                selectedCustomer
+                                    ? 'border-primary/70 bg-primary/5 ring-1 ring-primary/30'
+                                    : 'border-input bg-background'
+                            }`}
+                            placeholder="고객사"
+                            value={draftFilters.customerName}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
+                        />
+                        <input
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             placeholder="작성자"
                             value={draftFilters.authorName}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
                         />
                         <select
-                            className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
                             value={draftFilters.projectType}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
                         >

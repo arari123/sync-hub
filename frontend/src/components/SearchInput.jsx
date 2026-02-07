@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from './ui/Input';
-import { Button } from './ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -26,7 +25,7 @@ const SearchInput = ({ initialQuery = '', className, autoFocus }) => {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="What are you looking for?"
+                    placeholder="무엇을 찾고 계신가요?"
                     className="pl-10 h-12 rounded-full shadow-sm hover:shadow-md transition-shadow border-muted-foreground/20 text-lg"
                     autoFocus={autoFocus}
                 />

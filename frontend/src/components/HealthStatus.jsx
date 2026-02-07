@@ -5,9 +5,9 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 
 const DEPENDENCY_LABELS = {
-    db: 'Database',
-    elasticsearch: 'Elasticsearch',
-    ocr_worker: 'OCR Worker',
+    db: '데이터베이스',
+    elasticsearch: '엘라스틱서치',
+    ocr_worker: 'OCR 워커',
 };
 
 function getHealthTone(status, healthy) {
@@ -29,6 +29,14 @@ function asDependencyArray(dependencies) {
         mode: value?.mode || '',
         error: value?.error || '',
     }));
+}
+
+function toHealthStatusLabel(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'healthy') return '정상';
+    if (value === 'degraded') return '주의';
+    if (value === 'unknown') return '알 수 없음';
+    return '오류';
 }
 
 const HealthStatus = () => {
@@ -64,7 +72,7 @@ const HealthStatus = () => {
     return (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 text-sm">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold leading-none tracking-tight">System Health</h3>
+                <h3 className="font-semibold leading-none tracking-tight">시스템 헬스</h3>
                 <Button variant="ghost" size="sm" onClick={loadHealthDetails} className="h-6 w-6 p-0">
                     {isLoadingHealth ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                 </Button>
@@ -72,7 +80,7 @@ const HealthStatus = () => {
 
             <div className={cn("flex items-center gap-2 p-2 rounded-md border mb-3 font-bold", getHealthTone(healthStatus, false))}>
                 {healthStatus === 'healthy' ? <ShieldCheck size={16} /> : <ShieldX size={16} />}
-                <span>{healthStatus.toUpperCase()}</span>
+                <span>{toHealthStatusLabel(healthStatus)}</span>
             </div>
 
             {healthError && <p className="text-xs text-destructive mb-2">{healthError}</p>}
@@ -86,7 +94,7 @@ const HealthStatus = () => {
                             {dependency.key === 'ocr_worker' && <Activity size={14} />}
                             <span>{dependency.label}</span>
                         </div>
-                        <span className="text-xs font-mono">{dependency.healthy ? 'OK' : 'ERR'}</span>
+                        <span className="text-xs font-mono">{dependency.healthy ? '정상' : '오류'}</span>
                     </div>
                 ))}
             </div>

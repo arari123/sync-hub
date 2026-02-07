@@ -15,7 +15,7 @@ const Home = () => {
                     <Logo size="large" asLink={false} />
                 </div>
                 <p className="text-lg text-muted-foreground">
-                    Upload PDF/Excel documents and find exactly what you need with natural language search.
+                    PDF/Excel 문서를 업로드하고 자연어 검색으로 필요한 내용을 빠르게 찾으세요.
                 </p>
             </div>
 
@@ -28,13 +28,13 @@ const Home = () => {
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                             <UploadCloud size={16} />
-                            <h3 className="text-sm font-medium uppercase tracking-wider">Document Upload</h3>
+                            <h3 className="text-sm font-medium uppercase tracking-wider">문서 업로드</h3>
                             <span className="rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                Temporary
+                                임시
                             </span>
                         </div>
                         <p className="text-xs text-muted-foreground -mt-1">
-                            Temporary upload area on home page. It can be moved or removed later.
+                            메인 페이지의 임시 업로드 영역입니다. 추후 이동하거나 제거할 수 있습니다.
                         </p>
                         <UploadWidget />
                     </div>
@@ -45,7 +45,7 @@ const Home = () => {
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-2">
                         <ActivityIcon />
-                        <h3 className="text-sm font-medium uppercase tracking-wider">System Status</h3>
+                        <h3 className="text-sm font-medium uppercase tracking-wider">시스템 상태</h3>
                     </div>
                     <HealthStatus />
                 </div>

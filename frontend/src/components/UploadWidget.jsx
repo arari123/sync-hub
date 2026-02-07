@@ -8,15 +8,15 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 const ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xlsm', '.xltx', '.xltm', '.csv'];
 
 const STATUS_META = {
-    uploading: { label: 'Uploading', color: 'text-blue-500' },
-    pending: { label: 'Pending', color: 'text-gray-500' },
-    processing: { label: 'Processing', color: 'text-orange-500' },
-    completed: { label: 'Completed', color: 'text-green-500' },
-    failed: { label: 'Failed', color: 'text-red-500' },
+    uploading: { label: '업로드 중', color: 'text-blue-500' },
+    pending: { label: '대기', color: 'text-gray-500' },
+    processing: { label: '처리 중', color: 'text-orange-500' },
+    completed: { label: '완료', color: 'text-green-500' },
+    failed: { label: '실패', color: 'text-red-500' },
 };
 
 function getStatusMeta(status) {
-    return STATUS_META[status] || { label: status || 'unknown', color: 'text-gray-400' };
+    return STATUS_META[status] || { label: status || '알 수 없음', color: 'text-gray-400' };
 }
 
 const UploadWidget = () => {
@@ -35,7 +35,7 @@ const UploadWidget = () => {
         const lowered = file.name.toLowerCase();
         const isAllowed = ALLOWED_EXTENSIONS.some((extension) => lowered.endsWith(extension));
         if (!isAllowed) {
-            setUploadError('PDF/Excel/CSV files only.');
+            setUploadError('PDF/Excel/CSV 파일만 업로드할 수 있습니다.');
             return;
         }
 
@@ -65,9 +65,9 @@ const UploadWidget = () => {
             updateUploadJob(temporaryId, (job) => ({
                 ...job,
                 status: 'failed',
-                error: getErrorMessage(error, 'Upload failed'),
+                error: getErrorMessage(error, '업로드 실패'),
             }));
-            setUploadError(getErrorMessage(error, 'Cannot upload file'));
+            setUploadError(getErrorMessage(error, '파일을 업로드할 수 없습니다.'));
         }
     };
 
@@ -124,7 +124,7 @@ const UploadWidget = () => {
     return (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm">Upload Document</h3>
+                <h3 className="font-semibold text-sm">문서 업로드</h3>
             </div>
 
             <div
@@ -138,7 +138,7 @@ const UploadWidget = () => {
                 onClick={() => fileInputRef.current?.click()}
             >
                 <UploadCloud className="h-8 w-8 text-primary mb-2" />
-                <p className="text-sm text-foreground font-medium">Drag PDF/Excel here or click the button below</p>
+                <p className="text-sm text-foreground font-medium">PDF/Excel 파일을 끌어오거나 아래 버튼을 클릭하세요</p>
                 <Button
                     type="button"
                     size="sm"
@@ -148,7 +148,7 @@ const UploadWidget = () => {
                         fileInputRef.current?.click();
                     }}
                 >
-                    Select Document File
+                    문서 파일 선택
                 </Button>
                 <input
                     ref={fileInputRef}

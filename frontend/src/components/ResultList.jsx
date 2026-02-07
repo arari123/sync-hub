@@ -49,9 +49,9 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                 <div className="p-4 bg-muted rounded-full mb-4">
                     <FileText className="h-8 w-8 text-muted-foreground/50" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-1">No results found</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-1">검색 결과가 없습니다</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
-                    We couldn't find any documents matching your search. Try adjusting your keywords or filters.
+                    검색어와 일치하는 문서를 찾지 못했습니다. 검색어를 바꾸거나 필터를 조정해 보세요.
                 </p>
             </div>
         );
@@ -61,7 +61,7 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
         <div className="space-y-4">
             {results.map((result) => {
                 const isActive = selectedResult?.doc_id === result.doc_id;
-                const titleText = result.title || result.filename || 'Untitled document';
+                const titleText = result.title || result.filename || '제목 없음 문서';
                 const summaryText = result.summary || '요약 정보가 아직 생성되지 않았습니다.';
                 const pageText = typeof result.page === 'number' ? `p.${result.page}` : 'p.-';
                 const documentTypes = normalizeDocumentTypes(result.document_types);
@@ -90,7 +90,7 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                             </div>
                             <div className="flex flex-col gap-1 items-end">
                                 <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">{pageText}</span>
-                                <span className="text-[11px] font-mono text-muted-foreground/80">score {formatScore(result.score)}</span>
+                                <span className="text-[11px] font-mono text-muted-foreground/80">점수 {formatScore(result.score)}</span>
                             </div>
                         </div>
 

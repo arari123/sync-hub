@@ -61,3 +61,33 @@
 - 포함 항목:
   - 문서별 `content_chars`, `chunk_count`, `table_chunk_ratio`
   - 질의 5개 기준 `top-k recall` 및 질의별 상위 문서 ID
+
+## Excel 검색 테스트 샘플셋
+- 기준 경로: `uploads/excel-test-reports/`
+- 생성 스크립트: `scripts/generate_excel_test_reports.py`
+- 기본 샘플 개수: 10개 (`excel_report_01_*.xlsx` ~ `excel_report_10_*.xlsx`)
+
+### 공통 포함 필드
+- 고객사
+- 작성자
+- 작업장소
+- 대상설비
+- 고객사 담당자 이름
+- 작업 일자
+- 작업 시간
+- 작업 내용
+
+### Excel 검색 검증 절차
+1. 샘플 생성
+- `docker exec synchub_web bash -lc 'cd /app && python scripts/generate_excel_test_reports.py'`
+
+2. 업로드
+- `for f in /home/arari123/sync-hub/uploads/excel-test-reports/*.xlsx; do curl -s -F \"file=@$f\" http://localhost:8001/documents/upload; echo; done`
+
+3. 완료 상태 확인
+- `curl -s http://localhost:8001/documents/search?q=고객사&limit=20`
+
+4. 키워드 검색 확인(예시)
+- `curl -s 'http://localhost:8001/documents/search?q=한빛정밀&limit=5'`
+- `curl -s 'http://localhost:8001/documents/search?q=VisionFlex-Cam-12&limit=5'`
+- `curl -s 'http://localhost:8001/documents/search?q=라벨 인쇄 불량&limit=5'`

@@ -8,13 +8,14 @@
   - `api/documents.py`: Upload/search/status API, 스니펫/요약/근거문장/매칭포인트 생성 및 재랭킹.
   - `api/admin_debug.py`: 벡터/BM25 검색 디버그 API (`/api/admin/search_debug`).
   - `api/admin_dedup.py`: dedup 클러스터 조회/대표 변경/문서 ignore 관리자 API.
-  - `core/pipeline.py`: PDF parsing + OCR fallback + 문장/문단 기반 chunk indexing pipeline.
+  - `core/pipeline.py`: PDF/OCR + Excel 파싱을 통합한 문장/문단 기반 chunk indexing pipeline.
   - `core/dedup/hash.py`: 파일/정규화 텍스트 SHA-256 계산.
   - `core/dedup/minhash.py`: MinHash/LSH 기반 near duplicate 후보 탐색.
   - `core/dedup/policies.py`: dedup/index 정책 판정.
   - `core/dedup/service.py`: exact/near dedup 클러스터 오케스트레이션.
   - `core/parsing/reflow.py`: bbox 기반 컬럼 감지/리플로우 + 병렬 컬럼 분리 + 표 후보 분리.
   - `core/parsing/cleaning.py`: 헤더/푸터 반복 제거, 하이픈 복원, soft line break 정리.
+  - `core/parsing/spreadsheet.py`: Excel/CSV 시트 텍스트 추출 및 표/행 문장 세그먼트 생성.
   - `core/chunking/sentence_splitter.py`: 한/영 혼합 문장 경계 분리.
   - `core/chunking/chunker.py`: sentence-aware chunk 생성 + overlap + table row sentence 변환.
   - `core/indexing/reindex.py`: 재색인 CLI (`--dry-run` 지원).

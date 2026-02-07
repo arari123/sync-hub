@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
+const ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xlsm', '.xltx', '.xltm', '.csv'];
 
 const STATUS_META = {
     uploading: { label: 'Uploading', color: 'text-blue-500' },
@@ -31,8 +32,10 @@ const UploadWidget = () => {
     const uploadFile = async (file) => {
         if (!file) return;
 
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-            setUploadError('PDF files only.');
+        const lowered = file.name.toLowerCase();
+        const isAllowed = ALLOWED_EXTENSIONS.some((extension) => lowered.endsWith(extension));
+        if (!isAllowed) {
+            setUploadError('PDF/Excel/CSV files only.');
             return;
         }
 
@@ -121,7 +124,7 @@ const UploadWidget = () => {
     return (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm">Upload PDF</h3>
+                <h3 className="font-semibold text-sm">Upload Document</h3>
             </div>
 
             <div
@@ -135,7 +138,7 @@ const UploadWidget = () => {
                 onClick={() => fileInputRef.current?.click()}
             >
                 <UploadCloud className="h-8 w-8 text-primary mb-2" />
-                <p className="text-sm text-foreground font-medium">Drag PDF here or click the button below</p>
+                <p className="text-sm text-foreground font-medium">Drag PDF/Excel here or click the button below</p>
                 <Button
                     type="button"
                     size="sm"
@@ -145,9 +148,15 @@ const UploadWidget = () => {
                         fileInputRef.current?.click();
                     }}
                 >
-                    Select PDF File
+                    Select Document File
                 </Button>
-                <input ref={fileInputRef} type="file" accept=".pdf" hidden onChange={(e) => uploadFile(e.target.files?.[0])} />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.xlsx,.xlsm,.xltx,.xltm,.csv"
+                    hidden
+                    onChange={(e) => uploadFile(e.target.files?.[0])}
+                />
             </div>
 
             {uploadError && <p className="text-xs text-destructive mt-2">{uploadError}</p>}

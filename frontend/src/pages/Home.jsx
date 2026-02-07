@@ -5,7 +5,7 @@ import HealthStatus from '../components/HealthStatus';
 import { UploadCloud } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 
-const SHOW_TEMP_PDF_UPLOAD = true;
+const SHOW_TEMP_DOCUMENT_UPLOAD = true;
 
 const Home = () => {
     return (
@@ -15,7 +15,7 @@ const Home = () => {
                     <Logo size="large" asLink={false} />
                 </div>
                 <p className="text-lg text-muted-foreground">
-                    Upload PDF documents and find exactly what you need with natural language search.
+                    Upload PDF/Excel documents and find exactly what you need with natural language search.
                 </p>
             </div>
 
@@ -23,12 +23,12 @@ const Home = () => {
                 <SearchInput className="shadow-lg" autoFocus />
             </div>
 
-            {SHOW_TEMP_PDF_UPLOAD && (
+            {SHOW_TEMP_DOCUMENT_UPLOAD && (
                 <div className="w-full max-w-3xl px-4">
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                             <UploadCloud size={16} />
-                            <h3 className="text-sm font-medium uppercase tracking-wider">PDF Upload</h3>
+                            <h3 className="text-sm font-medium uppercase tracking-wider">Document Upload</h3>
                             <span className="rounded-full border border-muted-foreground/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 Temporary
                             </span>

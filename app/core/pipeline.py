@@ -28,6 +28,7 @@ from .dedup.service import (
 from .ocr import perform_ocr
 from .parsing.cleaning import build_clean_page_texts, merge_soft_linebreaks, normalize_line, normalize_text
 from .parsing.reflow import ReflowConfig, is_table_like_line, reflow_pdf
+from .parsing.spreadsheet import extract_spreadsheet_segments, is_spreadsheet_file
 from .vector_store import vector_store
 
 try:
@@ -388,15 +389,18 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
 
 
 def generate_chunk_records(file_path: str) -> Tuple[str, str, List[ChunkRecord]]:
-    raw_text, clean_text, segments = _build_segments_from_reflow(file_path)
+    if is_spreadsheet_file(file_path):
+        raw_text, clean_text, segments = extract_spreadsheet_segments(file_path)
+    else:
+        raw_text, clean_text, segments = _build_segments_from_reflow(file_path)
 
-    if _needs_ocr(raw_text, clean_text) or not segments:
-        ocr_text = perform_ocr(file_path)
-        if ocr_text.strip():
-            raw_text, clean_text, segments = _build_segments_from_plain_text(ocr_text)
+        if _needs_ocr(raw_text, clean_text) or not segments:
+            ocr_text = perform_ocr(file_path)
+            if ocr_text.strip():
+                raw_text, clean_text, segments = _build_segments_from_plain_text(ocr_text)
 
-    if not segments and raw_text.strip():
-        raw_text, clean_text, segments = _build_segments_from_plain_text(raw_text)
+        if not segments and raw_text.strip():
+            raw_text, clean_text, segments = _build_segments_from_plain_text(raw_text)
 
     if not raw_text and not clean_text:
         placeholder = "[OCR pending] No extractable text found. Configure OCR worker for scanned PDFs."

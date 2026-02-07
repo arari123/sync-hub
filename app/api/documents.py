@@ -1,5 +1,6 @@
 from datetime import datetime
 import html
+import mimetypes
 import os
 import re
 import shutil
@@ -38,6 +39,7 @@ SEARCH_CLUSTER_DIVERSITY = (
 )
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?。！？])\s+|\s+\|\s+|\n+")
 _QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
+SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".xlsx", ".xlsm", ".xltx", ".xltm", ".csv"}
 
 
 def _start_document_pipeline_async(doc_id: int) -> None:
@@ -345,14 +347,20 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    filename = (file.filename or "").strip()
+    ext = os.path.splitext(filename)[1].lower()
+    if not filename or ext not in SUPPORTED_UPLOAD_EXTENSIONS:
+        allowed = ", ".join(sorted(SUPPORTED_UPLOAD_EXTENSIONS))
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
+
     # Save file
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    file_path = os.path.join(UPLOAD_DIR, filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
     # Create DB record
     db_doc = models.Document(
-        filename=file.filename,
+        filename=filename,
         file_path=file_path,
         status="pending",
         created_at=datetime.utcnow().isoformat(),
@@ -480,10 +488,11 @@ def download_document(doc_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Document file not found")
 
     filename = doc.filename or os.path.basename(doc.file_path)
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     return FileResponse(
         path=doc.file_path,
         filename=filename,
-        media_type="application/pdf",
+        media_type=media_type,
     )
 
 @router.get("/{doc_id}")

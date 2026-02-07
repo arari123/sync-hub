@@ -462,6 +462,8 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
             "page": source.get("page"),
             "chunk_id": source.get("chunk_id"),
             "chunk_type": source.get("chunk_type"),
+            "table_cell_refs": source.get("table_cell_refs"),
+            "table_layout": source.get("table_layout"),
             "dedup_status": source.get("dedup_status"),
             "dedup_primary_doc_id": source.get("dedup_primary_doc_id"),
             "dedup_cluster_id": source.get("dedup_cluster_id"),

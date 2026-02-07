@@ -315,7 +315,7 @@ def _build_segments_from_reflow(file_path: str) -> Tuple[str, str, List[SourceSe
                 clean_text_parts.append(table_raw)
 
             for row_sentence in row_sentences:
-                cleaned_row = normalize_text(row_sentence)
+                cleaned_row = normalize_text(row_sentence.text)
                 if not cleaned_row:
                     continue
                 segments.append(
@@ -324,6 +324,8 @@ def _build_segments_from_reflow(file_path: str) -> Tuple[str, str, List[SourceSe
                         chunk_type="table_row_sentence",
                         text=cleaned_row,
                         raw_text=raw_text,
+                        table_cell_refs=",".join(row_sentence.cell_refs),
+                        table_layout=row_sentence.layout,
                     )
                 )
 
@@ -372,7 +374,7 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
             clean_text_parts.append(table_raw)
 
         for row_sentence in row_sentences:
-            cleaned_row = normalize_text(row_sentence)
+            cleaned_row = normalize_text(row_sentence.text)
             if not cleaned_row:
                 continue
             segments.append(
@@ -381,6 +383,8 @@ def _build_segments_from_plain_text(plain_text: str) -> Tuple[str, str, List[Sou
                     chunk_type="table_row_sentence",
                     text=cleaned_row,
                     raw_text=raw_text,
+                    table_cell_refs=",".join(row_sentence.cell_refs),
+                    table_layout=row_sentence.layout,
                 )
             )
 
@@ -459,6 +463,8 @@ def _index_chunks(doc, chunk_records: Sequence[ChunkRecord]) -> None:
             section_title=record.section_title,
             quality_score=record.quality_score,
             raw_text=record.raw_text,
+            table_cell_refs=record.table_cell_refs,
+            table_layout=record.table_layout,
             chunk_schema_version=record.chunk_schema_version,
             embedding_model_name=record.embedding_model_name,
             embedding_model_version=record.embedding_model_version,

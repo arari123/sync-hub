@@ -107,6 +107,18 @@ class VectorStore:
             return
 
         if self.client.indices.exists(index=self.index_name):
+            try:
+                self.client.indices.put_mapping(
+                    index=self.index_name,
+                    body={
+                        "properties": {
+                            "table_cell_refs": {"type": "keyword"},
+                            "table_layout": {"type": "keyword"},
+                        }
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"[vector_store] Failed to update mapping fields: {exc}")
             return
 
         mapping = {
@@ -129,6 +141,8 @@ class VectorStore:
                     "chunk_type": {"type": "keyword"},
                     "section_title": {"type": "keyword"},
                     "quality_score": {"type": "float"},
+                    "table_cell_refs": {"type": "keyword"},
+                    "table_layout": {"type": "keyword"},
                     "chunk_schema_version": {"type": "keyword"},
                     "embedding_model_name": {"type": "keyword"},
                     "embedding_model_version": {"type": "keyword"},
@@ -200,6 +214,8 @@ class VectorStore:
         section_title="",
         quality_score=0.0,
         raw_text="",
+        table_cell_refs="",
+        table_layout="",
         chunk_schema_version="",
         embedding_model_name="",
         embedding_model_version="",
@@ -217,6 +233,8 @@ class VectorStore:
             "chunk_type": chunk_type,
             "section_title": section_title,
             "quality_score": quality_score,
+            "table_cell_refs": table_cell_refs,
+            "table_layout": table_layout,
             "chunk_schema_version": chunk_schema_version,
             "embedding_model_name": embedding_model_name,
             "embedding_model_version": embedding_model_version,

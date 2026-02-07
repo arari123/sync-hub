@@ -381,3 +381,18 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 검증:
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 41 tests ... OK`)
     - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-07 (세션 재개-16)
+  - 표 레이아웃 확장(다양한 헤더 배치 대응):
+    - `app/core/chunking/chunker.py`에서 테이블 문장 변환을 `TableRowSentence` 구조로 확장.
+    - 가로 헤더형(`horizontal_header`) + 세로 헤더형(`vertical_header`) 문장 생성 로직 추가.
+    - 각 테이블 문장에 셀 좌표 메타(`r{row}c{col}`)를 부여하고 청크 병합 시 `table_cell_refs`를 합산.
+  - 메타 전파/검색 응답 확장:
+    - `app/core/pipeline.py`, `app/core/parsing/spreadsheet.py`에서 `table_cell_refs`, `table_layout`를 청크로 전달.
+    - `app/core/vector_store.py` 매핑/저장 필드 확장(`table_cell_refs`, `table_layout`).
+    - `app/api/documents.py` `/documents/search` 응답에 `table_cell_refs`, `table_layout` 포함.
+  - 테스트/검증:
+    - `tests/test_sentence_chunker.py` 갱신(객체형 row sentence 검증 + 세로 헤더 케이스 추가).
+    - `docker exec synchub_web bash -lc 'cd /app && ./scripts/verify_fast.sh'` 통과 (`Ran 42 tests ... OK`).
+  - 재색인/확인:
+    - `docker exec synchub_web bash -lc 'cd /app && python -m app.core.indexing.reindex --doc-id 3 --doc-id 4 --dedup off --index-policy all'` 완료.
+    - `GET /documents/search?q=Basler&limit=3` 결과에 `table_cell_refs`, `table_layout` 노출 확인.

@@ -107,7 +107,7 @@ def _build_sheet_segments(
             clean_parts.append(table_raw)
 
         for row_sentence in row_sentences:
-            cleaned = normalize_text(row_sentence)
+            cleaned = normalize_text(row_sentence.text)
             if not cleaned:
                 continue
             segments.append(
@@ -117,6 +117,8 @@ def _build_sheet_segments(
                     text=cleaned,
                     raw_text=raw_text,
                     section_title=sheet_name,
+                    table_cell_refs=",".join(row_sentence.cell_refs),
+                    table_layout=row_sentence.layout,
                 )
             )
 

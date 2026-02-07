@@ -15,6 +15,8 @@ class SourceSegment:
     text: str
     raw_text: str = ""
     section_title: str = ""
+    table_cell_refs: str = ""
+    table_layout: str = ""
 
 
 @dataclass
@@ -29,6 +31,15 @@ class ChunkRecord:
     chunk_schema_version: str
     embedding_model_name: str
     embedding_model_version: str
+    table_cell_refs: str = ""
+    table_layout: str = ""
+
+
+@dataclass
+class TableRowSentence:
+    text: str
+    cell_refs: List[str]
+    layout: str
 
 
 def chunker_from_env() -> dict:
@@ -224,7 +235,137 @@ def _is_header_row(cells: Sequence[str]) -> bool:
     return alpha_cells >= numeric_cells
 
 
-def table_group_to_structured_text(table_lines: Sequence[str]) -> Tuple[str, List[str]]:
+def _is_placeholder_header(label: str) -> bool:
+    return bool(re.match(r"^col_\d+$", (label or "").strip().lower()))
+
+
+def _cell_ref(row_index: int, col_index: int) -> str:
+    return f"r{row_index}c{col_index}"
+
+
+def _non_empty_ratio(values: Sequence[str]) -> float:
+    if not values:
+        return 0.0
+    non_empty = sum(1 for value in values if value.strip())
+    return non_empty / len(values)
+
+
+def _looks_like_matrix_table(rows: Sequence[Sequence[str]]) -> bool:
+    if len(rows) < 3:
+        return False
+    col_count = max((len(row) for row in rows), default=0)
+    if col_count < 3:
+        return False
+
+    top_header_ratio = _non_empty_ratio([rows[0][idx] for idx in range(1, col_count)])
+    left_header_ratio = _non_empty_ratio([rows[idx][0] for idx in range(1, len(rows))])
+    data_values = [
+        rows[ridx][cidx]
+        for ridx in range(1, len(rows))
+        for cidx in range(1, col_count)
+    ]
+    data_ratio = _non_empty_ratio(data_values)
+    return top_header_ratio >= 0.6 and left_header_ratio >= 0.6 and data_ratio >= 0.55
+
+
+def _build_horizontal_row_sentences(
+    header: Sequence[str],
+    data_rows: Sequence[Sequence[str]],
+    data_start_row_index: int,
+) -> List[TableRowSentence]:
+    results: List[TableRowSentence] = []
+
+    for row_offset, row in enumerate(data_rows):
+        row_index = data_start_row_index + row_offset
+        if not row:
+            continue
+
+        row_label = row[0].strip() if row[0].strip() else ""
+        row_label_header = header[0].strip() if header else "row_label"
+        parts: List[str] = []
+        refs: List[str] = []
+
+        if row_label:
+            parts.append(f"{row_label_header}: {row_label}")
+            refs.append(_cell_ref(row_index, 1))
+            if not _is_placeholder_header(row_label_header):
+                refs.append(_cell_ref(1, 1))
+
+        for idx, value in enumerate(row):
+            cell = value.strip()
+            if not cell:
+                continue
+            if idx == 0:
+                continue
+
+            col_header = header[idx].strip() if idx < len(header) else f"col_{idx+1}"
+            if row_label and not _is_placeholder_header(col_header):
+                parts.append(f"{row_label} {col_header}: {cell}")
+            else:
+                parts.append(f"{col_header}: {cell}")
+
+            refs.append(_cell_ref(row_index, idx + 1))
+            if not _is_placeholder_header(col_header):
+                refs.append(_cell_ref(1, idx + 1))
+
+        if parts:
+            deduped_refs = sorted(set(refs))
+            results.append(
+                TableRowSentence(
+                    text=" / ".join(parts),
+                    cell_refs=deduped_refs,
+                    layout="horizontal_header",
+                )
+            )
+
+    return results
+
+
+def _build_vertical_row_sentences(rows: Sequence[Sequence[str]]) -> List[TableRowSentence]:
+    if not _looks_like_matrix_table(rows):
+        return []
+
+    col_count = max((len(row) for row in rows), default=0)
+    if col_count < 2:
+        return []
+
+    results: List[TableRowSentence] = []
+    top_left_header = rows[0][0].strip() if rows[0] else ""
+
+    for cidx in range(1, col_count):
+        column_label = rows[0][cidx].strip()
+        if not column_label:
+            continue
+
+        parts: List[str] = []
+        refs: List[str] = [_cell_ref(1, cidx + 1)]
+        if top_left_header:
+            parts.append(f"{top_left_header}: {column_label}")
+            refs.append(_cell_ref(1, 1))
+
+        for ridx in range(1, len(rows)):
+            row_label = rows[ridx][0].strip() if rows[ridx] else ""
+            value = rows[ridx][cidx].strip() if cidx < len(rows[ridx]) else ""
+            if not row_label or not value:
+                continue
+
+            parts.append(f"{column_label} {row_label}: {value}")
+            refs.append(_cell_ref(ridx + 1, 1))
+            refs.append(_cell_ref(ridx + 1, cidx + 1))
+
+        if parts:
+            results.append(
+                TableRowSentence(
+                    text=" / ".join(parts),
+                    cell_refs=sorted(set(refs)),
+                    layout="vertical_header",
+                )
+            )
+
+    return results
+
+
+def table_group_to_structured_text(table_lines: Sequence[str]) -> Tuple[str, List[TableRowSentence]]:
     rows = [_split_table_row(line) for line in table_lines if line.strip()]
     rows = [row for row in rows if row]
     if not rows:
@@ -236,16 +377,19 @@ def table_group_to_structured_text(table_lines: Sequence[str]) -> Tuple[str, Lis
         padded = list(row) + [""] * (col_count - len(row))
         normalized_rows.append(padded)
 
+    has_explicit_header = len(normalized_rows) > 1 and _is_header_row(normalized_rows[0])
     if len(normalized_rows) == 1:
         header = [f"col_{idx+1}" for idx in range(col_count)]
         data_rows = normalized_rows
+        data_start_row_index = 1
     else:
         header = (
             normalized_rows[0]
-            if _is_header_row(normalized_rows[0])
+            if has_explicit_header
             else [f"col_{idx+1}" for idx in range(col_count)]
         )
-        data_rows = normalized_rows[1:] if header == normalized_rows[0] else normalized_rows
+        data_rows = normalized_rows[1:] if has_explicit_header else normalized_rows
+        data_start_row_index = 2 if has_explicit_header else 1
 
     markdown_lines = [
         "| " + " | ".join(header) + " |",
@@ -254,18 +398,31 @@ def table_group_to_structured_text(table_lines: Sequence[str]) -> Tuple[str, Lis
     for row in data_rows:
         markdown_lines.append("| " + " | ".join(row) + " |")
 
-    row_sentences: List[str] = []
-    for row in data_rows:
-        parts = []
-        for idx, value in enumerate(row):
-            cell = value.strip()
-            if not cell:
-                continue
-            parts.append(f"{header[idx]}: {cell}")
-        if parts:
-            row_sentences.append(" / ".join(parts))
+    row_sentences = _build_horizontal_row_sentences(
+        header=header,
+        data_rows=data_rows,
+        data_start_row_index=data_start_row_index,
+    )
+    row_sentences.extend(_build_vertical_row_sentences(normalized_rows))
 
-    return "\n".join(markdown_lines).strip(), row_sentences
+    deduped_sentences: List[TableRowSentence] = []
+    seen_text = set()
+    for item in row_sentences:
+        normalized_text = re.sub(r"\s+", " ", (item.text or "").strip())
+        if not normalized_text:
+            continue
+        if normalized_text in seen_text:
+            continue
+        seen_text.add(normalized_text)
+        deduped_sentences.append(
+            TableRowSentence(
+                text=normalized_text,
+                cell_refs=item.cell_refs,
+                layout=item.layout,
+            )
+        )
+
+    return "\n".join(markdown_lines).strip(), deduped_sentences
 
 
 def _merge_table_row_sentence_chunks(
@@ -326,6 +483,7 @@ def _merge_table_row_sentence_chunks(
                 continue
 
             template = window[0]
+            layouts = {item.table_layout for item in window if (item.table_layout or "").strip()}
             merged.append(
                 ChunkRecord(
                     chunk_index=-1,
@@ -338,6 +496,17 @@ def _merge_table_row_sentence_chunks(
                     chunk_schema_version=template.chunk_schema_version,
                     embedding_model_name=template.embedding_model_name,
                     embedding_model_version=template.embedding_model_version,
+                    table_cell_refs=",".join(
+                        sorted(
+                            {
+                                ref.strip()
+                                for item in window
+                                for ref in (item.table_cell_refs or "").split(",")
+                                if ref.strip()
+                            }
+                        )
+                    ),
+                    table_layout=template.table_layout if len(layouts) <= 1 else "mixed",
                 )
             )
 
@@ -404,6 +573,8 @@ def build_chunks(
                     chunk_schema_version=chunk_schema_version,
                     embedding_model_name=embedding_model_name,
                     embedding_model_version=embedding_model_version,
+                    table_cell_refs=segment.table_cell_refs or "",
+                    table_layout=segment.table_layout or "",
                 )
             )
             chunk_index += 1

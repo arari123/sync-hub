@@ -153,7 +153,9 @@ class SentenceChunkerTests(unittest.TestCase):
         )
 
         self.assertIn("| Name | Value |", table_raw)
-        self.assertIn("Name: Latency / Value: 20ms", row_sentences)
+        row_texts = [item.text for item in row_sentences]
+        self.assertIn("Name: Latency / Latency Value: 20ms", row_texts)
+        self.assertTrue(any(item.layout == "horizontal_header" for item in row_sentences))
 
     def test_table_group_conversion_splits_numeric_ocr_rows(self):
         table_raw, row_sentences = table_group_to_structured_text(
@@ -164,8 +166,23 @@ class SentenceChunkerTests(unittest.TestCase):
         )
 
         self.assertIn("| LJ-X8000 | +1.290mm | +2.000mm | REW |", table_raw)
-        self.assertTrue(any("+1.290mm: +0.500mm" in sentence for sentence in row_sentences))
-        self.assertTrue(any("+2.000mm: +0.700mm" in sentence for sentence in row_sentences))
+        self.assertTrue(any("+1.290mm: +0.500mm" in sentence.text for sentence in row_sentences))
+        self.assertTrue(any("+2.000mm: +0.700mm" in sentence.text for sentence in row_sentences))
+
+    def test_table_group_conversion_supports_vertical_headers(self):
+        _, row_sentences = table_group_to_structured_text(
+            [
+                "항목 | 모델A | 모델B",
+                "X축 범위 | 10mm | 20mm",
+                "정밀도 | 0.1mm | 0.2mm",
+            ]
+        )
+
+        vertical_sentences = [item for item in row_sentences if item.layout == "vertical_header"]
+        self.assertEqual(len(vertical_sentences), 2)
+        self.assertTrue(any("모델A X축 범위: 10mm" in item.text for item in vertical_sentences))
+        self.assertTrue(any("모델B 정밀도: 0.2mm" in item.text for item in vertical_sentences))
+        self.assertTrue(any("r1c2" in item.cell_refs for item in vertical_sentences))
 
     def test_table_row_sentence_chunks_are_merged(self):
         segments = [
@@ -174,6 +191,8 @@ class SentenceChunkerTests(unittest.TestCase):
                 chunk_type="table_row_sentence",
                 text=f"col_1: row_{idx} / col_2: {idx}",
                 raw_text="table_a",
+                table_cell_refs=f"r{idx}c1,r{idx}c2",
+                table_layout="horizontal_header",
             )
             for idx in range(1, 8)
         ]
@@ -196,6 +215,8 @@ class SentenceChunkerTests(unittest.TestCase):
         self.assertIn("row_1", chunks[0].content)
         self.assertIn("row_3", chunks[0].content)
         self.assertIn("\n", chunks[0].content)
+        self.assertIn("r1c1", chunks[0].table_cell_refs)
+        self.assertEqual(chunks[0].table_layout, "horizontal_header")
 
     def test_table_row_sentence_chunks_are_capped_per_table(self):
         segments = [

@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
-from ..core.document_summary import parse_document_types
+from ..core.document_summary import (
+    classify_document_types,
+    parse_document_types,
+    serialize_document_types,
+)
 from ..core.dedup.policies import resolve_policy, search_penalty_for_non_primary
 from ..core.dedup.service import compute_document_hashes
 from ..core.pipeline import EMBEDDING_BACKEND, process_document, model
@@ -400,6 +404,7 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
         document_map = {item.id: item for item in docs}
 
     output = []
+    has_doc_type_updates = False
     for result in reranked_hits:
         hit = result["hit"]
         source = hit.get("_source", {})
@@ -420,6 +425,25 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
         source_doc_types = parse_document_types(source.get("document_types"))
         db_doc_types = parse_document_types(db_doc.document_types if db_doc else "")
         document_types = source_doc_types or db_doc_types
+        if not document_types:
+            type_hint_text = "\n".join(
+                part
+                for part in (
+                    _clean_display_text(source.get("content") or ""),
+                    title,
+                    doc_summary,
+                    _clean_display_text(source.get("filename") or ""),
+                )
+                if part
+            )
+            inferred_types = classify_document_types(
+                filename=source.get("filename") or (db_doc.filename if db_doc else ""),
+                content_text=type_hint_text,
+            )
+            document_types = inferred_types
+            if db_doc and inferred_types and not db_doc_types:
+                db_doc.document_types = serialize_document_types(inferred_types)
+                has_doc_type_updates = True
         if not doc_summary:
             doc_summary = result["summary"]
 
@@ -441,6 +465,9 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
             "score": result["rerank_score"],
             "raw_score": result["raw_score"],
         })
+
+    if has_doc_type_updates:
+        db.commit()
     return output
 
 

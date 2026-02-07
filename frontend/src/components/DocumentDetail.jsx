@@ -6,6 +6,7 @@ const DOCUMENT_TYPE_LABELS = {
     catalog: '카탈로그',
     manual: '설명서',
     datasheet: '데이터시트',
+    unclassified: '미분류',
 };
 
 function normalizeDocumentTypes(value) {
@@ -40,6 +41,7 @@ const DocumentDetail = ({ result }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const documentTypes = normalizeDocumentTypes(result?.document_types || docDetails?.document_types);
+    const visibleDocumentTypes = documentTypes.length ? documentTypes : ['unclassified'];
 
     useEffect(() => {
         if (!result) return;
@@ -121,21 +123,17 @@ const DocumentDetail = ({ result }) => {
 
                         <div className="grid gap-2">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document Type</span>
-                            {documentTypes.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                    {documentTypes.map((type) => (
-                                        <span
-                                            key={type}
-                                            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary"
-                                        >
-                                            <Tag className="h-3 w-3" />
-                                            {toTypeLabel(type)}
-                                        </span>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-xs text-muted-foreground">분류 정보가 없습니다.</p>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {visibleDocumentTypes.map((type) => (
+                                    <span
+                                        key={type}
+                                        className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted px-2 py-1 text-xs text-foreground"
+                                    >
+                                        <Tag className="h-3 w-3" />
+                                        {toTypeLabel(type)}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="grid gap-1">

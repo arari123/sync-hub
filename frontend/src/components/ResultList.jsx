@@ -6,6 +6,7 @@ const DOCUMENT_TYPE_LABELS = {
     catalog: '카탈로그',
     manual: '설명서',
     datasheet: '데이터시트',
+    unclassified: '미분류',
 };
 
 function formatScore(score) {
@@ -63,6 +64,7 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                 const summaryText = result.summary || '요약 정보가 아직 생성되지 않았습니다.';
                 const pageText = typeof result.page === 'number' ? `p.${result.page}` : 'p.-';
                 const documentTypes = normalizeDocumentTypes(result.document_types);
+                const visibleDocumentTypes = documentTypes.length ? documentTypes : ['unclassified'];
 
                 return (
                     <div
@@ -94,10 +96,10 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                         <div className="space-y-2 text-sm text-foreground/80">
                             <p className="line-clamp-2">{summaryText}</p>
                             <div className="flex flex-wrap items-center gap-2 pt-1">
-                                {documentTypes.map((type) => (
+                                {visibleDocumentTypes.map((type) => (
                                     <span
                                         key={`${result.doc_id}-${type}`}
-                                        className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] text-primary"
+                                        className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted px-2 py-1 text-[11px] text-foreground"
                                     >
                                         <Tag className="h-3 w-3" />
                                         {toTypeLabel(type)}

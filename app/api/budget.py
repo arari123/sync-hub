@@ -614,6 +614,8 @@ def list_projects(
     min_total: Optional[float] = Query(default=None),
     max_total: Optional[float] = Query(default=None),
     sort_by: Optional[str] = Query(default=_DEFAULT_PROJECT_SORT, max_length=32),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -661,7 +663,17 @@ def list_projects(
         ):
             continue
         visible_projects.append(payload)
-    return _sort_project_payloads(visible_projects, sort_by=normalized_sort)
+    sorted_projects = _sort_project_payloads(visible_projects, sort_by=normalized_sort)
+    total = len(sorted_projects)
+    start = (page - 1) * page_size
+    end = start + page_size
+    items = sorted_projects[start:end]
+    return {
+        "items": items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+    }
 
 
 @router.get("/projects/search")

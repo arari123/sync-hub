@@ -7,6 +7,16 @@ import DocumentDetail from '../components/DocumentDetail';
 import { api, getErrorMessage } from '../lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+function extractItems(payload) {
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+    if (Array.isArray(payload?.items)) {
+        return payload.items;
+    }
+    return [];
+}
+
 function tokenizeQuery(query) {
     return String(query || '')
         .toLowerCase()
@@ -95,7 +105,7 @@ const SearchResults = () => {
             try {
                 const [docResult, projectResult] = await Promise.allSettled([
                     api.get('/documents/search', {
-                        params: { q: query, limit: 10 },
+                        params: { q: query, page: 1, page_size: 10 },
                         signal: controller.signal,
                     }),
                     api.get('/budget/projects/search', {
@@ -109,7 +119,7 @@ const SearchResults = () => {
                 }
 
                 if (!active) return;
-                const docData = Array.isArray(docResult.value?.data) ? docResult.value.data : [];
+                const docData = extractItems(docResult.value?.data);
                 let projectData =
                     projectResult.status === 'fulfilled' && Array.isArray(projectResult.value?.data)
                         ? projectResult.value.data
@@ -118,9 +128,10 @@ const SearchResults = () => {
                 if (projectResult.status !== 'fulfilled') {
                     try {
                         const fallbackResp = await api.get('/budget/projects', {
+                            params: { page: 1, page_size: 200 },
                             signal: controller.signal,
                         });
-                        projectData = searchProjectsLocally(fallbackResp.data, query, 8);
+                        projectData = searchProjectsLocally(extractItems(fallbackResp.data), query, 8);
                     } catch (_fallbackErr) {
                         projectData = [];
                     }

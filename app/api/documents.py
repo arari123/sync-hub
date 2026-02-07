@@ -447,13 +447,29 @@ async def upload_document(
     return {"id": db_doc.id, "status": "pending"}
 
 @router.get("/search")
-def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
+def search_documents(
+    q: str,
+    page: int = 1,
+    page_size: int = 10,
+    limit: int | None = None,
+    db: Session = Depends(get_db),
+):
     query = (q or "").strip()
+    page = max(1, int(page or 1))
+    if limit is not None:
+        page_size = int(limit)
+    page_size = max(1, min(int(page_size or 10), 20))
     if not query:
-        return []
+        return {
+            "items": [],
+            "page": page,
+            "page_size": page_size,
+            "total": 0,
+        }
 
-    limit = max(1, min(limit, 20))
-    candidate_limit = max(limit * SEARCH_CANDIDATE_MULTIPLIER, SEARCH_CANDIDATE_MIN)
+    end_index = page * page_size
+    start_index = max(0, (page - 1) * page_size)
+    candidate_limit = max(end_index * SEARCH_CANDIDATE_MULTIPLIER, SEARCH_CANDIDATE_MIN)
 
     # 1. Generate query vector (disabled when fallback embedder is active).
     query_vector = []
@@ -467,11 +483,13 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
     
     hits = results.get("hits", {}).get("hits", [])
     reranked_hits = _rerank_hits(hits, query)
-    reranked_hits = _apply_cluster_diversity(reranked_hits, limit=limit)
+    reranked_hits = _apply_cluster_diversity(reranked_hits, limit=end_index)
+    total = len(reranked_hits)
+    paged_hits = reranked_hits[start_index:end_index]
 
     doc_ids = {
         result.get("hit", {}).get("_source", {}).get("doc_id")
-        for result in reranked_hits
+        for result in paged_hits
     }
     doc_ids = {doc_id for doc_id in doc_ids if isinstance(doc_id, int)}
     document_map = {}
@@ -481,7 +499,7 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
 
     output = []
     has_doc_type_updates = False
-    for result in reranked_hits:
+    for result in paged_hits:
         hit = result["hit"]
         source = hit.get("_source", {})
         doc_id = source.get("doc_id")
@@ -546,7 +564,12 @@ def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
 
     if has_doc_type_updates:
         db.commit()
-    return output
+    return {
+        "items": output,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+    }
 
 
 @router.get("/{doc_id}/download")

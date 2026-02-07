@@ -19,7 +19,7 @@
   - `docs/repo-map.md`, `docs/ai-system-context.md` 링크/재개 기준 최신화
 
 ## 다음 세션 우선 작업
-1. 프로젝트/문서 목록 pagination 표준화 [대기]
+1. 프로젝트/문서 목록 pagination 표준화 [완료]
 - 대상: `GET /budget/projects`, `GET /documents/search`
 - 목표: `page`, `page_size`, `total` 형태의 공통 응답 규격 수립
 
@@ -32,7 +32,7 @@
 - 목표: 토큰 미사용 하드코딩 색상/크기 남발 방지 체크리스트/자동 점검 규칙 추가
 
 ## 체크리스트
-- [ ] 1) 프로젝트/문서 목록 pagination 표준화
+- [x] 1) 프로젝트/문서 목록 pagination 표준화
 - [ ] 2) 검색 품질 E2E 스모크 자동화
 - [ ] 3) 디자인 토큰/컴포넌트 규칙 lint 가이드화
 
@@ -62,4 +62,13 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 세션 재개 기준 문서를 `docs/session-handover-2026-02-08.md`로 분리
   - 검증:
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 64 tests ... OK`)
+    - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (우선작업 1 완료)
+  - pagination 표준화 구현:
+    - `GET /budget/projects` 응답을 `{ items, page, page_size, total }`로 통일
+    - `GET /documents/search` 응답을 `{ items, page, page_size, total }`로 통일 (`limit`은 호환 파라미터로 유지)
+  - 프론트 호환 보강:
+    - `BudgetManagement`, `SearchResults`에서 배열/페이지네이션 응답 모두 파싱 가능하도록 보강
+  - 검증:
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
     - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과

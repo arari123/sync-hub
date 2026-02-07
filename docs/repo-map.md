@@ -63,7 +63,8 @@
 - API Health: `http://localhost:8001/health`
 - API Health Detail: `http://localhost:8001/health/detail`
 - API Search: `http://localhost:8001/documents/search?q=...&limit=...`
-  - 반환 필드: `score`, `raw_score`, `summary`, `snippet`, `evidence`, `match_points`, `page`, `chunk_id`, `chunk_type`, `dedup_status`, `dedup_primary_doc_id`, `dedup_cluster_id`
+  - 응답 형식: `{ items, page, page_size, total }`
+  - `items[]` 반환 필드: `score`, `raw_score`, `summary`, `snippet`, `evidence`, `match_points`, `page`, `chunk_id`, `chunk_type`, `dedup_status`, `dedup_primary_doc_id`, `dedup_cluster_id`
 - Admin Search Debug: `http://localhost:8001/api/admin/search_debug?q=...&limit=...`
   - 반환 필드: `request_id`, `vector_topk`, `bm25_topk`, `fused_topk`, `search_mode`
 - Admin Dedup: `http://localhost:8001/api/admin/dedup/clusters`

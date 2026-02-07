@@ -20,6 +20,8 @@ class Document(Base):
     file_path = Column(String)
     status = Column(String, default="pending")  # pending, processing, completed, failed
     content_text = Column(String, nullable=True)
+    ai_title = Column(String, nullable=True)
+    ai_summary_short = Column(String, nullable=True)
     created_at = Column(String)
 
     file_sha256 = Column(String(64), nullable=True, index=True)

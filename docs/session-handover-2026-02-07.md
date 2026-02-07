@@ -249,6 +249,21 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
     - 원인: `react-router-dom`, `clsx`, `tailwind-merge` 의존성 누락으로 Vite import resolve 실패.
     - 조치: 프론트 의존성 동기화 + dev 서버 재시작.
     - 확인: `GET /src/App.jsx`, `GET /src/pages/SearchResults.jsx` 모두 `200`.
+- 2026-02-07 (세션 재개-6)
+  - 문서 전체 요약 메타 추가:
+    - `documents` 테이블에 `ai_title`, `ai_summary_short` 컬럼 추가(런타임 스키마 보정 포함).
+    - 문서 처리 파이프라인 완료 시 문서 전체 텍스트 기준 요약 생성 후 저장.
+    - 기본은 추출형 요약, 옵션으로 로컬 LLM(Ollama API) 사용 가능(`DOC_SUMMARY_USE_LOCAL_LLM=true`).
+  - 검색 응답/색인 확장:
+    - 색인 문서에 `ai_title`, `ai_summary_short` 저장.
+    - `/documents/search` 응답에서 문서 카드용 제목/요약을 우선 노출.
+    - `page` 필드는 기존대로 포함되어 매칭 페이지 표시 가능.
+  - 다운로드 경로 추가:
+    - `GET /documents/{doc_id}/download` 추가.
+    - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.
+  - 프론트 검색 결과 UI 정리:
+    - 카드 표시를 `제목 + 파일명 + 문서요약 + 매칭 페이지` 중심으로 변경.
+    - 우측 상세 패널에 PDF 다운로드 버튼 추가.
   - 메인 페이지 업로드 기능 강화(디자인 톤 유지):
     - `frontend/src/pages/Home.jsx`에서 검색창 바로 아래 `UploadWidget`을 전면 배치.
     - 기존 스타일(카드/타이포/애니메이션 계열) 유지.

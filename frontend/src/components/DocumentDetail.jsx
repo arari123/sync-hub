@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { api, getErrorMessage } from '../lib/api';
-import { Loader2, File } from 'lucide-react';
+import { api, API_BASE_URL, getErrorMessage } from '../lib/api';
+import { Loader2, File, Download } from 'lucide-react';
 
 const DocumentDetail = ({ result }) => {
     const [docDetails, setDocDetails] = useState(null);
@@ -54,14 +54,25 @@ const DocumentDetail = ({ result }) => {
                 ) : (
                     <div className="space-y-4 text-sm">
                         <div className="grid grid-cols-1 gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Title</span>
+                            <p className="font-semibold break-all">{result.title || result.filename}</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filename</span>
                             <p className="font-medium break-all">{result.filename}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="grid gap-1">
                                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</span>
                                 <p className="font-mono text-xs bg-muted p-1 rounded w-fit">{result.doc_id}</p>
+                            </div>
+                            <div className="grid gap-1">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Matched Page</span>
+                                <p className="font-mono text-xs bg-muted p-1 rounded w-fit">
+                                    {typeof result.page === 'number' ? `p.${result.page}` : '-'}
+                                </p>
                             </div>
                             <div className="grid gap-1">
                                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
@@ -70,10 +81,27 @@ const DocumentDetail = ({ result }) => {
                         </div>
 
                         <div className="grid gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Document Summary</span>
+                            <p className="text-sm leading-relaxed">{result.summary || '요약 정보가 없습니다.'}</p>
+                        </div>
+
+                        <div className="grid gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">File Path</span>
                             <p className="text-xs font-mono text-muted-foreground bg-muted p-2 rounded break-all">
                                 {docDetails?.file_path || 'Not available'}
                             </p>
+                        </div>
+
+                        <div className="pt-1">
+                            <a
+                                href={`${API_BASE_URL}/documents/${result.doc_id}/download`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                                PDF 다운로드
+                            </a>
                         </div>
 
                         {result.match_points && result.match_points.length > 0 && (

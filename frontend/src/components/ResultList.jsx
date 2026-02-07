@@ -1,7 +1,6 @@
 import React from 'react';
-import { renderHighlightedText } from '../lib/highlight';
 import { cn } from '../lib/utils';
-import { FileText } from 'lucide-react';
+import { FileText, FileSearch, Hash } from 'lucide-react';
 
 function formatScore(score) {
     if (typeof score !== 'number') return '-';
@@ -27,10 +26,9 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
         <div className="space-y-4">
             {results.map((result) => {
                 const isActive = selectedResult?.doc_id === result.doc_id;
-                const summaryText = result.summary || '';
-                const snippetText = result.snippet || 'No snippet available.';
-                const showSnippet = !summaryText || summaryText !== snippetText;
-                const evidenceList = Array.isArray(result.evidence) ? result.evidence : [];
+                const titleText = result.title || result.filename || 'Untitled document';
+                const summaryText = result.summary || '요약 정보가 아직 생성되지 않았습니다.';
+                const pageText = typeof result.page === 'number' ? `p.${result.page}` : 'p.-';
 
                 return (
                     <div
@@ -48,34 +46,29 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-lg leading-tight text-primary hover:underline">
-                                        {result.filename}
+                                        {titleText}
                                     </h3>
-                                    <span className="text-xs text-muted-foreground">ID: {result.doc_id}</span>
+                                    <span className="text-xs text-muted-foreground break-all">{result.filename}</span>
                                 </div>
                             </div>
-                            <div className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
-                                Score: {formatScore(result.score)}
+                            <div className="flex flex-col gap-1 items-end">
+                                <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">{pageText}</span>
+                                <span className="text-[11px] font-mono text-muted-foreground/80">score {formatScore(result.score)}</span>
                             </div>
                         </div>
 
                         <div className="space-y-2 text-sm text-foreground/80">
-                            {summaryText && (
-                                <p className="line-clamp-3">{renderHighlightedText(summaryText, query)}</p>
-                            )}
-
-                            {showSnippet && (
-                                <p className="text-muted-foreground text-xs italic">{renderHighlightedText(snippetText, query)}</p>
-                            )}
-
-                            {evidenceList.length > 0 && (
-                                <ul className="mt-2 space-y-1 pl-4 border-l-2 border-primary/20">
-                                    {evidenceList.slice(0, 2).map((sentence, index) => (
-                                        <li key={index} className="text-xs text-muted-foreground">
-                                            {renderHighlightedText(sentence, query)}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                            <p className="line-clamp-2">{summaryText}</p>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                                    <FileSearch className="h-3 w-3" />
+                                    검색어: {query || '-'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                                    <Hash className="h-3 w-3" />
+                                    문서 ID: {result.doc_id}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 );

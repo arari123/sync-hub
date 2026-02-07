@@ -46,6 +46,9 @@
   - 필요 시 `npm run verify` 통과
 - OCR 측정 샘플/기록 기준:
   - `docs/ocr-test-rules.md`
+- 문서 요약 메타(검색 카드용) 옵션:
+  - 기본: 추출형 요약(`DOC_SUMMARY_ENABLED=true`)
+  - 로컬 LLM 사용 시: `DOC_SUMMARY_USE_LOCAL_LLM=true`, `DOC_SUMMARY_OLLAMA_URL`, `DOC_SUMMARY_OLLAMA_MODEL` 설정
 - 프론트엔드 검색 장애 점검 순서:
   1. `VITE_API_URL`이 현재 API 포트와 일치하는지 확인
   2. `/health/detail`, `/documents/search`를 `curl`로 직접 확인

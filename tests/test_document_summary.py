@@ -1,0 +1,78 @@
+import json
+import unittest
+from unittest.mock import patch
+
+from app.core import document_summary
+
+
+class _DummyHttpResponse:
+    def __init__(self, payload: str):
+        self._payload = payload.encode("utf-8")
+
+    def read(self):
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class DocumentSummaryTests(unittest.TestCase):
+    def test_extractive_summary_uses_whole_document_body(self):
+        text = (
+            "반도체 공정 관리 보고서\n"
+            "본 문서는 공정별 측정 기준과 허용 편차를 정리한다. "
+            "라인별 샘플링 규칙과 이상치 대응 절차를 포함한다. "
+            "최종적으로 검사 자동화 적용 범위를 제안한다."
+        )
+
+        title, summary = document_summary.build_document_summary(
+            filename="report.pdf",
+            content_text=text,
+        )
+
+        self.assertIn("반도체 공정 관리 보고서", title)
+        self.assertIn("본 문서는 공정별 측정 기준과 허용 편차를 정리한다.", summary)
+        self.assertLessEqual(len(summary), document_summary.DOC_SUMMARY_SHORT_MAX_CHARS)
+
+    def test_summary_disabled_returns_filename_title_only(self):
+        original_enabled = document_summary.DOC_SUMMARY_ENABLED
+        try:
+            document_summary.DOC_SUMMARY_ENABLED = False
+            title, summary = document_summary.build_document_summary(
+                filename="AS_161723_SAMPLE.pdf",
+                content_text="임의 텍스트",
+            )
+            self.assertIn("AS 161723 SAMPLE", title)
+            self.assertEqual(summary, "")
+        finally:
+            document_summary.DOC_SUMMARY_ENABLED = original_enabled
+
+    def test_local_llm_summary_is_used_when_available(self):
+        original_enabled = document_summary.DOC_SUMMARY_ENABLED
+        original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
+        original_url = document_summary.DOC_SUMMARY_OLLAMA_URL
+        original_model = document_summary.DOC_SUMMARY_OLLAMA_MODEL
+        try:
+            document_summary.DOC_SUMMARY_ENABLED = True
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = True
+            document_summary.DOC_SUMMARY_OLLAMA_URL = "http://localhost:11434/api/generate"
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = "llama3.1"
+
+            envelope = {"response": json.dumps({"title": "LLM 제목", "summary": "LLM 요약 문장입니다."})}
+            with patch("urllib.request.urlopen", return_value=_DummyHttpResponse(json.dumps(envelope))):
+                title, summary = document_summary.build_document_summary(
+                    filename="any.pdf",
+                    content_text="긴 본문 텍스트",
+                )
+
+            self.assertEqual(title, "LLM 제목")
+            self.assertEqual(summary, "LLM 요약 문장입니다.")
+        finally:
+            document_summary.DOC_SUMMARY_ENABLED = original_enabled
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
+            document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
+            document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
+

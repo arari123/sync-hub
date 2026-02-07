@@ -27,14 +27,14 @@
 - 대상: 문서 검색 + 프로젝트 검색 동작 시나리오
 - 목표: 주요 질의(`라인 프로파일 센서`, `basler`, 장애조치 키워드) 회귀 자동 검증
 
-3. 디자인 토큰/컴포넌트 규칙 lint 가이드화 [대기]
+3. 디자인 토큰/컴포넌트 규칙 lint 가이드화 [완료]
 - 대상: `frontend/src/index.css`, `frontend/src/components/ui/*`
 - 목표: 토큰 미사용 하드코딩 색상/크기 남발 방지 체크리스트/자동 점검 규칙 추가
 
 ## 체크리스트
 - [x] 1) 프로젝트/문서 목록 pagination 표준화
 - [x] 2) 검색 품질 E2E 스모크 자동화
-- [ ] 3) 디자인 토큰/컴포넌트 규칙 lint 가이드화
+- [x] 3) 디자인 토큰/컴포넌트 규칙 lint 가이드화
 
 ## 다음 세션 바로 실행용 명령
 ```bash
@@ -84,5 +84,18 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
     - `scripts/generate_ocr_quality_report.py`가 페이지네이션 응답(`items`)을 인식하도록 수정
   - 검증:
     - `python3 scripts/search_e2e_smoke.py --api-base http://localhost:8001` 통과
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
+    - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (우선작업 3 완료)
+  - 디자인 토큰 lint 자동화:
+    - 스크립트 추가: `scripts/lint_frontend_design_tokens.py`
+    - 점검 범위: `frontend/src/index.css`, `frontend/src/components/ui/*.jsx`
+    - 실패 조건: 하드코딩 hex/임의 색상 class/인라인 색상 스타일/필수 토큰 누락
+  - 검증 파이프라인 연결:
+    - `scripts/verify_fast.sh`에 디자인 lint 실행 단계 추가
+  - 가이드 문서 갱신:
+    - `docs/ai-design-guide.md`에 자동 점검 규칙/명령 추가
+  - 검증:
+    - `python3 scripts/lint_frontend_design_tokens.py` 통과
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
     - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과

@@ -83,7 +83,20 @@
   3. Docker 기준 빌드 검증
      - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'`
 
-## 11. 연관 문서
+## 11. 자동 점검 규칙
+- 디자인 토큰 lint 스크립트:
+  - `python3 scripts/lint_frontend_design_tokens.py`
+- 점검 대상:
+  - `frontend/src/index.css`
+  - `frontend/src/components/ui/*.jsx`
+- 실패 조건:
+  - UI 컴포넌트의 하드코딩 hex 색상
+  - 임의 색상 class(`bg-[...]`, `text-[...]` 등) 남용
+  - 인라인 color/background/borderColor 스타일
+  - `index.css`의 필수 토큰/루트 변수 누락
+- `verify:fast`에는 위 lint가 기본 포함되어야 한다.
+
+## 12. 연관 문서
 - `docs/ai-system-context.md`
 - `docs/ai-frontend-guide.md`
 - `docs/repo-map.md`

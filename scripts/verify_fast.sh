@@ -45,5 +45,8 @@ if failed:
 print(f"Syntax check passed for {len(files)} files.")
 PY
 
+echo "Running frontend design-token lint..."
+python3 scripts/lint_frontend_design_tokens.py
+
 echo "Running unit tests..."
 python3 -m unittest discover -s tests -p 'test_*.py' -v

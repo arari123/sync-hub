@@ -3,20 +3,8 @@ import { Link } from 'react-router-dom';
 import { Plus, ArrowRight } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
-
-const PROJECT_TYPE_OPTIONS = [
-    { value: 'equipment', label: '설비' },
-    { value: 'parts', label: '파츠' },
-    { value: 'as', label: 'AS' },
-];
-
-const PROJECT_STAGE_OPTIONS = [
-    { value: 'review', label: '검토' },
-    { value: 'fabrication', label: '제작' },
-    { value: 'installation', label: '설치' },
-    { value: 'warranty', label: '워런티' },
-    { value: 'closure', label: '종료' },
-];
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 
 const PROJECT_SORT_OPTIONS = [
     { value: 'updated_desc', label: '업데이트 내림차순' },
@@ -78,19 +66,9 @@ function buildProjectFilterParams(filters) {
 }
 
 function stageBadgeClass(stage) {
-    if (stage === 'fabrication' || stage === 'progress') {
-        return 'border-amber-200 bg-amber-50 text-amber-700';
-    }
-    if (stage === 'installation') {
-        return 'border-sky-200 bg-sky-50 text-sky-700';
-    }
-    if (stage === 'warranty') {
-        return 'border-teal-200 bg-teal-50 text-teal-700';
-    }
-    if (stage === 'closure') {
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    }
-    return 'border-blue-200 bg-blue-50 text-blue-700';
+    const base = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors uppercase tracking-wider';
+    // Simplified to use a uniform slate theme for all stages as requested
+    return `${base} border-slate-200 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`;
 }
 
 function toggleMultiValue(list, value) {
@@ -156,10 +134,6 @@ const BudgetManagement = () => {
         setAppliedFilters({ ...draftFilters });
     };
 
-    const selectedCustomer = customerOptions.find(
-        (name) => name.toLowerCase() === String(draftFilters.customerName || '').trim().toLowerCase()
-    );
-
     const resetFilters = () => {
         setDraftFilters(emptyFilters);
         setAppliedFilters(emptyFilters);
@@ -192,267 +166,255 @@ const BudgetManagement = () => {
     );
 
     return (
-        <div className="space-y-6">
-            <BudgetBreadcrumb items={[{ label: '프로젝트 관리' }]} />
-
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <section className="rounded-xl border bg-card p-4 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h1 className="text-xl font-bold">프로젝트 관리</h1>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                전체 프로젝트의 진행 현황과 예산 상태를 통합 모니터링하고 프로젝트 상세 화면으로 이동할 수 있습니다.
-                            </p>
-                        </div>
-                        <Link
-                            to="/project-management/projects/new"
-                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-accent"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
+        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <BudgetBreadcrumb items={[{ label: '프로젝트 관리' }]} />
+                    <h1 className="text-3xl font-bold tracking-tight mt-2">프로젝트 관리</h1>
+                    <p className="text-muted-foreground mt-1">실행 예산 통합 모니터링 및 프로젝트 진행 현황</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Link to="/project-management/projects/new">
+                        <Button className="gap-2">
+                            <Plus size={18} />
                             프로젝트 생성
-                        </Link>
-                    </div>
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                        전체 프로젝트 {summary.projectCount}개 · 검토 {summary.reviewCount}개 · 제작 {summary.fabricationCount}개 · 설치 {summary.installationCount}개 · 워런티 {summary.warrantyCount}개 · 종료 {summary.closureCount}개
-                    </p>
-                </section>
-
-                <section className="rounded-xl border bg-card p-4 shadow-sm">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h2 className="text-xs font-semibold">필터</h2>
-                        <div className="flex gap-2">
-                            <button
-                                type="submit"
-                                form="budget-filter-form"
-                                className="inline-flex h-6 items-center justify-center rounded-md bg-primary px-2 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90"
-                            >
-                                적용
-                            </button>
-                            <button
-                                type="button"
-                                onClick={resetFilters}
-                                className="inline-flex h-6 items-center justify-center rounded-md border border-input bg-background px-2 text-[10px] hover:bg-accent"
-                            >
-                                초기화
-                            </button>
-                        </div>
-                    </div>
-                    <form id="budget-filter-form" className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" onSubmit={applyFilters}>
-                        <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="프로젝트 이름"
-                            value={draftFilters.projectName}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectName: event.target.value }))}
-                        />
-                        <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="프로젝트 코드"
-                            value={draftFilters.projectCode}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectCode: event.target.value }))}
-                        />
-                        <input
-                            list="budget-customer-options"
-                            className={`h-6 w-full rounded-md border px-2 text-[10px] ${
-                                selectedCustomer
-                                    ? 'border-primary/70 bg-primary/5 ring-1 ring-primary/30'
-                                    : 'border-input bg-background'
-                            }`}
-                            placeholder="고객사"
-                            value={draftFilters.customerName}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
-                        />
-                        <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="담당자"
-                            value={draftFilters.managerName}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, managerName: event.target.value }))}
-                        />
-                        <select
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            value={draftFilters.sortBy}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, sortBy: event.target.value }))}
-                        >
-                            {PROJECT_SORT_OPTIONS.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="sm:col-span-2 lg:col-span-3 xl:col-span-2">
-                            <p className="mb-1 text-[10px] text-muted-foreground">프로젝트 종류(복수 선택)</p>
-                            <div className="flex flex-wrap gap-1">
-                                {PROJECT_TYPE_OPTIONS.map((item) => {
-                                    const selected = draftFilters.projectTypes.includes(item.value);
-                                    return (
-                                        <button
-                                            key={item.value}
-                                            type="button"
-                                            onClick={() =>
-                                                setDraftFilters((prev) => ({
-                                                    ...prev,
-                                                    projectTypes: toggleMultiValue(prev.projectTypes, item.value),
-                                                }))
-                                            }
-                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] ${
-                                                selected
-                                                    ? 'border-primary/60 bg-primary/10 text-primary'
-                                                    : 'border-input bg-background text-foreground'
-                                            }`}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                        <div className="sm:col-span-2 lg:col-span-3 xl:col-span-2">
-                            <p className="mb-1 text-[10px] text-muted-foreground">프로젝트 상태(복수 선택)</p>
-                            <div className="flex flex-wrap gap-1">
-                                {PROJECT_STAGE_OPTIONS.map((item) => {
-                                    const selected = draftFilters.stages.includes(item.value);
-                                    return (
-                                        <button
-                                            key={item.value}
-                                            type="button"
-                                            onClick={() =>
-                                                setDraftFilters((prev) => ({
-                                                    ...prev,
-                                                    stages: toggleMultiValue(prev.stages, item.value),
-                                                }))
-                                            }
-                                            className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] ${
-                                                selected
-                                                    ? 'border-primary/60 bg-primary/10 text-primary'
-                                                    : 'border-input bg-background text-foreground'
-                                            }`}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </form>
-                    <datalist id="budget-customer-options">
-                        {customerOptions.map((name) => (
-                            <option key={name} value={name} />
-                        ))}
-                    </datalist>
-                </section>
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
+            {/* Summary Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <SummaryCard
+                    label="전체"
+                    count={summary.projectCount}
+                    color="indigo"
+                    isActive={appliedFilters.stages.length === 0}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: [] }))}
+                />
+                <SummaryCard
+                    label="검토"
+                    count={summary.reviewCount}
+                    color="slate"
+                    isActive={appliedFilters.stages.includes('review')}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: toggleMultiValue(p.stages, 'review') }))}
+                />
+                <SummaryCard
+                    label="제작"
+                    count={summary.fabricationCount}
+                    color="orange"
+                    isActive={appliedFilters.stages.includes('fabrication')}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: toggleMultiValue(p.stages, 'fabrication') }))}
+                />
+                <SummaryCard
+                    label="설치"
+                    count={summary.installationCount}
+                    color="blue"
+                    isActive={appliedFilters.stages.includes('installation')}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: toggleMultiValue(p.stages, 'installation') }))}
+                />
+                <SummaryCard
+                    label="워런티"
+                    count={summary.warrantyCount}
+                    color="violet"
+                    isActive={appliedFilters.stages.includes('warranty')}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: toggleMultiValue(p.stages, 'warranty') }))}
+                />
+                <SummaryCard
+                    label="종료"
+                    count={summary.closureCount}
+                    color="emerald"
+                    isActive={appliedFilters.stages.includes('closure')}
+                    onClick={() => setAppliedFilters(p => ({ ...p, stages: toggleMultiValue(p.stages, 'closure') }))}
+                />
+            </div>
+
+            {/* Filter Section */}
+            <section className="bg-card border rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">상세 필터</h2>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={resetFilters}>초기화</Button>
+                        <Button size="sm" type="submit" form="budget-filter-form" className="h-8 text-xs px-3">필터 적용</Button>
+                    </div>
+                </div>
+                <form id="budget-filter-form" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" onSubmit={applyFilters}>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">프로젝트 명</label>
+                        <input
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            placeholder="이름 입력"
+                            value={draftFilters.projectName}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, projectName: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">프로젝트 코드</label>
+                        <input
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            placeholder="코드 입력"
+                            value={draftFilters.projectCode}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, projectCode: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">고객사</label>
+                        <input
+                            list="budget-customer-options"
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            placeholder="고객사 선택/입력"
+                            value={draftFilters.customerName}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, customerName: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">정렬 기준</label>
+                        <select
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none"
+                            value={draftFilters.sortBy}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, sortBy: e.target.value }))}
+                        >
+                            {PROJECT_SORT_OPTIONS.map((item) => (
+                                <option key={item.value} value={item.value}>{item.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-muted-foreground/80 px-1">담당자</label>
+                        <input
+                            className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            placeholder="성함 입력"
+                            value={draftFilters.managerName}
+                            onChange={(e) => setDraftFilters(p => ({ ...p, managerName: e.target.value }))}
+                        />
+                    </div>
+                </form>
+            </section>
+
+            {/* Error Message */}
             {error && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
                     {error}
                 </div>
             )}
 
-            <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">프로젝트 모니터링</h2>
+            {/* Project List */}
+            <section className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold">프로젝트 모니터링</h2>
+                    <span className="text-sm text-muted-foreground">총 {projects.length}개 검색됨</span>
+                </div>
+
                 {isLoading ? (
-                    <p className="text-sm text-muted-foreground">불러오는 중...</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map(i => <div key={i} className="h-48 rounded-2xl bg-muted animate-pulse" />)}
+                    </div>
                 ) : projects.length === 0 ? (
-                    <div className="rounded-md border border-dashed px-4 py-8 text-center">
-                        <p className="text-sm text-muted-foreground">등록된 프로젝트가 없습니다.</p>
-                        <Link
-                            to="/project-management/projects/new"
-                            className="mt-3 inline-flex h-9 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            첫 프로젝트 생성하기
+                    <div className="rounded-2xl border border-dashed p-12 text-center bg-card">
+                        <p className="text-muted-foreground mb-4">등록된 프로젝트가 없습니다.</p>
+                        <Link to="/project-management/projects/new">
+                            <Button variant="outline">프로젝트 생성하기</Button>
                         </Link>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                        {projects.map((project) => {
-                            const confirmedBudget = Number(project?.monitoring?.confirmed_budget_total ?? project?.totals?.grand_total ?? 0);
-                            const actualSpentRaw = project?.monitoring?.actual_spent_total;
-                            const hasActual = actualSpentRaw !== null && actualSpentRaw !== undefined;
-                            const actualSpent = hasActual ? Number(actualSpentRaw) : 0;
-                            const variance = hasActual
-                                ? Number(project?.monitoring?.variance_total ?? confirmedBudget - actualSpent)
-                                : null;
-                            const showExecutionPanel = project?.current_stage !== 'review';
-
-                            return (
-                                <article
-                                    key={project.id}
-                                    className={`rounded-xl border p-4 ${
-                                        project?.is_mine
-                                            ? 'border-primary/40 bg-primary/5'
-                                            : 'bg-muted/10'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <p className="truncate text-sm font-semibold">{project.name}</p>
-                                                {project?.is_mine && (
-                                                    <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                                        내 프로젝트
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">종류: {project.project_type_label || '-'}</p>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">담당자: {project.manager_name || '담당자 미지정'}</p>
-                                        </div>
-                                        <div className="flex shrink-0 items-center gap-1.5">
-                                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
-                                                {project.current_stage_label}
-                                            </span>
-                                            <Link
-                                                to={`/project-management/projects/${project.id}`}
-                                                className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
-                                            >
-                                                상세
-                                                <ArrowRight className="h-3 w-3" />
-                                            </Link>
-                                            {!project.can_edit && (
-                                                <span className="inline-flex h-6 items-center rounded-md border border-border px-2 text-[11px] text-muted-foreground">
-                                                    읽기전용
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                        <AmountCell label="재료비" value={formatAmount(project.totals?.material_total)} />
-                                        <AmountCell label="인건비" value={formatAmount(project.totals?.labor_total)} />
-                                        <AmountCell label="경비" value={formatAmount(project.totals?.expense_total)} />
-                                        <AmountCell label="총 예산" value={formatAmount(project.totals?.grand_total)} strong />
-                                    </div>
-
-                                    <div className="my-3 border-t" />
-
-                                    {showExecutionPanel ? (
-                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                            <AmountCell label="확정 예산" value={formatAmount(confirmedBudget)} />
-                                            <AmountCell label="집행 금액" value={hasActual ? formatAmount(actualSpent) : '-'} />
-                                            <AmountCell label="차액" value={hasActual ? formatAmount(variance) : '-'} strong={hasActual} />
-                                        </div>
-                                    ) : null}
-
-                                    {showExecutionPanel && !hasActual && (
-                                        <p className="mt-2 text-[11px] text-muted-foreground">
-                                            집행 금액 연동 전: 현재는 확정 예산 기준으로 모니터링 구조만 제공됩니다.
-                                        </p>
-                                    )}
-                                </article>
-                            );
-                        })}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {projects.map((project) => (
+                            <ProjectCard key={project.id} project={project} />
+                        ))}
                     </div>
                 )}
             </section>
+            <datalist id="budget-customer-options">
+                {customerOptions.map((name) => (
+                    <option key={name} value={name} />
+                ))}
+            </datalist>
         </div>
     );
 };
 
-const AmountCell = ({ label, value, strong = false }) => (
-    <div className={`rounded-md border px-2 py-2 ${strong ? 'border-primary/30 bg-primary/5' : 'bg-background'}`}>
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-xs ${strong ? 'font-bold' : 'font-semibold'}`}>{value}</p>
-    </div>
-);
+const SummaryCard = ({ label, count, color, isActive, onClick }) => {
+    // Standardized to Slate-based theme for all cards as requested
+    const containerClasses = isActive
+        ? 'bg-slate-700 text-white border-slate-700 shadow-md shadow-slate-200'
+        : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-200';
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                "p-3 rounded-xl border text-left transition-all duration-200",
+                containerClasses
+            )}
+        >
+            <p className={cn("text-[10px] font-bold uppercase tracking-tight mb-0.5", isActive ? "text-white/80" : "text-muted-foreground")}>{label}</p>
+            <p className="text-xl font-extrabold tracking-tighter">{count}</p>
+        </button>
+    );
+};
+
+const ProjectCard = ({ project }) => {
+    const confirmedBudget = Number(project?.monitoring?.confirmed_budget_total ?? project?.totals?.grand_total ?? 0);
+    const actualSpent = Number(project?.monitoring?.actual_spent_total ?? 0);
+    const progress = confirmedBudget > 0 ? Math.min((actualSpent / confirmedBudget) * 100, 100) : 0;
+
+    return (
+        <article className="group bg-card border rounded-2xl p-5 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 flex flex-col h-full">
+            <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-base truncate group-hover:text-primary transition-colors">{project.name}</h3>
+                        {project?.is_mine && <span className="w-1.5 h-1.5 rounded-full bg-primary" title="내 프로젝트" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground font-mono">#{project.code || 'NO-CODE'}</p>
+                </div>
+                <span className={stageBadgeClass(project.current_stage)}>
+                    {project.current_stage_label}
+                </span>
+            </div>
+
+            <div className="space-y-4 mb-6 flex-1">
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-secondary/30 p-2 rounded-lg">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">담당자</p>
+                        <p className="text-xs font-semibold">{project.manager_name || '미지정'}</p>
+                    </div>
+                    <div className="bg-secondary/30 p-2 rounded-lg">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">고객사</p>
+                        <p className="text-xs font-semibold truncate">{project.customer_name || '-'}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-muted-foreground">집행률</span>
+                        <span className={progress > 90 ? 'text-destructive' : 'text-primary'}>{progress.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                            className={`h-full transition-all duration-500 ${progress > 90 ? 'bg-destructive' : 'bg-primary'}`}
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-end">
+                    <div>
+                        <p className="text-[10px] text-muted-foreground font-medium">총 실행 예산</p>
+                        <p className="text-sm font-bold">{formatAmount(confirmedBudget)}</p>
+                    </div>
+                    <Link to={`/project-management/projects/${project.id}`}>
+                        <Button size="sm" variant="ghost" className="h-8 text-[11px] gap-1 hover:bg-primary/10 hover:text-primary">
+                            상세보기 <ArrowRight size={12} />
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        </article>
+    );
+};
 
 export default BudgetManagement;

@@ -11,6 +11,7 @@ import BudgetProjectEditor from './pages/BudgetProjectEditor';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
+import PlaceholderPage from './pages/PlaceholderPage';
 import './App.css';
 
 function LegacyBudgetManagementRedirect() {
@@ -34,6 +35,8 @@ function App() {
           <Route path="/project-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/budget" element={<ProtectedRoute><BudgetProjectBudget /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
+          <Route path="/knowledge" element={<ProtectedRoute><PlaceholderPage title="지식 베이스" description="지식 베이스 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><PlaceholderPage title="설정" description="설정 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/budget-management/*" element={<LegacyBudgetManagementRedirect />} />
         </Routes>
       </Layout>

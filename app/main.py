@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -14,11 +15,23 @@ from .api import admin_debug, admin_dedup, auth, budget, documents
 models.Base.metadata.create_all(bind=engine)
 ensure_runtime_schema()
 
+def _parse_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000")
+    origins: list[str] = []
+    for item in raw.split(","):
+        origin = item.strip()
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins or ["http://localhost:8000", "http://127.0.0.1:8000"]
+
+
+cors_origins = _parse_cors_origins()
+
 app = FastAPI(title="Sync-Hub API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials="*" not in cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -75,14 +75,19 @@ const SearchResults = () => {
     const [selectedResult, setSelectedResult] = useState(null);
 
     useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
+
         const fetchResults = async () => {
             if (!query.trim()) {
+                if (!active) return;
                 setResults([]);
                 setProjectResults([]);
                 setSelectedResult(null);
                 return;
             }
 
+            if (!active) return;
             setIsLoading(true);
             setError('');
             setSelectedResult(null);
@@ -91,9 +96,11 @@ const SearchResults = () => {
                 const [docResult, projectResult] = await Promise.allSettled([
                     api.get('/documents/search', {
                         params: { q: query, limit: 10 },
+                        signal: controller.signal,
                     }),
                     api.get('/budget/projects/search', {
                         params: { q: query, limit: 8 },
+                        signal: controller.signal,
                     }),
                 ]);
 
@@ -101,6 +108,7 @@ const SearchResults = () => {
                     throw docResult.reason;
                 }
 
+                if (!active) return;
                 const docData = Array.isArray(docResult.value?.data) ? docResult.value.data : [];
                 let projectData =
                     projectResult.status === 'fulfilled' && Array.isArray(projectResult.value?.data)
@@ -109,24 +117,36 @@ const SearchResults = () => {
 
                 if (projectResult.status !== 'fulfilled') {
                     try {
-                        const fallbackResp = await api.get('/budget/projects');
+                        const fallbackResp = await api.get('/budget/projects', {
+                            signal: controller.signal,
+                        });
                         projectData = searchProjectsLocally(fallbackResp.data, query, 8);
                     } catch (_fallbackErr) {
                         projectData = [];
                     }
                 }
+                if (!active) return;
                 setResults(docData);
                 setProjectResults(projectData);
             } catch (err) {
+                if (!active || err?.code === 'ERR_CANCELED') {
+                    return;
+                }
                 setResults([]);
                 setProjectResults([]);
                 setError(getErrorMessage(err, '검색 요청을 처리하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.'));
             } finally {
+                if (!active) return;
                 setIsLoading(false);
             }
         };
 
         fetchResults();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
     }, [query]);
 
     return (

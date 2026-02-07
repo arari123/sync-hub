@@ -9,17 +9,6 @@ function formatAmount(value) {
     return `${number.toLocaleString('ko-KR')}원`;
 }
 
-function normalizeNumericFilter(value) {
-    return String(value || '').replace(/,/g, '').trim();
-}
-
-function formatNumericFilterInput(value) {
-    const digitsOnly = String(value || '').replace(/[^\d]/g, '');
-    if (!digitsOnly) return '';
-    const normalized = digitsOnly.replace(/^0+(?=\d)/, '');
-    return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
 function extractCustomerOptions(projectList) {
     const options = new Set();
     for (const project of Array.isArray(projectList) ? projectList : []) {
@@ -49,22 +38,12 @@ function buildProjectFilterParams(filters) {
     const params = {};
     const projectName = (filters.projectName || '').trim();
     const projectCode = (filters.projectCode || '').trim();
-    const minTotal = normalizeNumericFilter(filters.minTotal);
-    const maxTotal = normalizeNumericFilter(filters.maxTotal);
     const customerName = (filters.customerName || '').trim();
     const authorName = (filters.authorName || '').trim();
     const projectType = (filters.projectType || '').trim();
 
     if (projectName) params.project_name = projectName;
     if (projectCode) params.project_code = projectCode;
-    if (minTotal !== '') {
-        const value = Number(minTotal);
-        if (Number.isFinite(value)) params.min_total = value;
-    }
-    if (maxTotal !== '') {
-        const value = Number(maxTotal);
-        if (Number.isFinite(value)) params.max_total = value;
-    }
     if (customerName) params.customer_name = customerName;
     if (authorName) params.author_name = authorName;
     if (projectType) params.project_type = projectType;
@@ -85,8 +64,6 @@ const BudgetManagement = () => {
     const emptyFilters = {
         projectName: '',
         projectCode: '',
-        minTotal: '',
-        maxTotal: '',
         customerName: '',
         authorName: '',
         projectType: '',
@@ -134,16 +111,6 @@ const BudgetManagement = () => {
     const applyFilters = (event) => {
         event.preventDefault();
         setAppliedFilters({ ...draftFilters });
-    };
-
-    const handleMinTotalChange = (event) => {
-        const value = formatNumericFilterInput(event.target.value);
-        setDraftFilters((prev) => ({ ...prev, minTotal: value }));
-    };
-
-    const handleMaxTotalChange = (event) => {
-        const value = formatNumericFilterInput(event.target.value);
-        setDraftFilters((prev) => ({ ...prev, maxTotal: value }));
     };
 
     const selectedCustomer = customerOptions.find(
@@ -233,18 +200,6 @@ const BudgetManagement = () => {
                             placeholder="프로젝트 코드"
                             value={draftFilters.projectCode}
                             onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectCode: event.target.value }))}
-                        />
-                        <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="최소 금액(원)"
-                            value={draftFilters.minTotal}
-                            onChange={handleMinTotalChange}
-                        />
-                        <input
-                            className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="최대 금액(원)"
-                            value={draftFilters.maxTotal}
-                            onChange={handleMaxTotalChange}
                         />
                         <input
                             list="budget-customer-options"

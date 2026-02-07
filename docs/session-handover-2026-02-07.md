@@ -290,6 +290,13 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 검증:
     - `docker exec synchub_frontend npm run build` 통과
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
+- 2026-02-07 (세션 재개-10)
+  - 업로드 버튼 가시성 개선:
+    - `frontend/src/components/UploadWidget.jsx`에 명시적 버튼(`Select PDF File`) 추가.
+    - 드롭존 배경/테두리 대비 강화(`border-border`, `bg-card/80`, hover/drag 상태 강조).
+  - 검증:
+    - `docker exec synchub_frontend npm run build` 통과
+    - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
   - 다운로드 경로 추가:
     - `GET /documents/{doc_id}/download` 추가.
     - 확인: 존재하지 않는 문서 ID 요청 시 `404 {"detail":"Document not found"}`.

@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle2, CircleDashed, FileWarning, FileSearch } from 'lucide-react';
 import { api, getErrorMessage, POLLING_INTERVAL_MS } from '../lib/api';
 import { cn } from '../lib/utils';
+import { Button } from './ui/Button';
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
@@ -125,16 +126,27 @@ const UploadWidget = () => {
 
             <div
                 className={cn(
-                    "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/50 hover:bg-muted",
-                    isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                    "border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-card/80 hover:border-primary/40 hover:bg-accent/40",
+                    isDragOver ? "border-primary bg-primary/10" : "border-border"
                 )}
                 onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                 onDragLeave={() => setIsDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
             >
-                <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground font-medium">Drag PDF here or click to upload</p>
+                <UploadCloud className="h-8 w-8 text-primary mb-2" />
+                <p className="text-sm text-foreground font-medium">Drag PDF here or click the button below</p>
+                <Button
+                    type="button"
+                    size="sm"
+                    className="mt-3 shadow-sm"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                    }}
+                >
+                    Select PDF File
+                </Button>
                 <input ref={fileInputRef} type="file" accept=".pdf" hidden onChange={(e) => uploadFile(e.target.files?.[0])} />
             </div>
 

@@ -4,6 +4,7 @@ from app.core.budget_logic import (
     aggregate_equipment_costs_from_detail,
     normalize_stage,
     parse_detail_payload,
+    summarize_executed_costs_from_detail,
     stage_label,
     summarize_costs,
 )
@@ -112,6 +113,27 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(item["material_install_cost"], 5000)
         self.assertEqual(item["labor_install_cost"], 480000)
         self.assertEqual(item["expense_fab_cost"], 120000)
+
+    def test_summarize_executed_costs_from_detail(self):
+        payload = {
+            "material_items": [
+                {"executed_amount": 1500, "phase": "fabrication"},
+                {"executed_amount": 2500, "phase": "installation"},
+            ],
+            "labor_items": [
+                {"executed_amount": 3000, "phase": "fabrication"},
+            ],
+            "expense_items": [
+                {"executed_amount": 1200, "phase": "installation"},
+            ],
+        }
+        summary = summarize_executed_costs_from_detail(payload)
+        self.assertEqual(summary["material_executed_total"], 4000)
+        self.assertEqual(summary["labor_executed_total"], 3000)
+        self.assertEqual(summary["expense_executed_total"], 1200)
+        self.assertEqual(summary["fab_executed_total"], 4500)
+        self.assertEqual(summary["install_executed_total"], 3700)
+        self.assertEqual(summary["grand_executed_total"], 8200)
 
 
 if __name__ == "__main__":

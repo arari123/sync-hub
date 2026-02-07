@@ -1,8 +1,26 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2, Plus, Save } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, Navigate, useParams } from 'react-router-dom';
+import { BarChart3, CheckCircle2, ClipboardPaste, Package, Save, Users, Wallet } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
+import BudgetSidebar from '../components/BudgetSidebar';
+import { cn } from '../lib/utils';
+
+const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
+
+function isRowEmpty(row, section) {
+    if (!row) return true;
+    if (section === 'material') {
+        const hasValue = row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.executed_amount || row.memo;
+        return !hasValue;
+    }
+    if (section === 'labor') {
+        const hasValue = row.equipment_name || row.task_name || row.worker_type || row.quantity || row.hourly_rate || row.executed_amount || row.memo;
+        return !hasValue;
+    }
+    const hasValue = row.equipment_name || row.expense_name || row.basis || row.amount || row.executed_amount || row.memo;
+    return !hasValue;
+}
 
 const SECTION_META = {
     material: { label: '재료비', key: 'material_items' },
@@ -15,7 +33,7 @@ function toNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
-function buildEmptyRow(section) {
+function buildEmptyRow(section, phase = 'fabrication') {
     if (section === 'material') {
         return {
             equipment_name: '',
@@ -24,7 +42,8 @@ function buildEmptyRow(section) {
             spec: '',
             quantity: 0,
             unit_price: 0,
-            phase: 'fabrication',
+            executed_amount: 0,
+            phase: phase || 'fabrication',
             memo: '',
         };
     }
@@ -36,7 +55,8 @@ function buildEmptyRow(section) {
             unit: 'H',
             quantity: 0,
             hourly_rate: 0,
-            phase: 'fabrication',
+            executed_amount: 0,
+            phase: phase || 'fabrication',
             memo: '',
         };
     }
@@ -45,18 +65,39 @@ function buildEmptyRow(section) {
         expense_name: '',
         basis: '',
         amount: 0,
-        phase: 'fabrication',
+        executed_amount: 0,
+        phase: phase || 'fabrication',
         memo: '',
     };
 }
 
-function formatAmount(value) {
-    const number = Number(value || 0);
-    return `${number.toLocaleString('ko-KR')}원`;
+function injectBuffers(detailsObj) {
+    const result = { ...detailsObj };
+    Object.keys(SECTION_META).forEach((key) => {
+        const listKey = SECTION_META[key].key;
+        const existing = (result[listKey] || []).map((row) => ({
+            ...row,
+            phase: row.phase || 'fabrication',
+            executed_amount: toNumber(row.executed_amount),
+        }));
+
+        const fabCount = existing.filter((row) => row.phase === 'fabrication').length;
+        const instCount = existing.filter((row) => row.phase === 'installation').length;
+
+        const fabBuffer = Array.from({ length: Math.max(0, 50 - fabCount) }).map(() => buildEmptyRow(key, 'fabrication'));
+        const instBuffer = Array.from({ length: Math.max(0, 50 - instCount) }).map(() => buildEmptyRow(key, 'installation'));
+        result[listKey] = [...existing, ...fabBuffer, ...instBuffer];
+    });
+    return result;
+}
+
+function calcBudgetAmount(row, section) {
+    if (section === 'material') return toNumber(row.quantity) * toNumber(row.unit_price);
+    if (section === 'labor') return toNumber(row.quantity) * toNumber(row.hourly_rate);
+    return toNumber(row.amount);
 }
 
 const BudgetProjectEditor = () => {
-    const navigate = useNavigate();
     const { projectId, section = 'material' } = useParams();
 
     if (!SECTION_META[section]) {
@@ -65,21 +106,134 @@ const BudgetProjectEditor = () => {
 
     const [project, setProject] = useState(null);
     const [version, setVersion] = useState(null);
-    const [details, setDetails] = useState({
+    const [details, setDetails] = useState(() => injectBuffers({
         material_items: [],
         labor_items: [],
         expense_items: [],
-    });
+    }));
     const [totals, setTotals] = useState(null);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [currentPhase, setCurrentPhase] = useState('fabrication');
+    const [budgetEditMode, setBudgetEditMode] = useState(false);
 
     const rows = details[SECTION_META[section].key] || [];
     const canEditProject = project?.can_edit !== false;
     const isConfirmed = version?.status === 'confirmed';
-    const isReadonly = isConfirmed || !canEditProject;
+    const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
+    const isExecutionStage = EXECUTION_STAGES.has(currentStage);
+    const canEditExecutionFields = canEditProject && isExecutionStage;
+    const canEditBudgetFields = canEditProject && !isConfirmed && (!isExecutionStage || budgetEditMode);
+    const canSave = canEditBudgetFields || canEditExecutionFields;
+
+    const aggregationModeLabel = isExecutionStage && !budgetEditMode ? '집행금액' : '예산';
+    const entryModeLabel = isExecutionStage && !budgetEditMode ? '집행금액 입력 모드' : '예산 입력 모드';
+
+    useEffect(() => {
+        setBudgetEditMode(false);
+    }, [projectId, section, currentStage]);
+
+    const aggregation = useMemo(() => {
+        const result = { total: 0, equipments: [] };
+        const eqMap = {};
+
+        rows.forEach((row) => {
+            const amount = isExecutionStage && !budgetEditMode
+                ? toNumber(row.executed_amount)
+                : calcBudgetAmount(row, section);
+
+            result.total += amount;
+
+            const eqName = (row.equipment_name || '미지정 설비').trim() || '미지정 설비';
+            const unitName = section === 'material'
+                ? ((row.unit_name || '미지정 유닛').trim() || '미지정 유닛')
+                : ((row.phase || 'fabrication') === 'installation' ? '설치' : '제작');
+
+            if (!eqMap[eqName]) {
+                eqMap[eqName] = { name: eqName, total: 0, units: {}, unitOrder: [] };
+                result.equipments.push(eqMap[eqName]);
+            }
+            eqMap[eqName].total += amount;
+
+            if (!eqMap[eqName].units[unitName]) {
+                eqMap[eqName].units[unitName] = { name: unitName, total: 0 };
+                eqMap[eqName].unitOrder.push(eqMap[eqName].units[unitName]);
+            }
+            eqMap[eqName].units[unitName].total += amount;
+        });
+
+        result.equipments.forEach((eq) => {
+            eq.units = eq.unitOrder;
+        });
+
+        return result;
+    }, [rows, section, isExecutionStage, budgetEditMode]);
+
+    const displayRows = useMemo(() => {
+        return rows
+            .map((row, index) => ({ ...row, originalIndex: index }))
+            .filter((row) => (row.phase || 'fabrication') === currentPhase);
+    }, [rows, currentPhase]);
+
+    const materialColumns = useMemo(() => {
+        const base = [
+            { key: 'equipment_name', label: '설비', width: 'w-32', editScope: 'budget' },
+            { key: 'unit_name', label: '유닛', width: 'w-32', editScope: 'budget' },
+            { key: 'part_name', label: '부품명', width: 'w-40', editScope: 'budget' },
+            { key: 'spec', label: '규격/모델명', width: 'w-48', editScope: 'budget' },
+            { key: 'quantity', label: '수량', width: 'w-24', type: 'number', editScope: 'budget' },
+            { key: 'unit_price', label: '단가', width: 'w-32', type: 'number', editScope: 'budget' },
+        ];
+
+        if (isExecutionStage) {
+            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
+        }
+
+        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
+        return base;
+    }, [isExecutionStage]);
+
+    const laborColumns = useMemo(() => {
+        const base = [
+            { key: 'equipment_name', label: '설비', width: 'w-32', editScope: 'budget' },
+            { key: 'task_name', label: '작업명', width: 'w-40', editScope: 'budget' },
+            { key: 'worker_type', label: '직군', width: 'w-32', editScope: 'budget' },
+            { key: 'unit', label: '단위', width: 'w-20', editScope: 'budget' },
+            { key: 'quantity', label: '수량', width: 'w-24', type: 'number', editScope: 'budget' },
+            { key: 'hourly_rate', label: '단가', width: 'w-32', type: 'number', editScope: 'budget' },
+        ];
+
+        if (isExecutionStage) {
+            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
+        }
+
+        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
+        return base;
+    }, [isExecutionStage]);
+
+    const expenseColumns = useMemo(() => {
+        const base = [
+            { key: 'equipment_name', label: '설비', width: 'w-40', editScope: 'budget' },
+            { key: 'expense_name', label: '경비 항목', width: 'w-48', editScope: 'budget' },
+            { key: 'basis', label: '산정 기준', width: 'w-48', editScope: 'budget' },
+            { key: 'amount', label: '예산금액', width: 'w-32', type: 'number', editScope: 'budget' },
+        ];
+
+        if (isExecutionStage) {
+            base.push({ key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number', editScope: 'execution' });
+        }
+
+        base.push({ key: 'memo', label: '비고', width: 'w-48', editScope: isExecutionStage ? 'execution' : 'budget' });
+        return base;
+    }, [isExecutionStage]);
+
+    const canEditColumn = (column) => {
+        if (!canEditProject) return false;
+        if ((column.editScope || 'budget') === 'execution') return canEditExecutionFields;
+        return canEditBudgetFields;
+    };
 
     const load = async () => {
         if (!projectId) return;
@@ -98,7 +252,9 @@ const BudgetProjectEditor = () => {
             setVersion(currentVersion || null);
 
             const detailResp = await api.get(`/budget/versions/${currentVersion.id}/details`);
-            setDetails(detailResp?.data?.details || { material_items: [], labor_items: [], expense_items: [] });
+            const loadedDetails = detailResp?.data?.details || { material_items: [], labor_items: [], expense_items: [] };
+
+            setDetails(injectBuffers(loadedDetails));
             setTotals(detailResp?.data?.totals || null);
         } catch (err) {
             setError(getErrorMessage(err, '예산 상세 데이터를 불러오지 못했습니다.'));
@@ -112,31 +268,94 @@ const BudgetProjectEditor = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
-    const stageTabs = useMemo(
-        () => Object.entries(SECTION_META).map(([key, value]) => ({ key, ...value })),
-        []
-    );
+    const handlePaste = (event) => {
+        if (!canEditBudgetFields) return;
+
+        event.preventDefault();
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedData = clipboardData.getData('text');
+        const pasteRows = pastedData.split(/\r\n|\n/).filter((line) => line.trim() !== '');
+
+        const newItems = pasteRows.map((rowText) => {
+            const cols = rowText.split('\t');
+            if (section === 'material') {
+                return {
+                    equipment_name: cols[0] || '',
+                    unit_name: cols[1] || '',
+                    part_name: cols[2] || '',
+                    spec: cols[3] || '',
+                    quantity: toNumber(cols[4]),
+                    unit_price: toNumber(cols[5]),
+                    phase: (cols[6] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                    memo: cols[7] || '',
+                    executed_amount: toNumber(cols[8]),
+                };
+            }
+            if (section === 'labor') {
+                return {
+                    equipment_name: cols[0] || '',
+                    task_name: cols[1] || '',
+                    worker_type: cols[2] || '',
+                    unit: cols[3] || 'H',
+                    quantity: toNumber(cols[4]),
+                    hourly_rate: toNumber(cols[5]),
+                    phase: (cols[6] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                    memo: cols[7] || '',
+                    executed_amount: toNumber(cols[8]),
+                };
+            }
+            return {
+                equipment_name: cols[0] || '',
+                expense_name: cols[1] || '',
+                basis: cols[2] || '',
+                amount: toNumber(cols[3]),
+                phase: (cols[4] || '제작').includes('설치') ? 'installation' : 'fabrication',
+                memo: cols[5] || '',
+                executed_amount: toNumber(cols[6]),
+            };
+        });
+
+        const targetKey = SECTION_META[section].key;
+        setDetails((prev) => {
+            const currentPhaseExisting = (prev[targetKey] || []).filter((row) => row.phase === currentPhase && !isRowEmpty(row, section));
+            const otherPhaseExisting = (prev[targetKey] || []).filter((row) => row.phase !== currentPhase);
+            const combinedList = [...currentPhaseExisting, ...newItems, ...otherPhaseExisting];
+
+            return injectBuffers({
+                ...prev,
+                [targetKey]: combinedList,
+            });
+        });
+    };
 
     const updateRow = (index, key, value) => {
         const targetKey = SECTION_META[section].key;
-        setDetails((prev) => ({
-            ...prev,
-            [targetKey]: (prev[targetKey] || []).map((row, rowIndex) => {
-                if (rowIndex !== index) return row;
-                if (['quantity', 'unit_price', 'hourly_rate', 'amount'].includes(key)) {
-                    return { ...row, [key]: toNumber(value) };
-                }
-                return { ...row, [key]: value };
-            }),
-        }));
-    };
+        setDetails((prev) => {
+            const newList = [...(prev[targetKey] || [])];
+            const row = { ...newList[index] };
 
-    const addRow = () => {
-        const targetKey = SECTION_META[section].key;
-        setDetails((prev) => ({
-            ...prev,
-            [targetKey]: [...(prev[targetKey] || []), buildEmptyRow(section)],
-        }));
+            if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount'].includes(key)) {
+                row[key] = toNumber(value);
+            } else if (key === 'unit') {
+                row[key] = String(value || '').toUpperCase();
+            } else {
+                row[key] = value;
+            }
+            newList[index] = row;
+
+            const filteredIndices = [];
+            newList.forEach((item, itemIndex) => {
+                if ((item.phase || 'fabrication') === currentPhase) filteredIndices.push(itemIndex);
+            });
+
+            const positionInDisplay = filteredIndices.indexOf(index);
+            if (positionInDisplay >= filteredIndices.length - 3) {
+                const buffer = Array.from({ length: 20 }).map(() => buildEmptyRow(section, currentPhase));
+                newList.push(...buffer);
+            }
+
+            return { ...prev, [targetKey]: newList };
+        });
     };
 
     const removeRow = (index) => {
@@ -148,12 +367,20 @@ const BudgetProjectEditor = () => {
     };
 
     const saveDetail = async () => {
-        if (!version?.id) return;
+        if (!version?.id || !canSave) return;
+
         setIsSaving(true);
         setError('');
         try {
-            const response = await api.put(`/budget/versions/${version.id}/details`, details);
-            setDetails(response?.data?.details || details);
+            const cleanDetails = {};
+            Object.keys(SECTION_META).forEach((key) => {
+                const listKey = SECTION_META[key].key;
+                cleanDetails[listKey] = (details[listKey] || []).filter((row) => !isRowEmpty(row, key));
+            });
+
+            const response = await api.put(`/budget/versions/${version.id}/details`, cleanDetails);
+            const savedDetails = response?.data?.details || cleanDetails;
+            setDetails(injectBuffers(savedDetails));
             setTotals(response?.data?.totals || totals);
             setVersion(response?.data?.version || version);
         } catch (err) {
@@ -165,6 +392,7 @@ const BudgetProjectEditor = () => {
 
     const confirmCurrentVersion = async () => {
         if (!version?.id) return;
+
         setIsConfirming(true);
         setError('');
         try {
@@ -177,295 +405,397 @@ const BudgetProjectEditor = () => {
         }
     };
 
-    const createRevision = async () => {
-        if (!version?.id) return;
-        const reason = window.prompt('리비전 사유를 입력해 주세요.');
-        if (!reason || !reason.trim()) return;
+    const createRevision = async (reasonInput = null) => {
+        if (!version?.id) return null;
+
+        const reason = (reasonInput ?? window.prompt('리비전 사유를 입력해 주세요.'));
+        if (!reason || !String(reason).trim()) return null;
+
         setError('');
         try {
             const response = await api.post(`/budget/versions/${version.id}/revision`, {
-                change_reason: reason.trim(),
+                change_reason: String(reason).trim(),
             });
             const nextVersion = response?.data?.version;
-            if (!nextVersion?.id) return;
+            if (!nextVersion?.id) return null;
+
             setVersion(nextVersion);
             const detailResp = await api.get(`/budget/versions/${nextVersion.id}/details`);
-            setDetails(detailResp?.data?.details || details);
+            setDetails(injectBuffers(detailResp?.data?.details || details));
             setTotals(detailResp?.data?.totals || totals);
+            return nextVersion;
         } catch (err) {
             setError(getErrorMessage(err, '리비전 생성에 실패했습니다.'));
+            return null;
+        }
+    };
+
+    const toggleBudgetEditMode = async () => {
+        if (!isExecutionStage || !canEditProject) return;
+
+        if (budgetEditMode) {
+            setBudgetEditMode(false);
+            return;
+        }
+
+        if (isConfirmed) {
+            const reason = window.prompt('확정 버전입니다. 예산 변경을 위해 리비전을 생성합니다. 변경 사유를 입력해 주세요.');
+            if (!reason || !String(reason).trim()) return;
+            const nextVersion = await createRevision(String(reason).trim());
+            if (!nextVersion) return;
+        }
+
+        setBudgetEditMode(true);
+    };
+
+    const handleScroll = (event) => {
+        const { scrollTop, scrollHeight, clientHeight } = event.target;
+        if (scrollHeight - scrollTop <= clientHeight + 100) {
+            const targetKey = SECTION_META[section].key;
+            setDetails((prev) => {
+                const buffer = Array.from({ length: 50 }).map(() => buildEmptyRow(section, currentPhase));
+                return {
+                    ...prev,
+                    [targetKey]: [...(prev[targetKey] || []), ...buffer],
+                };
+            });
         }
     };
 
     if (isLoading) {
-        return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
+        return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
     }
 
     return (
-        <div className="space-y-5">
-            <BudgetBreadcrumb
-                items={[
-                    { label: '프로젝트 관리', to: '/project-management' },
-                    { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
-                    { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
-                    { label: `${SECTION_META[section].label} 입력` },
-                ]}
-            />
+        <div className="flex h-screen border-t border-slate-200 overflow-hidden" onPaste={handlePaste}>
+            <BudgetSidebar aggregation={aggregation} modeLabel={aggregationModeLabel} />
 
-            <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs text-muted-foreground">프로젝트 예산 입력</p>
-                        <h1 className="text-2xl font-bold">{project?.name || '프로젝트'}</h1>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            버전 v{version?.version_no || 0}
-                            {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} · 상태: {version?.status || '-'}
-                        </p>
+            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0" onScroll={handleScroll}>
+                <div className="flex-none">
+                    <div className="flex items-center justify-between mb-2">
+                        <BudgetBreadcrumb
+                            items={[
+                                { label: '프로젝트 관리', to: '/project-management' },
+                                { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
+                                { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
+                                { label: `${SECTION_META[section].label} 입력` },
+                            ]}
+                        />
+                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
+                            <NavLink
+                                to={`/project-management/projects/${projectId}/budget`}
+                                className={({ isActive }) => cn(
+                                    'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                    isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                )}
+                            >
+                                <BarChart3 size={12} />
+                                모니터링
+                            </NavLink>
+                            <div className="w-px h-3 bg-slate-300 mx-1" />
+                            {Object.keys(SECTION_META).map((key) => (
+                                <NavLink
+                                    key={key}
+                                    to={`/project-management/projects/${projectId}/edit/${key}`}
+                                    className={({ isActive }) => cn(
+                                        'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                        isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                    )}
+                                >
+                                    {key === 'material' ? <Package size={12} /> : key === 'labor' ? <Users size={12} /> : <Wallet size={12} />}
+                                    {SECTION_META[key].label}
+                                </NavLink>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link
-                            to={`/project-management/projects/${projectId}/budget`}
-                            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
-                        >
-                            예산 관리로
-                        </Link>
-                        {canEditProject && !isConfirmed && (
-                            <button
-                                type="button"
-                                onClick={saveDetail}
-                                disabled={isSaving}
-                                className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-                            >
-                                <Save className="h-3.5 w-3.5" />
-                                {isSaving ? '저장 중...' : '저장'}
-                            </button>
-                        )}
-                        {canEditProject && !isConfirmed && (
-                            <button
-                                type="button"
-                                onClick={confirmCurrentVersion}
-                                disabled={isConfirming}
-                                className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent disabled:opacity-60"
-                            >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                {isConfirming ? '확정 중...' : '버전 확정'}
-                            </button>
-                        )}
-                        {canEditProject && isConfirmed && (
-                            <button
-                                type="button"
-                                onClick={createRevision}
-                                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
-                            >
-                                리비전 생성
-                            </button>
-                        )}
-                        {!canEditProject && (
-                            <span className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs text-muted-foreground">
-                                읽기 전용(수정 권한 없음)
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </section>
 
-            {error && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    {error}
-                </div>
-            )}
-
-            <section className="rounded-xl border bg-card p-5 shadow-sm">
-                <div className="mb-4 flex flex-wrap gap-2">
-                    {stageTabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            type="button"
-                            onClick={() => navigate(`/project-management/projects/${projectId}/edit/${tab.key}`)}
-                            className={`inline-flex h-9 items-center justify-center rounded-md px-3 text-sm ${
-                                section === tab.key
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'border border-input bg-background hover:bg-accent'
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                    <section className="rounded-2xl border bg-card p-4 shadow-sm mt-1">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Budget Entry</p>
+                                <h1 className="text-2xl font-black tracking-tight text-slate-900">{project?.name || '프로젝트'}</h1>
+                                <p className="mt-1 text-xs font-bold text-slate-500">
+                                    버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
+                                    {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} ·
+                                    상태: <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-black uppercase leading-none">{version?.status || '-'}</span>
+                                    <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 text-[10px] font-black text-blue-700 uppercase leading-none">{entryModeLabel}</span>
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {canSave && (
+                                    <button
+                                        type="button"
+                                        onClick={saveDetail}
+                                        disabled={isSaving}
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
+                                    >
+                                        <Save size={16} />
+                                        {isSaving ? '저장 중...' : '전체 저장'}
+                                    </button>
+                                )}
+                                {canEditProject && !isConfirmed && (
+                                    <button
+                                        type="button"
+                                        onClick={confirmCurrentVersion}
+                                        disabled={isConfirming}
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                                    >
+                                        <CheckCircle2 size={16} />
+                                        {isConfirming ? '확정 중...' : '버전 확정'}
+                                    </button>
+                                )}
+                                {canEditProject && isConfirmed && (
+                                    <button
+                                        type="button"
+                                        onClick={() => createRevision()}
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        리비전 생성
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-base font-semibold">{SECTION_META[section].label} 상세 입력</h2>
-                    {!isReadonly && (
-                        <button
-                            type="button"
-                            onClick={addRow}
-                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-xs hover:bg-accent"
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            행 추가
-                        </button>
-                    )}
+                <div className="flex-1 min-h-0 flex flex-col">
+                    <section className="flex-1 rounded-2xl border bg-card p-4 shadow-sm flex flex-col min-h-0">
+                        <div className="mb-3 flex items-center justify-between flex-none">
+                            <div className="flex items-center gap-6 flex-wrap">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                        'p-2 rounded-lg',
+                                        section === 'material' ? 'bg-blue-50 text-blue-600' :
+                                            section === 'labor' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600',
+                                    )}
+                                    >
+                                        {section === 'material' ? <Package size={20} /> :
+                                            section === 'labor' ? <Users size={20} /> : <Wallet size={20} />}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{entryModeLabel}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                                    <button
+                                        onClick={() => setCurrentPhase('fabrication')}
+                                        className={cn(
+                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                            currentPhase === 'fabrication' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                        )}
+                                    >
+                                        제작비용 제어
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPhase('installation')}
+                                        className={cn(
+                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                            currentPhase === 'installation' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                        )}
+                                    >
+                                        설치비용 제어
+                                    </button>
+                                </div>
+
+                                {isExecutionStage && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleBudgetEditMode}
+                                        className={cn(
+                                            'h-8 rounded-lg px-3 text-[11px] font-black transition-colors border',
+                                            budgetEditMode
+                                                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                                        )}
+                                    >
+                                        {budgetEditMode ? '집행 입력으로 복귀' : '예산 변경'}
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
+                                    <ClipboardPaste size={12} />
+                                    <span>{canEditBudgetFields ? '외부 엑셀 데이터 붙여넣기 가능' : '현재 모드에서는 붙여넣기 비활성화'}</span>
+                                </div>
+                                {canSave && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={saveDetail}
+                                            disabled={isSaving}
+                                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-black text-white shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all disabled:opacity-50"
+                                        >
+                                            {isSaving ? (
+                                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                            ) : (
+                                                <Save size={14} />
+                                            )}
+                                            입력 데이터 저장
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="mb-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs font-medium text-destructive">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative">
+                            {section === 'material' && (
+                                <ExcelTable
+                                    columns={materialColumns}
+                                    rows={displayRows}
+                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
+                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
+                                    canEditColumn={canEditColumn}
+                                    allowRowDelete={canEditBudgetFields}
+                                />
+                            )}
+                            {section === 'labor' && (
+                                <ExcelTable
+                                    columns={laborColumns}
+                                    rows={displayRows}
+                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
+                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
+                                    canEditColumn={canEditColumn}
+                                    allowRowDelete={canEditBudgetFields}
+                                />
+                            )}
+                            {section === 'expense' && (
+                                <ExcelTable
+                                    columns={expenseColumns}
+                                    rows={displayRows}
+                                    onChange={(idx, key, val) => updateRow(displayRows[idx].originalIndex, key, val)}
+                                    onRemove={(idx) => removeRow(displayRows[idx].originalIndex)}
+                                    canEditColumn={canEditColumn}
+                                    allowRowDelete={canEditBudgetFields}
+                                />
+                            )}
+                        </div>
+                    </section>
                 </div>
-
-                {section === 'material' && (
-                    <MaterialTable rows={rows} onChange={updateRow} onRemove={removeRow} readonly={isReadonly} />
-                )}
-                {section === 'labor' && (
-                    <LaborTable rows={rows} onChange={updateRow} onRemove={removeRow} readonly={isReadonly} />
-                )}
-                {section === 'expense' && (
-                    <ExpenseTable rows={rows} onChange={updateRow} onRemove={removeRow} readonly={isReadonly} />
-                )}
-            </section>
-
-            <section className="grid grid-cols-2 gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-4">
-                <SummaryCell label="재료비" value={formatAmount(totals?.material_total)} />
-                <SummaryCell label="인건비" value={formatAmount(totals?.labor_total)} />
-                <SummaryCell label="경비" value={formatAmount(totals?.expense_total)} />
-                <SummaryCell label="총액" value={formatAmount(totals?.grand_total)} strong />
-            </section>
+            </div>
         </div>
     );
 };
 
-const SummaryCell = ({ label, value, strong = false }) => (
-    <div className={`rounded-md border p-3 ${strong ? 'border-primary/30 bg-primary/5' : 'bg-muted/10'}`}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-sm ${strong ? 'font-bold' : 'font-semibold'}`}>{value}</p>
-    </div>
-);
+const ExcelTable = ({ columns, rows, onChange, onRemove, canEditColumn, allowRowDelete }) => {
+    const tableRef = useRef(null);
 
-const Field = ({ value, onChange, placeholder, readonly = false, type = 'text' }) => (
-    <input
-        type={type}
-        className="h-8 w-full rounded border border-input bg-background px-2 text-xs"
-        value={value}
-        placeholder={placeholder}
-        onChange={onChange}
-        disabled={readonly}
-    />
-);
+    const handleKeyDown = (event, rowIndex, colIndex) => {
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) return;
 
-const PhaseSelect = ({ value, onChange, readonly = false }) => (
-    <select
-        className="h-8 w-full rounded border border-input bg-background px-2 text-xs"
-        value={value}
-        onChange={onChange}
-        disabled={readonly}
-    >
-        <option value="fabrication">제작</option>
-        <option value="installation">설치</option>
-    </select>
-);
+        const rowCount = rows.length;
+        const colCount = columns.length;
+        let nextRow = rowIndex;
+        let nextCol = colIndex;
 
-const MaterialTable = ({ rows, onChange, onRemove, readonly }) => (
-    <div className="overflow-x-auto rounded-md border">
-        <table className="min-w-[1180px] w-full text-xs">
-            <thead className="bg-muted/40">
+        if (event.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
+        else if (event.key === 'ArrowDown' || event.key === 'Enter') nextRow = Math.min(rowCount - 1, rowIndex + 1);
+        else if (event.key === 'ArrowLeft') nextCol = Math.max(0, colIndex - 1);
+        else if (event.key === 'ArrowRight') nextCol = Math.min(colCount - 1, colIndex + 1);
+
+        const nextTarget = tableRef.current?.querySelector(`[data-row="${nextRow}"][data-col="${nextCol}"] input, [data-row="${nextRow}"][data-col="${nextCol}"] select`);
+        if (!nextTarget) return;
+
+        event.preventDefault();
+        nextTarget.focus();
+        if (nextTarget.select) nextTarget.select();
+    };
+
+    return (
+        <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
+            <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
                 <tr>
-                    <th className="px-2 py-2 text-left">설비</th>
-                    <th className="px-2 py-2 text-left">유닛</th>
-                    <th className="px-2 py-2 text-left">부품</th>
-                    <th className="px-2 py-2 text-left">규격</th>
-                    <th className="px-2 py-2 text-right">수량</th>
-                    <th className="px-2 py-2 text-right">단가</th>
-                    <th className="px-2 py-2 text-center">구분</th>
-                    <th className="px-2 py-2 text-left">비고</th>
-                    <th className="px-2 py-2 text-center">삭제</th>
+                    {columns.map((col, idx) => (
+                        <th key={idx} className={cn('p-2 text-left font-black text-slate-500 uppercase tracking-tighter border-r border-slate-200 last:border-0', col.width)}>
+                            {col.label}
+                        </th>
+                    ))}
+                    {allowRowDelete && <th className="p-2 w-16 text-center text-slate-500 font-bold border-r-0 uppercase tracking-tighter">삭제</th>}
                 </tr>
             </thead>
             <tbody>
-                {rows.map((row, index) => (
-                    <tr key={`m-${index}`} className="border-t">
-                        <td className="px-2 py-1"><Field value={row.equipment_name || ''} onChange={(e) => onChange(index, 'equipment_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.unit_name || ''} onChange={(e) => onChange(index, 'unit_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.part_name || ''} onChange={(e) => onChange(index, 'part_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.spec || ''} onChange={(e) => onChange(index, 'spec', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field type="number" value={row.quantity ?? 0} onChange={(e) => onChange(index, 'quantity', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field type="number" value={row.unit_price ?? 0} onChange={(e) => onChange(index, 'unit_price', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><PhaseSelect value={row.phase || 'fabrication'} onChange={(e) => onChange(index, 'phase', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.memo || ''} onChange={(e) => onChange(index, 'memo', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1 text-center">
-                            <button type="button" className="rounded border border-input px-2 py-1 text-[11px] disabled:opacity-50" disabled={readonly} onClick={() => onRemove(index)}>삭제</button>
-                        </td>
-                    </tr>
-                ))}
-                {!rows.length && <tr><td colSpan={9} className="px-2 py-6 text-center text-xs text-muted-foreground">재료비 항목이 없습니다.</td></tr>}
-            </tbody>
-        </table>
-    </div>
-);
+                {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-b border-slate-100 hover:bg-slate-50/50 focus-within:bg-blue-50/30 group transition-colors">
+                        {columns.map((col, colIndex) => {
+                            const editable = Boolean(canEditColumn(col));
+                            const rawValue = row[col.key];
+                            const displayValue = col.type === 'number'
+                                ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
+                                : (rawValue || '');
 
-const LaborTable = ({ rows, onChange, onRemove, readonly }) => (
-    <div className="overflow-x-auto rounded-md border">
-        <table className="min-w-[1120px] w-full text-xs">
-            <thead className="bg-muted/40">
-                <tr>
-                    <th className="px-2 py-2 text-left">설비</th>
-                    <th className="px-2 py-2 text-left">작업명</th>
-                    <th className="px-2 py-2 text-left">직군</th>
-                    <th className="px-2 py-2 text-center">단위(H/D/W/M)</th>
-                    <th className="px-2 py-2 text-right">수량</th>
-                    <th className="px-2 py-2 text-right">시간당 단가</th>
-                    <th className="px-2 py-2 text-center">구분</th>
-                    <th className="px-2 py-2 text-left">비고</th>
-                    <th className="px-2 py-2 text-center">삭제</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((row, index) => (
-                    <tr key={`l-${index}`} className="border-t">
-                        <td className="px-2 py-1"><Field value={row.equipment_name || ''} onChange={(e) => onChange(index, 'equipment_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.task_name || ''} onChange={(e) => onChange(index, 'task_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.worker_type || ''} onChange={(e) => onChange(index, 'worker_type', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.unit || 'H'} onChange={(e) => onChange(index, 'unit', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field type="number" value={row.quantity ?? 0} onChange={(e) => onChange(index, 'quantity', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field type="number" value={row.hourly_rate ?? 0} onChange={(e) => onChange(index, 'hourly_rate', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><PhaseSelect value={row.phase || 'fabrication'} onChange={(e) => onChange(index, 'phase', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.memo || ''} onChange={(e) => onChange(index, 'memo', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1 text-center">
-                            <button type="button" className="rounded border border-input px-2 py-1 text-[11px] disabled:opacity-50" disabled={readonly} onClick={() => onRemove(index)}>삭제</button>
-                        </td>
+                            return (
+                                <td key={colIndex} className="p-0 border-r border-slate-100 last:border-0" data-row={rowIndex} data-col={colIndex}>
+                                    {col.type === 'select' ? (
+                                        <select
+                                            className={cn(
+                                                'w-full h-8 px-2 outline-none transition-all appearance-none text-slate-700 font-bold text-[10.5px]',
+                                                editable ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary' : 'bg-slate-50 text-slate-400 cursor-default',
+                                            )}
+                                            value={row[col.key] || 'fabrication'}
+                                            onChange={(event) => {
+                                                if (!editable) return;
+                                                onChange(rowIndex, col.key, event.target.value);
+                                            }}
+                                            onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                            disabled={!editable}
+                                        >
+                                            <option value="fabrication">제작</option>
+                                            <option value="installation">설치</option>
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            className={cn(
+                                                'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
+                                                editable
+                                                    ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
+                                                    : 'bg-slate-50 text-slate-400 cursor-text',
+                                            )}
+                                            value={displayValue}
+                                            onChange={(event) => {
+                                                if (!editable) return;
+                                                let val = event.target.value;
+                                                if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
+                                                onChange(rowIndex, col.key, val);
+                                            }}
+                                            onFocus={(event) => event.target.select()}
+                                            onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                            readOnly={!editable}
+                                        />
+                                    )}
+                                </td>
+                            );
+                        })}
+                        {allowRowDelete && (
+                            <td className="p-0 text-center">
+                                <button
+                                    type="button"
+                                    onClick={() => onRemove(rowIndex)}
+                                    className="p-2 text-slate-300 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all font-black text-[10px] uppercase"
+                                >
+                                    Del
+                                </button>
+                            </td>
+                        )}
                     </tr>
                 ))}
-                {!rows.length && <tr><td colSpan={9} className="px-2 py-6 text-center text-xs text-muted-foreground">인건비 항목이 없습니다.</td></tr>}
-            </tbody>
-        </table>
-    </div>
-);
-
-const ExpenseTable = ({ rows, onChange, onRemove, readonly }) => (
-    <div className="overflow-x-auto rounded-md border">
-        <table className="min-w-[980px] w-full text-xs">
-            <thead className="bg-muted/40">
-                <tr>
-                    <th className="px-2 py-2 text-left">설비</th>
-                    <th className="px-2 py-2 text-left">경비 항목</th>
-                    <th className="px-2 py-2 text-left">산정 기준</th>
-                    <th className="px-2 py-2 text-right">금액</th>
-                    <th className="px-2 py-2 text-center">구분</th>
-                    <th className="px-2 py-2 text-left">비고</th>
-                    <th className="px-2 py-2 text-center">삭제</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((row, index) => (
-                    <tr key={`e-${index}`} className="border-t">
-                        <td className="px-2 py-1"><Field value={row.equipment_name || ''} onChange={(e) => onChange(index, 'equipment_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.expense_name || ''} onChange={(e) => onChange(index, 'expense_name', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.basis || ''} onChange={(e) => onChange(index, 'basis', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field type="number" value={row.amount ?? 0} onChange={(e) => onChange(index, 'amount', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><PhaseSelect value={row.phase || 'fabrication'} onChange={(e) => onChange(index, 'phase', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1"><Field value={row.memo || ''} onChange={(e) => onChange(index, 'memo', e.target.value)} readonly={readonly} /></td>
-                        <td className="px-2 py-1 text-center">
-                            <button type="button" className="rounded border border-input px-2 py-1 text-[11px] disabled:opacity-50" disabled={readonly} onClick={() => onRemove(index)}>삭제</button>
+                {!rows.length && (
+                    <tr>
+                        <td colSpan={columns.length + (allowRowDelete ? 1 : 0)} className="p-12 text-center text-slate-400 font-bold italic bg-white">
+                            입력된 데이터가 없습니다. 검토 단계에서 예산을 입력하거나 제작/설치/AS 단계에서 집행금액을 입력해 주세요.
                         </td>
                     </tr>
-                ))}
-                {!rows.length && <tr><td colSpan={7} className="px-2 py-6 text-center text-xs text-muted-foreground">경비 항목이 없습니다.</td></tr>}
+                )}
             </tbody>
         </table>
-    </div>
-);
+    );
+};
 
 export default BudgetProjectEditor;

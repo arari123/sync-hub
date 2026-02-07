@@ -212,3 +212,62 @@ def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
             target["expense_fab_cost"] += amount
 
     return list(equipment_map.values())
+
+
+def summarize_executed_costs_from_detail(payload: dict) -> dict[str, float]:
+    summary = {
+        "material_fab_executed": 0.0,
+        "material_install_executed": 0.0,
+        "labor_fab_executed": 0.0,
+        "labor_install_executed": 0.0,
+        "expense_fab_executed": 0.0,
+        "expense_install_executed": 0.0,
+    }
+
+    for item in payload.get("material_items", []):
+        amount = to_number(item.get("executed_amount"))
+        phase = normalize_phase(item.get("phase") or "fabrication")
+        if phase == "installation":
+            summary["material_install_executed"] += amount
+        else:
+            summary["material_fab_executed"] += amount
+
+    for item in payload.get("labor_items", []):
+        amount = to_number(item.get("executed_amount"))
+        phase = normalize_phase(item.get("phase") or "fabrication")
+        if phase == "installation":
+            summary["labor_install_executed"] += amount
+        else:
+            summary["labor_fab_executed"] += amount
+
+    for item in payload.get("expense_items", []):
+        amount = to_number(item.get("executed_amount"))
+        phase = normalize_phase(item.get("phase") or "fabrication")
+        if phase == "installation":
+            summary["expense_install_executed"] += amount
+        else:
+            summary["expense_fab_executed"] += amount
+
+    summary["material_executed_total"] = (
+        summary["material_fab_executed"] + summary["material_install_executed"]
+    )
+    summary["labor_executed_total"] = (
+        summary["labor_fab_executed"] + summary["labor_install_executed"]
+    )
+    summary["expense_executed_total"] = (
+        summary["expense_fab_executed"] + summary["expense_install_executed"]
+    )
+    summary["fab_executed_total"] = (
+        summary["material_fab_executed"]
+        + summary["labor_fab_executed"]
+        + summary["expense_fab_executed"]
+    )
+    summary["install_executed_total"] = (
+        summary["material_install_executed"]
+        + summary["labor_install_executed"]
+        + summary["expense_install_executed"]
+    )
+    summary["grand_executed_total"] = (
+        summary["fab_executed_total"] + summary["install_executed_total"]
+    )
+    return summary

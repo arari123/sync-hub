@@ -17,9 +17,11 @@ from ..core.budget_logic import (
     aggregate_equipment_costs_from_detail,
     default_detail_payload,
     detail_payload_to_json,
+    normalize_phase,
     normalize_stage,
     parse_detail_payload,
     stage_label,
+    summarize_executed_costs_from_detail,
     summarize_costs,
     to_number,
 )
@@ -78,6 +80,7 @@ class BudgetProjectUpdate(BaseModel):
     installation_site: Optional[str] = Field(default=None, max_length=180)
     manager_user_id: Optional[int] = Field(default=None, ge=1)
     cover_image_url: Optional[str] = Field(default=None, max_length=500)
+    current_stage: Optional[str] = Field(default=None, max_length=32)
 
 
 class BudgetVersionCreate(BaseModel):
@@ -110,6 +113,7 @@ class MaterialDetailItem(BaseModel):
     spec: str = Field(default="", max_length=180)
     quantity: float = 0.0
     unit_price: float = 0.0
+    executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
     memo: str = Field(default="", max_length=300)
 
@@ -121,6 +125,7 @@ class LaborDetailItem(BaseModel):
     unit: str = Field(default="H", max_length=8)
     quantity: float = 0.0
     hourly_rate: float = 0.0
+    executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
     memo: str = Field(default="", max_length=300)
 
@@ -130,6 +135,7 @@ class ExpenseDetailItem(BaseModel):
     expense_name: str = Field(default="", max_length=180)
     basis: str = Field(default="", max_length=180)
     amount: float = 0.0
+    executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
     memo: str = Field(default="", max_length=300)
 
@@ -295,32 +301,37 @@ def _project_spent_ratio(stage: Optional[str], project_id: int) -> float:
     return max(0.0, min(1.15, base + variation))
 
 
-def _build_monitoring_payload(project: models.BudgetProject, totals: dict) -> dict:
+def _build_monitoring_payload(
+    project: models.BudgetProject,
+    totals: dict,
+    executed_summary: Optional[dict] = None,
+) -> dict:
     confirmed_material = to_number(totals.get("material_total"))
     confirmed_labor = to_number(totals.get("labor_total"))
     confirmed_expense = to_number(totals.get("expense_total"))
     confirmed_budget_total = to_number(totals.get("grand_total"))
-    if confirmed_budget_total <= 0:
-        return {
-            "confirmed_budget_material": 0.0,
-            "confirmed_budget_labor": 0.0,
-            "confirmed_budget_expense": 0.0,
-            "confirmed_budget_total": 0.0,
-            "actual_spent_material": 0.0,
-            "actual_spent_labor": 0.0,
-            "actual_spent_expense": 0.0,
-            "actual_spent_total": 0.0,
-            "variance_material": 0.0,
-            "variance_labor": 0.0,
-            "variance_expense": 0.0,
-            "variance_total": 0.0,
-        }
+    executed_material = to_number((executed_summary or {}).get("material_executed_total"))
+    executed_labor = to_number((executed_summary or {}).get("labor_executed_total"))
+    executed_expense = to_number((executed_summary or {}).get("expense_executed_total"))
+    executed_total = executed_material + executed_labor + executed_expense
 
-    spent_ratio = _project_spent_ratio(project.current_stage, int(project.id or 0))
-    actual_spent_material = round(confirmed_material * spent_ratio, 2)
-    actual_spent_labor = round(confirmed_labor * spent_ratio, 2)
-    actual_spent_expense = round(confirmed_expense * spent_ratio, 2)
-    actual_spent_total = round(confirmed_budget_total * spent_ratio, 2)
+    if executed_total > 0:
+        actual_spent_material = round(executed_material, 2)
+        actual_spent_labor = round(executed_labor, 2)
+        actual_spent_expense = round(executed_expense, 2)
+        actual_spent_total = round(executed_total, 2)
+    elif confirmed_budget_total > 0:
+        spent_ratio = _project_spent_ratio(project.current_stage, int(project.id or 0))
+        actual_spent_material = round(confirmed_material * spent_ratio, 2)
+        actual_spent_labor = round(confirmed_labor * spent_ratio, 2)
+        actual_spent_expense = round(confirmed_expense * spent_ratio, 2)
+        actual_spent_total = round(confirmed_budget_total * spent_ratio, 2)
+    else:
+        actual_spent_material = 0.0
+        actual_spent_labor = 0.0
+        actual_spent_expense = 0.0
+        actual_spent_total = 0.0
+
     variance_material = round(confirmed_material - actual_spent_material, 2)
     variance_labor = round(confirmed_labor - actual_spent_labor, 2)
     variance_expense = round(confirmed_expense - actual_spent_expense, 2)
@@ -606,6 +617,56 @@ def _require_version_edit_permission(version: models.BudgetVersion, user: models
     return project
 
 
+def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
+    signature = {
+        "material_items": [],
+        "labor_items": [],
+        "expense_items": [],
+    }
+
+    for item in detail_payload.get("material_items", []):
+        signature["material_items"].append(
+            (
+                (item.get("equipment_name") or "").strip(),
+                (item.get("unit_name") or "").strip(),
+                (item.get("part_name") or "").strip(),
+                (item.get("spec") or "").strip(),
+                to_number(item.get("quantity")),
+                to_number(item.get("unit_price")),
+                normalize_phase(item.get("phase") or "fabrication"),
+            )
+        )
+
+    for item in detail_payload.get("labor_items", []):
+        signature["labor_items"].append(
+            (
+                (item.get("equipment_name") or "").strip(),
+                (item.get("task_name") or "").strip(),
+                (item.get("worker_type") or "").strip(),
+                (item.get("unit") or "H").strip().upper(),
+                to_number(item.get("quantity")),
+                to_number(item.get("hourly_rate")),
+                normalize_phase(item.get("phase") or "fabrication"),
+            )
+        )
+
+    for item in detail_payload.get("expense_items", []):
+        signature["expense_items"].append(
+            (
+                (item.get("equipment_name") or "").strip(),
+                (item.get("expense_name") or "").strip(),
+                (item.get("basis") or "").strip(),
+                to_number(item.get("amount")),
+                normalize_phase(item.get("phase") or "fabrication"),
+            )
+        )
+
+    signature["material_items"].sort()
+    signature["labor_items"].sort()
+    signature["expense_items"].sort()
+    return signature
+
+
 def _serialize_project(
     project: models.BudgetProject,
     db: Session,
@@ -615,12 +676,15 @@ def _serialize_project(
     current = current_version or _get_current_version_for_project(project, db)
     if current:
         totals = summarize_costs(_version_equipments(current.id, db))
+        detail_payload = parse_detail_payload(current.budget_detail_json or "")
+        executed_summary = summarize_executed_costs_from_detail(detail_payload)
         current_version_id = int(current.id)
     else:
         totals = summarize_costs([])
+        executed_summary = summarize_executed_costs_from_detail(default_detail_payload())
         current_version_id = None
 
-    monitoring = _build_monitoring_payload(project, totals)
+    monitoring = _build_monitoring_payload(project, totals, executed_summary=executed_summary)
     manager = _project_manager(project, db)
     owner = _project_owner(project, db)
     manager_name = _user_display_name(manager, empty_label="담당자 미지정")
@@ -1017,6 +1081,15 @@ def update_project(
             project.project_type = normalized_type
             changed = True
 
+    if "current_stage" in fields_set and payload.current_stage is not None:
+        try:
+            normalized_stage = normalize_stage(payload.current_stage)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        if normalized_stage != (project.current_stage or ""):
+            project.current_stage = normalized_stage
+            changed = True
+
     if "customer_name" in fields_set:
         customer_name = (payload.customer_name or "").strip() or None
         if customer_name != (project.customer_name or None):
@@ -1322,15 +1395,21 @@ def upsert_version_details(
 ):
     version = _get_version_or_404(version_id, db)
     _require_version_edit_permission(version, user, db)
-    if version.status == "confirmed":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
-
-    now_iso = to_iso(utcnow())
     detail_dict = {
         "material_items": [item.model_dump() for item in payload.material_items],
         "labor_items": [item.model_dump() for item in payload.labor_items],
         "expense_items": [item.model_dump() for item in payload.expense_items],
     }
+
+    if version.status == "confirmed":
+        existing_detail = parse_detail_payload(version.budget_detail_json or "")
+        if _budget_lock_signature(existing_detail) != _budget_lock_signature(detail_dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="확정 버전에서는 예산 항목을 변경할 수 없습니다. 예산 변경 버튼으로 리비전을 생성해 주세요.",
+            )
+
+    now_iso = to_iso(utcnow())
     version.budget_detail_json = detail_payload_to_json(detail_dict)
     aggregated = aggregate_equipment_costs_from_detail(detail_dict)
     _replace_equipments_from_aggregate(version, aggregated_items=aggregated, db=db, now_iso=now_iso)

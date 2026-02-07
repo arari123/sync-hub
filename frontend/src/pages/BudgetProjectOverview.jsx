@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, PencilLine, X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { cn } from '../lib/utils';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 import { Button } from '../components/ui/Button';
 
@@ -25,6 +26,7 @@ const EMPTY_EDIT_FORM = {
     name: '',
     code: '',
     project_type: 'equipment',
+    current_stage: 'review',
     customer_name: '',
     installation_site: '',
     manager_user_id: '',
@@ -89,6 +91,7 @@ const BudgetProjectOverview = () => {
             name: project.name || '',
             code: project.code || '',
             project_type: project.project_type || 'equipment',
+            current_stage: project.current_stage || 'review',
             customer_name: project.customer_name || '',
             installation_site: project.installation_site || '',
             manager_user_id: project.manager_user_id ? String(project.manager_user_id) : '',
@@ -171,6 +174,7 @@ const BudgetProjectOverview = () => {
                 name,
                 code: (editForm.code || '').trim(),
                 project_type: editForm.project_type || 'equipment',
+                current_stage: editForm.current_stage || 'review',
                 customer_name: (editForm.customer_name || '').trim(),
                 installation_site: (editForm.installation_site || '').trim(),
                 manager_user_id: editForm.manager_user_id ? Number(editForm.manager_user_id) : undefined,
@@ -201,165 +205,175 @@ const BudgetProjectOverview = () => {
     const milestones = Array.isArray(project.summary_milestones) ? project.summary_milestones : [];
 
     return (
-        <>
-            <div className="space-y-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <BudgetBreadcrumb
-                            items={[
-                                { label: '프로젝트 관리', to: '/project-management' },
-                                { label: project.name || '프로젝트' },
-                            ]}
-                        />
-                        <h1 className="text-3xl font-bold tracking-tight mt-2">{project.name}</h1>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                            <StageBadge label={`단계 ${project.current_stage_label || '-'}`} accent />
-                            <StageBadge
-                                label={`버전 ${version?.version_no || '-'}${version?.revision_no > 0 ? `-r${version.revision_no}` : ''}`}
-                            />
-                            <StageBadge label={`업데이트 ${formatDate(project.updated_at)}`} muted={false} />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Link to={`/project-management/projects/${project.id}/budget`}>
-                            <Button className="gap-2">
-                                예산 관리
-                                <ArrowRight size={18} />
-                            </Button>
-                        </Link>
-                        {!project.can_edit && (
-                            <span className="inline-flex h-10 items-center px-4 rounded-lg border bg-muted text-xs font-semibold text-muted-foreground shadow-sm">
-                                읽기 전용
-                            </span>
-                        )}
+        <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+            {/* 1. Header & Breadcrumb */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <BudgetBreadcrumb
+                        items={[
+                            { label: '프로젝트 관리', to: '/project-management' },
+                            { label: project.name || '프로젝트' },
+                        ]}
+                    />
+                    <div className="flex items-center gap-3 mt-2">
+                        <h1 className="text-2xl font-black tracking-tight text-slate-900">{project.name}</h1>
+                        <span className="text-xs font-bold text-slate-400 font-mono tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">{project.code || 'NO-CODE'}</span>
                     </div>
                 </div>
-
-                {error && (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                        {error}
-                    </div>
-                )}
-
-                <section className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-base font-semibold">프로젝트 기본 정보</h2>
-                        {project.can_edit && (
-                            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => setIsEditOpen(true)}>
-                                <PencilLine className="h-3.5 w-3.5" />
-                                기본 정보 수정
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className={coverImageUrl ? 'grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]' : 'space-y-3'}>
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <InfoCell label="종류" value={project.project_type_label || '-'} compact />
-                                <InfoCell label="담당자" value={project.manager_name || '담당자 미지정'} compact />
-                                <InfoCell label="고객사" value={project.customer_name || '-'} compact />
-                                <InfoCell label="설치 장소" value={project.installation_site || '-'} compact />
-                                <InfoCell label="코드" value={project.code || '-'} compact />
-                                <InfoCell label="작성자" value={project.created_by_name || '-'} compact />
-                            </div>
-                            <InfoCell label="개요" value={project.description || '개요가 아직 없습니다.'} />
-                        </div>
-
-                        {coverImageUrl && (
-                            <article className="overflow-hidden rounded-lg border bg-muted/10">
-                                <img src={coverImageUrl} alt={`${project.name} 대표 이미지`} className="h-full min-h-[180px] w-full object-cover" />
-                            </article>
-                        )}
-                    </div>
-                </section>
-
-                <section className="rounded-xl border bg-card p-6 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <h2 className="text-base font-semibold">요약 일정</h2>
-                        <span className="text-xs text-muted-foreground">{project.schedule_detail_note || '상세 일정 작성은 추후 구현 예정입니다.'}</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        {milestones.map((item) => (
-                            <MilestoneCard key={item.key || item.label} item={item} />
-                        ))}
-                    </div>
-                </section>
-
-                <section className="rounded-xl border bg-card p-6 shadow-sm">
-                    <h2 className="mb-4 text-base font-semibold">전체 예산 요약</h2>
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                        <AmountCell
-                            label="재료비"
-                            value={formatAmount(confirmedMaterial)}
-                            subLabel="집행 금액"
-                            subValue={formatAmount(spentMaterial)}
-                        />
-                        <AmountCell
-                            label="인건비"
-                            value={formatAmount(confirmedLabor)}
-                            subLabel="집행 금액"
-                            subValue={formatAmount(spentLabor)}
-                        />
-                        <AmountCell
-                            label="경비"
-                            value={formatAmount(confirmedExpense)}
-                            subLabel="집행 금액"
-                            subValue={formatAmount(spentExpense)}
-                        />
-                        <AmountCell
-                            label="확정 예산"
-                            value={formatAmount(confirmedTotal)}
-                            subLabel="집행 금액 합계"
-                            subValue={formatAmount(projectActualSpentTotal)}
-                            strong
-                        />
-                        <AmountCell
-                            label="잔액"
-                            value={formatAmount(remainingTotal)}
-                            note="확정예산 - 집행금액 = 잔액"
-                            strong
-                        />
-                    </div>
-                </section>
-
-                <section className="rounded-xl border bg-card p-6 shadow-sm">
-                    <h2 className="mb-4 text-base font-semibold">설비별 예산/집행 현황</h2>
-                    {!equipmentCards.length ? (
-                        <p className="text-sm text-muted-foreground">설비 예산 데이터가 아직 없습니다.</p>
-                    ) : (
-                        <div className={equipmentCards.length === 1 ? 'space-y-3' : 'grid grid-cols-1 gap-3 lg:grid-cols-2'}>
-                            {equipmentCards.map((item) => (
-                                <article key={item.equipment_name} className="rounded-lg border bg-muted/10 p-4">
-                                    <p className="mb-3 text-sm font-semibold">{item.equipment_name}</p>
-                                    <GraphRow
-                                        label="재료비"
-                                        value={item.material}
-                                        maxValue={item.maxValue}
-                                        barClass="bg-blue-500"
-                                    />
-                                    <GraphRow
-                                        label="인건비"
-                                        value={item.labor}
-                                        maxValue={item.maxValue}
-                                        barClass="bg-emerald-500"
-                                    />
-                                    <GraphRow
-                                        label="경비"
-                                        value={item.expense}
-                                        maxValue={item.maxValue}
-                                        barClass="bg-amber-500"
-                                    />
-                                    <GraphRow
-                                        label="집행"
-                                        value={item.spent}
-                                        maxValue={item.maxValue}
-                                        barClass="bg-rose-500"
-                                    />
-                                </article>
-                            ))}
-                        </div>
+                <div className="flex items-center gap-2">
+                    <Link to={`/project-management/projects/${project.id}/budget`}>
+                        <Button size="sm" className="h-9 gap-2 font-bold px-4">
+                            예산 관리
+                            <ArrowRight size={16} />
+                        </Button>
+                    </Link>
+                    {!project.can_edit && (
+                        <span className="h-9 inline-flex items-center px-4 rounded-lg border bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            READ ONLY
+                        </span>
                     )}
-                </section>
+                </div>
+            </div>
+
+            {/* 2. Dashboard Hero Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <HeroCard
+                    label="현재 진행 단계"
+                    value={project.current_stage_label || '-'}
+                    subValue={`업데이트: ${formatDate(project.updated_at)}`}
+                    icon="stage"
+                />
+                <HeroCard
+                    label="집행율"
+                    value={`${((projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100).toFixed(1)}%`}
+                    progress={(projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100}
+                    subValue={`확정 예산: ${formatAmount(confirmedTotal)}`}
+                    icon="execution"
+                />
+                <HeroCard
+                    label="현재 잔액"
+                    value={formatAmount(remainingTotal)}
+                    subValue="남은 가용 예산"
+                    variant={remainingTotal < 0 ? 'destructive' : 'primary'}
+                    icon="balance"
+                />
+                <HeroCard
+                    label="총 집행 금액"
+                    value={formatAmount(projectActualSpentTotal)}
+                    subValue={`전체 ${version?.version_no || '1'}개 버전 기반`}
+                    icon="spent"
+                />
+            </div>
+
+            {error && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs font-medium text-destructive">
+                    {error}
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Identity & Schedule */}
+                <div className="space-y-6">
+                    {/* Project Identity */}
+                    <section className="rounded-2xl border bg-card overflow-hidden shadow-sm">
+                        {coverImageUrl && (
+                            <div className="h-40 w-full overflow-hidden border-b border-slate-100">
+                                <img src={coverImageUrl} alt={project.name} className="h-full w-full object-cover" />
+                            </div>
+                        )}
+                        <div className="p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-sm font-bold">프로젝트 정보</h2>
+                                {project.can_edit && (
+                                    <button onClick={() => setIsEditOpen(true)} className="text-[10px] font-bold text-primary hover:underline underline-offset-4">상세 정보 수정</button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-2.5">
+                                <IdentityRow label="고객사" value={project.customer_name} />
+                                <IdentityRow label="설치 장소" value={project.installation_site} />
+                                <IdentityRow label="담당자" value={project.manager_name} />
+                                <IdentityRow label="프로젝트 구분" value={project.project_type_label} />
+                            </div>
+                            <div className="pt-3 border-t border-slate-50">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1.5">개요</p>
+                                <p className="text-xs text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
+                                    {project.description || '작성된 개요가 없습니다.'}
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Schedule (Timeline Style) */}
+                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+                        <h2 className="text-sm font-bold mb-5 flex items-center gap-2">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            주요 일정 (Timeline)
+                        </h2>
+                        <div className="relative pl-3 border-l-2 border-slate-100 space-y-6 ml-1.5">
+                            {milestones.length > 0 ? (
+                                milestones.map((item, idx) => (
+                                    <TimelineItem key={item.key || idx} item={item} isLast={idx === milestones.length - 1} />
+                                ))
+                            ) : (
+                                <p className="text-xs text-slate-400">일정 데이터가 없습니다.</p>
+                            )}
+                        </div>
+                    </section>
+                </div>
+
+                {/* Right Column: Analytics */}
+                <div className="space-y-6">
+                    {/* Financial Analysis Block */}
+                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-sm font-bold flex items-center gap-2">
+                                <span className="w-1 h-4 bg-primary rounded-full" />
+                                예산/집행 분석 (Variance Analysis)
+                            </h2>
+                        </div>
+                        <div className="space-y-6">
+                            <VarianceRow
+                                label="재료비 (Material)"
+                                confirmed={confirmedMaterial}
+                                actual={spentMaterial}
+                                color="blue"
+                            />
+                            <VarianceRow
+                                label="인건비 (Labor)"
+                                confirmed={confirmedLabor}
+                                actual={spentLabor}
+                                color="emerald"
+                            />
+                            <VarianceRow
+                                label="경비 (Expense)"
+                                confirmed={confirmedExpense}
+                                actual={spentExpense}
+                                color="indigo"
+                            />
+                        </div>
+                    </section>
+
+                    {/* Equipment Status */}
+                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-sm font-bold flex items-center gap-2">
+                                <span className="w-1 h-4 bg-primary rounded-full" />
+                                설비별 집행 현황
+                            </h2>
+                        </div>
+                        {!equipmentCards.length ? (
+                            <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                                <p className="text-xs text-slate-400 font-medium whitespace-pre-wrap">설비 예산 데이터가 아직 없습니다.{"\n"}예산 관리에서 설비를 추가해 주세요.</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                {equipmentCards.map((item) => (
+                                    <CompactEquipmentCard key={item.equipment_name} item={item} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                </div>
             </div>
 
             {isEditOpen && (
@@ -378,82 +392,154 @@ const BudgetProjectOverview = () => {
                     onSubmit={saveProjectBasics}
                 />
             )}
-        </>
+        </div>
     );
 };
 
-const StageBadge = ({ label, accent = false, muted = true }) => {
-    const styleClass = accent
-        ? 'border-primary/30 bg-primary/10 text-primary'
-        : muted
-            ? 'border-border bg-muted/15 text-muted-foreground'
-            : 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300';
-    return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 font-medium ${styleClass}`}>{label}</span>;
-};
-
-const InfoCell = ({ label, value, compact = false }) => (
-    <div className={`rounded-md border bg-muted/10 ${compact ? 'px-3 py-2.5' : 'p-3'}`}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`mt-1 ${compact ? 'text-sm font-semibold' : 'text-sm font-medium'} break-words`}>{value}</p>
-    </div>
-);
-
-const AmountCell = ({ label, value, subLabel = '', subValue = '', note = '', strong = false }) => (
-    <div className={`rounded-md border p-3 ${strong ? 'border-primary/40 bg-primary/5' : 'bg-muted/10'}`}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-sm ${strong ? 'font-bold' : 'font-semibold'}`}>{value}</p>
-        {subLabel && (
-            <div className="mt-1.5">
-                <p className="text-[11px] text-muted-foreground">{subLabel}</p>
-                <p className="mt-0.5 text-sm font-semibold">{subValue || '-'}</p>
+const HeroCard = ({ label, value, subValue, icon, progress, variant = 'primary' }) => (
+    <div className="bg-card border rounded-2xl p-4 shadow-sm relative overflow-hidden group">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{label}</p>
+        <div className="flex items-baseline gap-1">
+            <p className={cn(
+                "text-xl font-black tracking-tighter",
+                variant === 'destructive' ? 'text-destructive' : 'text-slate-950'
+            )}>{value}</p>
+        </div>
+        <p className="text-[10px] font-medium text-slate-400 mt-1">{subValue}</p>
+        {progress !== undefined && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-50">
+                <div
+                    className="h-full bg-primary transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.min(progress, 100)}%` }}
+                />
             </div>
         )}
-        {note && <p className="mt-1.5 text-[11px] text-muted-foreground">{note}</p>}
     </div>
 );
 
-const GraphRow = ({ label, value, maxValue, barClass }) => {
-    const ratio = Math.max(0, Math.min(100, (toNumber(value) / toNumber(maxValue || 1)) * 100));
+const VarianceRow = ({ label, confirmed, actual, color = 'blue' }) => {
+    const ratio = confirmed > 0 ? (actual / confirmed) * 100 : 0;
+    const isOver = actual > confirmed;
+
+    const colorMap = {
+        blue: 'bg-blue-500',
+        emerald: 'bg-emerald-500',
+        indigo: 'bg-indigo-500',
+        amber: 'bg-amber-500',
+        rose: 'bg-rose-500'
+    };
+
     return (
-        <div className="mb-2.5">
-            <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-medium">{formatAmount(value)}</span>
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">{label}</span>
+                <div className="flex items-center gap-3">
+                    <div className="text-right">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Budget</p>
+                        <p className="text-[11px] font-bold text-slate-900">{formatAmount(confirmed)}</p>
+                    </div>
+                    <div className="w-px h-6 bg-slate-100" />
+                    <div className="text-right">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Actual</p>
+                        <p className={cn("text-[11px] font-bold", isOver ? 'text-destructive' : 'text-slate-900')}>{formatAmount(actual)}</p>
+                    </div>
+                </div>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className={`h-full ${barClass}`} style={{ width: `${ratio}%` }} />
+            <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                    className={cn("h-full transition-all duration-700", isOver ? 'bg-rose-500' : colorMap[color])}
+                    style={{ width: `${Math.min(ratio, 100)}%` }}
+                />
+                {isOver && (
+                    <div className="absolute inset-0 bg-rose-500/20 animate-pulse" />
+                )}
+            </div>
+            <div className="flex justify-between items-center text-[9px] font-bold tracking-tighter uppercase px-0.5">
+                <span className={cn(isOver ? 'text-destructive' : 'text-slate-400')}>
+                    집행율: {ratio.toFixed(1)}% {isOver && '(예산 초과)'}
+                </span>
+                <span className="text-slate-400">
+                    차이: {formatAmount(confirmed - actual)}
+                </span>
             </div>
         </div>
     );
 };
 
-const MilestoneCard = ({ item }) => {
-    const status = String(item.status || 'planned').toLowerCase();
-    const markerClass = status === 'done'
-        ? 'bg-emerald-500'
-        : status === 'active'
-            ? 'bg-blue-500'
-            : 'bg-slate-300 dark:bg-slate-600';
-
-    const statusClass = status === 'done'
-        ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
-        : status === 'active'
-            ? 'bg-blue-500/12 text-blue-700 dark:text-blue-300'
-            : 'bg-muted/50 text-muted-foreground';
+const CompactEquipmentCard = ({ item }) => {
+    const totalBudget = item.material + item.labor + item.expense;
+    const progress = totalBudget > 0 ? (item.spent / totalBudget) * 100 : 0;
 
     return (
-        <article className="rounded-md border bg-muted/10 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${markerClass}`} />
-                    <p className="text-sm font-semibold">{item.label || '-'}</p>
-                </div>
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass}`}>
-                    {item.status_label || '-'}
+        <article className="border border-slate-100 bg-slate-50/30 rounded-xl p-3 hover:border-primary/30 transition-all group">
+            <div className="flex items-center justify-between mb-3 min-w-0">
+                <h4 className="text-xs font-bold truncate pr-2 text-slate-800">{item.equipment_name}</h4>
+                <span className="text-[10px] font-black tracking-tighter bg-white border border-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                    {progress.toFixed(0)}%
                 </span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">목표일 {item.date || '-'}</p>
+
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 mb-3">
+                <MiniAmount label="재료비" value={item.material} />
+                <MiniAmount label="인건비" value={item.labor} />
+                <MiniAmount label="경비" value={item.expense} />
+                <MiniAmount label="실집행" value={item.spent} color="primary" />
+            </div>
+
+            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+            </div>
         </article>
+    );
+};
+
+const MiniAmount = ({ label, value, color = 'muted' }) => (
+    <div className="flex items-center justify-between gap-2">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{label}</span>
+        <span className={cn("text-[10px] font-semibold", color === 'primary' ? 'text-primary' : 'text-slate-600')}>{formatAmount(value)}</span>
+    </div>
+);
+
+const IdentityRow = ({ label, value }) => (
+    <div className="flex items-center justify-between gap-4 py-1.5 border-b border-slate-50 last:border-0">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter shrink-0">{label}</span>
+        <span className="text-xs font-semibold text-slate-700 truncate">{value || '-'}</span>
+    </div>
+);
+
+const TimelineItem = ({ item, isLast }) => {
+    const status = String(item.status || 'planned').toLowerCase();
+    const isActive = status === 'active';
+    const isDone = status === 'done';
+
+    return (
+        <div className="relative flex items-start">
+            <div className={cn(
+                "absolute -left-[17px] mt-1 w-2 h-2 rounded-full border-2 ring-4 ring-card",
+                isDone ? "bg-emerald-500 border-white shadow-sm" :
+                    isActive ? "bg-blue-500 border-white shadow-[0_0_8px_rgba(59,130,246,0.5)]" :
+                        "bg-white border-slate-300"
+            )} />
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className={cn("text-xs font-bold leading-none", isActive ? "text-blue-600" : isDone ? "text-slate-800" : "text-slate-400")}>
+                        {item.label}
+                    </p>
+                    <span className={cn(
+                        "text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded",
+                        isDone ? "bg-emerald-50 text-emerald-600" :
+                            isActive ? "bg-blue-50 text-blue-600 animate-pulse" :
+                                "bg-slate-50 text-slate-400"
+                    )}>
+                        {item.status_label}
+                    </span>
+                </div>
+                <p className="text-[10px] font-medium text-slate-400 font-mono tracking-tighter">목표: {item.date || '-'}</p>
+            </div>
+        </div>
     );
 };
 
@@ -509,6 +595,19 @@ const ProjectEditModal = ({ canEdit, form, setForm, managerOptions, isSaving, sa
                                     <option value="equipment">설비</option>
                                     <option value="parts">파츠</option>
                                     <option value="as">AS</option>
+                                </select>
+                            </Field>
+                            <Field label="현재 진행 단계">
+                                <select
+                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                    value={form.current_stage}
+                                    onChange={(event) => updateField('current_stage', event.target.value)}
+                                >
+                                    <option value="review">검토</option>
+                                    <option value="fabrication">제작</option>
+                                    <option value="installation">설치</option>
+                                    <option value="warranty">AS</option>
+                                    <option value="closure">종료</option>
                                 </select>
                             </Field>
                             <Field label="담당자">

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, FolderKanban, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
 function formatAmount(value) {
     const number = Number(value || 0);
@@ -62,12 +63,14 @@ const BudgetManagement = () => {
 
     return (
         <div className="space-y-6">
+            <BudgetBreadcrumb items={[{ label: '예산관리' }]} />
+
             <section className="rounded-xl border bg-card p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold">예산관리</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            전체 프로젝트 예산 현황을 모니터링하고 상세 입력으로 이동할 수 있습니다.
+                            전체 프로젝트 예산 현황을 모니터링하고 프로젝트별 요약 화면으로 이동할 수 있습니다.
                         </p>
                     </div>
                     <Link
@@ -142,15 +145,14 @@ const BudgetManagement = () => {
                                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
                                                 {project.current_stage_label}
                                             </span>
-                                            {project.can_edit ? (
-                                                <Link
-                                                to={`/budget-management/projects/${project.id}/edit/material`}
+                                            <Link
+                                                to={`/budget-management/projects/${project.id}`}
                                                 className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
                                             >
                                                 상세
                                                 <ArrowRight className="h-3 w-3" />
                                             </Link>
-                                        ) : (
+                                            {!project.can_edit && (
                                                 <span className="inline-flex h-6 items-center rounded-md border border-border px-2 text-[11px] text-muted-foreground">
                                                     읽기전용
                                                 </span>

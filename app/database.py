@@ -31,6 +31,8 @@ _BUDGET_VERSION_COLUMN_SPECS = {
 
 _BUDGET_PROJECT_COLUMN_SPECS = {
     "created_by_user_id": "INTEGER",
+    "customer_name": "VARCHAR(180)",
+    "installation_site": "VARCHAR(180)",
 }
 
 def _run_schema_statement(connection, sql: str) -> None:

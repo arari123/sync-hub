@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Plus, Save } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
 const SECTION_META = {
     material: { label: '재료비', key: 'material_items' },
@@ -202,6 +203,14 @@ const BudgetProjectEditor = () => {
 
     return (
         <div className="space-y-5">
+            <BudgetBreadcrumb
+                items={[
+                    { label: '예산관리', to: '/budget-management' },
+                    { label: project?.name || '프로젝트', to: `/budget-management/projects/${projectId}` },
+                    { label: `${SECTION_META[section].label} 입력` },
+                ]}
+            />
+
             <section className="rounded-xl border bg-card p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -214,10 +223,10 @@ const BudgetProjectEditor = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Link
-                            to="/budget-management"
+                            to={`/budget-management/projects/${projectId}`}
                             className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
                         >
-                            목록으로
+                            요약으로
                         </Link>
                         {canEditProject && !isConfirmed && (
                             <button

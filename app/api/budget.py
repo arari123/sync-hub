@@ -29,6 +29,8 @@ class BudgetProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     code: Optional[str] = Field(default=None, max_length=64)
     description: Optional[str] = Field(default=None, max_length=500)
+    customer_name: Optional[str] = Field(default=None, max_length=180)
+    installation_site: Optional[str] = Field(default=None, max_length=180)
 
 
 class BudgetVersionCreate(BaseModel):
@@ -284,6 +286,8 @@ def _serialize_project(
         "name": project.name,
         "code": project.code or "",
         "description": project.description or "",
+        "customer_name": project.customer_name or "",
+        "installation_site": project.installation_site or "",
         "current_stage": project.current_stage,
         "current_stage_label": stage_label(project.current_stage),
         "current_version_id": current_version_id,
@@ -334,6 +338,8 @@ def create_project(
         name=(payload.name or "").strip(),
         code=code,
         description=(payload.description or "").strip() or None,
+        customer_name=(payload.customer_name or "").strip() or None,
+        installation_site=(payload.installation_site or "").strip() or None,
         created_by_user_id=int(user.id),
         current_stage="review",
         created_at=now_iso,

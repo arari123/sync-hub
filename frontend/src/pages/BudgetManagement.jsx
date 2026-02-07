@@ -78,10 +78,7 @@ function buildProjectFilterParams(filters) {
 }
 
 function stageBadgeClass(stage) {
-    const emphasized = stage === 'review' || stage === 'installation' || stage === 'warranty';
-    const base = emphasized
-        ? 'px-3 py-1 rounded-full text-sm font-extrabold border transition-colors'
-        : 'px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-colors';
+    const base = 'px-3 py-1 rounded-full text-sm font-extrabold border transition-colors';
     // Simplified to use a uniform slate theme for all stages as requested
     return `${base} border-slate-200 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700`;
 }
@@ -154,6 +151,14 @@ const BudgetManagement = () => {
     const applyFilters = (event) => {
         event.preventDefault();
         setAppliedFilters({ ...draftFilters });
+    };
+
+    const toggleOnlyMine = () => {
+        setDraftFilters((prev) => {
+            const next = { ...prev, onlyMine: !prev.onlyMine };
+            setAppliedFilters(next);
+            return next;
+        });
     };
 
     const resetFilters = () => {
@@ -261,7 +266,7 @@ const BudgetManagement = () => {
                             variant={draftFilters.onlyMine ? 'default' : 'outline'}
                             size="sm"
                             className="h-8 text-xs px-3"
-                            onClick={() => setDraftFilters((prev) => ({ ...prev, onlyMine: !prev.onlyMine }))}
+                            onClick={toggleOnlyMine}
                         >
                             내 프로젝트만
                         </Button>

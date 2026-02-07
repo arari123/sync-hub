@@ -420,7 +420,13 @@ const SummaryCard = ({ label, count, color, isActive, onClick }) => {
 
 const ProjectCard = ({ project }) => {
     const confirmedBudget = Number(project?.monitoring?.confirmed_budget_total ?? project?.totals?.grand_total ?? 0);
-    const actualSpent = Number(project?.monitoring?.actual_spent_total ?? 0);
+    const spentByParts = (
+        Number(project?.monitoring?.actual_spent_material ?? 0)
+        + Number(project?.monitoring?.actual_spent_labor ?? 0)
+        + Number(project?.monitoring?.actual_spent_expense ?? 0)
+    );
+    const actualSpent = Math.max(Number(project?.monitoring?.actual_spent_total ?? 0), spentByParts, 0);
+    const remaining = confirmedBudget - actualSpent;
     const progress = confirmedBudget > 0 ? Math.min((actualSpent / confirmedBudget) * 100, 100) : 0;
 
     return (
@@ -467,9 +473,15 @@ const ProjectCard = ({ project }) => {
                 </div>
 
                 <div className="flex justify-between items-end">
-                    <div>
+                    <div className="space-y-0.5">
                         <p className="text-[10px] text-muted-foreground font-medium">총 실행 예산</p>
                         <p className="text-sm font-bold">{formatAmount(confirmedBudget)}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                            집행 합계 <span className="font-semibold text-foreground">{formatAmount(actualSpent)}</span>
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                            잔액 <span className="font-semibold text-foreground">{formatAmount(remaining)}</span>
+                        </p>
                     </div>
                     <Link to={`/project-management/projects/${project.id}`}>
                         <Button size="sm" variant="ghost" className="h-8 text-[11px] gap-1 hover:bg-primary/10 hover:text-primary">

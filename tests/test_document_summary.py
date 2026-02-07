@@ -21,6 +21,7 @@ class _DummyHttpResponse:
 
 class DocumentSummaryTests(unittest.TestCase):
     def test_extractive_summary_uses_whole_document_body(self):
+        original_use_local_llm = document_summary.DOC_SUMMARY_USE_LOCAL_LLM
         text = (
             "반도체 공정 관리 보고서\n"
             "본 문서는 공정별 측정 기준과 허용 편차를 정리한다. "
@@ -28,10 +29,14 @@ class DocumentSummaryTests(unittest.TestCase):
             "최종적으로 검사 자동화 적용 범위를 제안한다."
         )
 
-        title, summary = document_summary.build_document_summary(
-            filename="report.pdf",
-            content_text=text,
-        )
+        try:
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = False
+            title, summary = document_summary.build_document_summary(
+                filename="report.pdf",
+                content_text=text,
+            )
+        finally:
+            document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
 
         self.assertIn("반도체 공정 관리 보고서", title)
         self.assertIn("본 문서는 공정별 측정 기준과 허용 편차를 정리한다.", summary)
@@ -75,4 +80,3 @@ class DocumentSummaryTests(unittest.TestCase):
             document_summary.DOC_SUMMARY_USE_LOCAL_LLM = original_use_local_llm
             document_summary.DOC_SUMMARY_OLLAMA_URL = original_url
             document_summary.DOC_SUMMARY_OLLAMA_MODEL = original_model
-

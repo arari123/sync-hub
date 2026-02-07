@@ -27,6 +27,7 @@ services:
     depends_on:
       - db
       - elasticsearch
+      - ollama
 
   elasticsearch:
     build:
@@ -66,9 +67,19 @@ services:
     depends_on:
       - web
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: synchub_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
 volumes:
   postgres_data:
   es_data:
+  ollama_data:
 
 networks:
   default:

@@ -359,7 +359,7 @@ async def upload_document(
     return {"id": db_doc.id, "status": "pending"}
 
 @router.get("/search")
-def search_documents(q: str, limit: int = 5):
+def search_documents(q: str, limit: int = 5, db: Session = Depends(get_db)):
     query = (q or "").strip()
     if not query:
         return []
@@ -381,12 +381,34 @@ def search_documents(q: str, limit: int = 5):
     reranked_hits = _rerank_hits(hits, query)
     reranked_hits = _apply_cluster_diversity(reranked_hits, limit=limit)
 
+    doc_ids = {
+        result.get("hit", {}).get("_source", {}).get("doc_id")
+        for result in reranked_hits
+    }
+    doc_ids = {doc_id for doc_id in doc_ids if isinstance(doc_id, int)}
+    document_map = {}
+    if doc_ids:
+        docs = db.query(models.Document).filter(models.Document.id.in_(doc_ids)).all()
+        document_map = {item.id: item for item in docs}
+
     output = []
     for result in reranked_hits:
         hit = result["hit"]
         source = hit.get("_source", {})
-        title = _clean_display_text(source.get("ai_title") or source.get("filename") or "")
-        doc_summary = _clean_display_text(source.get("ai_summary_short") or "")
+        doc_id = source.get("doc_id")
+        db_doc = document_map.get(doc_id)
+
+        title = _clean_display_text(
+            source.get("ai_title")
+            or (db_doc.ai_title if db_doc else "")
+            or source.get("filename")
+            or ""
+        )
+        doc_summary = _clean_display_text(
+            source.get("ai_summary_short")
+            or (db_doc.ai_summary_short if db_doc else "")
+            or ""
+        )
         if not doc_summary:
             doc_summary = result["summary"]
 

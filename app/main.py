@@ -8,7 +8,7 @@ from . import models, schemas
 from .core.ocr import get_ocr_worker_health
 from .core.vector_store import vector_store
 from .database import engine, ensure_runtime_schema, get_db
-from .api import admin_debug, admin_dedup, documents
+from .api import admin_debug, admin_dedup, auth, documents
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -23,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(documents.router)
+app.include_router(auth.router)
 app.include_router(admin_debug.router)
 app.include_router(admin_dedup.router)
 

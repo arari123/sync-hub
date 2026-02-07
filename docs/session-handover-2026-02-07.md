@@ -396,3 +396,22 @@ docker exec synchub_web_noreload sh -lc 'cd /app && OCR_PYPDF_PREFLIGHT=false OC
   - 재색인/확인:
     - `docker exec synchub_web bash -lc 'cd /app && python -m app.core.indexing.reindex --doc-id 3 --doc-id 4 --dedup off --index-policy all'` 완료.
     - `GET /documents/search?q=Basler&limit=3` 결과에 `table_cell_refs`, `table_layout` 노출 확인.
+- 2026-02-07 (세션 재개-17)
+  - 로그인/가입(메일인증) 기능 추가:
+    - 백엔드: `app/api/auth.py`에 `signup`, `verify-email`, `login`, `me`, `logout` API 추가.
+    - 인증 유틸: `app/core/auth_utils.py`(비밀번호 해시/검증, 토큰 해시, 허용 도메인 판정).
+    - 메일 발송: `app/core/auth_mailer.py`(SMTP 설정 기반 인증 메일 전송, 개발용 링크 지원).
+    - 데이터 모델: `users`, `email_verification_tokens`, `auth_sessions` 테이블 추가.
+  - 프론트 인증 화면/가드 추가:
+    - `frontend/src/pages/Login.jsx`, `frontend/src/pages/Signup.jsx`, `frontend/src/pages/VerifyEmail.jsx` 추가.
+    - `frontend/src/components/ProtectedRoute.jsx`로 보호 라우트 적용.
+    - `frontend/src/lib/session.js` + `frontend/src/lib/api.js` 인터셉터로 Bearer 토큰 자동 첨부/401 세션 정리.
+    - 보호 라우트: `/`, `/search`, `/budget-management` (비로그인 시 `/login` 리다이렉트).
+  - 도메인 제한 설정:
+    - `.env.example`에 `AUTH_ALLOWED_EMAIL_DOMAINS` 및 SMTP/세션/토큰 만료 설정 추가.
+  - 검증:
+    - `docker exec synchub_web bash -lc 'cd /app && ./scripts/verify_fast.sh'` 통과 (`Ran 47 tests ... OK`).
+    - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과.
+    - 실동작 확인:
+      - 허용 도메인 가입 성공 + 인증 후 로그인 성공.
+      - 비허용 도메인 가입 요청 시 `HTTP 403` 확인.

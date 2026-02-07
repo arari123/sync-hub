@@ -135,7 +135,7 @@ const BudgetProjectOverview = () => {
                     <InfoCell label="프로젝트 종류" value={project.project_type_label || '-'} />
                     <InfoCell label="고객사" value={project.customer_name || '-'} />
                     <InfoCell label="설치 장소" value={project.installation_site || '-'} />
-                    <InfoCell label="작성자" value={project.author_name || '작성자 미지정'} />
+                    <InfoCell label="담당자" value={project.manager_name || '담당자 미지정'} />
                     <InfoCell label="마지막 업데이트" value={formatDate(project.updated_at)} />
                     <InfoCell label="프로젝트 코드" value={project.code || '-'} />
                     <InfoCell label="개요" value={project.description || '-'} className="md:col-span-2" />

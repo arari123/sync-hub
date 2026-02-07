@@ -232,6 +232,23 @@ def me(user: models.User = Depends(get_current_user)):
     return _serialize_user(user)
 
 
+@router.get("/users")
+def list_users(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    users = (
+        db.query(models.User)
+        .filter(
+            models.User.is_active.is_(True),
+            models.User.email_verified.is_(True),
+        )
+        .order_by(models.User.full_name.asc(), models.User.email.asc())
+        .all()
+    )
+    return [_serialize_user(user) for user in users]
+
+
 @router.post("/logout")
 def logout(
     authorization: str = Header(default=""),

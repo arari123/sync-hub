@@ -48,6 +48,7 @@ class BudgetProjectCreate(BaseModel):
     project_type: Optional[str] = Field(default="equipment", max_length=32)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
+    manager_user_id: Optional[int] = Field(default=None, ge=1)
 
 
 class BudgetVersionCreate(BaseModel):
@@ -190,9 +191,9 @@ def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
     }
 
 
-def _user_display_name(user: Optional[models.User]) -> str:
+def _user_display_name(user: Optional[models.User], empty_label: str = "담당자 미지정") -> str:
     if not user:
-        return "작성자 미지정"
+        return empty_label
     full_name = (user.full_name or "").strip()
     return full_name or user.email
 
@@ -201,6 +202,21 @@ def _project_owner(project: models.BudgetProject, db: Session) -> Optional[model
     if not project.created_by_user_id:
         return None
     return db.query(models.User).filter(models.User.id == project.created_by_user_id).first()
+
+
+def _project_manager_user_id(project: models.BudgetProject) -> Optional[int]:
+    if project.manager_user_id is not None:
+        return int(project.manager_user_id)
+    if project.created_by_user_id is not None:
+        return int(project.created_by_user_id)
+    return None
+
+
+def _project_manager(project: models.BudgetProject, db: Session) -> Optional[models.User]:
+    manager_user_id = _project_manager_user_id(project)
+    if manager_user_id is None:
+        return None
+    return db.query(models.User).filter(models.User.id == manager_user_id).first()
 
 
 def _normalize_project_type(value: Optional[str]) -> str:
@@ -230,15 +246,17 @@ def _project_type_code_or_empty(value: Optional[str]) -> str:
 def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
     if not user:
         return False
-    if project.created_by_user_id is None:
+    manager_user_id = _project_manager_user_id(project)
+    if manager_user_id is None:
         return True
-    return int(project.created_by_user_id) == int(user.id)
+    return manager_user_id == int(user.id)
 
 
 def _is_my_project(project: models.BudgetProject, user: Optional[models.User]) -> bool:
-    if not user or project.created_by_user_id is None:
+    manager_user_id = _project_manager_user_id(project)
+    if not user or manager_user_id is None:
         return False
-    return int(project.created_by_user_id) == int(user.id)
+    return manager_user_id == int(user.id)
 
 
 def _get_current_version_for_project(
@@ -282,9 +300,11 @@ def _is_project_visible_to_user(
 def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
     if project.created_by_user_id is None:
         project.created_by_user_id = int(user.id)
+    if project.manager_user_id is None:
+        project.manager_user_id = int(project.created_by_user_id)
         project.updated_at = to_iso(utcnow())
-        return
-    if int(project.created_by_user_id) != int(user.id):
+
+    if int(project.manager_user_id) != int(user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No edit permission for this project.")
 
 
@@ -313,7 +333,9 @@ def _serialize_project(
         "actual_spent_total": None,
         "variance_total": None,
     }
+    manager = _project_manager(project, db)
     owner = _project_owner(project, db)
+    manager_name = _user_display_name(manager, empty_label="담당자 미지정")
 
     version_count = (
         db.query(func.count(models.BudgetVersion.id))
@@ -335,7 +357,10 @@ def _serialize_project(
         "current_stage_label": stage_label(project.current_stage),
         "current_version_id": current_version_id,
         "version_count": int(version_count),
-        "author_name": _user_display_name(owner),
+        "manager_user_id": _project_manager_user_id(project),
+        "manager_name": manager_name,
+        "author_name": manager_name,  # backward compatibility
+        "created_by_name": _user_display_name(owner, empty_label="생성자 미지정"),
         "can_edit": _project_can_edit(project, user),
         "is_mine": _is_my_project(project, user),
         "totals": totals,
@@ -351,7 +376,7 @@ def _matches_project_filters(
     project_code: Optional[str],
     project_type: Optional[str],
     customer_name: Optional[str],
-    author_name: Optional[str],
+    manager_name: Optional[str],
     min_total: Optional[float],
     max_total: Optional[float],
 ) -> bool:
@@ -375,9 +400,9 @@ def _matches_project_filters(
         if customer_filter not in (project_payload.get("customer_name") or "").lower():
             return False
 
-    author_filter = (author_name or "").strip().lower()
-    if author_filter:
-        if author_filter not in (project_payload.get("author_name") or "").lower():
+    manager_filter = (manager_name or "").strip().lower()
+    if manager_filter:
+        if manager_filter not in (project_payload.get("manager_name") or "").lower():
             return False
 
     grand_total = to_number((project_payload.get("totals") or {}).get("grand_total"))
@@ -394,6 +419,7 @@ def list_projects(
     project_code: Optional[str] = Query(default=None, max_length=64),
     project_type: Optional[str] = Query(default=None, max_length=32),
     customer_name: Optional[str] = Query(default=None, max_length=180),
+    manager_name: Optional[str] = Query(default=None, max_length=180),
     author_name: Optional[str] = Query(default=None, max_length=180),
     min_total: Optional[float] = Query(default=None),
     max_total: Optional[float] = Query(default=None),
@@ -426,7 +452,7 @@ def list_projects(
             project_code=project_code,
             project_type=project_type,
             customer_name=customer_name,
-            author_name=author_name,
+            manager_name=(manager_name or author_name),
             min_total=min_total,
             max_total=max_total,
         ):
@@ -451,6 +477,11 @@ def create_project(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+    manager_user_id = int(payload.manager_user_id) if payload.manager_user_id is not None else int(user.id)
+    manager = db.query(models.User).filter(models.User.id == manager_user_id).first()
+    if not manager or not manager.is_active or not manager.email_verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid manager_user_id.")
+
     now_iso = to_iso(utcnow())
     project = models.BudgetProject(
         name=(payload.name or "").strip(),
@@ -460,6 +491,7 @@ def create_project(
         customer_name=(payload.customer_name or "").strip() or None,
         installation_site=(payload.installation_site or "").strip() or None,
         created_by_user_id=int(user.id),
+        manager_user_id=manager_user_id,
         current_stage="review",
         created_at=now_iso,
         updated_at=now_iso,

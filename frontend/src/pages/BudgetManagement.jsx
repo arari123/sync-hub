@@ -39,13 +39,13 @@ function buildProjectFilterParams(filters) {
     const projectName = (filters.projectName || '').trim();
     const projectCode = (filters.projectCode || '').trim();
     const customerName = (filters.customerName || '').trim();
-    const authorName = (filters.authorName || '').trim();
+    const managerName = (filters.managerName || '').trim();
     const projectType = (filters.projectType || '').trim();
 
     if (projectName) params.project_name = projectName;
     if (projectCode) params.project_code = projectCode;
     if (customerName) params.customer_name = customerName;
-    if (authorName) params.author_name = authorName;
+    if (managerName) params.manager_name = managerName;
     if (projectType) params.project_type = projectType;
     return params;
 }
@@ -65,7 +65,7 @@ const BudgetManagement = () => {
         projectName: '',
         projectCode: '',
         customerName: '',
-        authorName: '',
+        managerName: '',
         projectType: '',
     };
 
@@ -214,9 +214,9 @@ const BudgetManagement = () => {
                         />
                         <input
                             className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
-                            placeholder="작성자"
-                            value={draftFilters.authorName}
-                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
+                            placeholder="담당자"
+                            value={draftFilters.managerName}
+                            onChange={(event) => setDraftFilters((prev) => ({ ...prev, managerName: event.target.value }))}
                         />
                         <select
                             className="h-6 rounded-md border border-input bg-background px-2 text-[10px]"
@@ -291,7 +291,7 @@ const BudgetManagement = () => {
                                             </div>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">종류: {project.project_type_label || '-'}</p>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">작성자: {project.author_name || '작성자 미지정'}</p>
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">담당자: {project.manager_name || '담당자 미지정'}</p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">
                                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { getCurrentUser } from '../lib/session';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
 const BudgetProjectCreate = () => {
@@ -12,13 +13,54 @@ const BudgetProjectCreate = () => {
     const [description, setDescription] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [installationSite, setInstallationSite] = useState('');
+    const [managerUserId, setManagerUserId] = useState('');
+    const [managerOptions, setManagerOptions] = useState([]);
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        const currentUser = getCurrentUser();
+        if (currentUser?.id) {
+            setManagerUserId(String(currentUser.id));
+        }
+
+        let mounted = true;
+        const loadManagers = async () => {
+            try {
+                const response = await api.get('/auth/users');
+                const options = Array.isArray(response.data) ? response.data : [];
+                if (!mounted) return;
+                setManagerOptions(options);
+
+                if (!options.length) return;
+                if (!currentUser?.id) {
+                    setManagerUserId(String(options[0].id));
+                    return;
+                }
+                const exists = options.some((item) => Number(item?.id) === Number(currentUser.id));
+                if (!exists) {
+                    setManagerUserId(String(options[0].id));
+                }
+            } catch (_err) {
+                if (!mounted) return;
+                setManagerOptions([]);
+            }
+        };
+
+        loadManagers();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const createProject = async (event) => {
         event.preventDefault();
         if (!name.trim()) {
             setError('프로젝트 이름을 입력해 주세요.');
+            return;
+        }
+        if (!managerUserId) {
+            setError('담당자를 선택해 주세요.');
             return;
         }
 
@@ -32,6 +74,7 @@ const BudgetProjectCreate = () => {
                 description: description.trim(),
                 customer_name: customerName.trim(),
                 installation_site: installationSite.trim(),
+                manager_user_id: Number(managerUserId),
             });
             const projectId = created?.data?.id;
             if (!projectId) {
@@ -117,6 +160,18 @@ const BudgetProjectCreate = () => {
                         value={installationSite}
                         onChange={(event) => setInstallationSite(event.target.value)}
                     />
+                    <select
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        value={managerUserId}
+                        onChange={(event) => setManagerUserId(event.target.value)}
+                    >
+                        <option value="">담당자 선택</option>
+                        {managerOptions.map((user) => (
+                            <option key={user.id} value={String(user.id)}>
+                                {(user.full_name || '').trim() || user.email}
+                            </option>
+                        ))}
+                    </select>
                     <textarea
                         className="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
                         placeholder="개요(선택)"

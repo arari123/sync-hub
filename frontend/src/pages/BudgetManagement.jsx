@@ -130,41 +130,38 @@ const BudgetManagement = () => {
                 </p>
             </section>
 
-            {error && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    {error}
+            <section className="rounded-xl border bg-card p-4 shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">필터</h2>
+                    <p className="text-[11px] text-muted-foreground">조건에 맞는 프로젝트만 표시</p>
                 </div>
-            )}
-
-            <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold">프로젝트 모니터링</h2>
-                <form className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6" onSubmit={applyFilters}>
+                <form className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6" onSubmit={applyFilters}>
                     <input
-                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
                         placeholder="최소 금액(원)"
                         value={draftFilters.minTotal}
                         onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
                     />
                     <input
-                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
                         placeholder="최대 금액(원)"
                         value={draftFilters.maxTotal}
                         onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
                     />
                     <input
-                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
                         placeholder="고객사"
                         value={draftFilters.customerName}
                         onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
                     />
                     <input
-                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
                         placeholder="작성자"
                         value={draftFilters.authorName}
                         onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
                     />
                     <select
-                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2.5 text-[11px]"
                         value={draftFilters.projectType}
                         onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
                     >
@@ -176,20 +173,29 @@ const BudgetManagement = () => {
                     <div className="flex gap-2">
                         <button
                             type="submit"
-                            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                            className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-2.5 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
                         >
-                            필터 적용
+                            적용
                         </button>
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-xs hover:bg-accent"
+                            className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-2.5 text-[11px] hover:bg-accent"
                         >
                             초기화
                         </button>
                     </div>
                 </form>
+            </section>
 
+            {error && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {error}
+                </div>
+            )}
+
+            <section className="rounded-xl border bg-card p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold">프로젝트 모니터링</h2>
                 {isLoading ? (
                     <p className="text-sm text-muted-foreground">불러오는 중...</p>
                 ) : projects.length === 0 ? (

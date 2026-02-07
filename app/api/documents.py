@@ -40,6 +40,23 @@ SEARCH_CLUSTER_DIVERSITY = (
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?。！？])\s+|\s+\|\s+|\n+")
 _QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
 SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".xlsx", ".xlsm", ".xltx", ".xltm", ".csv"}
+SPREADSHEET_EXTENSIONS = {".xlsx", ".xlsm", ".xltx", ".xltm", ".csv"}
+FAILURE_REPORT_DOC_TYPE = "equipment_failure_report"
+MAINTENANCE_QUERY_HINTS = (
+    "장애",
+    "조치",
+    "보고서",
+    "점검",
+    "고장",
+    "트러블",
+    "수리",
+    "보전",
+    "as",
+    "incident",
+    "failure",
+    "maintenance",
+    "troubleshooting",
+)
 
 
 def _start_document_pipeline_async(doc_id: int) -> None:
@@ -254,6 +271,45 @@ def _is_placeholder_content(text: str) -> bool:
     return any(marker in normalized for marker in markers)
 
 
+def _is_spreadsheet_filename(filename: str) -> bool:
+    ext = os.path.splitext((filename or "").strip().lower())[1]
+    return ext in SPREADSHEET_EXTENSIONS
+
+
+def _has_maintenance_search_intent(query_lower: str, tokens: list[str]) -> bool:
+    body = (query_lower or "").strip().lower()
+    if any(hint in body for hint in MAINTENANCE_QUERY_HINTS):
+        return True
+
+    lowered_tokens = {str(token or "").strip().lower() for token in tokens if token}
+    return "as" in lowered_tokens
+
+
+def _should_filter_low_evidence_spreadsheet_or_failure_doc(
+    filename: str,
+    document_types: list[str],
+    query_lower: str,
+    tokens: list[str],
+    matched_terms: list[str],
+    phrase_count: int,
+) -> bool:
+    if len(tokens) < 2:
+        return False
+    if phrase_count > 0:
+        return False
+    if _has_maintenance_search_intent(query_lower, tokens):
+        return False
+
+    normalized_types = {str(item or "").strip().lower() for item in (document_types or [])}
+    is_failure_doc = FAILURE_REPORT_DOC_TYPE in normalized_types
+    is_spreadsheet = _is_spreadsheet_filename(filename)
+    if not (is_failure_doc or is_spreadsheet):
+        return False
+
+    required_token_matches = 2 if len(tokens) <= 3 else 3
+    return len(matched_terms) < required_token_matches
+
+
 def _rerank_hits(hits: list[dict], query: str) -> list[dict]:
     tokens = _tokenize_query(query)
     query_lower = query.strip().lower()
@@ -264,6 +320,7 @@ def _rerank_hits(hits: list[dict], query: str) -> list[dict]:
         source = hit.get("_source", {})
         content = _clean_display_text(source.get("content") or "")
         filename = _clean_display_text(source.get("filename") or "")
+        document_types = parse_document_types(source.get("document_types"))
         content_lower = content.lower()
 
         if _is_placeholder_content(content):
@@ -274,6 +331,17 @@ def _rerank_hits(hits: list[dict], query: str) -> list[dict]:
         token_frequency = sum(content_lower.count(token.lower()) for token in tokens)
         phrase_count = content_lower.count(query_lower) if query_lower else 0
         all_terms_matched = bool(tokens) and len(matched_terms) == len(tokens)
+
+        if _should_filter_low_evidence_spreadsheet_or_failure_doc(
+            filename=filename,
+            document_types=document_types,
+            query_lower=query_lower,
+            tokens=tokens,
+            matched_terms=matched_terms,
+            phrase_count=phrase_count,
+        ):
+            continue
+
         filename_hits = sum(1 for token in tokens if token.lower() in filename.lower())
         highlight_bonus = 0.35 if _extract_highlight_snippet(hit) else 0.0
         noise_penalty = _text_noise_penalty(content)

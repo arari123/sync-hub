@@ -29,6 +29,22 @@ function extractCustomerOptions(projectList) {
     return Array.from(options).sort((a, b) => a.localeCompare(b, 'ko-KR'));
 }
 
+function applyProjectTextFilters(projectList, filters) {
+    const list = Array.isArray(projectList) ? projectList : [];
+    const nameFilter = String(filters?.projectName || '').trim().toLowerCase();
+    const codeFilter = String(filters?.projectCode || '').trim().toLowerCase();
+
+    if (!nameFilter && !codeFilter) return list;
+    return list.filter((project) => {
+        const projectName = String(project?.name || '').toLowerCase();
+        const projectCode = String(project?.code || '').toLowerCase();
+
+        if (nameFilter && !projectName.includes(nameFilter)) return false;
+        if (codeFilter && !projectCode.includes(codeFilter)) return false;
+        return true;
+    });
+}
+
 function buildProjectFilterParams(filters) {
     const params = {};
     const projectName = (filters.projectName || '').trim();
@@ -90,7 +106,8 @@ const BudgetManagement = () => {
             const response = await api.get('/budget/projects', {
                 params: buildProjectFilterParams(appliedFilters),
             });
-            setProjects(Array.isArray(response.data) ? response.data : []);
+            const list = Array.isArray(response.data) ? response.data : [];
+            setProjects(applyProjectTextFilters(list, appliedFilters));
         } catch (err) {
             setError(getErrorMessage(err, '프로젝트 목록을 불러오지 못했습니다.'));
         } finally {

@@ -131,6 +131,7 @@ const BudgetProjectOverview = () => {
                 <h2 className="mb-4 text-base font-semibold">프로젝트 기본 정보</h2>
                 <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                     <InfoCell label="프로젝트 이름" value={project.name || '-'} />
+                    <InfoCell label="프로젝트 종류" value={project.project_type_label || '-'} />
                     <InfoCell label="고객사" value={project.customer_name || '-'} />
                     <InfoCell label="설치 장소" value={project.installation_site || '-'} />
                     <InfoCell label="작성자" value={project.author_name || '작성자 미지정'} />

@@ -8,6 +8,7 @@ const BudgetProjectCreate = () => {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
+    const [projectType, setProjectType] = useState('equipment');
     const [description, setDescription] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [installationSite, setInstallationSite] = useState('');
@@ -27,6 +28,7 @@ const BudgetProjectCreate = () => {
             const created = await api.post('/budget/projects', {
                 name: name.trim(),
                 code: code.trim(),
+                project_type: projectType,
                 description: description.trim(),
                 customer_name: customerName.trim(),
                 installation_site: installationSite.trim(),
@@ -94,6 +96,15 @@ const BudgetProjectCreate = () => {
                         value={code}
                         onChange={(event) => setCode(event.target.value)}
                     />
+                    <select
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        value={projectType}
+                        onChange={(event) => setProjectType(event.target.value)}
+                    >
+                        <option value="equipment">설비</option>
+                        <option value="parts">파츠</option>
+                        <option value="as">AS</option>
+                    </select>
                     <input
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                         placeholder="고객사(선택)"

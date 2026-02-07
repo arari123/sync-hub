@@ -31,6 +31,7 @@ _BUDGET_VERSION_COLUMN_SPECS = {
 
 _BUDGET_PROJECT_COLUMN_SPECS = {
     "created_by_user_id": "INTEGER",
+    "project_type": "VARCHAR(32)",
     "customer_name": "VARCHAR(180)",
     "installation_site": "VARCHAR(180)",
 }
@@ -110,6 +111,10 @@ def ensure_runtime_schema() -> None:
             _run_schema_statement(
                 connection,
                 "CREATE INDEX IF NOT EXISTS idx_budget_projects_created_by_user_id ON budget_projects (created_by_user_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_budget_projects_project_type ON budget_projects (project_type)",
             )
 
 

@@ -9,6 +9,28 @@ function formatAmount(value) {
     return `${number.toLocaleString('ko-KR')}원`;
 }
 
+function buildProjectFilterParams(filters) {
+    const params = {};
+    const minTotal = (filters.minTotal || '').trim();
+    const maxTotal = (filters.maxTotal || '').trim();
+    const customerName = (filters.customerName || '').trim();
+    const authorName = (filters.authorName || '').trim();
+    const projectType = (filters.projectType || '').trim();
+
+    if (minTotal !== '') {
+        const value = Number(minTotal);
+        if (Number.isFinite(value)) params.min_total = value;
+    }
+    if (maxTotal !== '') {
+        const value = Number(maxTotal);
+        if (Number.isFinite(value)) params.max_total = value;
+    }
+    if (customerName) params.customer_name = customerName;
+    if (authorName) params.author_name = authorName;
+    if (projectType) params.project_type = projectType;
+    return params;
+}
+
 function stageBadgeClass(stage) {
     if (stage === 'progress') {
         return 'border-amber-200 bg-amber-50 text-amber-700';
@@ -20,26 +42,48 @@ function stageBadgeClass(stage) {
 }
 
 const BudgetManagement = () => {
+    const emptyFilters = {
+        minTotal: '',
+        maxTotal: '',
+        customerName: '',
+        authorName: '',
+        projectType: '',
+    };
+
     const [projects, setProjects] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [draftFilters, setDraftFilters] = useState(emptyFilters);
+    const [appliedFilters, setAppliedFilters] = useState(emptyFilters);
 
     const loadProjects = useCallback(async () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await api.get('/budget/projects');
+            const response = await api.get('/budget/projects', {
+                params: buildProjectFilterParams(appliedFilters),
+            });
             setProjects(Array.isArray(response.data) ? response.data : []);
         } catch (err) {
             setError(getErrorMessage(err, '프로젝트 목록을 불러오지 못했습니다.'));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [appliedFilters]);
 
     useEffect(() => {
         loadProjects();
     }, [loadProjects]);
+
+    const applyFilters = (event) => {
+        event.preventDefault();
+        setAppliedFilters({ ...draftFilters });
+    };
+
+    const resetFilters = () => {
+        setDraftFilters(emptyFilters);
+        setAppliedFilters(emptyFilters);
+    };
 
     const summary = projects.reduce(
         (acc, project) => {
@@ -94,6 +138,58 @@ const BudgetManagement = () => {
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
                 <h2 className="mb-4 text-base font-semibold">프로젝트 모니터링</h2>
+                <form className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6" onSubmit={applyFilters}>
+                    <input
+                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        placeholder="최소 금액(원)"
+                        value={draftFilters.minTotal}
+                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, minTotal: event.target.value }))}
+                    />
+                    <input
+                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        placeholder="최대 금액(원)"
+                        value={draftFilters.maxTotal}
+                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, maxTotal: event.target.value }))}
+                    />
+                    <input
+                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        placeholder="고객사"
+                        value={draftFilters.customerName}
+                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, customerName: event.target.value }))}
+                    />
+                    <input
+                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        placeholder="작성자"
+                        value={draftFilters.authorName}
+                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, authorName: event.target.value }))}
+                    />
+                    <select
+                        className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+                        value={draftFilters.projectType}
+                        onChange={(event) => setDraftFilters((prev) => ({ ...prev, projectType: event.target.value }))}
+                    >
+                        <option value="">프로젝트 종류(전체)</option>
+                        <option value="equipment">설비</option>
+                        <option value="parts">파츠</option>
+                        <option value="as">AS</option>
+                    </select>
+                    <div className="flex gap-2">
+                        <button
+                            type="submit"
+                            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                        >
+                            필터 적용
+                        </button>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-xs hover:bg-accent"
+                        >
+                            초기화
+                        </button>
+                    </div>
+                </form>
+
                 {isLoading ? (
                     <p className="text-sm text-muted-foreground">불러오는 중...</p>
                 ) : projects.length === 0 ? (
@@ -139,6 +235,7 @@ const BudgetManagement = () => {
                                                 )}
                                             </div>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">종류: {project.project_type_label || '-'}</p>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">작성자: {project.author_name || '작성자 미지정'}</p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">

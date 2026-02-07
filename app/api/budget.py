@@ -24,11 +24,28 @@ from ..database import get_db
 
 router = APIRouter(prefix="/budget", tags=["budget"])
 
+_PROJECT_TYPE_LABELS = {
+    "equipment": "설비",
+    "parts": "파츠",
+    "as": "AS",
+}
+
+_PROJECT_TYPE_TO_CODE = {
+    "설비": "equipment",
+    "equipment": "equipment",
+    "eq": "equipment",
+    "파츠": "parts",
+    "부품": "parts",
+    "parts": "parts",
+    "as": "as",
+}
+
 
 class BudgetProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     code: Optional[str] = Field(default=None, max_length=64)
     description: Optional[str] = Field(default=None, max_length=500)
+    project_type: Optional[str] = Field(default="equipment", max_length=32)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
 
@@ -186,6 +203,30 @@ def _project_owner(project: models.BudgetProject, db: Session) -> Optional[model
     return db.query(models.User).filter(models.User.id == project.created_by_user_id).first()
 
 
+def _normalize_project_type(value: Optional[str]) -> str:
+    key = (value or "").strip().lower()
+    if not key:
+        return "equipment"
+    if key in _PROJECT_TYPE_TO_CODE:
+        return _PROJECT_TYPE_TO_CODE[key]
+    raise ValueError(f"Unsupported project_type: {value}")
+
+
+def _project_type_label(value: Optional[str]) -> str:
+    try:
+        normalized = _normalize_project_type(value)
+    except ValueError:
+        return "미분류"
+    return _PROJECT_TYPE_LABELS.get(normalized, "미분류")
+
+
+def _project_type_code_or_empty(value: Optional[str]) -> str:
+    try:
+        return _normalize_project_type(value)
+    except ValueError:
+        return ""
+
+
 def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
     if not user:
         return False
@@ -286,6 +327,8 @@ def _serialize_project(
         "name": project.name,
         "code": project.code or "",
         "description": project.description or "",
+        "project_type": _project_type_code_or_empty(project.project_type),
+        "project_type_label": _project_type_label(project.project_type),
         "customer_name": project.customer_name or "",
         "installation_site": project.installation_site or "",
         "current_stage": project.current_stage,
@@ -302,11 +345,56 @@ def _serialize_project(
     }
 
 
+def _matches_project_filters(
+    project_payload: dict,
+    project_type: Optional[str],
+    customer_name: Optional[str],
+    author_name: Optional[str],
+    min_total: Optional[float],
+    max_total: Optional[float],
+) -> bool:
+    if project_type:
+        normalized_filter = _normalize_project_type(project_type)
+        if (project_payload.get("project_type") or "") != normalized_filter:
+            return False
+
+    customer_filter = (customer_name or "").strip().lower()
+    if customer_filter:
+        if customer_filter not in (project_payload.get("customer_name") or "").lower():
+            return False
+
+    author_filter = (author_name or "").strip().lower()
+    if author_filter:
+        if author_filter not in (project_payload.get("author_name") or "").lower():
+            return False
+
+    grand_total = to_number((project_payload.get("totals") or {}).get("grand_total"))
+    if min_total is not None and grand_total < to_number(min_total):
+        return False
+    if max_total is not None and grand_total > to_number(max_total):
+        return False
+    return True
+
+
 @router.get("/projects")
 def list_projects(
+    project_type: Optional[str] = Query(default=None, max_length=32),
+    customer_name: Optional[str] = Query(default=None, max_length=180),
+    author_name: Optional[str] = Query(default=None, max_length=180),
+    min_total: Optional[float] = Query(default=None),
+    max_total: Optional[float] = Query(default=None),
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
+    if min_total is not None and max_total is not None and to_number(min_total) > to_number(max_total):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="min_total cannot exceed max_total.")
+
+    if project_type:
+        try:
+            _normalize_project_type(project_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     all_projects = (
         db.query(models.BudgetProject)
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
@@ -317,7 +405,17 @@ def list_projects(
         current_version = _get_current_version_for_project(project, db)
         if not _is_project_visible_to_user(project, current_version=current_version, user=user):
             continue
-        visible_projects.append(_serialize_project(project, db, user=user, current_version=current_version))
+        payload = _serialize_project(project, db, user=user, current_version=current_version)
+        if not _matches_project_filters(
+            payload,
+            project_type=project_type,
+            customer_name=customer_name,
+            author_name=author_name,
+            min_total=min_total,
+            max_total=max_total,
+        ):
+            continue
+        visible_projects.append(payload)
     return visible_projects
 
 
@@ -332,12 +430,17 @@ def create_project(
         exists = db.query(models.BudgetProject).filter(models.BudgetProject.code == code).first()
         if exists:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project code already exists.")
+    try:
+        project_type = _normalize_project_type(payload.project_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     now_iso = to_iso(utcnow())
     project = models.BudgetProject(
         name=(payload.name or "").strip(),
         code=code,
         description=(payload.description or "").strip() or None,
+        project_type=project_type,
         customer_name=(payload.customer_name or "").strip() or None,
         installation_site=(payload.installation_site or "").strip() or None,
         created_by_user_id=int(user.id),

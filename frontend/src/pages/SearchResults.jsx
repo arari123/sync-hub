@@ -31,7 +31,7 @@ const SearchResults = () => {
             setSelectedResult(null);
 
             try {
-                const [docResponse, projectResponse] = await Promise.all([
+                const [docResult, projectResult] = await Promise.allSettled([
                     api.get('/documents/search', {
                         params: { q: query, limit: 10 },
                     }),
@@ -39,8 +39,16 @@ const SearchResults = () => {
                         params: { q: query, limit: 8 },
                     }),
                 ]);
-                const docData = Array.isArray(docResponse.data) ? docResponse.data : [];
-                const projectData = Array.isArray(projectResponse.data) ? projectResponse.data : [];
+
+                if (docResult.status !== 'fulfilled') {
+                    throw docResult.reason;
+                }
+
+                const docData = Array.isArray(docResult.value?.data) ? docResult.value.data : [];
+                const projectData =
+                    projectResult.status === 'fulfilled' && Array.isArray(projectResult.value?.data)
+                        ? projectResult.value.data
+                        : [];
                 setResults(docData);
                 setProjectResults(projectData);
             } catch (err) {

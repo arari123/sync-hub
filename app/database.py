@@ -29,6 +29,10 @@ _BUDGET_VERSION_COLUMN_SPECS = {
     "budget_detail_json": "TEXT",
 }
 
+_BUDGET_PROJECT_COLUMN_SPECS = {
+    "created_by_user_id": "INTEGER",
+}
+
 def _run_schema_statement(connection, sql: str) -> None:
     try:
         connection.execute(text(sql))
@@ -91,6 +95,20 @@ def ensure_runtime_schema() -> None:
                     connection,
                     f"ALTER TABLE budget_versions ADD COLUMN {column_name} {column_spec}",
                 )
+
+        if "budget_projects" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("budget_projects")}
+            for column_name, column_spec in _BUDGET_PROJECT_COLUMN_SPECS.items():
+                if column_name in existing_columns:
+                    continue
+                _run_schema_statement(
+                    connection,
+                    f"ALTER TABLE budget_projects ADD COLUMN {column_name} {column_spec}",
+                )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_budget_projects_created_by_user_id ON budget_projects (created_by_user_id)",
+            )
 
 
 def get_db():

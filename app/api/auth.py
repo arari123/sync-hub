@@ -87,7 +87,7 @@ def _resolve_session(token: str, db: Session) -> models.AuthSession:
     return session
 
 
-def _current_user(authorization: str = Header(default=""), db: Session = Depends(get_db)) -> models.User:
+def get_current_user(authorization: str = Header(default=""), db: Session = Depends(get_db)) -> models.User:
     token = _extract_bearer_token(authorization)
     session = _resolve_session(token, db)
     user = db.query(models.User).filter(models.User.id == session.user_id).first()
@@ -228,7 +228,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me")
-def me(user: models.User = Depends(_current_user)):
+def me(user: models.User = Depends(get_current_user)):
     return _serialize_user(user)
 
 
@@ -236,7 +236,7 @@ def me(user: models.User = Depends(_current_user)):
 def logout(
     authorization: str = Header(default=""),
     db: Session = Depends(get_db),
-    _: models.User = Depends(_current_user),
+    _: models.User = Depends(get_current_user),
 ):
     token = _extract_bearer_token(authorization)
     session = _resolve_session(token, db)

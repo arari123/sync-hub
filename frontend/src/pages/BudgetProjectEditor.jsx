@@ -76,6 +76,9 @@ const BudgetProjectEditor = () => {
     const [isConfirming, setIsConfirming] = useState(false);
 
     const rows = details[SECTION_META[section].key] || [];
+    const canEditProject = project?.can_edit !== false;
+    const isConfirmed = version?.status === 'confirmed';
+    const isReadonly = isConfirmed || !canEditProject;
 
     const load = async () => {
         if (!projectId) return;
@@ -197,8 +200,6 @@ const BudgetProjectEditor = () => {
         return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
     }
 
-    const isReadonly = version?.status === 'confirmed';
-
     return (
         <div className="space-y-5">
             <section className="rounded-xl border bg-card p-6 shadow-sm">
@@ -218,7 +219,7 @@ const BudgetProjectEditor = () => {
                         >
                             목록으로
                         </Link>
-                        {!isReadonly && (
+                        {canEditProject && !isConfirmed && (
                             <button
                                 type="button"
                                 onClick={saveDetail}
@@ -229,7 +230,7 @@ const BudgetProjectEditor = () => {
                                 {isSaving ? '저장 중...' : '저장'}
                             </button>
                         )}
-                        {!isReadonly ? (
+                        {canEditProject && !isConfirmed && (
                             <button
                                 type="button"
                                 onClick={confirmCurrentVersion}
@@ -239,7 +240,8 @@ const BudgetProjectEditor = () => {
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 {isConfirming ? '확정 중...' : '버전 확정'}
                             </button>
-                        ) : (
+                        )}
+                        {canEditProject && isConfirmed && (
                             <button
                                 type="button"
                                 onClick={createRevision}
@@ -247,6 +249,11 @@ const BudgetProjectEditor = () => {
                             >
                                 리비전 생성
                             </button>
+                        )}
+                        {!canEditProject && (
+                            <span className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs text-muted-foreground">
+                                읽기 전용(수정 권한 없음)
+                            </span>
                         )}
                     </div>
                 </div>

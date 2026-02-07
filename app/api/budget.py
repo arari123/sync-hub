@@ -19,6 +19,7 @@ from ..core.budget_logic import (
     summarize_costs,
     to_number,
 )
+from .auth import get_current_user
 from ..database import get_db
 
 router = APIRouter(prefix="/budget", tags=["budget"])
@@ -170,7 +171,43 @@ def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
     }
 
 
-def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
+def _user_display_name(user: Optional[models.User]) -> str:
+    if not user:
+        return "작성자 미지정"
+    full_name = (user.full_name or "").strip()
+    return full_name or user.email
+
+
+def _project_owner(project: models.BudgetProject, db: Session) -> Optional[models.User]:
+    if not project.created_by_user_id:
+        return None
+    return db.query(models.User).filter(models.User.id == project.created_by_user_id).first()
+
+
+def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
+    if not user:
+        return False
+    if project.created_by_user_id is None:
+        return True
+    return int(project.created_by_user_id) == int(user.id)
+
+
+def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
+    if project.created_by_user_id is None:
+        project.created_by_user_id = int(user.id)
+        project.updated_at = to_iso(utcnow())
+        return
+    if int(project.created_by_user_id) != int(user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No edit permission for this project.")
+
+
+def _require_version_edit_permission(version: models.BudgetVersion, user: models.User, db: Session) -> models.BudgetProject:
+    project = _get_project_or_404(version.project_id, db)
+    _require_project_edit_permission(project, user)
+    return project
+
+
+def _serialize_project(project: models.BudgetProject, db: Session, user: Optional[models.User] = None) -> dict:
     current_version = (
         db.query(models.BudgetVersion)
         .filter(
@@ -201,6 +238,7 @@ def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
         "actual_spent_total": None,
         "variance_total": None,
     }
+    owner = _project_owner(project, db)
 
     version_count = (
         db.query(func.count(models.BudgetVersion.id))
@@ -218,6 +256,8 @@ def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
         "current_stage_label": stage_label(project.current_stage),
         "current_version_id": current_version_id,
         "version_count": int(version_count),
+        "author_name": _user_display_name(owner),
+        "can_edit": _project_can_edit(project, user),
         "totals": totals,
         "monitoring": monitoring,
         "created_at": project.created_at,
@@ -226,17 +266,24 @@ def _serialize_project(project: models.BudgetProject, db: Session) -> dict:
 
 
 @router.get("/projects")
-def list_projects(db: Session = Depends(get_db)):
+def list_projects(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     projects = (
         db.query(models.BudgetProject)
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
         .all()
     )
-    return [_serialize_project(project, db) for project in projects]
+    return [_serialize_project(project, db, user=user) for project in projects]
 
 
 @router.post("/projects")
-def create_project(payload: BudgetProjectCreate, db: Session = Depends(get_db)):
+def create_project(
+    payload: BudgetProjectCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     code = (payload.code or "").strip() or None
     if code:
         exists = db.query(models.BudgetProject).filter(models.BudgetProject.code == code).first()
@@ -248,6 +295,7 @@ def create_project(payload: BudgetProjectCreate, db: Session = Depends(get_db)):
         name=(payload.name or "").strip(),
         code=code,
         description=(payload.description or "").strip() or None,
+        created_by_user_id=int(user.id),
         current_stage="review",
         created_at=now_iso,
         updated_at=now_iso,
@@ -255,7 +303,7 @@ def create_project(payload: BudgetProjectCreate, db: Session = Depends(get_db)):
     db.add(project)
     db.commit()
     db.refresh(project)
-    return _serialize_project(project, db)
+    return _serialize_project(project, db, user=user)
 
 
 @router.get("/projects/{project_id}/versions")
@@ -263,6 +311,7 @@ def list_versions(
     project_id: int,
     stage: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
 ):
     project = _get_project_or_404(project_id, db)
     query = db.query(models.BudgetVersion).filter(models.BudgetVersion.project_id == project.id)
@@ -275,14 +324,20 @@ def list_versions(
 
     versions = query.order_by(models.BudgetVersion.created_at.desc(), models.BudgetVersion.id.desc()).all()
     return {
-        "project": _serialize_project(project, db),
+        "project": _serialize_project(project, db, user=user),
         "versions": [_serialize_version(version, db) for version in versions],
     }
 
 
 @router.post("/projects/{project_id}/versions")
-def create_version(project_id: int, payload: BudgetVersionCreate, db: Session = Depends(get_db)):
+def create_version(
+    project_id: int,
+    payload: BudgetVersionCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     project = _get_project_or_404(project_id, db)
+    _require_project_edit_permission(project, user)
     try:
         stage = normalize_stage(payload.stage or project.current_stage)
     except ValueError as exc:
@@ -333,8 +388,13 @@ def create_version(project_id: int, payload: BudgetVersionCreate, db: Session = 
 
 
 @router.post("/versions/{version_id}/confirm")
-def confirm_version(version_id: int, db: Session = Depends(get_db)):
+def confirm_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     version = _get_version_or_404(version_id, db)
+    _require_version_edit_permission(version, user, db)
     if version.status == "confirmed":
         return {"message": "이미 확정된 버전입니다.", "version": _serialize_version(version, db)}
     if version.status not in {"draft", "revision"}:
@@ -350,8 +410,14 @@ def confirm_version(version_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/versions/{version_id}/revision")
-def create_revision(version_id: int, payload: BudgetRevisionCreate, db: Session = Depends(get_db)):
+def create_revision(
+    version_id: int,
+    payload: BudgetRevisionCreate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     source = _get_version_or_404(version_id, db)
+    project = _require_version_edit_permission(source, user, db)
     if source.status != "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only confirmed version can create revision.")
 
@@ -406,7 +472,6 @@ def create_revision(version_id: int, payload: BudgetRevisionCreate, db: Session 
             )
         )
 
-    project = _get_project_or_404(source.project_id, db)
     project.current_stage = source.stage
     project.updated_at = now_iso
 
@@ -416,7 +481,11 @@ def create_revision(version_id: int, payload: BudgetRevisionCreate, db: Session 
 
 
 @router.get("/versions/{version_id}/equipments")
-def list_equipments(version_id: int, db: Session = Depends(get_db)):
+def list_equipments(
+    version_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
     version = _get_version_or_404(version_id, db)
     items = _version_equipments(version.id, db)
     totals = summarize_costs(items)
@@ -442,8 +511,14 @@ def list_equipments(version_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/versions/{version_id}/equipments")
-def replace_equipments(version_id: int, payload: EquipmentBulkPayload, db: Session = Depends(get_db)):
+def replace_equipments(
+    version_id: int,
+    payload: EquipmentBulkPayload,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     version = _get_version_or_404(version_id, db)
+    _require_version_edit_permission(version, user, db)
     if version.status == "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
 
@@ -471,24 +546,36 @@ def replace_equipments(version_id: int, payload: EquipmentBulkPayload, db: Sessi
 
     version.updated_at = now_iso
     db.commit()
-    return list_equipments(version_id=version.id, db=db)
+    return list_equipments(version_id=version.id, db=db, _=user)
 
 
 @router.get("/versions/{version_id}/details")
-def get_version_details(version_id: int, db: Session = Depends(get_db)):
+def get_version_details(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     version = _get_version_or_404(version_id, db)
     payload = parse_detail_payload(version.budget_detail_json or "")
     totals = summarize_costs(_version_equipments(version.id, db))
+    project = _get_project_or_404(version.project_id, db)
     return {
         "version": _serialize_version(version, db),
+        "project": _serialize_project(project, db, user=user),
         "details": payload,
         "totals": totals,
     }
 
 
 @router.put("/versions/{version_id}/details")
-def upsert_version_details(version_id: int, payload: BudgetDetailPayload, db: Session = Depends(get_db)):
+def upsert_version_details(
+    version_id: int,
+    payload: BudgetDetailPayload,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     version = _get_version_or_404(version_id, db)
+    _require_version_edit_permission(version, user, db)
     if version.status == "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
 
@@ -505,11 +592,15 @@ def upsert_version_details(version_id: int, payload: BudgetDetailPayload, db: Se
     version.updated_at = now_iso
     db.commit()
     db.refresh(version)
-    return get_version_details(version_id=version.id, db=db)
+    return get_version_details(version_id=version.id, db=db, user=user)
 
 
 @router.get("/projects/{project_id}/summary")
-def project_summary(project_id: int, db: Session = Depends(get_db)):
+def project_summary(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
     project = _get_project_or_404(project_id, db)
     stage_summaries = {}
 
@@ -540,6 +631,6 @@ def project_summary(project_id: int, db: Session = Depends(get_db)):
         }
 
     return {
-        "project": _serialize_project(project, db),
+        "project": _serialize_project(project, db, user=user),
         "stages": stage_summaries,
     }

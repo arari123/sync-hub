@@ -122,18 +122,25 @@ const BudgetManagement = () => {
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-semibold">{project.name}</p>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">코드: {project.code || '-'}</p>
+                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">작성자: {project.author_name || '작성자 미지정'}</p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">
                                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageBadgeClass(project.current_stage)}`}>
                                                 {project.current_stage_label}
                                             </span>
-                                            <Link
-                                                to={`/budget-management/projects/${project.id}/edit/material`}
-                                                className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
-                                            >
-                                                입력
-                                                <ArrowRight className="h-3 w-3" />
-                                            </Link>
+                                            {project.can_edit ? (
+                                                <Link
+                                                    to={`/budget-management/projects/${project.id}/edit/material`}
+                                                    className="inline-flex h-6 items-center justify-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] hover:bg-accent hover:text-accent-foreground"
+                                                >
+                                                    입력
+                                                    <ArrowRight className="h-3 w-3" />
+                                                </Link>
+                                            ) : (
+                                                <span className="inline-flex h-6 items-center rounded-md border border-border px-2 text-[11px] text-muted-foreground">
+                                                    읽기전용
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 

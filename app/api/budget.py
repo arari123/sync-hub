@@ -451,20 +451,32 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
     if not haystack:
         return 0.0
 
+    matched_tokens = 0
+    for token in tokens:
+        if token in haystack:
+            matched_tokens += 1
+
     score = 0.0
+    exact_phrase_match = False
     if query_lower:
         if query_lower in name_lower:
             score += 4.0
+            exact_phrase_match = True
         if query_lower in code_lower:
             score += 3.5
+            exact_phrase_match = True
         if query_lower in customer_lower:
             score += 2.8
+            exact_phrase_match = True
         if query_lower in manager_lower:
             score += 2.2
+            exact_phrase_match = True
         if query_lower in description_lower:
             score += 2.0
+            exact_phrase_match = True
         if query_lower in haystack:
             score += 1.0
+            exact_phrase_match = True
 
     for token in tokens:
         if token in name_lower:
@@ -477,6 +489,11 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
             score += 0.9
         if token in description_lower:
             score += 0.8
+
+    if not exact_phrase_match and len(tokens) >= 2:
+        required_token_matches = 2 if len(tokens) <= 3 else 3
+        if matched_tokens < required_token_matches:
+            return 0.0
 
     return score
 

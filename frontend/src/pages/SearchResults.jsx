@@ -23,6 +23,15 @@ function scoreProject(project, queryTokens, queryLower) {
     const code = String(project?.code || '').toLowerCase();
     const haystack = `${name} ${description} ${customer} ${manager} ${code}`.trim();
     if (!haystack) return 0;
+    const hasExactPhrase = Boolean(queryLower) && haystack.includes(queryLower);
+    const matchedTokens = queryTokens.filter((token) => haystack.includes(token)).length;
+
+    if (!hasExactPhrase && queryTokens.length >= 2) {
+        const requiredTokenMatches = queryTokens.length <= 3 ? 2 : 3;
+        if (matchedTokens < requiredTokenMatches) {
+            return 0;
+        }
+    }
 
     let score = 0;
     if (queryLower && haystack.includes(queryLower)) score += 3;
@@ -98,7 +107,7 @@ const SearchResults = () => {
                         ? projectResult.value.data
                         : [];
 
-                if (!projectData.length) {
+                if (projectResult.status !== 'fulfilled') {
                     try {
                         const fallbackResp = await api.get('/budget/projects');
                         projectData = searchProjectsLocally(fallbackResp.data, query, 8);

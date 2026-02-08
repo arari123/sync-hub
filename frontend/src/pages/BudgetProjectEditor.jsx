@@ -56,13 +56,6 @@ const AUTO_EXPENSE_FORMULAS = {
     DOBI: 'dobi',
     OTHER: 'other',
 };
-const AUTO_EXPENSE_QUANTITY_FORMULAS = new Set([
-    AUTO_EXPENSE_FORMULAS.TRIP,
-    AUTO_EXPENSE_FORMULAS.LODGING,
-    AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
-    AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
-    AUTO_EXPENSE_FORMULAS.AIRFARE,
-]);
 const AUTO_EXPENSE_FORMULA_BY_NAME = {
     '프로젝트 운영비': AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
     '소모품비': AUTO_EXPENSE_FORMULAS.CONSUMABLES,
@@ -907,34 +900,6 @@ const BudgetProjectEditor = () => {
             const isDomesticExpenseFormula = phase === 'fabrication' || locale === 'domestic';
             const defaultTransportBundle = Math.ceil(installationManDays / 5);
             const defaultOverseasTransportCount = Math.ceil(installationManDays * overseasTransportDailyCount);
-            const computeAutoExpenseAmountByQuantity = ({
-                formula,
-                quantity,
-                generatedAmount,
-                currentAmount,
-            }) => {
-                const qty = toNumber(quantity);
-                if (formula === AUTO_EXPENSE_FORMULAS.TRIP) {
-                    const rate = isDomesticExpenseFormula ? domesticTripDaily : overseasTripDaily;
-                    return Math.floor(qty * rate);
-                }
-                if (formula === AUTO_EXPENSE_FORMULAS.LODGING) {
-                    const rate = isDomesticExpenseFormula ? domesticLodgingDaily : overseasLodgingDaily;
-                    return Math.floor(qty * rate);
-                }
-                if (formula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
-                    return Math.floor(qty * domesticDistanceKm * domesticTransportPerKm);
-                }
-                if (formula === AUTO_EXPENSE_FORMULAS.AIRFARE) {
-                    return Math.floor(qty * overseasAirfareDaily);
-                }
-                if (formula === AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT) {
-                    const current = toNumber(currentAmount);
-                    return current > 0 ? current : toNumber(generatedAmount);
-                }
-                return toNumber(generatedAmount);
-            };
-
             const autoRows = [];
             const pushExpenseRow = ({
                 formula,
@@ -1112,11 +1077,20 @@ const BudgetProjectEditor = () => {
                 const current = currentByFormula[generated.auto_formula]
                     || currentByName[String(generated?.expense_name || '').trim()];
                 const isLocked = Boolean(current?.lock_auto);
-                if (isLocked) {
-                    nextPhaseRows.push(current);
+                if (!forceReset && current) {
+                    const resolvedCurrentFormula = resolveExpenseAutoFormula(current) || generated.auto_formula;
+                    nextPhaseRows.push({
+                        ...current,
+                        equipment_name: normalizeEquipmentName(current?.equipment_name || generated.equipment_name) || targetEquipmentName,
+                        expense_type: normalizeExpenseType(current?.expense_type || generated.expense_type || targetExpenseType),
+                        expense_name: String(current?.expense_name || generated.expense_name || '').trim()
+                            || generated.expense_name,
+                        basis: String(current?.basis || '').trim() || generated.basis,
+                        auto_formula: resolvedCurrentFormula,
+                    });
                     return;
                 }
-                if (!forceReset && current && current.is_auto !== true) {
+                if (isLocked) {
                     nextPhaseRows.push(current);
                     return;
                 }
@@ -1124,45 +1098,56 @@ const BudgetProjectEditor = () => {
                     ...generated,
                     equipment_name: normalizeEquipmentName(current?.equipment_name || generated.equipment_name) || targetEquipmentName,
                     expense_type: normalizeExpenseType(current?.expense_type || generated.expense_type || targetExpenseType),
-                    quantity: (
-                        !forceReset
-                        && current
-                        && generated.is_auto
-                        && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
-                        && current.quantity !== undefined
-                        && current.quantity !== null
-                        && String(current.quantity).trim() !== ''
-                    ) ? toNumber(current.quantity) : generated.quantity,
-                    amount: (
-                        !forceReset
-                        && current
-                        && generated.is_auto
-                        && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
-                    )
-                        ? computeAutoExpenseAmountByQuantity({
-                            formula: generated.auto_formula,
-                            quantity: current.quantity,
-                            generatedAmount: generated.amount,
-                            currentAmount: current.amount,
-                        })
-                        : generated.amount,
-                    memo: current?.memo || generated.memo,
+                    quantity: generated.quantity,
+                    amount: generated.amount,
+                    memo: String(current?.memo || generated.memo || '').trim(),
                     lock_auto: Boolean(current?.lock_auto),
                 });
             });
 
-            const autoExpenseNameSet = new Set(
-                autoRows.map((item) => String(item?.expense_name || '').trim()).filter(Boolean),
-            );
-            samePhaseRows.forEach((row) => {
-                if (!resolveExpenseAutoFormula(row)) {
+            if (!forceReset) {
+                const includedFormulaKeys = new Set(
+                    nextPhaseRows
+                        .map((row) => resolveExpenseAutoFormula(row))
+                        .filter(Boolean),
+                );
+                const includedNames = new Set(
+                    nextPhaseRows
+                        .map((row) => String(row?.expense_name || '').trim())
+                        .filter(Boolean),
+                );
+                samePhaseRows.forEach((row) => {
+                    const formula = resolveExpenseAutoFormula(row);
                     const normalizedName = String(row?.expense_name || '').trim();
-                    if (autoExpenseNameSet.has(normalizedName)) {
+                    if (formula) {
+                        if (includedFormulaKeys.has(formula)) return;
+                        includedFormulaKeys.add(formula);
+                        if (normalizedName) includedNames.add(normalizedName);
+                        nextPhaseRows.push(
+                            String(row?.auto_formula || '').trim() === formula
+                                ? row
+                                : { ...row, auto_formula: formula },
+                        );
                         return;
                     }
+                    if (normalizedName && includedNames.has(normalizedName)) return;
+                    if (normalizedName) includedNames.add(normalizedName);
                     nextPhaseRows.push(row);
-                }
-            });
+                });
+            } else {
+                const autoExpenseNameSet = new Set(
+                    autoRows.map((item) => String(item?.expense_name || '').trim()).filter(Boolean),
+                );
+                samePhaseRows.forEach((row) => {
+                    if (!resolveExpenseAutoFormula(row)) {
+                        const normalizedName = String(row?.expense_name || '').trim();
+                        if (autoExpenseNameSet.has(normalizedName)) {
+                            return;
+                        }
+                        nextPhaseRows.push(row);
+                    }
+                });
+            }
 
             const dedupedPhaseRows = [];
             const seenAutoFormula = new Set();

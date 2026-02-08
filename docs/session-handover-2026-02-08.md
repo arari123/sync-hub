@@ -148,3 +148,17 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (경비 저장 후 재병합 덮어쓰기 재수정)
+  - 문제:
+    - `전체 저장` 이후 경비 재병합 과정에서 `횟수/MD`, `산정 기준`, 금액이 자동값으로 다시 덮이는 케이스 재발
+  - 조치:
+    - `autoFillExpenseRows(forceReset=false)`를 **비파괴 병합**으로 변경
+    - 저장/일반 변경 경로에서는 기존 행(`quantity`, `amount`, `basis`, `memo`)을 그대로 유지
+    - `경비 자동 산정` 버튼(`forceReset=true`)에서만 자동값으로 재산정/초기화되도록 경로 분리
+    - 일반 병합에서 누락 행 보존 로직 강화(동일 공식키/항목명 기준)
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose restart web frontend` 재기동 완료

@@ -167,13 +167,12 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
         return {
             equipment_name: '',
             task_name: '',
-            staffing_type: '자체',
+            staffing_type: '',
             worker_type: '',
             unit: 'H',
-            quantity: 0,
-            headcount: 1,
+            quantity: '',
             location_type: 'domestic',
-            hourly_rate: 0,
+            hourly_rate: '',
             phase,
             memo: '',
         };
@@ -257,8 +256,7 @@ function calcBudgetAmount(row, section, settings) {
             ? normalizeLocationType(settings?.installation_locale)
             : 'domestic';
         const hours = laborUnitToHours(row.unit, locationType, settings);
-        const headcount = toNumber(row.headcount) || 1;
-        return toNumber(row.quantity) * hours * headcount * toNumber(row.hourly_rate);
+        return toNumber(row.quantity) * hours * toNumber(row.hourly_rate);
     }
     return toNumber(row.amount);
 }
@@ -397,9 +395,8 @@ const BudgetProjectEditor = () => {
         ],
         labor: [
             { key: 'equipment_name', label: '설비', width: 'w-32' },
-            { key: 'task_name', label: '부서', width: 'w-40' },
-            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS },
-            { key: 'headcount', label: '인원', width: 'w-20', type: 'number' },
+            { key: 'task_name', label: '부서', width: 'w-40', readonly: true },
+            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS, readonly: true },
             { key: 'worker_type', label: '직군/메모', width: 'w-32' },
             { key: 'unit', label: '단위', width: 'w-20', options: ['H', 'D', 'W', 'M'] },
             { key: 'quantity', label: '시간/기간', width: 'w-20', type: 'number' },
@@ -435,8 +432,8 @@ const BudgetProjectEditor = () => {
         ],
         labor: [
             { key: 'equipment_name', label: '설비', width: 'w-32' },
-            { key: 'task_name', label: '작업명(집행)', width: 'w-40' },
-            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS },
+            { key: 'task_name', label: '작업명(집행)', width: 'w-40', readonly: true },
+            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS, readonly: true },
             { key: 'worker_type', label: '직군(집행)', width: 'w-32' },
             { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
             { key: 'memo', label: '비고', width: 'w-48' },
@@ -560,11 +557,12 @@ const BudgetProjectEditor = () => {
 
     const addLaborDepartmentRow = ({ department, staffingType }) => {
         const targetDepartment = String(department || '').trim();
+        const normalizedStaffingType = staffingType === '외주' ? '외주' : '자체';
         if (!targetDepartment) return;
         setDetails((prev) => {
             const source = [...(prev.labor_items || [])];
             const phaseRows = source.filter((row) => (row.phase || 'fabrication') === currentPhase)
-                .filter((row) => String(row.staffing_type || '자체') === staffingType);
+                .filter((row) => String(row.staffing_type || '자체') === normalizedStaffingType);
             const equipmentFallback = phaseRows.find((row) => String(row?.equipment_name || '').trim())?.equipment_name || '';
             const duplicateCount = phaseRows.filter((row) => {
                 const name = String(row.task_name || '').trim();
@@ -574,15 +572,24 @@ const BudgetProjectEditor = () => {
                 ? `${targetDepartment}(${duplicateCount + 1})`
                 : targetDepartment;
 
-            source.push({
+            const newRow = {
                 ...buildEmptyBudgetRow('labor', currentPhase),
                 equipment_name: equipmentFallback,
                 task_name: nextDepartmentName,
-                staffing_type: staffingType,
+                staffing_type: normalizedStaffingType,
+                unit: normalizedStaffingType === '외주' ? 'D' : 'H',
                 location_type: currentPhase === 'installation'
                     ? projectInstallationInfo.locale
                     : 'domestic',
-            });
+            };
+            const firstEmptyIndex = source.findIndex(
+                (row) => (row.phase || 'fabrication') === currentPhase && isBudgetRowEmpty(row, 'labor'),
+            );
+            if (firstEmptyIndex >= 0) {
+                source[firstEmptyIndex] = { ...source[firstEmptyIndex], ...newRow };
+            } else {
+                source.push(newRow);
+            }
 
             return {
                 ...prev,
@@ -622,10 +629,9 @@ const BudgetProjectEditor = () => {
             const installationManDays = laborRows
                 .filter((row) => (row.phase || 'fabrication') === 'installation')
                 .reduce((sum, row) => {
-                    const headcount = toNumber(row.headcount) || 1;
                     const locationType = projectInstallationInfo.locale;
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
-                    return sum + ((hours / 8) * headcount);
+                    return sum + (hours / 8);
                 }, 0);
 
             const autoRows = [];
@@ -817,7 +823,7 @@ const BudgetProjectEditor = () => {
         setDetails((prev) => {
             const newList = [...(prev[activeKey] || [])];
             const row = { ...newList[index] };
-            if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount', 'headcount'].includes(key)) {
+            if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
                 row[key] = String(value || '').toUpperCase();
@@ -1895,7 +1901,7 @@ const ExcelTable = ({
                                                 'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
                                                 isCellEditable
                                                     ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
-                                                    : 'bg-slate-50 text-slate-400',
+                                                    : 'bg-slate-100 text-slate-600 font-black',
                                                 isEditingCurrentCell ? 'cursor-text' : 'cursor-default',
                                             )}
                                             value={displayValue}

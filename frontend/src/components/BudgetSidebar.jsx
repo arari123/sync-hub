@@ -65,8 +65,8 @@ const BudgetSidebar = ({
     };
 
     return (
-        <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
-            <div className="p-6 border-b bg-white">
+        <aside className="w-full max-h-[38vh] border-b bg-slate-50/50 flex flex-col shrink-0 xl:w-72 xl:max-h-none xl:border-b-0 xl:border-r">
+            <div className="p-4 border-b bg-white sm:p-5 xl:p-6">
                 <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cost Summary</h2>
                 <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-200">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{modeLabel} Total</p>
@@ -79,7 +79,7 @@ const BudgetSidebar = ({
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar sm:p-4">
                 <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                     <div className="px-3 py-2.5 border-b bg-slate-50">
                         <div className="flex items-center justify-between gap-2">

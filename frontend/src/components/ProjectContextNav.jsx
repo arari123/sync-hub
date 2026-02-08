@@ -107,87 +107,89 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
 
     return (
         <nav className={cn('rounded-xl border bg-white/95 p-1.5 shadow-sm', className)}>
-            <div className="flex flex-wrap items-center gap-1.5">
-                {MENU_ITEMS.map((item) => {
-                    const to = `${basePath}${item.subPath}`;
-                    const isActive = isMenuItemActive(item.key, location.pathname, basePath);
-                    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
-                    const Icon = item.icon;
+            <div className="overflow-x-auto">
+                <div className="flex min-w-max items-center gap-1.5 whitespace-nowrap">
+                    {MENU_ITEMS.map((item) => {
+                        const to = `${basePath}${item.subPath}`;
+                        const isActive = isMenuItemActive(item.key, location.pathname, basePath);
+                        const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                        const Icon = item.icon;
 
-                    if (!hasChildren) {
+                        if (!hasChildren) {
+                            return (
+                                <Link
+                                    key={item.key}
+                                    to={to}
+                                    className={cn(
+                                        'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[10.5px] font-semibold transition-colors',
+                                        isActive
+                                            ? 'border-primary/45 bg-primary/10 text-primary shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                                    )}
+                                >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {item.label}
+                                </Link>
+                            );
+                        }
+
+                        const isOpen = openMenuKey === item.key;
                         return (
-                            <Link
-                                key={item.key}
-                                to={to}
-                                className={cn(
-                                    'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[10.5px] font-semibold transition-colors',
-                                    isActive
-                                        ? 'border-primary/45 bg-primary/10 text-primary shadow-sm'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
-                                )}
-                            >
-                                <Icon className="h-3.5 w-3.5" />
-                                {item.label}
-                            </Link>
-                        );
-                    }
-
-                    const isOpen = openMenuKey === item.key;
-                    return (
-                        <div
-                            key={item.key}
-                            className="relative"
-                            onMouseEnter={() => keepMenuOpen(item.key)}
-                            onMouseLeave={scheduleMenuClose}
-                            onFocusCapture={() => keepMenuOpen(item.key)}
-                            onBlurCapture={scheduleMenuClose}
-                        >
-                            <Link
-                                to={to}
-                                className={cn(
-                                    'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[10.5px] font-semibold transition-colors',
-                                    isActive
-                                        ? 'border-primary/45 bg-primary/10 text-primary shadow-sm'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
-                                )}
-                            >
-                                <Icon className="h-3.5 w-3.5" />
-                                {item.label}
-                                <ChevronDown className={cn('h-3 w-3 opacity-70 transition-transform', isOpen && 'rotate-180')} />
-                            </Link>
-
                             <div
-                                className={cn(
-                                    'absolute left-0 top-full z-30 mt-1 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg transition-all',
-                                    isOpen
-                                        ? 'pointer-events-auto translate-y-0 opacity-100'
-                                        : 'pointer-events-none translate-y-1 opacity-0',
-                                )}
+                                key={item.key}
+                                className="relative"
+                                onMouseEnter={() => keepMenuOpen(item.key)}
+                                onMouseLeave={scheduleMenuClose}
+                                onFocusCapture={() => keepMenuOpen(item.key)}
+                                onBlurCapture={scheduleMenuClose}
                             >
-                                {item.children.map((child) => {
-                                    const childTo = `${basePath}${child.subPath}`;
-                                    const isChildActive = isChildItemActive(location.pathname, basePath, child.subPath);
-                                    const ChildIcon = child.icon;
-                                    return (
-                                        <Link
-                                            key={child.key}
-                                            to={childTo}
-                                            className={cn(
-                                                'flex h-7 items-center gap-1.5 rounded-md px-2 text-[10.5px] font-semibold transition-colors',
-                                                isChildActive
-                                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                                    : 'text-slate-600 hover:bg-slate-100',
-                                            )}
-                                        >
-                                            <ChildIcon className="h-3.5 w-3.5" />
-                                            {child.label}
-                                        </Link>
-                                    );
-                                })}
+                                <Link
+                                    to={to}
+                                    className={cn(
+                                        'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[10.5px] font-semibold transition-colors',
+                                        isActive
+                                            ? 'border-primary/45 bg-primary/10 text-primary shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                                    )}
+                                >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {item.label}
+                                    <ChevronDown className={cn('h-3 w-3 opacity-70 transition-transform', isOpen && 'rotate-180')} />
+                                </Link>
+
+                                <div
+                                    className={cn(
+                                        'absolute left-0 top-full z-30 mt-1 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg transition-all',
+                                        isOpen
+                                            ? 'pointer-events-auto translate-y-0 opacity-100'
+                                            : 'pointer-events-none translate-y-1 opacity-0',
+                                    )}
+                                >
+                                    {item.children.map((child) => {
+                                        const childTo = `${basePath}${child.subPath}`;
+                                        const isChildActive = isChildItemActive(location.pathname, basePath, child.subPath);
+                                        const ChildIcon = child.icon;
+                                        return (
+                                            <Link
+                                                key={child.key}
+                                                to={childTo}
+                                                className={cn(
+                                                    'flex h-7 items-center gap-1.5 rounded-md px-2 text-[10.5px] font-semibold transition-colors',
+                                                    isChildActive
+                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                        : 'text-slate-600 hover:bg-slate-100',
+                                                )}
+                                            >
+                                                <ChildIcon className="h-3.5 w-3.5" />
+                                                {child.label}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </nav>
     );

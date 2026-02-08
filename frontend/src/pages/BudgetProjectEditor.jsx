@@ -1865,7 +1865,7 @@ const BudgetProjectEditor = () => {
     }
 
     return (
-        <div className="flex h-screen border-t border-slate-200 overflow-hidden">
+        <div className="flex h-screen flex-col border-t border-slate-200 overflow-hidden xl:flex-row">
             <BudgetSidebar
                 aggregation={aggregation}
                 summary={sidebarSummary}
@@ -1876,7 +1876,7 @@ const BudgetProjectEditor = () => {
                 onSelectTreeNode={handleSelectScopeNode}
             />
 
-            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
+            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-0 space-y-2 sm:px-4 lg:px-6 xl:px-8 flex flex-col min-w-0">
                 <div className="flex-none">
                     <ProjectPageHeader
                         projectId={projectId}

@@ -407,3 +407,22 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (재료비 입력 페이지 반응형 붕괴 보강)
+  - 요구 반영:
+    - 브라우저 창폭 축소 시 재료비 입력 페이지의 브레드크럼/상단 메뉴/프로젝트 제목/입력 트리 레이아웃 붕괴 완화
+  - 조치:
+    - `BudgetBreadcrumb`: nowrap + 가로 스크롤 구조로 변경(`className` 확장 포함)
+    - `ProjectContextNav`: 메뉴 행을 nowrap + 가로 스크롤로 변경
+    - `ProjectPageHeader`: `lg` 기준 2열 전환, 제목 `truncate` 적용, 메뉴 영역 폭 제약 재조정
+    - `BudgetProjectEditor`: `xl` 이하에서 세로 레이아웃 전환, 메인 패딩 반응형 축소
+    - `BudgetSidebar`: `xl` 이하에서 상단 배치 + 높이 제한 적용
+  - 관련 파일:
+    - `frontend/src/components/BudgetBreadcrumb.jsx`
+    - `frontend/src/components/ProjectContextNav.jsx`
+    - `frontend/src/components/ProjectPageHeader.jsx`
+    - `frontend/src/components/BudgetSidebar.jsx`
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+    - `.agent/execplans/2026-02-08-material-editor-responsive-hardening.md`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

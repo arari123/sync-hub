@@ -12,11 +12,16 @@ const ProjectPageHeader = ({
     actions = null,
 }) => {
     return (
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-                <BudgetBreadcrumb items={breadcrumbItems} />
+                <BudgetBreadcrumb items={breadcrumbItems} className="mb-2" />
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-black tracking-tight text-slate-900">{projectName || '프로젝트'}</h1>
+                    <h1
+                        className="max-w-full truncate text-2xl font-black tracking-tight text-slate-900"
+                        title={projectName || '프로젝트'}
+                    >
+                        {projectName || '프로젝트'}
+                    </h1>
                     {projectCode && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-bold tracking-tight text-slate-500">
                             {projectCode}
@@ -35,7 +40,7 @@ const ProjectPageHeader = ({
                 </div>
             </div>
 
-            <div className="w-full space-y-2 md:w-auto md:min-w-[540px]">
+            <div className="w-full space-y-2 lg:w-[min(62%,840px)] lg:min-w-[420px]">
                 <ProjectContextNav projectId={projectId} />
                 {actions && (
                     <div className="flex flex-wrap items-center justify-end gap-2">

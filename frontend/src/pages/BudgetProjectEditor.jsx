@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Navigate, useParams } from 'react-router-dom';
-import { BarChart3, CheckCircle2, ClipboardPaste, Package, Save, Users, Wallet } from 'lucide-react';
+import { BarChart3, CheckCircle2, Package, Save, Users, Wallet } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 import BudgetSidebar from '../components/BudgetSidebar';
@@ -667,16 +667,6 @@ const BudgetProjectEditor = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
-    const updateBudgetSettings = (patch) => {
-        setDetails((prev) => ({
-            ...prev,
-            budget_settings: mergeBudgetSettings({
-                ...(prev?.budget_settings || {}),
-                ...(typeof patch === 'function' ? patch(prev?.budget_settings || {}) : patch),
-            }),
-        }));
-    };
-
     const addLaborDepartmentRow = ({ department, staffingType }) => {
         const targetDepartment = String(department || '').trim();
         const normalizedStaffingType = staffingType === '외주' ? '외주' : '자체';
@@ -736,6 +726,13 @@ const BudgetProjectEditor = () => {
                 : 'domestic';
             const targetEquipmentName = activeEquipmentName;
             const targetExpenseType = activeExpenseType;
+            const isOutsourceExpense = targetExpenseType === '외주';
+            const outsourceAutoFormulas = new Set([
+                AUTO_EXPENSE_FORMULAS.TRIP,
+                AUTO_EXPENSE_FORMULAS.LODGING,
+                AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
+                AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
+            ]);
 
             const materialRows = prev.material_items || [];
             const laborRows = prev.labor_items || [];
@@ -814,144 +811,116 @@ const BudgetProjectEditor = () => {
             };
 
             const autoRows = [];
+            const pushExpenseRow = ({
+                formula,
+                name,
+                basis,
+                amount = 0,
+                quantity = '',
+            }) => {
+                const autoEnabled = !isOutsourceExpense || outsourceAutoFormulas.has(formula);
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_type: targetExpenseType,
-                    expense_name: '프로젝트 운영비',
-                    basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
-                    amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
-                    is_auto: true,
+                    expense_name: name,
+                    basis: autoEnabled ? basis : '수동 입력',
+                    quantity: autoEnabled ? quantity : '',
+                    amount: autoEnabled ? amount : 0,
+                    is_auto: autoEnabled,
                     lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
+                    auto_formula: formula,
                 });
-            autoRows.push({
-                ...buildEmptyBudgetRow('expense', phase),
-                equipment_name: targetEquipmentName,
-                expense_type: targetExpenseType,
-                expense_name: '소모품비',
+            };
+
+            pushExpenseRow({
+                formula: AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
+                name: '프로젝트 운영비',
+                basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
+                amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
+            });
+            pushExpenseRow({
+                formula: AUTO_EXPENSE_FORMULAS.CONSUMABLES,
+                name: '소모품비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.consumable_ratio_fabrication)}%`
                     : `총 재료비 ${toNumber(settings.consumable_ratio_installation)}%`,
-                    amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
-                        phase === 'fabrication'
-                            ? toNumber(settings.consumable_ratio_fabrication)
-                            : toNumber(settings.consumable_ratio_installation)
-                    ) / 100),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.CONSUMABLES,
-                });
-            autoRows.push({
-                ...buildEmptyBudgetRow('expense', phase),
-                equipment_name: targetEquipmentName,
-                expense_type: targetExpenseType,
-                expense_name: '공구비',
+                amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
+                    phase === 'fabrication'
+                        ? toNumber(settings.consumable_ratio_fabrication)
+                        : toNumber(settings.consumable_ratio_installation)
+                ) / 100),
+            });
+            pushExpenseRow({
+                formula: AUTO_EXPENSE_FORMULAS.TOOLS,
+                name: '공구비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.tool_ratio_fabrication)}%`
                     : `총 재료비 ${toNumber(settings.tool_ratio_installation)}%`,
-                    amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
-                        phase === 'fabrication'
-                            ? toNumber(settings.tool_ratio_fabrication)
-                            : toNumber(settings.tool_ratio_installation)
-                    ) / 100),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.TOOLS,
-                });
+                amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
+                    phase === 'fabrication'
+                        ? toNumber(settings.tool_ratio_fabrication)
+                        : toNumber(settings.tool_ratio_installation)
+                ) / 100),
+            });
 
             if (phase === 'fabrication' || locale === 'domestic') {
                 const tripQuantity = installationManDays;
                 const lodgingQuantity = installationManDays;
                 const transportQuantity = defaultTransportBundle;
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '출장비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.TRIP,
+                    name: '출장비',
                     basis: `출장 횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원`,
                     quantity: tripQuantity,
                     amount: Math.floor(tripQuantity * domesticTripDaily),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
                 });
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '숙박비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.LODGING,
+                    name: '숙박비',
                     basis: `숙박 횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원`,
                     quantity: lodgingQuantity,
                     amount: Math.floor(lodgingQuantity * domesticLodgingDaily),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
                 });
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '국내 교통비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
+                    name: '국내 교통비',
                     basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
                     quantity: transportQuantity,
                     amount: Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                 });
             } else {
                 const tripQuantity = installationManDays;
                 const lodgingQuantity = installationManDays;
                 const transportQuantity = defaultOverseasTransportCount;
                 const airfareQuantity = installationManDays;
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '출장비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.TRIP,
+                    name: '출장비',
                     basis: `출장 횟수/MD * ${overseasTripDaily.toLocaleString('ko-KR')}원`,
                     quantity: tripQuantity,
                     amount: Math.floor(tripQuantity * overseasTripDaily),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
                 });
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '숙박비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.LODGING,
+                    name: '숙박비',
                     basis: `숙박 횟수/MD * ${overseasLodgingDaily.toLocaleString('ko-KR')}원`,
                     quantity: lodgingQuantity,
                     amount: Math.floor(lodgingQuantity * overseasLodgingDaily),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
                 });
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '해외 교통비',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
+                    name: '해외 교통비',
                     basis: '해외 교통비 단가 수동 입력 (횟수 자동 제안)',
                     quantity: transportQuantity,
                     amount: 0,
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
                 });
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: '항공료',
+                pushExpenseRow({
+                    formula: AUTO_EXPENSE_FORMULAS.AIRFARE,
+                    name: '항공료',
                     basis: `항공 횟수/MD * ${overseasAirfareDaily.toLocaleString('ko-KR')}원`,
                     quantity: airfareQuantity,
                     amount: Math.floor(airfareQuantity * overseasAirfareDaily),
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: AUTO_EXPENSE_FORMULAS.AIRFARE,
                 });
             }
 
@@ -960,16 +929,11 @@ const BudgetProjectEditor = () => {
                 ['도비 비용', AUTO_EXPENSE_FORMULAS.DOBI],
                 ['기타 비용', AUTO_EXPENSE_FORMULAS.OTHER],
             ].forEach(([name, formula]) => {
-                autoRows.push({
-                    ...buildEmptyBudgetRow('expense', phase),
-                    equipment_name: targetEquipmentName,
-                    expense_type: targetExpenseType,
-                    expense_name: name,
+                pushExpenseRow({
+                    formula,
+                    name,
                     basis: '수동 입력',
                     amount: 0,
-                    is_auto: true,
-                    lock_auto: false,
-                    auto_formula: formula,
                 });
             });
 
@@ -1001,6 +965,7 @@ const BudgetProjectEditor = () => {
                     quantity: (
                         !forceReset
                         && current
+                        && generated.is_auto
                         && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
                         && current.quantity !== undefined
                         && current.quantity !== null
@@ -1009,6 +974,7 @@ const BudgetProjectEditor = () => {
                     amount: (
                         !forceReset
                         && current
+                        && generated.is_auto
                         && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
                     )
                         ? computeAutoExpenseAmountByQuantity({
@@ -1106,6 +1072,7 @@ const BudgetProjectEditor = () => {
                 section === 'expense'
                 && activeMode === 'budget'
                 && key === 'quantity'
+                && row.is_auto
                 && row.auto_formula
             ) {
                 const settings = mergeBudgetSettings(prev?.budget_settings);
@@ -1624,24 +1591,10 @@ const BudgetProjectEditor = () => {
                                             onClick={() => autoFillExpenseRows({ forceReset: true })}
                                             className="h-8 rounded-lg px-3 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200"
                                         >
-                                            경비 자동 산정 초기화
+                                            경비 자동 산정
                                         </button>
-                                        <input
-                                            type="text"
-                                            value={toNumber(budgetSettings.domestic_distance_km).toLocaleString('ko-KR')}
-                                            onChange={(event) => updateBudgetSettings({ domestic_distance_km: toNumber(event.target.value) })}
-                                            className="h-8 w-28 rounded-md border bg-white px-2 text-[11px]"
-                                            placeholder="왕복거리(km)"
-                                        />
                                     </div>
                                 )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
-                                    <ClipboardPaste size={12} />
-                                    <span>{canEditScopedRows ? '엑셀 붙여넣기 가능' : '현재 상태에서는 수정 불가'}</span>
-                                </div>
                             </div>
                         </div>
 

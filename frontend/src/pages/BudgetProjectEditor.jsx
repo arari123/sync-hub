@@ -55,6 +55,13 @@ const AUTO_EXPENSE_FORMULAS = {
     DOBI: 'dobi',
     OTHER: 'other',
 };
+const AUTO_EXPENSE_QUANTITY_FORMULAS = new Set([
+    AUTO_EXPENSE_FORMULAS.TRIP,
+    AUTO_EXPENSE_FORMULAS.LODGING,
+    AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
+    AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
+    AUTO_EXPENSE_FORMULAS.AIRFARE,
+]);
 
 const COMMON_EQUIPMENT_NAME = '공통';
 
@@ -247,6 +254,7 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
         expense_name: '',
         lock_auto: false,
         basis: '',
+        quantity: '',
         amount: 0,
         is_auto: false,
         auto_formula: '',
@@ -505,6 +513,7 @@ const BudgetProjectEditor = () => {
             { key: 'expense_name', label: '경비 항목', width: 'w-48', readonly: true },
             { key: 'lock_auto', label: '잠금', width: 'w-20', options: ['해제', '잠금'] },
             { key: 'basis', label: '산정 기준', width: 'w-48', readonly: true },
+            { key: 'quantity', label: '횟수/MD', width: 'w-24', type: 'number' },
             { key: 'amount', label: '예산금액', width: 'w-32', type: 'number' },
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
@@ -740,6 +749,44 @@ const BudgetProjectEditor = () => {
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
                     return sum + (hours / 8);
                 }, 0);
+            const domesticTripDaily = toNumber(settings.domestic_trip_daily) || 32000;
+            const domesticLodgingDaily = toNumber(settings.domestic_lodging_daily) || 70000;
+            const domesticDistanceKm = toNumber(settings.domestic_distance_km) || 0;
+            const domesticTransportPerKm = toNumber(settings.domestic_transport_per_km) || 250;
+            const overseasTripDaily = toNumber(settings.overseas_trip_daily) || 120000;
+            const overseasLodgingDaily = toNumber(settings.overseas_lodging_daily) || 200000;
+            const overseasAirfareDaily = toNumber(settings.overseas_airfare_daily) || 350000;
+            const overseasTransportDailyCount = toNumber(settings.overseas_transport_daily_count) || 1;
+            const isDomesticExpenseFormula = phase === 'fabrication' || locale === 'domestic';
+            const defaultTransportBundle = Math.ceil(installationManDays / 5);
+            const defaultOverseasTransportCount = Math.ceil(installationManDays * overseasTransportDailyCount);
+            const computeAutoExpenseAmountByQuantity = ({
+                formula,
+                quantity,
+                generatedAmount,
+                currentAmount,
+            }) => {
+                const qty = toNumber(quantity);
+                if (formula === AUTO_EXPENSE_FORMULAS.TRIP) {
+                    const rate = isDomesticExpenseFormula ? domesticTripDaily : overseasTripDaily;
+                    return Math.floor(qty * rate);
+                }
+                if (formula === AUTO_EXPENSE_FORMULAS.LODGING) {
+                    const rate = isDomesticExpenseFormula ? domesticLodgingDaily : overseasLodgingDaily;
+                    return Math.floor(qty * rate);
+                }
+                if (formula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
+                    return Math.floor(qty * domesticDistanceKm * domesticTransportPerKm);
+                }
+                if (formula === AUTO_EXPENSE_FORMULAS.AIRFARE) {
+                    return Math.floor(qty * overseasAirfareDaily);
+                }
+                if (formula === AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT) {
+                    const current = toNumber(currentAmount);
+                    return current > 0 ? current : toNumber(generatedAmount);
+                }
+                return toNumber(generatedAmount);
+            };
 
             const autoRows = [];
                 autoRows.push({
@@ -786,20 +833,16 @@ const BudgetProjectEditor = () => {
                 });
 
             if (phase === 'fabrication' || locale === 'domestic') {
-                const trip = Math.floor(installationManDays * (toNumber(settings.domestic_trip_daily) || 32000));
-                const lodging = Math.floor(installationManDays * (toNumber(settings.domestic_lodging_daily) || 70000));
-                const transportBundle = Math.ceil(installationManDays / 5);
-                const transport = Math.floor(
-                    transportBundle
-                    * (toNumber(settings.domestic_distance_km) || 0)
-                    * (toNumber(settings.domestic_transport_per_km) || 250)
-                );
+                const tripQuantity = installationManDays;
+                const lodgingQuantity = installationManDays;
+                const transportQuantity = defaultTransportBundle;
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '출장비',
-                    basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_trip_daily) || 32000).toLocaleString('ko-KR')}원`,
-                    amount: trip,
+                    basis: `출장 횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원`,
+                    quantity: tripQuantity,
+                    amount: Math.floor(tripQuantity * domesticTripDaily),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
@@ -808,8 +851,9 @@ const BudgetProjectEditor = () => {
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '숙박비',
-                    basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_lodging_daily) || 70000).toLocaleString('ko-KR')}원`,
-                    amount: lodging,
+                    basis: `숙박 횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원`,
+                    quantity: lodgingQuantity,
+                    amount: Math.floor(lodgingQuantity * domesticLodgingDaily),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
@@ -818,19 +862,25 @@ const BudgetProjectEditor = () => {
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '국내 교통비',
-                    basis: `${transportBundle}회 * ${(toNumber(settings.domestic_distance_km) || 0).toLocaleString('ko-KR')}km * ${(toNumber(settings.domestic_transport_per_km) || 250).toLocaleString('ko-KR')}원`,
-                    amount: transport,
+                    basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
+                    quantity: transportQuantity,
+                    amount: Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                 });
             } else {
+                const tripQuantity = installationManDays;
+                const lodgingQuantity = installationManDays;
+                const transportQuantity = defaultOverseasTransportCount;
+                const airfareQuantity = installationManDays;
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '출장비',
-                    basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_trip_daily) || 120000).toLocaleString('ko-KR')}원`,
-                    amount: Math.floor(installationManDays * (toNumber(settings.overseas_trip_daily) || 120000)),
+                    basis: `출장 횟수/MD * ${overseasTripDaily.toLocaleString('ko-KR')}원`,
+                    quantity: tripQuantity,
+                    amount: Math.floor(tripQuantity * overseasTripDaily),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
@@ -839,8 +889,9 @@ const BudgetProjectEditor = () => {
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '숙박비',
-                    basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_lodging_daily) || 200000).toLocaleString('ko-KR')}원`,
-                    amount: Math.floor(installationManDays * (toNumber(settings.overseas_lodging_daily) || 200000)),
+                    basis: `숙박 횟수/MD * ${overseasLodgingDaily.toLocaleString('ko-KR')}원`,
+                    quantity: lodgingQuantity,
+                    amount: Math.floor(lodgingQuantity * overseasLodgingDaily),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
@@ -849,7 +900,8 @@ const BudgetProjectEditor = () => {
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '해외 교통비',
-                    basis: `해외 교통비 단가 수동 입력 필요 (자동 산정 수량: ${Math.ceil(installationManDays * (toNumber(settings.overseas_transport_daily_count) || 1))})`,
+                    basis: '해외 교통비 단가 수동 입력 (횟수 자동 제안)',
+                    quantity: transportQuantity,
                     amount: 0,
                     is_auto: true,
                     lock_auto: false,
@@ -859,8 +911,9 @@ const BudgetProjectEditor = () => {
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_name: '항공료',
-                    basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_airfare_daily) || 350000).toLocaleString('ko-KR')}원`,
-                    amount: Math.floor(installationManDays * (toNumber(settings.overseas_airfare_daily) || 350000)),
+                    basis: `항공 횟수/MD * ${overseasAirfareDaily.toLocaleString('ko-KR')}원`,
+                    quantity: airfareQuantity,
+                    amount: Math.floor(airfareQuantity * overseasAirfareDaily),
                     is_auto: true,
                     lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.AIRFARE,
@@ -908,6 +961,26 @@ const BudgetProjectEditor = () => {
                 nextPhaseRows.push({
                     ...generated,
                     equipment_name: normalizeEquipmentName(current?.equipment_name || generated.equipment_name) || targetEquipmentName,
+                    quantity: (
+                        !forceReset
+                        && current
+                        && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
+                        && current.quantity !== undefined
+                        && current.quantity !== null
+                        && String(current.quantity).trim() !== ''
+                    ) ? toNumber(current.quantity) : generated.quantity,
+                    amount: (
+                        !forceReset
+                        && current
+                        && AUTO_EXPENSE_QUANTITY_FORMULAS.has(generated.auto_formula)
+                    )
+                        ? computeAutoExpenseAmountByQuantity({
+                            formula: generated.auto_formula,
+                            quantity: current.quantity,
+                            generatedAmount: generated.amount,
+                            currentAmount: current.amount,
+                        })
+                        : generated.amount,
                     memo: current?.memo || generated.memo,
                     lock_auto: Boolean(current?.lock_auto),
                 });
@@ -988,6 +1061,37 @@ const BudgetProjectEditor = () => {
                 row.location_type = (row.phase || 'fabrication') === 'installation'
                     ? projectInstallationInfo.locale
                     : 'domestic';
+            }
+            if (
+                section === 'expense'
+                && activeMode === 'budget'
+                && key === 'quantity'
+                && row.auto_formula
+            ) {
+                const settings = mergeBudgetSettings(prev?.budget_settings);
+                settings.installation_locale = projectInstallationInfo.locale;
+                const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                const locale = rowPhase === 'installation' ? projectInstallationInfo.locale : 'domestic';
+                const qty = toNumber(row.quantity);
+                if (row.auto_formula === AUTO_EXPENSE_FORMULAS.TRIP) {
+                    const rate = (rowPhase === 'fabrication' || locale === 'domestic')
+                        ? (toNumber(settings.domestic_trip_daily) || 32000)
+                        : (toNumber(settings.overseas_trip_daily) || 120000);
+                    row.amount = Math.floor(qty * rate);
+                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.LODGING) {
+                    const rate = (rowPhase === 'fabrication' || locale === 'domestic')
+                        ? (toNumber(settings.domestic_lodging_daily) || 70000)
+                        : (toNumber(settings.overseas_lodging_daily) || 200000);
+                    row.amount = Math.floor(qty * rate);
+                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
+                    row.amount = Math.floor(
+                        qty
+                        * (toNumber(settings.domestic_distance_km) || 0)
+                        * (toNumber(settings.domestic_transport_per_km) || 250),
+                    );
+                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.AIRFARE) {
+                    row.amount = Math.floor(qty * (toNumber(settings.overseas_airfare_daily) || 350000));
+                }
             }
             newList[index] = row;
 

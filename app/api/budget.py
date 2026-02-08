@@ -143,6 +143,7 @@ class ExpenseDetailItem(BaseModel):
     equipment_name: str = Field(..., min_length=1, max_length=180)
     expense_name: str = Field(default="", max_length=180)
     basis: str = Field(default="", max_length=180)
+    quantity: float = 0.0
     amount: float = 0.0
     is_auto: bool = False
     auto_formula: str = Field(default="", max_length=120)
@@ -714,6 +715,7 @@ def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
                 (item.get("equipment_name") or "").strip(),
                 (item.get("expense_name") or "").strip(),
                 (item.get("basis") or "").strip(),
+                to_number(item.get("quantity")),
                 to_number(item.get("amount")),
                 normalize_phase(item.get("phase") or "fabrication"),
             )

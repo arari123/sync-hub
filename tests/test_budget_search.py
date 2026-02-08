@@ -43,6 +43,36 @@ class BudgetSearchTests(unittest.TestCase):
         score = _project_search_score(payload, "라인 프로파일 센서 개선", tokens)
         self.assertGreater(score, 0.0)
 
+    def test_installation_site_query_is_scored(self):
+        payload = {
+            "name": "2차 조립라인 구축",
+            "description": "설치 일정 수립",
+            "code": "SIM-EQ-020",
+            "customer_name": "한빛정밀",
+            "manager_name": "admin",
+            "installation_site": "울산 북구 공장",
+            "equipment_names": ["검사기A"],
+        }
+
+        tokens = _tokenize_search_query("울산 북구")
+        score = _project_search_score(payload, "울산 북구", tokens)
+        self.assertGreater(score, 0.0)
+
+    def test_equipment_name_query_is_scored(self):
+        payload = {
+            "name": "검사라인 개선",
+            "description": "",
+            "code": "SIM-EQ-021",
+            "customer_name": "미래테크",
+            "manager_name": "admin",
+            "installation_site": "대전",
+            "equipment_names": ["레이저 마킹기", "비전 검사기"],
+        }
+
+        tokens = _tokenize_search_query("비전 검사기")
+        score = _project_search_score(payload, "비전 검사기", tokens)
+        self.assertGreater(score, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

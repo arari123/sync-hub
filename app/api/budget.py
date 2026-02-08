@@ -792,8 +792,17 @@ def _serialize_project(
     current_version: Optional[models.BudgetVersion] = None,
 ) -> dict:
     current = current_version or _get_current_version_for_project(project, db)
+    equipment_names: list[str] = []
     if current:
-        totals = summarize_costs(_version_equipments(current.id, db))
+        equipments = _version_equipments(current.id, db)
+        totals = summarize_costs(equipments)
+        seen_equipment_names: set[str] = set()
+        for item in equipments:
+            name = (item.equipment_name or "").strip()
+            if not name or name in seen_equipment_names:
+                continue
+            seen_equipment_names.add(name)
+            equipment_names.append(name)
         detail_payload = parse_detail_payload(current.budget_detail_json or "")
         executed_summary = summarize_executed_costs_from_detail(detail_payload)
         current_version_id = int(current.id)
@@ -827,6 +836,7 @@ def _serialize_project(
         "project_type_label": _project_type_label(project.project_type),
         "customer_name": project.customer_name or "",
         "installation_site": project.installation_site or "",
+        "equipment_names": equipment_names,
         "business_trip_distance_km": to_number(project.business_trip_distance_km),
         "cover_image_url": custom_cover_image_url,
         "cover_image_fallback_url": generated_cover_image_url,
@@ -922,6 +932,11 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
     code = (project_payload.get("code") or "").strip()
     customer_name = (project_payload.get("customer_name") or "").strip()
     manager_name = (project_payload.get("manager_name") or "").strip()
+    installation_site = (project_payload.get("installation_site") or "").strip()
+    equipment_names = project_payload.get("equipment_names") or []
+    equipment_name_text = " ".join(
+        (str(item or "").strip() for item in equipment_names if str(item or "").strip())
+    ).strip()
 
     query_lower = (query or "").strip().lower()
     name_lower = name.lower()
@@ -929,9 +944,21 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
     code_lower = code.lower()
     customer_lower = customer_name.lower()
     manager_lower = manager_name.lower()
+    installation_site_lower = installation_site.lower()
+    equipment_name_lower = equipment_name_text.lower()
 
     haystack = " ".join(
-        part for part in (name, description, code, customer_name, manager_name) if part
+        part
+        for part in (
+            name,
+            description,
+            code,
+            customer_name,
+            manager_name,
+            installation_site,
+            equipment_name_text,
+        )
+        if part
     ).lower()
     if not haystack:
         return 0.0
@@ -956,6 +983,12 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
         if query_lower in manager_lower:
             score += 2.2
             exact_phrase_match = True
+        if query_lower in installation_site_lower:
+            score += 1.9
+            exact_phrase_match = True
+        if query_lower in equipment_name_lower:
+            score += 2.6
+            exact_phrase_match = True
         if query_lower in description_lower:
             score += 2.0
             exact_phrase_match = True
@@ -972,6 +1005,10 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
             score += 1.0
         if token in manager_lower:
             score += 0.9
+        if token in installation_site_lower:
+            score += 0.8
+        if token in equipment_name_lower:
+            score += 1.1
         if token in description_lower:
             score += 0.8
 

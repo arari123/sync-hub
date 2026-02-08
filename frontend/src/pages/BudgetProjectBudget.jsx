@@ -191,6 +191,10 @@ function collectEquipmentNames(projectType, equipments, details) {
     if (projectType !== 'equipment') return ['공통'];
 
     const namesFromEquipments = (equipments || []).map((item) => normalizeEquipmentName(item?.equipment_name, ''));
+    const uniqueFromEquipments = uniqueValues(namesFromEquipments);
+    if (uniqueFromEquipments.length > 0) {
+        return uniqueFromEquipments;
+    }
     const namesFromDetails = [
         ...(details?.material_items || []).map((row) => normalizeEquipmentName(row?.equipment_name, '')),
         ...(details?.labor_items || []).map((row) => normalizeEquipmentName(row?.equipment_name, '')),
@@ -200,7 +204,7 @@ function collectEquipmentNames(projectType, equipments, details) {
         ...(details?.execution_expense_items || []).map((row) => normalizeEquipmentName(row?.equipment_name, '')),
     ];
 
-    const merged = uniqueValues([...namesFromEquipments, ...namesFromDetails]);
+    const merged = uniqueValues(namesFromDetails);
     return merged.length > 0 ? merged : ['미지정 설비'];
 }
 
@@ -270,7 +274,18 @@ const BudgetProjectBudget = () => {
 
     const dashboard = useMemo(() => {
         const settings = { ...DEFAULT_LABOR_SETTINGS, ...(details?.budget_settings || {}) };
+        const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
         const equipmentNames = collectEquipmentNames(project?.project_type || 'equipment', equipments, details);
+        const allowedEquipmentSet = new Set(equipmentNames);
+        const fallbackEquipmentName = equipmentNames[0] || '미지정 설비';
+        const resolveScopedEquipmentName = (rawEquipmentName) => {
+            const normalized = normalizeEquipmentName(rawEquipmentName, '');
+            if (!normalized) return fallbackEquipmentName;
+            if (isEquipmentProject && allowedEquipmentSet.size > 0 && !allowedEquipmentSet.has(normalized)) {
+                return '';
+            }
+            return normalized;
+        };
         const equipmentMap = new Map();
 
         equipmentNames.forEach((name) => {
@@ -278,7 +293,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.material_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
             const amount = toNumber(row?.quantity) * toNumber(row?.unit_price);
@@ -294,7 +310,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.execution_material_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
             const amount = toNumber(row?.executed_amount);
@@ -308,7 +325,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.labor_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const staffingType = normalizeStaffingType(row?.staffing_type);
             const taskName = String(row?.task_name || '').trim() || '미지정 항목';
@@ -323,7 +341,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.execution_labor_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const staffingType = normalizeStaffingType(row?.staffing_type);
             const taskName = String(row?.task_name || '').trim() || '미지정 항목';
@@ -338,7 +357,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.expense_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const expenseType = normalizeExpenseType(row?.expense_type);
             const expenseName = String(row?.expense_name || '').trim() || '미지정 항목';
@@ -354,7 +374,8 @@ const BudgetProjectBudget = () => {
         });
 
         (details?.execution_expense_items || []).forEach((row) => {
-            const equipmentName = normalizeEquipmentName(row?.equipment_name, equipmentNames[0] || '미지정 설비');
+            const equipmentName = resolveScopedEquipmentName(row?.equipment_name);
+            if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const expenseType = normalizeExpenseType(row?.expense_type);
             const expenseName = String(row?.expense_name || '').trim() || '미지정 항목';

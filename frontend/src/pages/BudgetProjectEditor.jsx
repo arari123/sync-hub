@@ -1262,6 +1262,7 @@ const ExcelTable = ({
     const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
     const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
     const [selectionEnd, setSelectionEnd] = useState({ row: 0, col: 0 });
+    const [editingCell, setEditingCell] = useState(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [isFillDragging, setIsFillDragging] = useState(false);
     const [fillAnchor, setFillAnchor] = useState(null);
@@ -1286,13 +1287,13 @@ const ExcelTable = ({
         && col <= range.colMax
     );
 
-    const focusCell = (row, col) => {
+    const focusCell = (row, col, { selectText = false } = {}) => {
         const nextTarget = tableRef.current?.querySelector(
-            `[data-row="${row}"][data-col="${col}"] input, [data-row="${row}"][data-col="${col}"] select`,
+            `[data-row="${row}"][data-col="${col}"] input, [data-row="${row}"][data-col="${col}"] select, [data-row="${row}"][data-col="${col}"] [data-cell-display="true"]`,
         );
         if (!nextTarget) return;
         nextTarget.focus();
-        if (nextTarget.select) nextTarget.select();
+        if (selectText && nextTarget.select) nextTarget.select();
     };
 
     const setSingleCellSelection = (row, col) => {
@@ -1301,6 +1302,23 @@ const ExcelTable = ({
         setActiveCell({ row: nextRow, col: nextCol });
         setSelectionStart({ row: nextRow, col: nextCol });
         setSelectionEnd({ row: nextRow, col: nextCol });
+    };
+
+    const isEditing = (row, col) => (
+        editingCell?.row === row && editingCell?.col === col
+    );
+
+    const startEditingCell = (row, col, { selectText = true } = {}) => {
+        const column = columns[col];
+        if (!editable || !column || column.readonly) return;
+        setEditingCell({ row, col });
+        requestAnimationFrame(() => {
+            focusCell(row, col, { selectText });
+        });
+    };
+
+    const stopEditingCell = () => {
+        setEditingCell(null);
     };
 
     const isCellFilled = (row, col) => {
@@ -1383,6 +1401,35 @@ const ExcelTable = ({
     }, [columns, fillAnchor, fillTarget, isFillDragging, onChange, rows]);
 
     const handleKeyDown = (event, rowIndex, colIndex) => {
+        const column = columns[colIndex];
+        const isCellEditable = editable && column && !column.readonly;
+        const isPrintableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+        const isEditingCurrentCell = isEditing(rowIndex, colIndex);
+
+        if (isEditingCurrentCell) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                stopEditingCell();
+                focusCell(rowIndex, colIndex);
+                return;
+            }
+            if (!['Enter', 'Tab'].includes(event.key)) return;
+        } else if (event.key === 'F2' && isCellEditable) {
+            event.preventDefault();
+            startEditingCell(rowIndex, colIndex);
+            return;
+        } else if (isCellEditable && !column?.options && (isPrintableKey || event.key === 'Backspace' || event.key === 'Delete')) {
+            event.preventDefault();
+            let nextValue = '';
+            if (isPrintableKey) {
+                nextValue = column.type === 'number' ? event.key.replace(/[^0-9]/g, '') : event.key;
+                if (!nextValue) return;
+            }
+            onChange(rowIndex, column.key, nextValue);
+            startEditingCell(rowIndex, colIndex, { selectText: false });
+            return;
+        }
+
         if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(event.key)) return;
 
         let nextRow = rowIndex;
@@ -1402,6 +1449,10 @@ const ExcelTable = ({
 
         event.preventDefault();
 
+        if (isEditingCurrentCell) {
+            stopEditingCell();
+        }
+
         if (event.shiftKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
             setActiveCell({ row: nextRow, col: nextCol });
             setSelectionEnd({ row: nextRow, col: nextCol });
@@ -1415,6 +1466,7 @@ const ExcelTable = ({
         if (event.button !== 0) return;
         if (isFillDragging) return;
         event.preventDefault();
+        stopEditingCell();
         setActiveCell({ row: rowIndex, col: colIndex });
         if (event.shiftKey) {
             setSelectionEnd({ row: rowIndex, col: colIndex });
@@ -1424,6 +1476,10 @@ const ExcelTable = ({
         }
         setIsSelecting(true);
         focusCell(rowIndex, colIndex);
+    };
+
+    const handleCellDoubleClick = (rowIndex, colIndex) => {
+        startEditingCell(rowIndex, colIndex);
     };
 
     const handleCellMouseEnter = (rowIndex, colIndex) => {
@@ -1498,6 +1554,8 @@ const ExcelTable = ({
                                 const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
 
                                 if (col.options && isCellEditable) {
+                                    const isEditingCurrentCell = isEditing(rowIndex, colIndex);
+
                                     return (
                                         <td
                                             key={colIndex}
@@ -1510,18 +1568,35 @@ const ExcelTable = ({
                                             data-col={colIndex}
                                             onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
                                             onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                            onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
                                         >
-                                            <select
-                                                className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700"
-                                                value={String(rawValue || '').toUpperCase()}
-                                                onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
-                                                onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
-                                                onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
-                                            >
-                                                {col.options.map((opt) => (
-                                                    <option key={opt} value={opt}>{opt}</option>
-                                                ))}
-                                            </select>
+                                            {isEditingCurrentCell ? (
+                                                <select
+                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700"
+                                                    value={String(rawValue || '').toUpperCase()}
+                                                    onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
+                                                    onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                                    onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
+                                                    onBlur={() => {
+                                                        if (!isEditing(rowIndex, colIndex)) return;
+                                                        stopEditingCell();
+                                                    }}
+                                                >
+                                                    {col.options.map((opt) => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    data-cell-display="true"
+                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left text-slate-700"
+                                                    onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
+                                                    onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                                >
+                                                    {String(rawValue || '').toUpperCase()}
+                                                </button>
+                                            )}
                                             {isActive && editable && !col.readonly && (
                                                 <button
                                                     type="button"
@@ -1546,6 +1621,7 @@ const ExcelTable = ({
                                         data-col={colIndex}
                                         onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
                                         onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                        onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
                                     >
                                         <input
                                             type="text"
@@ -1563,12 +1639,15 @@ const ExcelTable = ({
                                                 if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
                                                 onChange(rowIndex, col.key, val);
                                             }}
-                                            onFocus={(event) => {
+                                            onFocus={() => {
                                                 setSingleCellSelection(rowIndex, colIndex);
-                                                event.target.select();
                                             }}
                                             onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
-                                            readOnly={!isCellEditable}
+                                            onBlur={() => {
+                                                if (!isEditing(rowIndex, colIndex)) return;
+                                                stopEditingCell();
+                                            }}
+                                            readOnly={!isCellEditable || !isEditing(rowIndex, colIndex)}
                                         />
                                         {isActive && editable && !col.readonly && (
                                             <button

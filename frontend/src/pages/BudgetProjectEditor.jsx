@@ -1514,7 +1514,7 @@ const BudgetProjectEditor = () => {
                 [activeKey]: [...source, ...buffer],
             };
         });
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, details[activeKey], section]);
 
     useEffect(() => {
         if (section === 'material') return;

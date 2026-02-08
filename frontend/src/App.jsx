@@ -37,6 +37,7 @@ function App() {
           <Route path="/project-management/projects/:projectId/joblist" element={<ProtectedRoute><PlaceholderPage title="잡리스트" description="잡리스트 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/schedule" element={<ProtectedRoute><PlaceholderPage title="일정 관리" description="일정 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/spec" element={<ProtectedRoute><PlaceholderPage title="사양 관리" description="사양 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><PlaceholderPage title="데이터 관리" description="데이터 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/fabrication" element={<ProtectedRoute><PlaceholderPage title="제작 관리" description="제작 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/installation" element={<ProtectedRoute><PlaceholderPage title="설치 관리" description="설치 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/as" element={<ProtectedRoute><PlaceholderPage title="AS 관리" description="AS 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />

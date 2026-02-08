@@ -42,6 +42,7 @@ const ACTIVE_MANAGEMENT_AREAS = [
 
 const UPCOMING_MANAGEMENT_AREAS = [
     { key: 'spec', label: '사양 관리', path: 'spec' },
+    { key: 'data', label: '데이터 관리', path: 'data' },
 ];
 
 const BudgetProjectOverview = () => {

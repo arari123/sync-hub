@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
@@ -34,11 +34,17 @@ const EMPTY_EDIT_FORM = {
     cover_image_url: '',
 };
 
+const ACTIVE_MANAGEMENT_AREAS = [
+    { key: 'budget', label: '예산 관리', path: 'budget' },
+    { key: 'joblist', label: '잡리스트', path: 'joblist' },
+    { key: 'schedule', label: '일정 관리', path: 'schedule' },
+];
+
 const UPCOMING_MANAGEMENT_AREAS = [
-    '사양 관리',
-    '제작 관리',
-    '설치 관리',
-    'AS 관리',
+    { key: 'spec', label: '사양 관리', path: 'spec' },
+    { key: 'fabrication', label: '제작 관리', path: 'fabrication' },
+    { key: 'installation', label: '설치 관리', path: 'installation' },
+    { key: 'as', label: 'AS 관리', path: 'as' },
 ];
 
 const BudgetProjectOverview = () => {
@@ -210,6 +216,33 @@ const BudgetProjectOverview = () => {
 
     const coverImageUrl = (project.cover_image_display_url || project.cover_image_url || project.cover_image_fallback_url || '').trim();
     const milestones = Array.isArray(project.summary_milestones) ? project.summary_milestones : [];
+    const baseProjectPath = `/project-management/projects/${project.id}`;
+    const budgetManagementPath = `${baseProjectPath}/budget`;
+    const scheduleManagementPath = `${baseProjectPath}/schedule`;
+    const jobListPath = `${baseProjectPath}/joblist`;
+    const managementLinks = ACTIVE_MANAGEMENT_AREAS.map((item) => ({
+        ...item,
+        to: `${baseProjectPath}/${item.path}`,
+    }));
+    const upcomingManagementLinks = UPCOMING_MANAGEMENT_AREAS.map((item) => ({
+        ...item,
+        to: `${baseProjectPath}/${item.path}`,
+    }));
+
+    const jobSummary = milestones.reduce(
+        (acc, item) => {
+            const status = String(item?.status || '').toLowerCase();
+            acc.total += 1;
+            if (status === 'done') acc.done += 1;
+            else if (status === 'active') acc.active += 1;
+            else acc.planned += 1;
+            return acc;
+        },
+        { total: 0, done: 0, active: 0, planned: 0 }
+    );
+    const upcomingJobs = milestones
+        .filter((item) => String(item?.status || '').toLowerCase() !== 'done')
+        .slice(0, 4);
 
     return (
         <div className="space-y-5 pb-12 animate-in fade-in duration-500">
@@ -227,31 +260,25 @@ const BudgetProjectOverview = () => {
                         <span className="text-xs font-bold text-slate-400 font-mono tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">{project.code || 'NO-CODE'}</span>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Link to={`/project-management/projects/${project.id}/budget`}>
-                        <Button size="sm" className="h-8 gap-1.5 font-bold px-3.5 text-xs">
-                            예산 관리
-                            <ArrowRight size={16} />
-                        </Button>
-                    </Link>
-                    {UPCOMING_MANAGEMENT_AREAS.map((label) => (
-                        <Button
-                            key={label}
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            className="h-8 px-3 text-xs text-muted-foreground"
-                            title="준비 중"
-                        >
-                            {label}
-                        </Button>
-                    ))}
-                    {!project.can_edit && (
-                        <span className="h-8 inline-flex items-center px-3 rounded-lg border bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            READ ONLY
-                        </span>
-                    )}
+                <div className="w-full md:w-auto rounded-xl border bg-card/70 p-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {managementLinks.map((item) => (
+                            <ManagementLinkButton key={item.key} to={item.to} label={item.label} />
+                        ))}
+                        {upcomingManagementLinks.map((item) => (
+                            <ManagementLinkButton
+                                key={item.key}
+                                to={item.to}
+                                label={item.label}
+                                upcoming
+                            />
+                        ))}
+                        {!project.can_edit && (
+                            <span className="ml-1 inline-flex h-7 items-center rounded-md border bg-slate-50 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                READ ONLY
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -261,27 +288,23 @@ const BudgetProjectOverview = () => {
                     label="현재 진행 단계"
                     value={project.current_stage_label || '-'}
                     subValue={`업데이트: ${formatDate(project.updated_at)}`}
-                    icon="stage"
                 />
                 <HeroCard
                     label="집행율"
                     value={`${((projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100).toFixed(1)}%`}
                     progress={(projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100}
                     subValue={`확정 예산: ${formatAmount(confirmedTotal)}`}
-                    icon="execution"
                 />
                 <HeroCard
                     label="현재 잔액"
                     value={formatAmount(remainingTotal)}
                     subValue="남은 가용 예산"
                     variant={remainingTotal < 0 ? 'destructive' : 'primary'}
-                    icon="balance"
                 />
                 <HeroCard
                     label="총 집행 금액"
                     value={formatAmount(projectActualSpentTotal)}
                     subValue={`전체 ${version?.version_no || '1'}개 버전 기반`}
-                    icon="spent"
                 />
             </div>
 
@@ -291,8 +314,8 @@ const BudgetProjectOverview = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:[grid-template-rows:minmax(0,1fr)_minmax(0,1fr)]">
-                <section className="rounded-2xl border bg-card overflow-hidden shadow-sm lg:row-span-2 h-full">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:[grid-template-rows:repeat(3,minmax(0,1fr))]">
+                <section className="rounded-2xl border bg-card overflow-hidden shadow-sm lg:row-span-3 h-full min-h-0">
                     {coverImageUrl && (
                         <div className="w-full max-w-[360px] aspect-square overflow-hidden border-b border-slate-100 mx-auto">
                             <img src={coverImageUrl} alt={project.name} className="h-full w-full object-cover" />
@@ -321,14 +344,19 @@ const BudgetProjectOverview = () => {
                     </div>
                 </section>
 
-                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0">
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-bold flex items-center gap-2">
+                        <Link to={budgetManagementPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
                             <span className="w-1 h-4 bg-primary rounded-full" />
                             예산/집행 분석
-                        </h2>
+                        </Link>
+                        <Link to={budgetManagementPath}>
+                            <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
+                                예산 관리
+                            </Button>
+                        </Link>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-3 mt-auto">
                         <VarianceRow
                             label="재료비 (Material)"
                             confirmed={confirmedMaterial}
@@ -350,12 +378,19 @@ const BudgetProjectOverview = () => {
                     </div>
                 </section>
 
-                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0">
-                    <h2 className="text-sm font-bold mb-3 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-primary rounded-full" />
-                        주요 일정 (Timeline)
-                    </h2>
-                    <div className="relative pl-3 border-l-2 border-slate-100 space-y-4 ml-1.5 max-h-[360px] overflow-auto pr-1">
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                        <Link to={scheduleManagementPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            주요 일정 (Timeline)
+                        </Link>
+                        <Link to={scheduleManagementPath}>
+                            <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
+                                일정 관리
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="relative pl-3 border-l-2 border-slate-100 space-y-4 ml-1.5 overflow-auto pr-1 flex-1 min-h-0">
                         {milestones.length > 0 ? (
                             milestones.map((item, idx) => (
                                 <TimelineItem key={item.key || idx} item={item} />
@@ -364,6 +399,39 @@ const BudgetProjectOverview = () => {
                             <p className="text-xs text-slate-400">일정 데이터가 없습니다.</p>
                         )}
                     </div>
+                </section>
+
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
+                        <Link to={jobListPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            잡리스트
+                        </Link>
+                        <Link to={jobListPath}>
+                            <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
+                                잡리스트
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                        <MiniStat label="전체" value={jobSummary.total} />
+                        <MiniStat label="진행중" value={jobSummary.active} tone="primary" />
+                        <MiniStat label="대기" value={jobSummary.planned} />
+                    </div>
+                    {upcomingJobs.length > 0 ? (
+                        <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
+                            {upcomingJobs.map((item, index) => (
+                                <div key={`${item.key || index}-${item.label || ''}`} className="rounded-md border bg-muted/20 px-2.5 py-2">
+                                    <p className="text-[11px] font-semibold truncate">{item.label || `작업 ${index + 1}`}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">목표일: {item.date || '-'}</p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex-1 min-h-0 rounded-md border border-dashed bg-muted/10 flex items-center justify-center text-[11px] text-muted-foreground text-center px-2">
+                            등록된 작업이 없습니다.
+                        </div>
+                    )}
                 </section>
             </div>
 
@@ -403,7 +471,7 @@ const BudgetProjectOverview = () => {
     );
 };
 
-const HeroCard = ({ label, value, subValue, icon, progress, variant = 'primary' }) => (
+const HeroCard = ({ label, value, subValue, progress, variant = 'primary' }) => (
     <div className="bg-card border rounded-2xl p-4 shadow-sm relative overflow-hidden group">
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{label}</p>
         <div className="flex items-baseline gap-1">
@@ -499,6 +567,32 @@ const MiniAmount = ({ label, value, color = 'muted' }) => (
     <div className="flex items-center justify-between gap-2">
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{label}</span>
         <span className={cn("text-[10px] font-semibold", color === 'primary' ? 'text-primary' : 'text-slate-600')}>{formatAmount(value)}</span>
+    </div>
+);
+
+const ManagementLinkButton = ({ to, label, upcoming = false }) => (
+    <Link
+        to={to}
+        className={cn(
+            'inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-semibold transition-colors',
+            upcoming
+                ? 'border-dashed border-muted-foreground/30 text-muted-foreground hover:bg-muted/40'
+                : 'border-primary/35 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
+        )}
+    >
+        {label}
+    </Link>
+);
+
+const MiniStat = ({ label, value, tone = 'default' }) => (
+    <div
+        className={cn(
+            'rounded-md border px-2 py-1.5 text-center',
+            tone === 'primary' ? 'border-primary/30 bg-primary/5' : 'bg-muted/15'
+        )}
+    >
+        <p className="text-[9px] text-muted-foreground">{label}</p>
+        <p className={cn('text-[12px] font-bold', tone === 'primary' ? 'text-primary' : 'text-foreground')}>{value}</p>
     </div>
 );
 

@@ -284,21 +284,20 @@ const BudgetProjectOverview = () => {
                     subValue={`업데이트: ${formatDate(project.updated_at)}`}
                 />
                 <HeroCard
-                    label="집행율"
-                    value={`${((projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100).toFixed(1)}%`}
-                    progress={(projectActualSpentTotal / Math.max(confirmedTotal, 1)) * 100}
-                    subValue={`확정 예산: ${formatAmount(confirmedTotal)}`}
+                    label="총 실행 예산"
+                    value={formatAmount(confirmedTotal)}
+                    subValue="확정 예산 기준"
+                />
+                <HeroCard
+                    label="총 집행 금액"
+                    value={formatAmount(projectActualSpentTotal)}
+                    subValue={`전체 ${version?.version_no || '1'}개 버전 기반`}
                 />
                 <HeroCard
                     label="현재 잔액"
                     value={formatAmount(remainingTotal)}
                     subValue="남은 가용 예산"
                     variant={remainingTotal < 0 ? 'destructive' : 'primary'}
-                />
-                <HeroCard
-                    label="총 집행 금액"
-                    value={formatAmount(projectActualSpentTotal)}
-                    subValue={`전체 ${version?.version_no || '1'}개 버전 기반`}
                 />
                 <HeroCard
                     label="이슈"

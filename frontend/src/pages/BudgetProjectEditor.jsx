@@ -1056,7 +1056,22 @@ const BudgetProjectEditor = () => {
             samePhaseRows.forEach((row) => {
                 const formula = String(row.auto_formula || '').trim();
                 if (!formula) return;
-                currentByFormula[formula] = row;
+                const current = currentByFormula[formula];
+                if (!current) {
+                    currentByFormula[formula] = row;
+                    return;
+                }
+                const currentLocked = Boolean(current?.lock_auto);
+                const nextLocked = Boolean(row?.lock_auto);
+                const currentManual = current?.is_auto !== true;
+                const nextManual = row?.is_auto !== true;
+                if (nextLocked && !currentLocked) {
+                    currentByFormula[formula] = row;
+                    return;
+                }
+                if (nextManual && !currentManual) {
+                    currentByFormula[formula] = row;
+                }
             });
 
             const nextPhaseRows = [];
@@ -1067,7 +1082,7 @@ const BudgetProjectEditor = () => {
                     nextPhaseRows.push(current);
                     return;
                 }
-                if (!forceReset && current && current.is_auto === false) {
+                if (!forceReset && current && current.is_auto !== true) {
                     nextPhaseRows.push(current);
                     return;
                 }

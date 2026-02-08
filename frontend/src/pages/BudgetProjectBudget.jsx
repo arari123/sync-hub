@@ -759,6 +759,7 @@ const BudgetProjectBudget = () => {
                                                                         execution={item.executionAmount}
                                                                         showExecution={showExecution}
                                                                         description={item.basis || ''}
+                                                                        zeroMuted
                                                                     />
                                                                 ))}
                                                             </div>
@@ -863,29 +864,44 @@ const CompareBar = ({ budget, execution, showExecution }) => {
     );
 };
 
-const AmountItem = ({ label, budget, execution, showExecution, description = '' }) => {
+const AmountItem = ({ label, budget, execution, showExecution, description = '', zeroMuted = false }) => {
     const remaining = toNumber(budget) - toNumber(execution);
+    const isZeroBudget = toNumber(budget) === 0;
+    const isZeroExecution = toNumber(execution) === 0;
+    const isZeroRemaining = toNumber(remaining) === 0;
+    const isZeroItem = showExecution
+        ? (isZeroBudget && isZeroExecution && isZeroRemaining)
+        : isZeroBudget;
+    const muted = zeroMuted && isZeroItem;
 
     return (
-        <div className="rounded border border-slate-100 px-2 py-1.5">
+        <div className={cn(
+            'rounded border border-slate-100 px-2 py-1.5',
+            muted && 'border-slate-200 bg-slate-100/80',
+        )}
+        >
             <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] font-semibold text-slate-700">{label}</p>
+                <p className={cn('truncate text-[11px] font-semibold text-slate-700', muted && 'text-slate-500')}>{label}</p>
                 {!showExecution ? (
-                    <p className="text-[11px] font-semibold text-slate-700">{formatAmount(budget)}</p>
+                    <p className={cn('text-[11px] font-semibold text-slate-700', muted && 'text-slate-500')}>{formatAmount(budget)}</p>
                 ) : (
-                    <p className="text-[11px] font-semibold text-slate-700">
+                    <p className={cn('text-[11px] font-semibold text-slate-700', muted && 'text-slate-500')}>
                         {formatAmount(budget)}
-                        <span className="ml-1 text-[10px] font-medium text-slate-500">/ {formatAmount(execution)}</span>
+                        <span className={cn('ml-1 text-[10px] font-medium text-slate-500', muted && 'text-slate-400')}>/ {formatAmount(execution)}</span>
                     </p>
                 )}
             </div>
             {showExecution && (
                 <p className="mt-0.5 text-right text-[10px] font-medium">
-                    잔액 <span className={cn(remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>{formatAmount(remaining)}</span>
+                    잔액 <span className={cn(
+                        remaining < 0 ? 'text-rose-600' : 'text-emerald-700',
+                        muted && 'text-slate-400',
+                    )}
+                    >{formatAmount(remaining)}</span>
                 </p>
             )}
             {description && (
-                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{description}</p>
+                <p className={cn('mt-0.5 truncate text-[10px] text-muted-foreground', muted && 'text-slate-400')}>{description}</p>
             )}
         </div>
     );

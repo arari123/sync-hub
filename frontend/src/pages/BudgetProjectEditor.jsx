@@ -63,6 +63,14 @@ function toNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
+function parseLockAutoValue(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    const text = String(value ?? '').trim().toLowerCase();
+    if (!text) return false;
+    return ['잠금', 'locked', 'true', '1', 'yes', 'y'].includes(text);
+}
+
 function normalizeEquipmentName(value) {
     return String(value || '').trim();
 }
@@ -280,12 +288,15 @@ function buildEmptyExecutionRow(section, phase = 'fabrication') {
     };
 }
 
-function _injectKeyBuffers(list, builder) {
+function _injectKeyBuffers(list, builder, minRowsPerPhase = 50) {
     const rows = (list || []).map((item) => ({ ...item, phase: item.phase || 'fabrication' }));
+    if (minRowsPerPhase <= 0) {
+        return rows;
+    }
     const fabCount = rows.filter((item) => item.phase === 'fabrication').length;
     const instCount = rows.filter((item) => item.phase === 'installation').length;
-    const fabBuffer = Array.from({ length: Math.max(0, 50 - fabCount) }, () => builder('fabrication'));
-    const instBuffer = Array.from({ length: Math.max(0, 50 - instCount) }, () => builder('installation'));
+    const fabBuffer = Array.from({ length: Math.max(0, minRowsPerPhase - fabCount) }, () => builder('fabrication'));
+    const instBuffer = Array.from({ length: Math.max(0, minRowsPerPhase - instCount) }, () => builder('installation'));
     return [...rows, ...fabBuffer, ...instBuffer];
 }
 
@@ -293,13 +304,16 @@ function injectBuffers(detailsObj) {
     const result = { ...detailsObj, budget_settings: mergeBudgetSettings(detailsObj?.budget_settings) };
     Object.keys(SECTION_META).forEach((section) => {
         const meta = SECTION_META[section];
+        const minRowsPerPhase = section === 'material' ? 50 : 0;
         result[meta.budgetKey] = _injectKeyBuffers(
             result[meta.budgetKey],
             (phase) => buildEmptyBudgetRow(section, phase),
+            minRowsPerPhase,
         );
         result[meta.executionKey] = _injectKeyBuffers(
             result[meta.executionKey],
             (phase) => buildEmptyExecutionRow(section, phase),
+            minRowsPerPhase,
         );
     });
     return result;
@@ -391,9 +405,12 @@ const BudgetProjectEditor = () => {
             .filter((row) => {
                 if ((row.phase || 'fabrication') !== currentPhase) return false;
                 if (!activeEquipmentName) return false;
-                return normalizeEquipmentName(row.equipment_name) === activeEquipmentName;
+                if (normalizeEquipmentName(row.equipment_name) !== activeEquipmentName) return false;
+                if (section === 'labor') return String(row?.task_name || '').trim().length > 0;
+                if (section === 'expense') return String(row?.expense_name || '').trim().length > 0;
+                return true;
             }),
-        [rows, currentPhase, activeEquipmentName],
+        [rows, currentPhase, activeEquipmentName, section],
     );
 
     const sidebarSummary = useMemo(() => {
@@ -934,7 +951,7 @@ const BudgetProjectEditor = () => {
             } else if (key === 'staffing_type') {
                 row[key] = String(value || '자체');
             } else if (key === 'lock_auto') {
-                row[key] = String(value || '해제') === '잠금';
+                row[key] = parseLockAutoValue(value);
             } else if (key === 'location_type') {
                 row[key] = normalizeLocationType(value);
             } else {
@@ -966,7 +983,7 @@ const BudgetProjectEditor = () => {
                 }
             });
             const positionInDisplay = filteredIndices.indexOf(index);
-            if (positionInDisplay >= filteredIndices.length - 3) {
+            if (section === 'material' && positionInDisplay >= filteredIndices.length - 3) {
                 const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
                 const buffer = Array.from({ length: 20 }, () => ({
                     ...builder(section, currentPhase),
@@ -1146,6 +1163,7 @@ const BudgetProjectEditor = () => {
     ]);
 
     useEffect(() => {
+        if (section !== 'material') return;
         if (!activeEquipmentName) return;
         const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
         setDetails((prev) => {
@@ -1167,6 +1185,7 @@ const BudgetProjectEditor = () => {
     }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
 
     const handleScroll = (event) => {
+        if (section !== 'material') return;
         const { scrollTop, scrollHeight, clientHeight } = event.target;
         if (scrollHeight - scrollTop <= clientHeight + 100) {
             if (!activeEquipmentName) return;
@@ -1506,7 +1525,7 @@ const ExcelTable = ({
     };
 
     const normalizeHistoryValue = (value, column) => {
-        if (column?.key === 'lock_auto') return value ? '잠금' : '해제';
+        if (column?.key === 'lock_auto') return parseLockAutoValue(value) ? '잠금' : '해제';
         if (column?.type === 'number') return String(toNumber(value));
         if (column?.key === 'unit') return String(value ?? '').toUpperCase();
         return String(value ?? '');
@@ -1517,7 +1536,7 @@ const ExcelTable = ({
             const text = String(value ?? '').trim();
             if (text === '잠금') return '잠금';
             if (text === '해제') return '해제';
-            return value ? '잠금' : '해제';
+            return parseLockAutoValue(value) ? '잠금' : '해제';
         }
         if (column?.type === 'number') return String(value ?? '').replace(/[^0-9]/g, '');
         if (column?.key === 'unit') return String(value ?? '').trim().toUpperCase();
@@ -1855,6 +1874,7 @@ const ExcelTable = ({
         if (isFillDragging) return;
         event.preventDefault();
         stopEditingCell();
+        const column = columns[colIndex];
         setActiveCell({ row: rowIndex, col: colIndex });
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
             setSelectionEnd({ row: rowIndex, col: colIndex });
@@ -1862,7 +1882,22 @@ const ExcelTable = ({
             setSelectionStart({ row: rowIndex, col: colIndex });
             setSelectionEnd({ row: rowIndex, col: colIndex });
         }
-        setIsSelecting(true);
+        const isToggleLockCell = (
+            column?.key === 'lock_auto'
+            && editable
+            && !column?.readonly
+            && !event.shiftKey
+            && !event.ctrlKey
+            && !event.metaKey
+        );
+        if (isToggleLockCell) {
+            const currentLocked = parseLockAutoValue(rows[rowIndex]?.[column.key]);
+            const change = buildCellChange(rowIndex, colIndex, currentLocked ? '해제' : '잠금');
+            if (change) applyCellChanges([change]);
+            setIsSelecting(false);
+        } else {
+            setIsSelecting(true);
+        }
         focusCell(rowIndex, colIndex, { preserveSelection: true });
     };
 
@@ -2059,7 +2094,7 @@ const ExcelTable = ({
                                     ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
                                     : (rawValue || '');
                                 const optionValue = col.key === 'lock_auto'
-                                    ? (rawValue ? '잠금' : '해제')
+                                    ? (parseLockAutoValue(rawValue) ? '잠금' : '해제')
                                     : String(rawValue || '');
                                 const isCellEditable = editable && !col.readonly;
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
@@ -2069,7 +2104,7 @@ const ExcelTable = ({
                                 const isCopied = isCellInCopiedRange(rowIndex, colIndex);
                                 const cellCursorClass = isEditingCurrentCell ? 'cursor-text' : 'cursor-default';
                                 const isLockAutoColumn = col.key === 'lock_auto';
-                                const isLockedAuto = Boolean(rawValue);
+                                const isLockedAuto = parseLockAutoValue(rawValue);
 
                                 if (col.options && isCellEditable) {
                                     return (
@@ -2118,14 +2153,6 @@ const ExcelTable = ({
                                                             ? (isLockedAuto ? 'text-amber-700 font-black' : 'text-emerald-700 font-black')
                                                             : 'text-slate-700',
                                                     )}
-                                                    onClick={(event) => {
-                                                        if (!isLockAutoColumn) return;
-                                                        event.preventDefault();
-                                                        event.stopPropagation();
-                                                        const nextValue = isLockedAuto ? '해제' : '잠금';
-                                                        const change = buildCellChange(rowIndex, colIndex, nextValue);
-                                                        if (change) applyCellChanges([change]);
-                                                    }}
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                 >

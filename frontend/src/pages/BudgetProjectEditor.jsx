@@ -84,6 +84,10 @@ function toNumber(value) {
     return Number.isFinite(number) ? number : 0;
 }
 
+function formatCurrency(value) {
+    return `${Math.round(toNumber(value)).toLocaleString('ko-KR')}원`;
+}
+
 function parseLockAutoValue(value) {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value !== 0;
@@ -791,6 +795,16 @@ const BudgetProjectEditor = () => {
         });
         return next;
     }, [displayRows, sortState, visibleColumns]);
+    const activeScopeTotalAmount = useMemo(
+        () => displayRows.reduce((sum, row) => (
+            sum + (
+                activeMode === 'execution'
+                    ? toNumber(row?.executed_amount)
+                    : calcBudgetAmount(row, section, effectiveBudgetSettings)
+            )
+        ), 0),
+        [activeMode, displayRows, effectiveBudgetSettings, section],
+    );
     const autoCompleteOptions = useMemo(() => {
         const unitSet = new Set();
         const laborDeptSet = new Set([
@@ -1946,7 +1960,13 @@ const BudgetProjectEditor = () => {
                 <div className="flex-1 min-h-0 flex flex-col">
                     <section className="flex-1 rounded-2xl border bg-card p-4 shadow-sm flex flex-col min-h-0">
                         <div className="mb-3 flex flex-col gap-2.5 flex-none">
-                            <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
+                            <div className="flex items-center justify-between gap-2">
+                                <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
+                                <div className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700">
+                                    <span className="text-slate-500">{activeMode === 'execution' ? '집행 합계' : '예산 합계'}</span>
+                                    <span className="text-slate-900">{formatCurrency(activeScopeTotalAmount)}</span>
+                                </div>
+                            </div>
 
                             {isEquipmentProject && !equipmentNames.length && (
                                 <div className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-black text-rose-700 w-fit">

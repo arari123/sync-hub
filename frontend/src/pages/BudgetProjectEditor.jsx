@@ -344,7 +344,7 @@ const BudgetProjectEditor = () => {
             { key: 'unit_name', label: '유닛', width: 'w-32' },
             { key: 'part_name', label: '파츠명', width: 'w-40' },
             { key: 'spec', label: '규격/모델명', width: 'w-48' },
-            { key: 'quantity', label: '수량', width: 'w-24', type: 'number' },
+            { key: 'quantity', label: '수량', width: 'w-20', type: 'number' },
             { key: 'unit_price', label: '단가', width: 'w-32', type: 'number' },
             { key: 'line_total', label: '합계', width: 'w-36', type: 'number', readonly: true, computed: (row) => toNumber(row.quantity) * toNumber(row.unit_price) },
             { key: 'memo', label: '비고', width: 'w-48' },
@@ -355,7 +355,7 @@ const BudgetProjectEditor = () => {
             { key: 'headcount', label: '인원', width: 'w-20', type: 'number' },
             { key: 'worker_type', label: '직군/메모', width: 'w-32' },
             { key: 'unit', label: '단위', width: 'w-20', options: ['H', 'D', 'W', 'M'] },
-            { key: 'quantity', label: '시간/기간', width: 'w-24', type: 'number' },
+            { key: 'quantity', label: '시간/기간', width: 'w-20', type: 'number' },
             { key: 'hourly_rate', label: '시간단가', width: 'w-32', type: 'number' },
             {
                 key: 'line_total',
@@ -412,10 +412,7 @@ const BudgetProjectEditor = () => {
         });
         return names.size > 1;
     }, [details]);
-    const visibleColumns = useMemo(
-        () => columns.filter((col) => isMultiEquipmentProject || col.key !== 'equipment_name'),
-        [columns, isMultiEquipmentProject],
-    );
+    const visibleColumns = useMemo(() => columns, [columns]);
     const sortedDisplayRows = useMemo(() => {
         if (!sortState?.key || sortState.direction === 'none') return displayRows;
         const next = [...displayRows];
@@ -994,12 +991,6 @@ const BudgetProjectEditor = () => {
                                     </div>
                                 </div>
 
-                                {!isMultiEquipmentProject && (
-                                    <div className="inline-flex items-center rounded-md border bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500">
-                                        단일 설비 프로젝트: 설비 컬럼은 숨김 처리됨
-                                    </div>
-                                )}
-
                                 <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
                                     <button
                                         onClick={() => setCurrentPhase('fabrication')}
@@ -1368,6 +1359,12 @@ const ExcelTable = ({
         const isCellEditable = editable && column && !column.readonly;
         const isPrintableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
         const isEditingCurrentCell = isEditing(rowIndex, colIndex);
+
+        if (event.key === 'Escape' && copiedRange) {
+            event.preventDefault();
+            setCopiedRange(null);
+            return;
+        }
 
         if (isEditingCurrentCell) {
             if (event.key === 'Escape') {

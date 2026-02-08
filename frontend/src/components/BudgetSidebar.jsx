@@ -27,7 +27,7 @@ const BudgetSidebar = ({ aggregation = {}, summary = null, modeLabel = '예산' 
     );
 
     return (
-        <aside className="w-80 border-r bg-slate-50/50 flex flex-col shrink-0">
+        <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
             <div className="p-6 border-b bg-white">
                 <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cost Summary</h2>
                 <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-200">

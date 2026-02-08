@@ -36,7 +36,7 @@ const EMPTY_EDIT_FORM = {
 
 const ACTIVE_MANAGEMENT_AREAS = [
     { key: 'budget', label: '예산 관리', path: 'budget' },
-    { key: 'joblist', label: '잡리스트', path: 'joblist' },
+    { key: 'joblist', label: '이슈 관리', path: 'joblist' },
     { key: 'schedule', label: '일정 관리', path: 'schedule' },
 ];
 
@@ -217,7 +217,7 @@ const BudgetProjectOverview = () => {
     const baseProjectPath = `/project-management/projects/${project.id}`;
     const budgetManagementPath = `${baseProjectPath}/budget`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
-    const jobListPath = `${baseProjectPath}/joblist`;
+    const issueManagementPath = `${baseProjectPath}/joblist`;
     const managementLinks = ACTIVE_MANAGEMENT_AREAS.map((item) => ({
         ...item,
         to: `${baseProjectPath}/${item.path}`,
@@ -277,7 +277,7 @@ const BudgetProjectOverview = () => {
             </div>
 
             {/* 2. Dashboard Hero Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <HeroCard
                     label="현재 진행 단계"
                     value={project.current_stage_label || '-'}
@@ -299,6 +299,12 @@ const BudgetProjectOverview = () => {
                     label="총 집행 금액"
                     value={formatAmount(projectActualSpentTotal)}
                     subValue={`전체 ${version?.version_no || '1'}개 버전 기반`}
+                />
+                <HeroCard
+                    label="이슈"
+                    value={`${pendingJobCount}건`}
+                    subValue={`완료 ${completedJobCount}건`}
+                    variant={pendingJobCount > 0 ? 'destructive' : 'primary'}
                 />
             </div>
 
@@ -340,13 +346,13 @@ const BudgetProjectOverview = () => {
 
                 <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
                     <div className="flex items-center justify-between mb-3">
-                        <Link to={jobListPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
+                        <Link to={issueManagementPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
                             <span className="w-1 h-4 bg-primary rounded-full" />
-                            잡리스트
+                            이슈 관리
                         </Link>
-                        <Link to={jobListPath}>
+                        <Link to={issueManagementPath}>
                             <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
-                                잡리스트
+                                이슈 관리
                             </Button>
                         </Link>
                     </div>

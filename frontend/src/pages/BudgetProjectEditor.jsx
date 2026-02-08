@@ -84,6 +84,11 @@ function normalizeExpenseType(value) {
     return normalized === '외주' ? '외주' : '자체';
 }
 
+function normalizeStaffingType(value) {
+    const normalized = String(value || '').trim();
+    return normalized === '외주' ? '외주' : '자체';
+}
+
 function normalizeEquipmentName(value) {
     return String(value || '').trim();
 }
@@ -131,12 +136,18 @@ function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
             ...(meta.budgetKey === SECTION_META.expense.budgetKey
                 ? { expense_type: normalizeExpenseType(row?.expense_type) }
                 : {}),
+            ...(meta.budgetKey === SECTION_META.labor.budgetKey
+                ? { staffing_type: normalizeStaffingType(row?.staffing_type) }
+                : {}),
         }));
         result[meta.executionKey] = (result[meta.executionKey] || []).map((row) => ({
             ...row,
             equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
             ...(meta.executionKey === SECTION_META.expense.executionKey
                 ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                : {}),
+            ...(meta.executionKey === SECTION_META.labor.executionKey
+                ? { staffing_type: normalizeStaffingType(row?.staffing_type) }
                 : {}),
         }));
     });
@@ -251,9 +262,9 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
         return {
             equipment_name: '',
             task_name: '',
-            staffing_type: '',
+            staffing_type: '자체',
             worker_type: '',
-            unit: '',
+            unit: 'H',
             quantity: '',
             location_type: 'domestic',
             hourly_rate: '',
@@ -1123,7 +1134,7 @@ const BudgetProjectEditor = () => {
             } else if (key === 'unit') {
                 row[key] = String(value || '').toUpperCase();
             } else if (key === 'staffing_type') {
-                row[key] = String(value || '자체');
+                row[key] = normalizeStaffingType(value);
             } else if (key === 'lock_auto') {
                 row[key] = parseLockAutoValue(value);
             } else if (key === 'location_type') {
@@ -1348,7 +1359,7 @@ const BudgetProjectEditor = () => {
                     };
                 }
                 if (sectionKey === 'labor') {
-                    const staffingType = String(row?.staffing_type || '자체').trim() === '외주' ? '외주' : '자체';
+                    const staffingType = normalizeStaffingType(row?.staffing_type);
                     return {
                         ...baseRow,
                         task_name: String(row?.task_name || '').trim(),
@@ -1391,7 +1402,7 @@ const BudgetProjectEditor = () => {
                     };
                 }
                 if (sectionKey === 'labor') {
-                    const staffingType = String(row?.staffing_type || '자체').trim() === '외주' ? '외주' : '자체';
+                    const staffingType = normalizeStaffingType(row?.staffing_type);
                     return {
                         ...baseRow,
                         task_name: String(row?.task_name || '').trim(),
@@ -2547,12 +2558,15 @@ const ExcelTable = ({
                             </td>
                             {columns.map((col, colIndex) => {
                                 const rawValue = col.computed ? col.computed(row) : row[col.key];
+                                const normalizedRawValue = col.key === 'staffing_type'
+                                    ? normalizeStaffingType(rawValue)
+                                    : rawValue;
                                 const displayValue = col.type === 'number'
-                                    ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
-                                    : (rawValue || '');
+                                    ? (normalizedRawValue === null || normalizedRawValue === undefined || normalizedRawValue === '' ? '' : toNumber(normalizedRawValue).toLocaleString('ko-KR'))
+                                    : (normalizedRawValue || '');
                                 const optionValue = col.key === 'lock_auto'
                                     ? (parseLockAutoValue(rawValue) ? '잠금' : '해제')
-                                    : String(rawValue || '');
+                                    : String(normalizedRawValue || '');
                                 const isCellEditable = editable && !col.readonly;
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
                                 const isSelected = isCellInSelection(rowIndex, colIndex);

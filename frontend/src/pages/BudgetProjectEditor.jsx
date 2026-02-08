@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { NavLink, Navigate, useParams } from 'react-router-dom';
-import { BarChart3, CheckCircle2, Package, Save, Users, Wallet } from 'lucide-react';
+import { Navigate, useParams } from 'react-router-dom';
+import { CheckCircle2, Save } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
-import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 import BudgetSidebar from '../components/BudgetSidebar';
+import ProjectPageHeader from '../components/ProjectPageHeader';
 import { cn } from '../lib/utils';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
@@ -1878,56 +1878,20 @@ const BudgetProjectEditor = () => {
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
                 <div className="flex-none">
-                    <div className="flex items-center justify-between mb-2">
-                        <BudgetBreadcrumb
-                            items={[
-                                { label: '프로젝트 관리', to: '/project-management' },
-                                { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
-                                { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
-                                { label: `${SECTION_META[section].label} 입력` },
-                            ]}
-                        />
-                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
-                            <NavLink
-                                to={`/project-management/projects/${projectId}/budget`}
-                                className={({ isActive }) => cn(
-                                    'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                    isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                )}
-                            >
-                                <BarChart3 size={12} />
-                                모니터링
-                            </NavLink>
-                            <div className="w-px h-3 bg-slate-300 mx-1" />
-                            {Object.keys(SECTION_META).map((key) => (
-                                <NavLink
-                                    key={key}
-                                    to={`/project-management/projects/${projectId}/edit/${key}`}
-                                    className={({ isActive }) => cn(
-                                        'flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                        isActive ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                    )}
-                                >
-                                    {key === 'material' ? <Package size={12} /> : key === 'labor' ? <Users size={12} /> : <Wallet size={12} />}
-                                    {SECTION_META[key].label}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
-
-                    <section className="rounded-2xl border bg-card p-4 shadow-sm mt-1">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Budget Entry</p>
-                                <h1 className="text-2xl font-black tracking-tight text-slate-900">{project?.name || '프로젝트'}</h1>
-                                <p className="mt-1 text-xs font-bold text-slate-500">
-                                    버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
-                                    {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} ·
-                                    상태: <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-black uppercase leading-none">{version?.status || '-'}</span>
-                                    <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-50 text-[10px] font-black text-blue-700 uppercase leading-none">{entryModeLabel}</span>
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
+                    <ProjectPageHeader
+                        projectId={projectId}
+                        projectName={project?.name || '프로젝트'}
+                        projectCode={project?.code || ''}
+                        pageLabel={`${SECTION_META[section].label} 입력`}
+                        canEdit={project?.can_edit}
+                        breadcrumbItems={[
+                            { label: '프로젝트 관리', to: '/project-management' },
+                            { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
+                            { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
+                            { label: `${SECTION_META[section].label} 입력` },
+                        ]}
+                        actions={(
+                            <>
                                 {canSave && (
                                     <button
                                         type="button"
@@ -1959,8 +1923,17 @@ const BudgetProjectEditor = () => {
                                         리비전 생성
                                     </button>
                                 )}
-                            </div>
-                        </div>
+                            </>
+                        )}
+                    />
+
+                    <section className="mt-1 rounded-2xl border bg-card p-4 shadow-sm">
+                        <p className="text-xs font-bold text-slate-500">
+                            버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
+                            {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} ·
+                            상태: <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none">{version?.status || '-'}</span>
+                            <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none text-blue-700">{entryModeLabel}</span>
+                        </p>
                     </section>
                 </div>
 

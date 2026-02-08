@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
-import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
+import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
 
 function toNumber(value) {
@@ -22,17 +22,6 @@ function formatDate(value) {
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString('ko-KR', { hour12: false });
 }
-
-const ACTIVE_MANAGEMENT_AREAS = [
-    { key: 'budget', label: '예산 관리', path: 'budget' },
-    { key: 'joblist', label: '이슈 관리', path: 'joblist' },
-    { key: 'schedule', label: '일정 관리', path: 'schedule' },
-];
-
-const UPCOMING_MANAGEMENT_AREAS = [
-    { key: 'spec', label: '사양 관리', path: 'spec' },
-    { key: 'data', label: '데이터 관리', path: 'data' },
-];
 
 const BudgetProjectOverview = () => {
     const { projectId } = useParams();
@@ -127,14 +116,6 @@ const BudgetProjectOverview = () => {
     const budgetManagementPath = `${baseProjectPath}/budget`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
     const issueManagementPath = `${baseProjectPath}/joblist`;
-    const managementLinks = ACTIVE_MANAGEMENT_AREAS.map((item) => ({
-        ...item,
-        to: `${baseProjectPath}/${item.path}`,
-    }));
-    const upcomingManagementLinks = UPCOMING_MANAGEMENT_AREAS.map((item) => ({
-        ...item,
-        to: `${baseProjectPath}/${item.path}`,
-    }));
     const latestJobEntries = Array.isArray(project?.joblist_latest_entries)
         ? project.joblist_latest_entries.filter((item) => item && typeof item === 'object')
         : [];
@@ -149,41 +130,17 @@ const BudgetProjectOverview = () => {
 
     return (
         <div className="space-y-5 pb-12 animate-in fade-in duration-500">
-            {/* 1. Header & Breadcrumb */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <BudgetBreadcrumb
-                        items={[
-                            { label: '프로젝트 관리', to: '/project-management' },
-                            { label: project.name || '프로젝트' },
-                        ]}
-                    />
-                    <div className="flex items-center gap-3 mt-2">
-                        <h1 className="text-2xl font-black tracking-tight text-slate-900">{project.name}</h1>
-                        <span className="text-xs font-bold text-slate-400 font-mono tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">{project.code || 'NO-CODE'}</span>
-                    </div>
-                </div>
-                <div className="w-full md:w-auto rounded-xl border bg-card/70 p-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        {managementLinks.map((item) => (
-                            <ManagementLinkButton key={item.key} to={item.to} label={item.label} />
-                        ))}
-                        {upcomingManagementLinks.map((item) => (
-                            <ManagementLinkButton
-                                key={item.key}
-                                to={item.to}
-                                label={item.label}
-                                upcoming
-                            />
-                        ))}
-                        {!project.can_edit && (
-                            <span className="ml-1 inline-flex h-7 items-center rounded-md border bg-slate-50 px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                READ ONLY
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <ProjectPageHeader
+                projectId={project.id}
+                projectName={project.name || '프로젝트'}
+                projectCode={project.code || ''}
+                pageLabel="프로젝트 상세"
+                canEdit={project.can_edit}
+                breadcrumbItems={[
+                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: project.name || '프로젝트' },
+                ]}
+            />
 
             {/* 2. Dashboard Hero Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -465,20 +422,6 @@ const MiniAmount = ({ label, value, color = 'muted' }) => (
         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{label}</span>
         <span className={cn("text-[10px] font-semibold", color === 'primary' ? 'text-primary' : 'text-slate-600')}>{formatAmount(value)}</span>
     </div>
-);
-
-const ManagementLinkButton = ({ to, label, upcoming = false }) => (
-    <Link
-        to={to}
-        className={cn(
-            'inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-semibold transition-colors',
-            upcoming
-                ? 'border-dashed border-muted-foreground/30 text-muted-foreground hover:bg-muted/40'
-                : 'border-primary/35 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
-        )}
-    >
-        {label}
-    </Link>
 );
 
 const IdentityRow = ({ label, value }) => (

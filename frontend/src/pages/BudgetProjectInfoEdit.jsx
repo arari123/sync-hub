@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
-import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
+import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
 
 function toNumber(value) {
@@ -206,8 +206,13 @@ const BudgetProjectInfoEdit = () => {
     if (!project.can_edit) {
         return (
             <div className="space-y-4">
-                <BudgetBreadcrumb
-                    items={[
+                <ProjectPageHeader
+                    projectId={project.id}
+                    projectName={project.name || '프로젝트'}
+                    projectCode={project.code || ''}
+                    pageLabel="프로젝트 정보 수정"
+                    canEdit={project.can_edit}
+                    breadcrumbItems={[
                         { label: '프로젝트 관리', to: '/project-management' },
                         { label: project.name || '프로젝트', to: baseProjectPath },
                         { label: '상세 정보 수정' },
@@ -225,16 +230,18 @@ const BudgetProjectInfoEdit = () => {
 
     return (
         <div className="space-y-5 pb-10">
-            <div className="space-y-2">
-                <BudgetBreadcrumb
-                    items={[
-                        { label: '프로젝트 관리', to: '/project-management' },
-                        { label: project.name || '프로젝트', to: baseProjectPath },
-                        { label: '상세 정보 수정' },
-                    ]}
-                />
-                <h1 className="text-xl font-black tracking-tight text-slate-900">프로젝트 상세 정보 수정</h1>
-            </div>
+            <ProjectPageHeader
+                projectId={project.id}
+                projectName={project.name || '프로젝트'}
+                projectCode={project.code || ''}
+                pageLabel="프로젝트 정보 수정"
+                canEdit={project.can_edit}
+                breadcrumbItems={[
+                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: project.name || '프로젝트', to: baseProjectPath },
+                    { label: '상세 정보 수정' },
+                ]}
+            />
 
             {error && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-xs font-medium text-destructive">

@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, PencilLine } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
-import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
+import ProjectPageHeader from '../components/ProjectPageHeader';
 
 function toNumber(value) {
     const number = Number(value || 0);
@@ -12,12 +11,6 @@ function toNumber(value) {
 function formatAmount(value) {
     return `${toNumber(value).toLocaleString('ko-KR')}원`;
 }
-
-const EDIT_SECTIONS = [
-    { key: 'material', label: '재료비 입력' },
-    { key: 'labor', label: '인건비 입력' },
-    { key: 'expense', label: '경비 입력' },
-];
 
 const BudgetProjectBudget = () => {
     const { projectId } = useParams();
@@ -92,8 +85,13 @@ const BudgetProjectBudget = () => {
 
     return (
         <div className="space-y-5">
-            <BudgetBreadcrumb
-                items={[
+            <ProjectPageHeader
+                projectId={project.id}
+                projectName={project.name || '프로젝트'}
+                projectCode={project.code || ''}
+                pageLabel="예산 관리"
+                canEdit={project.can_edit}
+                breadcrumbItems={[
                     { label: '프로젝트 관리', to: '/project-management' },
                     { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: '예산 관리' },
@@ -101,22 +99,12 @@ const BudgetProjectBudget = () => {
             />
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p className="text-xs text-muted-foreground">프로젝트 예산 운영</p>
-                        <h1 className="text-2xl font-bold">예산 관리</h1>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {project.name} · 단계: {project.current_stage_label} · 버전 {version?.version_no || '-'}
-                            {version?.revision_no > 0 ? `-r${version.revision_no}` : ''}
-                        </p>
-                    </div>
-                    <Link
-                        to={`/project-management/projects/${project.id}`}
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs hover:bg-accent"
-                    >
-                        프로젝트 상세
-                        <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
+                <div>
+                    <p className="text-xs text-muted-foreground">프로젝트 예산 운영</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        현재 단계: {project.current_stage_label || '-'} · 버전 {version?.version_no || '-'}
+                        {version?.revision_no > 0 ? `-r${version.revision_no}` : ''}
+                    </p>
                 </div>
             </section>
 
@@ -125,29 +113,6 @@ const BudgetProjectBudget = () => {
                     {error}
                 </div>
             )}
-
-            <section className="rounded-xl border bg-card p-5 shadow-sm">
-                <h2 className="mb-3 text-base font-semibold">입력 페이지 이동</h2>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {EDIT_SECTIONS.map((item) => (
-                        <Link
-                            key={item.key}
-                            to={`/project-management/projects/${project.id}/edit/${item.key}`}
-                            className={`inline-flex h-9 items-center justify-center gap-1 rounded-md border px-3 text-sm ${
-                                project?.can_edit
-                                    ? 'border-input bg-background hover:bg-accent'
-                                    : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/30'
-                            }`}
-                        >
-                            <PencilLine className="h-3.5 w-3.5" />
-                            {item.label}
-                        </Link>
-                    ))}
-                </div>
-                {!project?.can_edit && (
-                    <p className="mt-2 text-xs text-muted-foreground">읽기 전용 권한입니다. 입력 페이지에서는 수정할 수 없습니다.</p>
-                )}
-            </section>
 
             <section className="rounded-xl border bg-card p-6 shadow-sm">
                 <h2 className="mb-4 text-base font-semibold">예산 요약</h2>

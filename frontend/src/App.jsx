@@ -9,6 +9,7 @@ import BudgetProjectOverview from './pages/BudgetProjectOverview';
 import BudgetProjectInfoEdit from './pages/BudgetProjectInfoEdit';
 import BudgetProjectBudget from './pages/BudgetProjectBudget';
 import BudgetProjectEditor from './pages/BudgetProjectEditor';
+import ProjectPlaceholderPage from './pages/ProjectPlaceholderPage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
@@ -36,13 +37,13 @@ function App() {
           <Route path="/project-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/info/edit" element={<ProtectedRoute><BudgetProjectInfoEdit /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/budget" element={<ProtectedRoute><BudgetProjectBudget /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/joblist" element={<ProtectedRoute><PlaceholderPage title="이슈 관리" description="이슈 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/schedule" element={<ProtectedRoute><PlaceholderPage title="일정 관리" description="일정 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/spec" element={<ProtectedRoute><PlaceholderPage title="사양 관리" description="사양 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><PlaceholderPage title="데이터 관리" description="데이터 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/fabrication" element={<ProtectedRoute><PlaceholderPage title="제작 관리" description="제작 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/installation" element={<ProtectedRoute><PlaceholderPage title="설치 관리" description="설치 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/as" element={<ProtectedRoute><PlaceholderPage title="AS 관리" description="AS 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/joblist" element={<ProtectedRoute><ProjectPlaceholderPage title="이슈 관리" description="이슈 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/schedule" element={<ProtectedRoute><ProjectPlaceholderPage title="일정 관리" description="일정 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/spec" element={<ProtectedRoute><ProjectPlaceholderPage title="사양 관리" description="사양 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><ProjectPlaceholderPage title="데이터 관리" description="데이터 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/fabrication" element={<ProtectedRoute><ProjectPlaceholderPage title="제작 관리" description="제작 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/installation" element={<ProtectedRoute><ProjectPlaceholderPage title="설치 관리" description="설치 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/as" element={<ProtectedRoute><ProjectPlaceholderPage title="AS 관리" description="AS 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
           <Route path="/knowledge" element={<ProtectedRoute><PlaceholderPage title="지식 베이스" description="지식 베이스 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><PlaceholderPage title="설정" description="설정 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />

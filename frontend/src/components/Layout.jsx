@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Logo from './ui/Logo';
-import ProjectContextNav from './ProjectContextNav';
 import { clearSession, getCurrentUser, isAuthenticated } from '../lib/session';
 
 const Layout = ({ children }) => {
@@ -59,7 +58,6 @@ const Layout = ({ children }) => {
                     )}
                 </div>
             </header>
-            <ProjectContextNav />
             <main className="container mx-auto px-4 py-8">
                 {children}
             </main>

@@ -357,3 +357,28 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (프로젝트 헤더/메뉴 UX 리디자인)
+  - 요구 반영:
+    - 프로젝트 상세 기준으로 브레드크럼/제목 우측에 공통 메뉴 배치
+    - 상세/예산/입력/정보수정/프로젝트 하위 플레이스홀더 페이지를 동일 헤더 패턴으로 통일
+    - 예산관리 메뉴는 클릭 시 메인 이동, 마우스오버 시 하위 입력(재료비/인건비/경비) 노출
+    - 재료비/인건비/경비 입력 페이지의 `전체 저장`, `버전 확정` 버튼을 상단 헤더 우측으로 이동
+  - 조치:
+    - 공통 헤더 컴포넌트 추가: `ProjectPageHeader`
+    - 프로젝트 컨텍스트 메뉴 컴포넌트 개편: hover dropdown + active 상태 개선
+    - 레이아웃 전역 메뉴 제거 후 각 프로젝트 페이지 헤더에 메뉴 삽입
+    - 프로젝트 하위 placeholder 전용 페이지 추가(`ProjectPlaceholderPage`) 후 라우트 교체
+  - 관련 파일:
+    - `frontend/src/components/ProjectPageHeader.jsx`
+    - `frontend/src/components/ProjectContextNav.jsx`
+    - `frontend/src/components/Layout.jsx`
+    - `frontend/src/pages/BudgetProjectOverview.jsx`
+    - `frontend/src/pages/BudgetProjectBudget.jsx`
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+    - `frontend/src/pages/BudgetProjectInfoEdit.jsx`
+    - `frontend/src/pages/ProjectPlaceholderPage.jsx`
+    - `frontend/src/App.jsx`
+    - `.agent/execplans/2026-02-08-project-header-menu-redesign.md`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

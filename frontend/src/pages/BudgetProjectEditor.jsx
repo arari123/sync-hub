@@ -1814,6 +1814,17 @@ const BudgetProjectEditor = () => {
                             </div>
                         )}
 
+                        {activeMode === 'budget' && section === 'expense' && (
+                            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <p className="text-[11px] font-black text-slate-700 mb-1.5">경비 입력 안내</p>
+                                <ul className="space-y-1 text-[11px] font-medium text-slate-600 list-disc pl-4">
+                                    <li>재료비와 인건비를 기준으로 경비 금액이 자동 산정되며, 필요 시 금액을 수동으로 수정할 수 있습니다.</li>
+                                    <li>'경비 자동 산정' 버튼을 누르면 잠금 해제된 행이 자동 산정 기준 금액으로 일괄 초기화됩니다.</li>
+                                    <li>산정 기준이 '수동 입력'인 항목은 자동 산정 대상이 아닙니다.</li>
+                                </ul>
+                            </div>
+                        )}
+
                         <div
                             className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative"
                             onScroll={handleMaterialTableScroll}

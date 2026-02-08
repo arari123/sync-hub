@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 function formatAmount(value) {
     const number = Number(value || 0);
@@ -10,10 +10,10 @@ const BudgetSidebar = ({
     summary = null,
     modeLabel = '예산',
     section = 'material',
-    materialUnitLibrary = [],
+    treeItems = [],
+    activeTreeKey = '',
+    onSelectTreeNode,
 }) => {
-    const [selectedUnitKey, setSelectedUnitKey] = useState('');
-    const [unitCountByKey, setUnitCountByKey] = useState({});
     const { total = 0, equipments = [] } = aggregation;
     const sectionSummary = summary && typeof summary === 'object'
         ? summary
@@ -29,12 +29,9 @@ const BudgetSidebar = ({
     const laborTotal = Number(laborSummary.fabrication_total || 0) + Number(laborSummary.installation_total || 0);
     const expenseTotal = Number(expenseSummary.fabrication_total || 0) + Number(expenseSummary.installation_total || 0);
     const grandTotal = materialTotal + laborTotal + expenseTotal;
-    const resolveUnitCount = (unitKey) => {
-        const raw = String(unitCountByKey[unitKey] ?? '1').trim();
-        const parsed = Number(raw);
-        if (!Number.isFinite(parsed)) return 1;
-        return Math.max(1, Math.floor(parsed));
-    };
+    const treeGuide = section === 'material'
+        ? '설비 > 제작/설치 > 유닛'
+        : '설비 > 제작/설치';
 
     return (
         <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
@@ -51,102 +48,77 @@ const BudgetSidebar = ({
                 </div>
             </div>
 
-            {section === 'material' && (
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                        <div className="px-3 py-2.5 border-b bg-slate-50">
-                            <p className="text-[11px] font-black text-slate-700">유닛 템플릿</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">유닛을 선택 후 드래그해 재료비 표에 놓으면 파츠가 자동 입력됩니다.</p>
-                        </div>
-                        <div className="p-2 space-y-1.5">
-                            {materialUnitLibrary.map((unit) => {
-                                const isSelected = selectedUnitKey === unit.key;
-                                const unitCount = resolveUnitCount(unit.key);
-                                const multipliedTotal = Number(unit.total || 0) * unitCount;
-                                return (
-                                    <div
-                                        key={unit.key}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => setSelectedUnitKey(unit.key)}
-                                        onKeyDown={(event) => {
-                                            if (event.key !== 'Enter' && event.key !== ' ') return;
-                                            event.preventDefault();
-                                            setSelectedUnitKey(unit.key);
-                                        }}
-                                        className={`w-full text-left rounded-lg border px-2.5 py-2 transition-all ${
-                                            isSelected
-                                                ? 'border-sky-300 bg-sky-50'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-[11px] font-black text-slate-900 truncate">{unit.unit_name}</span>
-                                            <span className="text-[10px] font-black text-slate-700">{formatAmount(multipliedTotal)}</span>
-                                        </div>
-                                        <p className="mt-0.5 text-[10px] text-slate-500 truncate">
-                                            설비: {unit.equipment_name} · 단계: {unit.phase_label} · 파츠 {unit.items?.length || 0}개
-                                        </p>
-                                        <div className="mt-1.5 flex items-center justify-between gap-2">
-                                            <label
-                                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600"
-                                                onClick={(event) => event.stopPropagation()}
-                                            >
-                                                개수
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={String(unitCountByKey[unit.key] ?? '1')}
-                                                    onChange={(event) => {
-                                                        const next = event.target.value.replace(/[^0-9]/g, '');
-                                                        setUnitCountByKey((prev) => ({
-                                                            ...prev,
-                                                            [unit.key]: next,
-                                                        }));
-                                                    }}
-                                                    onBlur={() => {
-                                                        const normalized = String(resolveUnitCount(unit.key));
-                                                        setUnitCountByKey((prev) => ({
-                                                            ...prev,
-                                                            [unit.key]: normalized,
-                                                        }));
-                                                    }}
-                                                    className="h-6 w-12 rounded border border-slate-300 bg-white px-1 text-center text-[10px] font-semibold text-slate-800"
-                                                />
-                                            </label>
-                                            <button
-                                                type="button"
-                                                draggable
-                                                onClick={(event) => event.stopPropagation()}
-                                                onDragStart={(event) => {
-                                                    event.stopPropagation();
-                                                    event.dataTransfer.effectAllowed = 'copy';
-                                                    event.dataTransfer.setData('application/json', JSON.stringify({
-                                                        kind: 'material_unit_template',
-                                                        unit_key: unit.key,
-                                                        unit_name: unit.unit_name,
-                                                        unit_count: resolveUnitCount(unit.key),
-                                                        rows: unit.items,
-                                                    }));
-                                                }}
-                                                className="h-6 rounded border border-sky-300 bg-sky-50 px-2 text-[10px] font-black text-sky-700"
-                                            >
-                                                드래그
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {!materialUnitLibrary.length && (
-                                <div className="py-8 text-center">
-                                    <p className="text-[11px] font-semibold text-slate-400">유닛 데이터가 없습니다.</p>
-                                </div>
-                            )}
-                        </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-3 py-2.5 border-b bg-slate-50">
+                        <p className="text-[11px] font-black text-slate-700">입력 트리</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{treeGuide}</p>
+                    </div>
+                    <div className="p-2 space-y-1">
+                        {treeItems.map((item) => (
+                            <TreeNode
+                                key={item.key}
+                                node={item}
+                                depth={0}
+                                activeTreeKey={activeTreeKey}
+                                onSelectTreeNode={onSelectTreeNode}
+                            />
+                        ))}
+                        {!treeItems.length && (
+                            <div className="py-8 text-center">
+                                <p className="text-[11px] font-semibold text-slate-400">표시할 범위가 없습니다.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
         </aside>
+    );
+};
+
+const TreeNode = ({
+    node,
+    depth,
+    activeTreeKey,
+    onSelectTreeNode,
+}) => {
+    const paddingLeft = 10 + depth * 14;
+    const isActive = activeTreeKey === node.key;
+    return (
+        <div>
+            <button
+                type="button"
+                onClick={() => onSelectTreeNode?.(node)}
+                className={`w-full rounded-md border px-2 py-1.5 text-left transition-all ${
+                    isActive
+                        ? 'border-sky-300 bg-sky-50 text-sky-800'
+                        : 'border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50'
+                }`}
+                style={{ paddingLeft }}
+            >
+                <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] font-black">{node.label}</span>
+                    {Number.isFinite(node.count) && (
+                        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-500">
+                            {node.count}
+                        </span>
+                    )}
+                </div>
+            </button>
+            {Array.isArray(node.children) && node.children.length > 0 && (
+                <div className="mt-1 space-y-1">
+                    {node.children.map((child) => (
+                        <TreeNode
+                            key={child.key}
+                            node={child}
+                            depth={depth + 1}
+                            activeTreeKey={activeTreeKey}
+                            onSelectTreeNode={onSelectTreeNode}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
     );
 };
 

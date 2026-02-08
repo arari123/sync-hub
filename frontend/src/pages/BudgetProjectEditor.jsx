@@ -430,6 +430,10 @@ function calcBudgetAmount(row, section, settings) {
     return toNumber(row.amount);
 }
 
+function resolveMaterialUnitLabel(row) {
+    return String(row?.unit_name || row?.part_name || '').trim();
+}
+
 const BudgetProjectEditor = () => {
     const { projectId, section = 'material' } = useParams();
 
@@ -452,19 +456,29 @@ const BudgetProjectEditor = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
-    const [currentPhase, setCurrentPhase] = useState('fabrication');
-    const [currentExpenseType, setCurrentExpenseType] = useState('자체');
     const [equipmentNames, setEquipmentNames] = useState([]);
-    const [currentEquipmentName, setCurrentEquipmentName] = useState('');
+    const [treeSelectionBySection, setTreeSelectionBySection] = useState(() => ({
+        material: { equipment: '', phase: 'all', unit: '' },
+        labor: { equipment: '', phase: 'all', unit: '' },
+        expense: { equipment: '', phase: 'all', unit: '' },
+    }));
+    const [materialUnitCountByScope, setMaterialUnitCountByScope] = useState({});
+    const [appliedMaterialUnitCountByScope, setAppliedMaterialUnitCountByScope] = useState({});
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
-    const [isMaterialUnitDragOver, setIsMaterialUnitDragOver] = useState(false);
 
     const canEditProject = project?.can_edit !== false;
     const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
+    const activeTreeSelection = treeSelectionBySection[section] || { equipment: '', phase: 'all', unit: '' };
+    const activePhaseFilter = activeTreeSelection.phase === 'installation' || activeTreeSelection.phase === 'fabrication'
+        ? activeTreeSelection.phase
+        : 'all';
     const activeEquipmentName = isEquipmentProject
-        ? normalizeEquipmentName(currentEquipmentName || equipmentNames[0] || '')
+        ? normalizeEquipmentName(activeTreeSelection.equipment || equipmentNames[0] || '')
         : COMMON_EQUIPMENT_NAME;
-    const activeExpenseType = normalizeExpenseType(currentExpenseType);
+    const activeUnitFilter = section === 'material'
+        ? String(activeTreeSelection.unit || '').trim()
+        : '';
+    const currentPhase = activePhaseFilter === 'installation' ? 'installation' : 'fabrication';
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
@@ -497,23 +511,43 @@ const BudgetProjectEditor = () => {
 
     const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
     const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
-    const currentPhaseLabel = currentPhase === 'installation' ? '설치' : '제작';
+    const rowIsEmptyFn = activeMode === 'execution' ? isExecutionRowEmpty : isBudgetRowEmpty;
 
     const displayRows = useMemo(
         () => rows
             .map((row, index) => ({ ...row, originalIndex: index }))
             .filter((row) => {
-                if ((row.phase || 'fabrication') !== currentPhase) return false;
                 if (!activeEquipmentName) return false;
                 if (normalizeEquipmentName(row.equipment_name) !== activeEquipmentName) return false;
-                if (section === 'labor') return String(row?.task_name || '').trim().length > 0;
+                const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                if (activePhaseFilter !== 'all' && rowPhase !== activePhaseFilter) return false;
+
+                if (section === 'material') {
+                    if (activePhaseFilter === 'all') {
+                        return !rowIsEmptyFn(row, 'material');
+                    }
+                    const rowUnitLabel = resolveMaterialUnitLabel(row);
+                    if (activeUnitFilter) {
+                        if (!rowUnitLabel) return rowIsEmptyFn(row, 'material');
+                        return rowUnitLabel === activeUnitFilter;
+                    }
+                    return true;
+                }
+                if (section === 'labor') {
+                    if (activePhaseFilter === 'all') {
+                        return String(row?.task_name || '').trim().length > 0;
+                    }
+                    return true;
+                }
                 if (section === 'expense') {
-                    if (normalizeExpenseType(row?.expense_type) !== activeExpenseType) return false;
+                    if (activePhaseFilter === 'all') {
+                        return String(row?.expense_name || '').trim().length > 0;
+                    }
                     return String(row?.expense_name || '').trim().length > 0;
                 }
                 return true;
             }),
-        [rows, currentPhase, activeEquipmentName, activeExpenseType, section],
+        [rows, activeEquipmentName, activePhaseFilter, section, activeUnitFilter, rowIsEmptyFn],
     );
 
     const sidebarSummary = useMemo(() => {
@@ -577,60 +611,75 @@ const BudgetProjectEditor = () => {
         total: Number(sidebarSummary?.[section]?.fabrication_total || 0) + Number(sidebarSummary?.[section]?.installation_total || 0),
         equipments: sidebarSummary?.material?.equipments || [],
     }), [sidebarSummary, section]);
-    const materialUnitLibrary = useMemo(() => {
-        const executionRows = details.execution_material_items || [];
-        const budgetRows = details.material_items || [];
-        const useExecutionRows = activeMode === 'execution'
-            && executionRows.some((row) => !isExecutionRowEmpty(row, 'material'));
-        const sourceRows = useExecutionRows ? executionRows : budgetRows;
-        const rowIsEmpty = useExecutionRows ? isExecutionRowEmpty : isBudgetRowEmpty;
-        const buckets = new Map();
+    const buildScopeTreeKey = useCallback((equipmentName, phase = 'all', unitName = '') => {
+        const normalizedEquipment = normalizeEquipmentName(equipmentName) || COMMON_EQUIPMENT_NAME;
+        const normalizedPhase = phase === 'fabrication' || phase === 'installation' ? phase : 'all';
+        const normalizedUnitName = String(unitName || '').trim();
+        if (section === 'material' && normalizedPhase !== 'all' && normalizedUnitName) {
+            return `${section}::${normalizedEquipment}::${normalizedPhase}::${normalizedUnitName}`;
+        }
+        return `${section}::${normalizedEquipment}::${normalizedPhase}`;
+    }, [section]);
 
-        sourceRows.forEach((row) => {
-            if (rowIsEmpty(row, 'material')) return;
-            const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
-            const phaseLabel = phase === 'installation' ? '설치' : '제작';
-            const unitName = String(row?.unit_name || '').trim() || String(row?.part_name || '').trim();
-            if (!unitName) return;
-            const equipmentName = normalizeEquipmentName(row?.equipment_name) || '미지정 설비';
-            const key = `${equipmentName}::${phase}::${unitName}`;
-            const amount = useExecutionRows
-                ? toNumber(row.executed_amount)
-                : calcBudgetAmount(row, 'material', effectiveBudgetSettings);
-
-            if (!buckets.has(key)) {
-                buckets.set(key, {
-                    key,
-                    equipment_name: equipmentName,
-                    phase,
-                    phase_label: phaseLabel,
-                    unit_name: unitName,
-                    total: 0,
-                    items: [],
+    const sidebarTreeItems = useMemo(() => {
+        const equipments = isEquipmentProject
+            ? equipmentNames
+            : [COMMON_EQUIPMENT_NAME];
+        return equipments
+            .filter(Boolean)
+            .map((equipmentName) => {
+                const normalizedEquipment = normalizeEquipmentName(equipmentName);
+                const equipmentRows = rows.filter(
+                    (row) => normalizeEquipmentName(row?.equipment_name) === normalizedEquipment,
+                );
+                const equipmentCount = equipmentRows.filter((row) => !rowIsEmptyFn(row, section)).length;
+                const phaseNodes = ['fabrication', 'installation'].map((phase) => {
+                    const phaseRows = equipmentRows.filter(
+                        (row) => ((row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication') === phase,
+                    );
+                    const phaseCount = phaseRows.filter((row) => !rowIsEmptyFn(row, section)).length;
+                    const children = [];
+                    if (section === 'material') {
+                        const unitCountMap = new Map();
+                        phaseRows.forEach((row) => {
+                            if (rowIsEmptyFn(row, 'material')) return;
+                            const unitLabel = resolveMaterialUnitLabel(row);
+                            if (!unitLabel) return;
+                            unitCountMap.set(unitLabel, (unitCountMap.get(unitLabel) || 0) + 1);
+                        });
+                        Array.from(unitCountMap.entries())
+                            .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ko-KR'))
+                            .forEach(([unitLabel, unitCount]) => {
+                                children.push({
+                                    key: buildScopeTreeKey(normalizedEquipment, phase, unitLabel),
+                                    label: unitLabel,
+                                    count: unitCount,
+                                    scope: { equipment: normalizedEquipment, phase, unit: unitLabel },
+                                });
+                            });
+                    }
+                    return {
+                        key: buildScopeTreeKey(normalizedEquipment, phase),
+                        label: phase === 'installation' ? '설치' : '제작',
+                        count: phaseCount,
+                        scope: { equipment: normalizedEquipment, phase, unit: '' },
+                        children,
+                    };
                 });
-            }
-
-            const bucket = buckets.get(key);
-            bucket.total += amount;
-            bucket.items.push({
-                unit_name: unitName,
-                part_name: String(row?.part_name || '').trim(),
-                spec: String(row?.spec || '').trim(),
-                quantity: toNumber(row?.quantity),
-                unit_price: toNumber(row?.unit_price),
-                executed_amount: toNumber(row?.executed_amount),
-                memo: String(row?.memo || '').trim(),
+                return {
+                    key: buildScopeTreeKey(normalizedEquipment, 'all'),
+                    label: normalizedEquipment,
+                    count: equipmentCount,
+                    scope: { equipment: normalizedEquipment, phase: 'all', unit: '' },
+                    children: phaseNodes,
+                };
             });
-        });
+    }, [isEquipmentProject, equipmentNames, rows, rowIsEmptyFn, section, buildScopeTreeKey]);
 
-        return Array.from(buckets.values()).sort((a, b) => {
-            const equipmentCompare = String(a.equipment_name).localeCompare(String(b.equipment_name), 'ko-KR');
-            if (equipmentCompare !== 0) return equipmentCompare;
-            if (a.phase !== b.phase) return a.phase === 'fabrication' ? -1 : 1;
-            if (b.total !== a.total) return b.total - a.total;
-            return String(a.unit_name).localeCompare(String(b.unit_name), 'ko-KR');
-        });
-    }, [activeMode, details.execution_material_items, details.material_items, effectiveBudgetSettings]);
+    const activeTreeKey = useMemo(
+        () => buildScopeTreeKey(activeEquipmentName, activePhaseFilter, activeUnitFilter),
+        [buildScopeTreeKey, activeEquipmentName, activePhaseFilter, activeUnitFilter],
+    );
 
     const budgetColumnsBySection = useMemo(() => ({
         material: [
@@ -659,6 +708,7 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         expense: [
+            { key: 'expense_type', label: '구분', width: 'w-20', readonly: true },
             { key: 'expense_name', label: '경비 항목', width: 'w-48', readonly: true },
             { key: 'lock_auto', label: '잠금', width: 'w-20', options: ['해제', '잠금'] },
             { key: 'basis', label: '산정 기준', width: 'w-48', readonly: true },
@@ -684,6 +734,7 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         expense: [
+            { key: 'expense_type', label: '구분', width: 'w-20', readonly: true },
             { key: 'expense_name', label: '경비 항목(집행)', width: 'w-48' },
             { key: 'basis', label: '산정 기준(집행)', width: 'w-48' },
             { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
@@ -728,13 +779,90 @@ const BudgetProjectEditor = () => {
             task_name: Array.from(laborDeptSet),
         };
     }, [details, budgetSettings]);
-    const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
     const canSave = canEditScopedRows;
+    const canAppendLaborDepartment = canEditScopedRows && activePhaseFilter !== 'all';
+    const activeMaterialUnitScopeKey = section === 'material'
+        && activePhaseFilter !== 'all'
+        && activeUnitFilter
+        ? `${activeEquipmentName}::${activePhaseFilter}::${activeUnitFilter}`
+        : '';
+    const activeMaterialUnitCountInput = activeMaterialUnitScopeKey
+        ? String(materialUnitCountByScope[activeMaterialUnitScopeKey] ?? '1')
+        : '1';
+    const resolveMaterialUnitCount = useCallback((scopeKey) => {
+        const raw = String(materialUnitCountByScope[scopeKey] ?? '1').trim();
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) return 1;
+        return Math.max(1, Math.floor(parsed));
+    }, [materialUnitCountByScope]);
+    const handleMaterialUnitCountInputChange = useCallback((nextValue) => {
+        if (!activeMaterialUnitScopeKey) return;
+        const digitsOnly = String(nextValue || '').replace(/[^0-9]/g, '');
+        setMaterialUnitCountByScope((prev) => ({
+            ...prev,
+            [activeMaterialUnitScopeKey]: digitsOnly,
+        }));
+    }, [activeMaterialUnitScopeKey]);
+    const applyMaterialUnitCount = useCallback(() => {
+        if (!canEditScopedRows) return;
+        if (!activeMaterialUnitScopeKey || !activeEquipmentName || !activeUnitFilter) return;
+        const previousCount = Math.max(
+            1,
+            Math.floor(Number(appliedMaterialUnitCountByScope[activeMaterialUnitScopeKey] || 1)),
+        );
+        const nextCount = resolveMaterialUnitCount(activeMaterialUnitScopeKey);
+        if (previousCount === nextCount) return;
+        setDetails((prev) => {
+            const source = [...(prev[activeKey] || [])];
+            const updated = source.map((row) => {
+                const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                if (rowPhase !== activePhaseFilter) return row;
+                if (normalizeEquipmentName(row?.equipment_name) !== activeEquipmentName) return row;
+                if (resolveMaterialUnitLabel(row) !== activeUnitFilter) return row;
+                if (rowIsEmptyFn(row, 'material')) return row;
+                if (activeMode === 'execution') {
+                    return {
+                        ...row,
+                        executed_amount: (toNumber(row.executed_amount) / previousCount) * nextCount,
+                    };
+                }
+                return {
+                    ...row,
+                    quantity: (toNumber(row.quantity) / previousCount) * nextCount,
+                };
+            });
+            return {
+                ...prev,
+                [activeKey]: updated,
+            };
+        });
+        setMaterialUnitCountByScope((prev) => ({
+            ...prev,
+            [activeMaterialUnitScopeKey]: String(nextCount),
+        }));
+        setAppliedMaterialUnitCountByScope((prev) => ({
+            ...prev,
+            [activeMaterialUnitScopeKey]: nextCount,
+        }));
+    }, [
+        activeEquipmentName,
+        activeKey,
+        activeMaterialUnitScopeKey,
+        activeMode,
+        activePhaseFilter,
+        activeUnitFilter,
+        appliedMaterialUnitCountByScope,
+        canEditScopedRows,
+        resolveMaterialUnitCount,
+        rowIsEmptyFn,
+    ]);
 
     const load = async () => {
         if (!projectId) return;
         setIsLoading(true);
         setError('');
+        setMaterialUnitCountByScope({});
+        setAppliedMaterialUnitCountByScope({});
         try {
             const versionResp = await api.get(`/budget/projects/${projectId}/versions`);
             const payload = versionResp?.data || {};
@@ -778,11 +906,6 @@ const BudgetProjectEditor = () => {
             );
 
             setEquipmentNames(resolvedEquipmentNames);
-            setCurrentEquipmentName((prev) => (
-                resolvedEquipmentNames.includes(prev)
-                    ? prev
-                    : (resolvedEquipmentNames[0] || '')
-            ));
             setDetails(injectBuffers(normalizedDetails));
         } catch (err) {
             setError(getErrorMessage(err, '예산 상세 데이터를 불러오지 못했습니다.'));
@@ -796,10 +919,70 @@ const BudgetProjectEditor = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
+    useEffect(() => {
+        const defaultEquipmentName = isEquipmentProject
+            ? (equipmentNames[0] || '')
+            : COMMON_EQUIPMENT_NAME;
+        setTreeSelectionBySection((prev) => {
+            let changed = false;
+            const next = { ...prev };
+            Object.keys(SECTION_META).forEach((targetSection) => {
+                const current = prev[targetSection] || {};
+                let equipmentName = normalizeEquipmentName(current.equipment || '');
+                if (isEquipmentProject) {
+                    if (!equipmentName || !equipmentNames.includes(equipmentName)) {
+                        equipmentName = defaultEquipmentName;
+                    }
+                } else {
+                    equipmentName = COMMON_EQUIPMENT_NAME;
+                }
+                let phase = current.phase;
+                if (phase !== 'fabrication' && phase !== 'installation' && phase !== 'all') {
+                    phase = 'all';
+                }
+                const unit = targetSection === 'material'
+                    ? String(current.unit || '').trim()
+                    : '';
+                const normalized = { equipment: equipmentName, phase, unit };
+                if (
+                    !current
+                    || current.equipment !== normalized.equipment
+                    || current.phase !== normalized.phase
+                    || String(current.unit || '') !== normalized.unit
+                ) {
+                    next[targetSection] = normalized;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [equipmentNames, isEquipmentProject]);
+
+    const handleSelectScopeNode = useCallback((node) => {
+        const scope = node?.scope || {};
+        const nextEquipmentName = isEquipmentProject
+            ? normalizeEquipmentName(scope.equipment || activeEquipmentName || equipmentNames[0] || '')
+            : COMMON_EQUIPMENT_NAME;
+        const nextPhase = scope.phase === 'fabrication' || scope.phase === 'installation'
+            ? scope.phase
+            : 'all';
+        const nextUnit = section === 'material'
+            ? String(scope.unit || '').trim()
+            : '';
+        setTreeSelectionBySection((prev) => ({
+            ...prev,
+            [section]: {
+                equipment: nextEquipmentName,
+                phase: nextPhase,
+                unit: nextUnit,
+            },
+        }));
+    }, [activeEquipmentName, equipmentNames, isEquipmentProject, section]);
+
     const addLaborDepartmentRow = ({ department, staffingType }) => {
         const targetDepartment = String(department || '').trim();
         const normalizedStaffingType = staffingType === '외주' ? '외주' : '자체';
-        if (!targetDepartment || !activeEquipmentName) return;
+        if (!targetDepartment || !activeEquipmentName || activePhaseFilter === 'all') return;
         setDetails((prev) => {
             const source = [...(prev.labor_items || [])];
             const phaseRows = source
@@ -844,18 +1027,22 @@ const BudgetProjectEditor = () => {
         });
     };
 
-    const autoFillExpenseRows = useCallback(({ forceReset = false } = {}) => {
+    const autoFillExpenseRows = useCallback(({
+        forceReset = false,
+        phaseOverride = null,
+        expenseTypeOverride = null,
+    } = {}) => {
         setDetails((prev) => {
             if (!activeEquipmentName) return prev;
             const settings = mergeBudgetSettings(prev?.budget_settings);
             settings.installation_locale = projectInstallationInfo.locale;
             settings.domestic_distance_km = projectBusinessTripDistanceKm;
-            const phase = currentPhase;
+            const phase = phaseOverride === 'installation' ? 'installation' : 'fabrication';
             const locale = phase === 'installation'
                 ? projectInstallationInfo.locale
                 : 'domestic';
             const targetEquipmentName = activeEquipmentName;
-            const targetExpenseType = activeExpenseType;
+            const targetExpenseType = normalizeExpenseType(expenseTypeOverride || '자체');
             const isOutsourceExpense = targetExpenseType === '외주';
             const outsourceAutoFormulas = new Set([
                 AUTO_EXPENSE_FORMULAS.TRIP,
@@ -1186,7 +1373,7 @@ const BudgetProjectEditor = () => {
                 expense_items: [...otherPhaseRows, ...dedupedPhaseRows],
             };
         });
-    }, [activeEquipmentName, activeExpenseType, currentPhase, projectBusinessTripDistanceKm, projectInstallationInfo.locale]);
+    }, [activeEquipmentName, projectBusinessTripDistanceKm, projectInstallationInfo.locale]);
 
     const toggleSort = (columnKey) => {
         setSortState((prev) => {
@@ -1206,8 +1393,8 @@ const BudgetProjectEditor = () => {
             if (activeEquipmentName) {
                 row.equipment_name = activeEquipmentName;
             }
-            if (section === 'expense') {
-                row.expense_type = activeExpenseType;
+            if (section === 'material' && activeUnitFilter && !String(row?.unit_name || '').trim()) {
+                row.unit_name = activeUnitFilter;
             }
             if (
                 section === 'expense'
@@ -1284,22 +1471,28 @@ const BudgetProjectEditor = () => {
 
             const filteredIndices = [];
             newList.forEach((item, itemIndex) => {
-                const isExpenseTypeMatched = section !== 'expense'
-                    || normalizeExpenseType(item?.expense_type) === activeExpenseType;
+                const rowPhase = (item.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                if (activePhaseFilter !== 'all' && rowPhase !== activePhaseFilter) {
+                    return;
+                }
+                const unitMatched = section !== 'material'
+                    || !activeUnitFilter
+                    || !resolveMaterialUnitLabel(item)
+                    || resolveMaterialUnitLabel(item) === activeUnitFilter;
                 if (
-                    (item.phase || 'fabrication') === currentPhase
-                    && normalizeEquipmentName(item?.equipment_name) === activeEquipmentName
-                    && isExpenseTypeMatched
+                    normalizeEquipmentName(item?.equipment_name) === activeEquipmentName
+                    && unitMatched
                 ) {
                     filteredIndices.push(itemIndex);
                 }
             });
             const positionInDisplay = filteredIndices.indexOf(index);
-            if (section === 'material' && positionInDisplay >= filteredIndices.length - 3) {
+            if (section === 'material' && activePhaseFilter !== 'all' && positionInDisplay >= filteredIndices.length - 3) {
                 const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
                 const buffer = Array.from({ length: 20 }, () => ({
                     ...builder(section, currentPhase),
                     equipment_name: activeEquipmentName,
+                    ...(activeUnitFilter ? { unit_name: activeUnitFilter } : {}),
                 }));
                 newList.push(...buffer);
             }
@@ -1317,110 +1510,6 @@ const BudgetProjectEditor = () => {
             [activeKey]: (prev[activeKey] || []).filter((_, rowIndex) => rowIndex !== index),
         }));
     };
-
-    const insertMaterialTemplateRows = useCallback((templateRows, unitCount = 1) => {
-        if (section !== 'material' || !activeEquipmentName) return;
-        const parsedUnitCount = Number(unitCount);
-        const normalizedUnitCount = Number.isFinite(parsedUnitCount)
-            ? Math.max(1, Math.floor(parsedUnitCount))
-            : 1;
-        const normalizedRows = (templateRows || [])
-            .map((row) => ({
-                unit_name: String(row?.unit_name || '').trim(),
-                part_name: String(row?.part_name || '').trim(),
-                spec: String(row?.spec || '').trim(),
-                memo: String(row?.memo || '').trim(),
-                quantity: toNumber(row?.quantity),
-                unit_price: toNumber(row?.unit_price),
-                executed_amount: toNumber(row?.executed_amount),
-            }))
-            .filter((row) => (
-                row.unit_name
-                || row.part_name
-                || row.spec
-                || row.memo
-                || row.quantity
-                || row.unit_price
-                || row.executed_amount
-            ));
-        if (!normalizedRows.length) return;
-
-        setDetails((prev) => {
-            const source = [...(prev[activeKey] || [])];
-            const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
-            const rowIsEmpty = activeMode === 'execution' ? isExecutionRowEmpty : isBudgetRowEmpty;
-
-            normalizedRows.forEach((item) => {
-                const nextRow = {
-                    ...builder('material', currentPhase),
-                    equipment_name: activeEquipmentName,
-                    unit_name: item.unit_name,
-                    part_name: item.part_name,
-                    spec: item.spec,
-                    memo: item.memo,
-                };
-                if (activeMode === 'execution') {
-                    nextRow.executed_amount = toNumber(item.executed_amount) * normalizedUnitCount;
-                } else {
-                    nextRow.quantity = toNumber(item.quantity) * normalizedUnitCount;
-                    nextRow.unit_price = item.unit_price;
-                }
-
-                const scopedEmptyIndex = source.findIndex((row) => (
-                    (row.phase || 'fabrication') === currentPhase
-                    && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
-                    && rowIsEmpty(row, 'material')
-                ));
-                if (scopedEmptyIndex >= 0) {
-                    source[scopedEmptyIndex] = { ...source[scopedEmptyIndex], ...nextRow };
-                } else {
-                    source.push(nextRow);
-                }
-            });
-
-            return {
-                ...prev,
-                [activeKey]: source,
-            };
-        });
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
-
-    const handleMaterialUnitDragOver = useCallback((event) => {
-        if (section !== 'material') return;
-        const types = Array.from(event.dataTransfer?.types || []);
-        if (!types.includes('application/json') && !types.includes('text/plain')) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-        setIsMaterialUnitDragOver(true);
-    }, [section]);
-
-    const handleMaterialUnitDrop = useCallback((event) => {
-        if (section !== 'material') return;
-        event.preventDefault();
-        setIsMaterialUnitDragOver(false);
-        const raw = event.dataTransfer?.getData('application/json')
-            || event.dataTransfer?.getData('text/plain')
-            || '';
-        if (!raw) return;
-        try {
-            const payload = JSON.parse(raw);
-            if (payload?.kind !== 'material_unit_template') return;
-            const fallbackUnitName = String(payload?.unit_name || '').trim();
-            const templateRows = (payload?.rows || []).map((row) => ({
-                ...row,
-                unit_name: String(row?.unit_name || fallbackUnitName).trim(),
-            }));
-            insertMaterialTemplateRows(templateRows, payload?.unit_count);
-        } catch (_error) {
-            // ignore malformed drop payload
-        }
-    }, [insertMaterialTemplateRows, section]);
-
-    const handleMaterialUnitDragLeave = useCallback((event) => {
-        if (section !== 'material') return;
-        if (event.currentTarget.contains(event.relatedTarget)) return;
-        setIsMaterialUnitDragOver(false);
-    }, [section]);
 
     const saveDetail = async () => {
         if (!version?.id || !canSave) return;
@@ -1580,11 +1669,6 @@ const BudgetProjectEditor = () => {
             );
 
             setEquipmentNames(refreshedEquipmentNames);
-            setCurrentEquipmentName((prev) => (
-                refreshedEquipmentNames.includes(prev)
-                    ? prev
-                    : (refreshedEquipmentNames[0] || '')
-            ));
             setDetails(injectBuffers(normalizedSavedDetails));
             setVersion(response?.data?.version || version);
         } catch (err) {
@@ -1644,11 +1728,6 @@ const BudgetProjectEditor = () => {
                     : COMMON_EQUIPMENT_NAME,
             );
             setEquipmentNames(refreshedEquipmentNames);
-            setCurrentEquipmentName((prev) => (
-                refreshedEquipmentNames.includes(prev)
-                    ? prev
-                    : (refreshedEquipmentNames[0] || '')
-            ));
             setDetails(injectBuffers(normalizedRevisionDetails));
             return nextVersion;
         } catch (err) {
@@ -1660,10 +1739,22 @@ const BudgetProjectEditor = () => {
     useEffect(() => {
         if (activeMode !== 'budget') return;
         if (isEquipmentProject && !activeEquipmentName) return;
-        autoFillExpenseRows({ forceReset: false });
+        const phaseTargets = activePhaseFilter === 'all'
+            ? ['fabrication', 'installation']
+            : [currentPhase];
+        phaseTargets.forEach((phase) => {
+            EXPENSE_TYPE_OPTIONS.forEach((expenseType) => {
+                autoFillExpenseRows({
+                    forceReset: false,
+                    phaseOverride: phase,
+                    expenseTypeOverride: expenseType,
+                });
+            });
+        });
     }, [
         activeMode,
         activeEquipmentName,
+        activePhaseFilter,
         autoFillExpenseRows,
         currentPhase,
         details.labor_items,
@@ -1675,33 +1766,36 @@ const BudgetProjectEditor = () => {
     useEffect(() => {
         if (section !== 'material') return;
         if (!activeEquipmentName) return;
+        if (activePhaseFilter === 'all') return;
         const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
         setDetails((prev) => {
             const source = [...(prev[activeKey] || [])];
             const scopedCount = source.filter((row) => (
                 (row.phase || 'fabrication') === currentPhase
                 && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
+                && (
+                    !activeUnitFilter
+                    || !resolveMaterialUnitLabel(row)
+                    || resolveMaterialUnitLabel(row) === activeUnitFilter
+                )
             )).length;
             if (scopedCount >= 50) return prev;
             const buffer = Array.from({ length: 50 - scopedCount }, () => ({
                 ...builder(section, currentPhase),
                 equipment_name: activeEquipmentName,
+                ...(activeUnitFilter ? { unit_name: activeUnitFilter } : {}),
             }));
             return {
                 ...prev,
                 [activeKey]: [...source, ...buffer],
             };
         });
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, details[activeKey], section]);
-
-    useEffect(() => {
-        if (section === 'material') return;
-        setIsMaterialUnitDragOver(false);
-    }, [section]);
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, details[activeKey], section, activePhaseFilter, activeUnitFilter]);
 
     const appendMaterialBufferRows = useCallback((count = 50) => {
         if (section !== 'material') return;
         if (!activeEquipmentName) return;
+        if (activePhaseFilter === 'all') return;
         const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
         setDetails((prev) => ({
             ...prev,
@@ -1710,10 +1804,11 @@ const BudgetProjectEditor = () => {
                 ...Array.from({ length: count }, () => ({
                     ...builder(section, currentPhase),
                     equipment_name: activeEquipmentName,
+                    ...(activeUnitFilter ? { unit_name: activeUnitFilter } : {}),
                 })),
             ],
         }));
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section, activePhaseFilter, activeUnitFilter]);
 
     const handleMaterialTableScroll = useCallback((event) => {
         if (section !== 'material') return;
@@ -1734,7 +1829,9 @@ const BudgetProjectEditor = () => {
                 summary={sidebarSummary}
                 modeLabel={aggregationModeLabel}
                 section={section}
-                materialUnitLibrary={materialUnitLibrary}
+                treeItems={sidebarTreeItems}
+                activeTreeKey={activeTreeKey}
+                onSelectTreeNode={handleSelectScopeNode}
             />
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
@@ -1827,163 +1924,121 @@ const BudgetProjectEditor = () => {
 
                 <div className="flex-1 min-h-0 flex flex-col">
                     <section className="flex-1 rounded-2xl border bg-card p-4 shadow-sm flex flex-col min-h-0">
-                        <div className="mb-3 flex items-center justify-between flex-none">
-                            <div className="flex items-center gap-4 flex-wrap">
-                                <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                        'p-2 rounded-lg',
-                                        section === 'material' ? 'bg-blue-50 text-blue-600' :
-                                            section === 'labor' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600',
-                                    )}
-                                    >
-                                        {section === 'material' ? <Package size={20} /> : section === 'labor' ? <Users size={20} /> : <Wallet size={20} />}
-                                    </div>
-                                    <div>
-                                        <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{entryModeLabel}</p>
-                                    </div>
+                        <div className="mb-3 flex flex-col gap-2.5 flex-none">
+                            <h2 className="text-sm font-black text-slate-900">{SECTION_META[section].label} 상세 입력</h2>
+
+                            {isEquipmentProject && !equipmentNames.length && (
+                                <div className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-black text-rose-700 w-fit">
+                                    설비 프로젝트는 기본정보에서 설비를 먼저 등록해 주세요.
                                 </div>
+                            )}
 
-                                {isEquipmentProject && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
-                                        {equipmentNames.length ? (
-                                            equipmentNames.map((equipmentName) => (
-                                                <button
-                                                    key={`equipment-tab-${equipmentName}`}
-                                                    type="button"
-                                                    onClick={() => setCurrentEquipmentName(equipmentName)}
-                                                    className={cn(
-                                                        'px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                                        activeEquipmentName === equipmentName
-                                                            ? 'bg-white text-violet-700 shadow-sm ring-1 ring-slate-200'
-                                                            : 'text-slate-500 hover:text-slate-700',
-                                                    )}
-                                                >
-                                                    {equipmentName}
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <span className="px-2 py-1 text-[11px] font-black text-rose-600">
-                                                설비 기본정보에서 설비를 먼저 등록해 주세요.
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-
-                                {!isEquipmentProject && (
-                                    <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
-                                        설비 구분 없음: 공통 입력
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            {activeMode === 'budget' && section === 'material' && activeMaterialUnitScopeKey && (
+                                <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 w-fit">
+                                    <span className="text-[11px] font-black text-slate-700">유닛 개수</span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={activeMaterialUnitCountInput}
+                                        onChange={(event) => handleMaterialUnitCountInputChange(event.target.value)}
+                                        disabled={!canEditScopedRows}
+                                        onBlur={() => {
+                                            const normalized = String(resolveMaterialUnitCount(activeMaterialUnitScopeKey));
+                                            setMaterialUnitCountByScope((prev) => ({
+                                                ...prev,
+                                                [activeMaterialUnitScopeKey]: normalized,
+                                            }));
+                                        }}
+                                        className="h-7 w-16 rounded border border-slate-300 bg-white px-2 text-center text-[11px] font-semibold text-slate-800 disabled:opacity-50"
+                                    />
                                     <button
-                                        onClick={() => setCurrentPhase('fabrication')}
-                                        className={cn(
-                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                            currentPhase === 'fabrication' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                        )}
+                                        type="button"
+                                        onClick={applyMaterialUnitCount}
+                                        disabled={!canEditScopedRows}
+                                        className="h-7 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-[11px] font-black text-sky-700 disabled:opacity-50"
                                     >
-                                        제작
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentPhase('installation')}
-                                        className={cn(
-                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                            currentPhase === 'installation' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                        )}
-                                    >
-                                        설치
+                                        적용
                                     </button>
                                 </div>
+                            )}
 
-                                {section === 'expense' && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                        {EXPENSE_TYPE_OPTIONS.map((expenseType) => (
-                                            <button
-                                                key={`expense-type-${expenseType}`}
-                                                type="button"
-                                                onClick={() => setCurrentExpenseType(expenseType)}
-                                                className={cn(
-                                                    'px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                                    activeExpenseType === expenseType
-                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200'
-                                                        : 'text-slate-500 hover:text-slate-700',
-                                                )}
-                                            >
-                                                {expenseType} 경비
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                            {activeMode === 'budget' && section === 'labor' && (
+                                <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
+                                    <span className="px-2 text-[10px] font-black text-slate-500 uppercase">자체</span>
+                                    {(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS).map((department) => (
+                                        <button
+                                            key={`inhouse-${department}`}
+                                            type="button"
+                                            onClick={() => addLaborDepartmentRow({ department, staffingType: '자체' })}
+                                            disabled={!canAppendLaborDepartment}
+                                            className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-emerald-700 ring-1 ring-slate-200 hover:bg-emerald-50 disabled:opacity-40"
+                                        >
+                                            {department}
+                                        </button>
+                                    ))}
+                                    <span className="mx-1 h-5 w-px bg-slate-300" />
+                                    <span className="px-2 text-[10px] font-black text-slate-500 uppercase">외주</span>
+                                    {OUTSOURCE_LABOR_DEPARTMENTS.map((department) => (
+                                        <button
+                                            key={`outsource-${department}`}
+                                            type="button"
+                                            onClick={() => addLaborDepartmentRow({ department, staffingType: '외주' })}
+                                            disabled={!canAppendLaborDepartment}
+                                            className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200 hover:bg-indigo-50 disabled:opacity-40"
+                                        >
+                                            {department}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
 
-                                <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
-                                    입력 스코프:
-                                    <span className="ml-1 text-slate-900">
-                                        {isEquipmentProject ? activeEquipmentName || '설비 미선택' : '공통'}
-                                        {' > '}
-                                        {currentPhaseLabel}
-                                        {section === 'expense' ? ` > ${activeExpenseType} 경비` : ''}
+                            {activeMode === 'budget' && section === 'labor' && !canAppendLaborDepartment && (
+                                <div className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black text-amber-700 w-fit">
+                                    인건비 항목 추가는 사이드바에서 제작 또는 설치 단계를 선택한 뒤 가능합니다.
+                                </div>
+                            )}
+
+                            {activeMode === 'budget' && section === 'labor' && (
+                                <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-700 w-fit">
+                                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-emerald-700">
+                                        자체인원 1M/H {INHOUSE_LABOR_RATE_PER_HOUR.toLocaleString('ko-KR')}원
+                                    </span>
+                                    <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-indigo-700">
+                                        외주인원 1M/D {OUTSOURCE_LABOR_RATE_PER_DAY.toLocaleString('ko-KR')}원
                                     </span>
                                 </div>
+                            )}
 
-                                {activeMode === 'budget' && section === 'labor' && (
-                                    <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
-                                        <span className="px-2 text-[10px] font-black text-slate-500 uppercase">자체</span>
-                                        {(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS).map((department) => (
-                                            <button
-                                                key={`inhouse-${department}`}
-                                                type="button"
-                                                onClick={() => addLaborDepartmentRow({ department, staffingType: '자체' })}
-                                                className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-emerald-700 ring-1 ring-slate-200 hover:bg-emerald-50"
-                                            >
-                                                {department}
-                                            </button>
-                                        ))}
-                                        <span className="mx-1 h-5 w-px bg-slate-300" />
-                                        <span className="px-2 text-[10px] font-black text-slate-500 uppercase">외주</span>
-                                        {OUTSOURCE_LABOR_DEPARTMENTS.map((department) => (
-                                            <button
-                                                key={`outsource-${department}`}
-                                                type="button"
-                                                onClick={() => addLaborDepartmentRow({ department, staffingType: '외주' })}
-                                                className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200 hover:bg-indigo-50"
-                                            >
-                                                {department}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                            {activeMode === 'budget' && (section === 'labor' || section === 'expense') && (
+                                <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600 w-fit">
+                                    설치 기준: <span className="ml-1 text-slate-900">{projectInstallationInfo.label}</span>
+                                </div>
+                            )}
 
-                                {activeMode === 'budget' && section === 'labor' && (
-                                    <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-700">
-                                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-emerald-700">
-                                            자체인원 1M/H {INHOUSE_LABOR_RATE_PER_HOUR.toLocaleString('ko-KR')}원
-                                        </span>
-                                        <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-indigo-700">
-                                            외주인원 1M/D {OUTSOURCE_LABOR_RATE_PER_DAY.toLocaleString('ko-KR')}원
-                                        </span>
-                                    </div>
-                                )}
-
-                                {activeMode === 'budget' && (section === 'labor' || section === 'expense') && (
-                                    <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
-                                        설치 기준: <span className="ml-1 text-slate-900">{projectInstallationInfo.label}</span>
-                                    </div>
-                                )}
-
-                                {activeMode === 'budget' && section === 'expense' && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                        <button
-                                            type="button"
-                                            onClick={() => autoFillExpenseRows({ forceReset: true })}
-                                            className="h-8 rounded-lg px-3 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200"
-                                        >
-                                            경비 자동 산정
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            {activeMode === 'budget' && section === 'expense' && (
+                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 w-fit">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const phaseTargets = activePhaseFilter === 'all'
+                                                ? ['fabrication', 'installation']
+                                                : [currentPhase];
+                                            phaseTargets.forEach((phase) => {
+                                                EXPENSE_TYPE_OPTIONS.forEach((expenseType) => {
+                                                    autoFillExpenseRows({
+                                                        forceReset: true,
+                                                        phaseOverride: phase,
+                                                        expenseTypeOverride: expenseType,
+                                                    });
+                                                });
+                                            });
+                                        }}
+                                        className="h-8 rounded-lg px-3 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200"
+                                    >
+                                        경비 자동 산정
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {error && (
@@ -2006,9 +2061,6 @@ const BudgetProjectEditor = () => {
                         <div
                             className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative"
                             onScroll={handleMaterialTableScroll}
-                            onDragOver={handleMaterialUnitDragOver}
-                            onDrop={handleMaterialUnitDrop}
-                            onDragLeave={handleMaterialUnitDragLeave}
                         >
                             <ExcelTable
                                 columns={visibleColumns}
@@ -2038,13 +2090,6 @@ const BudgetProjectEditor = () => {
                                     return rawValue;
                                 }}
                             />
-                            {section === 'material' && isMaterialUnitDragOver && (
-                                <div className="pointer-events-none absolute inset-2 rounded-xl border-2 border-dashed border-sky-400 bg-sky-50/70 flex items-center justify-center z-20">
-                                    <div className="rounded-lg border border-sky-200 bg-white px-4 py-2 text-[11px] font-black text-sky-700 shadow-sm">
-                                        유닛 템플릿을 여기에 놓으면 현재 설비/단계에 파츠가 입력됩니다.
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </section>
                 </div>

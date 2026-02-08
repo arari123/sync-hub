@@ -234,3 +234,25 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (예산 입력 사이드바 트리 전환 및 상단 전환 UI 제거)
+  - 요구 반영:
+    - 재료비/인건비/경비 입력 페이지 공통으로 사이드바를 트리 구조로 개편
+      - 재료비: `설비 > 제작/설치 > 유닛`
+      - 인건비/경비: `설비 > 제작/설치`
+    - 재료비 트리 선택 동작:
+      - 설비 클릭: 설비 전체 파츠 표시
+      - 설비 > 제작/설치 클릭: 해당 단계 파츠 표시
+      - 설비 > 제작/설치 > 유닛 클릭: 해당 유닛 파츠 표시
+    - 기존 상단의 입력 스코프/설비/제작설치/자체외주 전환 버튼 제거
+    - 재료비에서 유닛 노드 선택 시 상단에 `유닛 개수` 입력 + `적용` 버튼 제공(기본값 1)
+  - 조치:
+    - `BudgetSidebar`를 템플릿 카드 방식에서 트리 렌더링 컴포넌트로 재구성
+    - `BudgetProjectEditor`의 표시 필터 로직을 트리 선택 기반으로 재작성
+    - 재료비 유닛 개수 적용 시 선택 유닛의 수량(집행 모드에서는 집행금액) 배수 반영
+    - 경비 표에 `구분(expense_type)` 열 추가(자체/외주 동시 표시 가시성 보강)
+  - 관련 파일:
+    - `frontend/src/components/BudgetSidebar.jsx`
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

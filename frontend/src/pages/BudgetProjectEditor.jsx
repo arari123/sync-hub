@@ -1331,6 +1331,87 @@ const BudgetProjectEditor = () => {
             const preservedExecutionMaterialEmptyRows = (details.execution_material_items || [])
                 .filter((row) => isExecutionRowEmpty(row, 'material'))
                 .map((row) => ({ ...row }));
+            const normalizeBudgetRowForSave = (sectionKey, row, equipmentName) => {
+                const baseRow = {
+                    ...row,
+                    equipment_name: equipmentName,
+                };
+                if (sectionKey === 'material') {
+                    return {
+                        ...baseRow,
+                        unit_name: String(row?.unit_name || '').trim(),
+                        part_name: String(row?.part_name || '').trim(),
+                        spec: String(row?.spec || '').trim(),
+                        quantity: toNumber(row?.quantity),
+                        unit_price: toNumber(row?.unit_price),
+                        memo: String(row?.memo || '').trim(),
+                    };
+                }
+                if (sectionKey === 'labor') {
+                    const staffingType = String(row?.staffing_type || '자체').trim() === '외주' ? '외주' : '자체';
+                    return {
+                        ...baseRow,
+                        task_name: String(row?.task_name || '').trim(),
+                        staffing_type: staffingType,
+                        worker_type: String(row?.worker_type || '').trim(),
+                        unit: String(row?.unit || (staffingType === '외주' ? 'D' : 'H')).trim().toUpperCase() || (staffingType === '외주' ? 'D' : 'H'),
+                        quantity: toNumber(row?.quantity),
+                        headcount: toNumber(row?.headcount) || 1,
+                        location_type: normalizeLocationType(row?.location_type),
+                        hourly_rate: toNumber(row?.hourly_rate),
+                        memo: String(row?.memo || '').trim(),
+                    };
+                }
+                return {
+                    ...baseRow,
+                    expense_name: String(row?.expense_name || '').trim(),
+                    basis: String(row?.basis || '').trim(),
+                    quantity: toNumber(row?.quantity),
+                    amount: toNumber(row?.amount),
+                    lock_auto: parseLockAutoValue(row?.lock_auto),
+                    memo: String(row?.memo || '').trim(),
+                    ...(sectionKey === 'expense'
+                        ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                        : {}),
+                };
+            };
+            const normalizeExecutionRowForSave = (sectionKey, row, equipmentName) => {
+                const baseRow = {
+                    ...row,
+                    equipment_name: equipmentName,
+                };
+                if (sectionKey === 'material') {
+                    return {
+                        ...baseRow,
+                        unit_name: String(row?.unit_name || '').trim(),
+                        part_name: String(row?.part_name || '').trim(),
+                        spec: String(row?.spec || '').trim(),
+                        executed_amount: toNumber(row?.executed_amount),
+                        memo: String(row?.memo || '').trim(),
+                    };
+                }
+                if (sectionKey === 'labor') {
+                    const staffingType = String(row?.staffing_type || '자체').trim() === '외주' ? '외주' : '자체';
+                    return {
+                        ...baseRow,
+                        task_name: String(row?.task_name || '').trim(),
+                        staffing_type: staffingType,
+                        worker_type: String(row?.worker_type || '').trim(),
+                        executed_amount: toNumber(row?.executed_amount),
+                        memo: String(row?.memo || '').trim(),
+                    };
+                }
+                return {
+                    ...baseRow,
+                    expense_name: String(row?.expense_name || '').trim(),
+                    basis: String(row?.basis || '').trim(),
+                    executed_amount: toNumber(row?.executed_amount),
+                    memo: String(row?.memo || '').trim(),
+                    ...(sectionKey === 'expense'
+                        ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                        : {}),
+                };
+            };
             const cleanDetails = {};
             const primaryEquipmentName = activeEquipmentName || equipmentNames[0] || COMMON_EQUIPMENT_NAME;
             const allowedEquipmentSet = new Set(equipmentNames);
@@ -1343,13 +1424,7 @@ const BudgetProjectEditor = () => {
                         if (isEquipmentProject && allowedEquipmentSet.size > 0 && !allowedEquipmentSet.has(equipmentName)) {
                             equipmentName = primaryEquipmentName;
                         }
-                        return {
-                            ...row,
-                            equipment_name: equipmentName,
-                            ...(sectionKey === 'expense'
-                                ? { expense_type: normalizeExpenseType(row?.expense_type) }
-                                : {}),
-                        };
+                        return normalizeBudgetRowForSave(sectionKey, row, equipmentName);
                     });
                 cleanDetails[meta.executionKey] = (details[meta.executionKey] || [])
                     .filter((row) => !isExecutionRowEmpty(row, sectionKey))
@@ -1358,13 +1433,7 @@ const BudgetProjectEditor = () => {
                         if (isEquipmentProject && allowedEquipmentSet.size > 0 && !allowedEquipmentSet.has(equipmentName)) {
                             equipmentName = primaryEquipmentName;
                         }
-                        return {
-                            ...row,
-                            equipment_name: equipmentName,
-                            ...(sectionKey === 'expense'
-                                ? { expense_type: normalizeExpenseType(row?.expense_type) }
-                                : {}),
-                        };
+                        return normalizeExecutionRowForSave(sectionKey, row, equipmentName);
                     });
             });
             cleanDetails.budget_settings = mergeBudgetSettings(details?.budget_settings);

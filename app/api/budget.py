@@ -128,6 +128,7 @@ class MaterialDetailItem(BaseModel):
 class LaborDetailItem(BaseModel):
     equipment_name: str = Field(..., min_length=1, max_length=180)
     task_name: str = Field(default="", max_length=180)
+    staffing_type: str = Field(default="자체", max_length=16)
     worker_type: str = Field(default="", max_length=120)
     unit: str = Field(default="H", max_length=8)
     quantity: float = 0.0
@@ -166,6 +167,7 @@ class MaterialExecutionItem(BaseModel):
 class LaborExecutionItem(BaseModel):
     equipment_name: str = Field(..., min_length=1, max_length=180)
     task_name: str = Field(default="", max_length=180)
+    staffing_type: str = Field(default="자체", max_length=16)
     worker_type: str = Field(default="", max_length=120)
     executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
@@ -681,6 +683,10 @@ def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
         normalized = str(raw_value or "").strip()
         return "외주" if normalized == "외주" else "자체"
 
+    def _normalize_staffing_type(raw_value: Any) -> str:
+        normalized = str(raw_value or "").strip()
+        return "외주" if normalized == "외주" else "자체"
+
     signature = {
         "material_items": [],
         "labor_items": [],
@@ -705,6 +711,7 @@ def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
             (
                 (item.get("equipment_name") or "").strip(),
                 (item.get("task_name") or "").strip(),
+                _normalize_staffing_type(item.get("staffing_type")),
                 (item.get("worker_type") or "").strip(),
                 (item.get("unit") or "H").strip().upper(),
                 to_number(item.get("quantity")),

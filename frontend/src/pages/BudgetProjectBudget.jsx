@@ -603,11 +603,13 @@ const BudgetProjectBudget = () => {
                                     return (
                                         <div key={`${equipment.name}-${phase}`} className="rounded-lg border bg-slate-50/70 p-3">
                                             <p className="mb-1 text-xs font-bold text-slate-700">{PHASE_LABEL[phase]}</p>
-                                            <AmountLine label="재료비" budget={phaseData.material.budget} execution={phaseData.material.execution} showExecution={showExecution} layout="vertical" />
-                                            <AmountLine label="인건비" budget={phaseData.labor.budget} execution={phaseData.labor.execution} showExecution={showExecution} layout="vertical" />
-                                            <AmountLine label="경비" budget={phaseData.expense.budget} execution={phaseData.expense.execution} showExecution={showExecution} layout="vertical" />
-                                            <div className="mt-2 border-t border-slate-200 pt-2">
+                                            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                                <AmountLine label="재료비" budget={phaseData.material.budget} execution={phaseData.material.execution} showExecution={showExecution} layout="vertical" />
+                                                <AmountLine label="인건비" budget={phaseData.labor.budget} execution={phaseData.labor.execution} showExecution={showExecution} layout="vertical" />
+                                                <AmountLine label="경비" budget={phaseData.expense.budget} execution={phaseData.expense.execution} showExecution={showExecution} layout="vertical" />
                                                 <AmountLine label="소계" budget={phaseData.total.budget} execution={phaseData.total.execution} showExecution={showExecution} strong layout="vertical" />
+                                            </div>
+                                            <div className="mt-2 border-t border-slate-200 pt-2">
                                                 <CompareBar budget={phaseData.total.budget} execution={phaseData.total.execution} showExecution={showExecution} />
                                             </div>
                                         </div>

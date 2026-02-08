@@ -1085,44 +1085,19 @@ const BudgetProjectEditor = () => {
 
     const handleMaterialTreeContextAction = useCallback((action, node) => {
         if (section !== 'material') return;
+        const nodeType = String(node?.nodeType || '');
         const scope = node?.scope || {};
         const targetEquipment = normalizeEquipmentName(
             scope.equipment || activeEquipmentName || equipmentNames[0] || '',
         );
         const targetPhase = scope.phase === 'installation' ? 'installation' : 'fabrication';
         const targetUnit = String(scope.unit || '').trim();
-        if (!targetEquipment || !targetUnit) return;
-
-        const sourceRows = details[activeKey] || [];
-        const scopeMatchedRows = sourceRows.filter((row) => {
-            const rowEquipment = normalizeEquipmentName(row?.equipment_name);
-            const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
-            return (
-                rowEquipment === targetEquipment
-                && rowPhase === targetPhase
-                && resolveMaterialUnitLabel(row) === targetUnit
-            );
-        });
-
-        if (action === 'copy') {
-            const copiedRows = scopeMatchedRows.filter((row) => !rowIsEmptyFn(row, 'material'));
-            if (!copiedRows.length) {
-                setMaterialUnitClipboard(null);
-                return;
-            }
-            const copiedScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
-            const unitCountMap = normalizeMaterialUnitCountMap(details?.budget_settings?.material_unit_counts);
-            setMaterialUnitClipboard({
-                rows: copiedRows.map((row) => ({ ...row })),
-                sourceUnitName: targetUnit,
-                sourceScopeKey: copiedScopeKey,
-                sourceUnitCount: Math.max(1, Number(unitCountMap[copiedScopeKey] || 1)),
-            });
-            return;
-        }
+        if (!targetEquipment) return;
 
         if (action === 'paste') {
+            if (nodeType !== 'phase') return;
             if (!materialUnitClipboard?.rows?.length) return;
+            const sourceRows = details[activeKey] || [];
             const existingUnitNames = new Set(
                 sourceRows
                     .filter((row) => {
@@ -1180,6 +1155,36 @@ const BudgetProjectEditor = () => {
                     expenseType: '',
                 },
             }));
+            return;
+        }
+
+        if (nodeType !== 'unit' || !targetUnit) return;
+
+        const sourceRows = details[activeKey] || [];
+        const scopeMatchedRows = sourceRows.filter((row) => {
+            const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+            const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            return (
+                rowEquipment === targetEquipment
+                && rowPhase === targetPhase
+                && resolveMaterialUnitLabel(row) === targetUnit
+            );
+        });
+
+        if (action === 'copy') {
+            const copiedRows = scopeMatchedRows.filter((row) => !rowIsEmptyFn(row, 'material'));
+            if (!copiedRows.length) {
+                setMaterialUnitClipboard(null);
+                return;
+            }
+            const copiedScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
+            const unitCountMap = normalizeMaterialUnitCountMap(details?.budget_settings?.material_unit_counts);
+            setMaterialUnitClipboard({
+                rows: copiedRows.map((row) => ({ ...row })),
+                sourceUnitName: targetUnit,
+                sourceScopeKey: copiedScopeKey,
+                sourceUnitCount: Math.max(1, Number(unitCountMap[copiedScopeKey] || 1)),
+            });
             return;
         }
 

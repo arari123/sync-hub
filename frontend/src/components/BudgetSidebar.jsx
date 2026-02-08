@@ -79,7 +79,8 @@ const BudgetSidebar = ({
     }, []);
     const handleNodeContextMenu = (event, node) => {
         if (section !== 'material') return;
-        if (String(node?.nodeType || '') !== 'unit') return;
+        const nodeType = String(node?.nodeType || '');
+        if (nodeType !== 'unit' && nodeType !== 'phase') return;
         event.preventDefault();
         event.stopPropagation();
         setContextMenuState({
@@ -167,9 +168,19 @@ const BudgetSidebar = ({
                     }}
                     onClick={(event) => event.stopPropagation()}
                 >
-                    <ContextMenuButton label="복사" onClick={() => runContextAction('copy')} />
-                    <ContextMenuButton label="붙여넣기" onClick={() => runContextAction('paste')} disabled={!hasCopiedUnit} />
-                    <ContextMenuButton label="삭제" onClick={() => runContextAction('delete')} danger />
+                    {String(contextMenuState?.node?.nodeType || '') === 'unit' && (
+                        <>
+                            <ContextMenuButton label="복사" onClick={() => runContextAction('copy')} />
+                            <ContextMenuButton label="삭제" onClick={() => runContextAction('delete')} danger />
+                        </>
+                    )}
+                    {String(contextMenuState?.node?.nodeType || '') === 'phase' && (
+                        <ContextMenuButton
+                            label="붙여넣기"
+                            onClick={() => runContextAction('paste')}
+                            disabled={!hasCopiedUnit}
+                        />
+                    )}
                 </div>
             )}
         </aside>

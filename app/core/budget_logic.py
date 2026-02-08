@@ -67,6 +67,9 @@ _DEFAULT_BUDGET_SETTINGS = {
     "labor_days_per_month_overseas": 30.0,
 }
 
+INHOUSE_LABOR_RATE_PER_HOUR = 35000.0
+OUTSOURCE_LABOR_RATE_PER_DAY = 400000.0
+
 
 def normalize_stage(stage: str) -> str:
     value = (stage or "").strip().lower()
@@ -134,6 +137,26 @@ def labor_unit_to_hours(unit: str, location_type: str = "domestic", settings: di
         )
         return days * _LABOR_UNIT_HOURS["D"]
     return 1.0
+
+
+def labor_budget_amount(item: dict, settings: dict | None = None) -> float:
+    quantity = to_number(item.get("quantity"))
+    headcount = to_number(item.get("headcount")) or 1.0
+    location_type = normalize_location_type(
+        item.get("location_type")
+        or (settings or {}).get("installation_locale")
+        or "domestic"
+    )
+    hours = labor_unit_to_hours(
+        item.get("unit") or "H",
+        location_type=location_type,
+        settings=settings,
+    )
+    staffing_type = str(item.get("staffing_type") or "자체").strip()
+    if staffing_type == "외주":
+        days = hours / 8.0
+        return quantity * days * OUTSOURCE_LABOR_RATE_PER_DAY * headcount
+    return quantity * hours * INHOUSE_LABOR_RATE_PER_HOUR * headcount
 
 
 def summarize_costs(items: Iterable[object]) -> dict[str, float]:
@@ -257,20 +280,7 @@ def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
 
     for item in payload.get("labor_items", []):
         target = _bucket(item.get("equipment_name") or "")
-        quantity = to_number(item.get("quantity"))
-        rate = to_number(item.get("hourly_rate"))
-        headcount = to_number(item.get("headcount")) or 1.0
-        location_type = normalize_location_type(
-            item.get("location_type")
-            or settings.get("installation_locale")
-            or "domestic"
-        )
-        factor = labor_unit_to_hours(
-            item.get("unit") or "H",
-            location_type=location_type,
-            settings=settings,
-        )
-        amount = quantity * factor * rate * headcount
+        amount = labor_budget_amount(item, settings=settings)
         phase = normalize_phase(item.get("phase") or "fabrication")
         if phase == "installation":
             target["labor_install_cost"] += amount

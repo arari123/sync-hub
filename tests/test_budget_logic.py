@@ -99,7 +99,7 @@ class BudgetLogicTests(unittest.TestCase):
                     "quantity": 2,
                     "headcount": 2,
                     "location_type": "domestic",
-                    "hourly_rate": 30000,
+                    "staffing_type": "외주",
                     "unit": "D",
                     "phase": "installation",
                 },
@@ -118,7 +118,7 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(item["equipment_name"], "검사기A")
         self.assertEqual(item["material_fab_cost"], 30000)
         self.assertEqual(item["material_install_cost"], 5000)
-        self.assertEqual(item["labor_install_cost"], 960000)
+        self.assertEqual(item["labor_install_cost"], 1600000)
         self.assertEqual(item["expense_fab_cost"], 120000)
 
     def test_aggregate_equipment_costs_supports_overseas_week_month_units(self):
@@ -132,7 +132,6 @@ class BudgetLogicTests(unittest.TestCase):
                     "quantity": 1,
                     "headcount": 1,
                     "location_type": "overseas",
-                    "hourly_rate": 10000,
                     "unit": "W",
                     "phase": "installation",
                 },
@@ -141,7 +140,6 @@ class BudgetLogicTests(unittest.TestCase):
                     "quantity": 1,
                     "headcount": 1,
                     "location_type": "overseas",
-                    "hourly_rate": 10000,
                     "unit": "M",
                     "phase": "installation",
                 },
@@ -151,7 +149,7 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         item = results[0]
         # W=7D=56H, M=30D=240H
-        self.assertEqual(item["labor_install_cost"], 2960000)
+        self.assertEqual(item["labor_install_cost"], 10360000)
 
     def test_summarize_executed_costs_from_detail(self):
         payload = {

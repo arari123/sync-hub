@@ -17,6 +17,8 @@ const SECTION_META = {
 const DEFAULT_LABOR_DEPARTMENTS = ['PM', '설계', 'SW', '검사기술', '제어1', '제어2'];
 const OUTSOURCE_LABOR_DEPARTMENTS = ['PM', '설계', '기구', '전장', '제어', 'SW'];
 const STAFFING_TYPE_OPTIONS = ['자체', '외주'];
+const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
+const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 
 const DEFAULT_BUDGET_SETTINGS = {
     labor_departments: DEFAULT_LABOR_DEPARTMENTS,
@@ -134,7 +136,7 @@ function isBudgetRowEmpty(row, section) {
         return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.memo);
     }
     if (section === 'labor') {
-        return !(row.task_name || row.worker_type || row.quantity || row.hourly_rate || row.memo);
+        return !(row.task_name || row.worker_type || row.quantity || row.memo);
     }
     return !(row.equipment_name || row.expense_name || row.basis || row.amount || row.memo);
 }
@@ -256,7 +258,14 @@ function calcBudgetAmount(row, section, settings) {
             ? normalizeLocationType(settings?.installation_locale)
             : 'domestic';
         const hours = laborUnitToHours(row.unit, locationType, settings);
-        return toNumber(row.quantity) * hours * toNumber(row.hourly_rate);
+        const quantity = toNumber(row.quantity);
+        const headcount = toNumber(row.headcount) || 1;
+        const isOutsource = String(row?.staffing_type || '자체').trim() === '외주';
+        if (isOutsource) {
+            const days = hours / 8;
+            return quantity * days * OUTSOURCE_LABOR_RATE_PER_DAY * headcount;
+        }
+        return quantity * hours * INHOUSE_LABOR_RATE_PER_HOUR * headcount;
     }
     return toNumber(row.amount);
 }
@@ -400,7 +409,6 @@ const BudgetProjectEditor = () => {
             { key: 'worker_type', label: '직군/메모', width: 'w-32' },
             { key: 'unit', label: '단위', width: 'w-20', options: ['H', 'D', 'W', 'M'] },
             { key: 'quantity', label: '시간/기간', width: 'w-20', type: 'number' },
-            { key: 'hourly_rate', label: '시간단가', width: 'w-32', type: 'number' },
             {
                 key: 'line_total',
                 label: '금액',
@@ -823,7 +831,7 @@ const BudgetProjectEditor = () => {
         setDetails((prev) => {
             const newList = [...(prev[activeKey] || [])];
             const row = { ...newList[index] };
-            if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount'].includes(key)) {
+            if (['quantity', 'unit_price', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
                 row[key] = String(value || '').toUpperCase();
@@ -1141,6 +1149,17 @@ const BudgetProjectEditor = () => {
                                                 {department}
                                             </button>
                                         ))}
+                                    </div>
+                                )}
+
+                                {activeMode === 'budget' && section === 'labor' && (
+                                    <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-700">
+                                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-emerald-700">
+                                            자체인원 1M/H {INHOUSE_LABOR_RATE_PER_HOUR.toLocaleString('ko-KR')}원
+                                        </span>
+                                        <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-indigo-700">
+                                            외주인원 1M/D {OUTSOURCE_LABOR_RATE_PER_DAY.toLocaleString('ko-KR')}원
+                                        </span>
                                     </div>
                                 )}
 

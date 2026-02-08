@@ -330,3 +330,14 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (상세정보 설비 삭제 버튼 포커스/오삭제 UI 버그 보정)
+  - 문제:
+    - 설비 삭제(X) UI가 첫 항목에 포커스가 튀며 오동작하는 현상
+  - 조치:
+    - 설비 목록 영역을 `label` 래퍼에서 분리해 클릭 시 첫 삭제 버튼으로 포커스가 이동하는 문제 제거
+    - 삭제 버튼에 `onMouseDown/onClick`에서 `preventDefault + stopPropagation` 적용
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectInfoEdit.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

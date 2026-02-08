@@ -326,7 +326,11 @@ const BudgetProjectInfoEdit = () => {
                     </Field>
                 </div>
 
-                <Field label="설비 목록" required={editForm.project_type === 'equipment'}>
+                <div className="space-y-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                        설비 목록
+                        {editForm.project_type === 'equipment' ? ' *' : ''}
+                    </span>
                     {editForm.project_type === 'equipment' ? (
                         <div className="space-y-2.5">
                             <div className="rounded-md border bg-slate-50 p-2.5">
@@ -340,7 +344,15 @@ const BudgetProjectInfoEdit = () => {
                                                 {equipmentName}
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeEquipment(equipmentName)}
+                                                    onMouseDown={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                    }}
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        removeEquipment(equipmentName);
+                                                    }}
                                                     className="rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                                     aria-label={`${equipmentName} 삭제`}
                                                 >
@@ -375,7 +387,7 @@ const BudgetProjectInfoEdit = () => {
                     ) : (
                         <p className="text-[11px] text-slate-500">파츠/AS 프로젝트는 설비 입력이 필요하지 않습니다.</p>
                     )}
-                </Field>
+                </div>
 
                 <Field label="개요">
                     <textarea

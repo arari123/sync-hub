@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Boxes, BriefcaseBusiness, Calculator, ClipboardList, HardHat, Wallet } from 'lucide-react';
+import { BarChart3, Boxes, BriefcaseBusiness, Calculator, Package, Receipt, Users, Wallet } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
 import ProjectPageHeader from '../components/ProjectPageHeader';
@@ -512,9 +512,9 @@ const BudgetProjectBudget = () => {
 
     const baseProjectPath = `/project-management/projects/${project.id}`;
     const entryPages = [
-        { key: 'material', label: '재료비 입력', to: `${baseProjectPath}/edit/material`, icon: Boxes },
-        { key: 'labor', label: '인건비 입력', to: `${baseProjectPath}/edit/labor`, icon: HardHat },
-        { key: 'expense', label: '경비 입력', to: `${baseProjectPath}/edit/expense`, icon: ClipboardList },
+        { key: 'material', label: '재료비 입력', to: `${baseProjectPath}/edit/material`, icon: Package },
+        { key: 'labor', label: '인건비 입력', to: `${baseProjectPath}/edit/labor`, icon: Users },
+        { key: 'expense', label: '경비 입력', to: `${baseProjectPath}/edit/expense`, icon: Receipt },
     ];
 
     return (

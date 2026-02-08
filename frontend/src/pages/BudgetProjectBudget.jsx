@@ -242,7 +242,6 @@ const BudgetProjectBudget = () => {
     const [project, setProject] = useState(null);
     const [version, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
-    const [totals, setTotals] = useState(null);
     const [details, setDetails] = useState(EMPTY_DETAILS);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
@@ -264,7 +263,6 @@ const BudgetProjectBudget = () => {
 
                 if (!currentVersion?.id) {
                     setEquipments([]);
-                    setTotals(currentProject?.totals || null);
                     setDetails(EMPTY_DETAILS);
                     return;
                 }
@@ -276,7 +274,6 @@ const BudgetProjectBudget = () => {
 
                 const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
                 setEquipments(itemList);
-                setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
                 setDetails(detailResp?.data?.details || EMPTY_DETAILS);
             } catch (err) {
                 setError(getErrorMessage(err, '예산 관리 데이터를 불러오지 못했습니다.'));
@@ -491,12 +488,12 @@ const BudgetProjectBudget = () => {
         });
 
         const aggregateBudget = {
-            material: toNumber(totals?.material_total) || (aggregatePhaseBudget.fabrication.material + aggregatePhaseBudget.installation.material),
-            labor: toNumber(totals?.labor_total) || (aggregatePhaseBudget.fabrication.labor + aggregatePhaseBudget.installation.labor),
-            expense: toNumber(totals?.expense_total) || (aggregatePhaseBudget.fabrication.expense + aggregatePhaseBudget.installation.expense),
-            fabrication: toNumber(totals?.fab_total) || aggregatePhaseBudget.fabrication.total,
-            installation: toNumber(totals?.install_total) || aggregatePhaseBudget.installation.total,
-            grand: toNumber(totals?.grand_total) || (aggregatePhaseBudget.fabrication.total + aggregatePhaseBudget.installation.total),
+            material: aggregatePhaseBudget.fabrication.material + aggregatePhaseBudget.installation.material,
+            labor: aggregatePhaseBudget.fabrication.labor + aggregatePhaseBudget.installation.labor,
+            expense: aggregatePhaseBudget.fabrication.expense + aggregatePhaseBudget.installation.expense,
+            fabrication: aggregatePhaseBudget.fabrication.total,
+            installation: aggregatePhaseBudget.installation.total,
+            grand: aggregatePhaseBudget.fabrication.total + aggregatePhaseBudget.installation.total,
         };
 
         const aggregateExecution = {
@@ -524,7 +521,7 @@ const BudgetProjectBudget = () => {
                 grand: aggregateBudget.grand - aggregateExecution.grand,
             },
         };
-    }, [details, equipments, project?.project_type, totals]);
+    }, [details, equipments, project?.project_type]);
 
     if (isLoading) {
         return <p className="text-sm text-muted-foreground">불러오는 중...</p>;

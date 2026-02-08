@@ -1259,27 +1259,206 @@ const ExcelTable = ({
     allowRowDelete,
 }) => {
     const tableRef = useRef(null);
+    const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
+    const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
+    const [selectionEnd, setSelectionEnd] = useState({ row: 0, col: 0 });
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [isFillDragging, setIsFillDragging] = useState(false);
+    const [fillAnchor, setFillAnchor] = useState(null);
+    const [fillTarget, setFillTarget] = useState(null);
 
-    const handleKeyDown = (event, rowIndex, colIndex) => {
-        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) return;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const rowCount = rows.length;
+    const colCount = columns.length;
 
-        const rowCount = rows.length;
-        const colCount = columns.length;
-        let nextRow = rowIndex;
-        let nextCol = colIndex;
+    const range = useMemo(() => {
+        const rowMin = Math.min(selectionStart.row, selectionEnd.row);
+        const rowMax = Math.max(selectionStart.row, selectionEnd.row);
+        const colMin = Math.min(selectionStart.col, selectionEnd.col);
+        const colMax = Math.max(selectionStart.col, selectionEnd.col);
+        return { rowMin, rowMax, colMin, colMax };
+    }, [selectionStart, selectionEnd]);
 
-        if (event.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
-        else if (event.key === 'ArrowDown' || event.key === 'Enter') nextRow = Math.min(rowCount - 1, rowIndex + 1);
-        else if (event.key === 'ArrowLeft') nextCol = Math.max(0, colIndex - 1);
-        else if (event.key === 'ArrowRight') nextCol = Math.min(colCount - 1, colIndex + 1);
+    const isCellInSelection = (row, col) => (
+        row >= range.rowMin
+        && row <= range.rowMax
+        && col >= range.colMin
+        && col <= range.colMax
+    );
 
-        const nextTarget = tableRef.current?.querySelector(`[data-row="${nextRow}"][data-col="${nextCol}"] input`);
+    const focusCell = (row, col) => {
+        const nextTarget = tableRef.current?.querySelector(
+            `[data-row="${row}"][data-col="${col}"] input, [data-row="${row}"][data-col="${col}"] select`,
+        );
         if (!nextTarget) return;
-
-        event.preventDefault();
         nextTarget.focus();
         if (nextTarget.select) nextTarget.select();
     };
+
+    const setSingleCellSelection = (row, col) => {
+        const nextRow = clamp(row, 0, Math.max(rowCount - 1, 0));
+        const nextCol = clamp(col, 0, Math.max(colCount - 1, 0));
+        setActiveCell({ row: nextRow, col: nextCol });
+        setSelectionStart({ row: nextRow, col: nextCol });
+        setSelectionEnd({ row: nextRow, col: nextCol });
+    };
+
+    const isCellFilled = (row, col) => {
+        const colDef = columns[col];
+        if (!colDef || !rows[row]) return false;
+        const value = colDef.computed ? colDef.computed(rows[row]) : rows[row][colDef.key];
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'number') return Number.isFinite(value);
+        return String(value).trim() !== '';
+    };
+
+    const findCtrlJumpTarget = (row, col, direction) => {
+        if (direction === 'ArrowUp' || direction === 'ArrowDown') {
+            const step = direction === 'ArrowUp' ? -1 : 1;
+            let target = row;
+            let found = false;
+            for (let idx = row + step; idx >= 0 && idx < rowCount; idx += step) {
+                if (isCellFilled(idx, col)) {
+                    target = idx;
+                    found = true;
+                }
+            }
+            return found ? target : (step > 0 ? rowCount - 1 : 0);
+        }
+        const step = direction === 'ArrowLeft' ? -1 : 1;
+        let target = col;
+        let found = false;
+        for (let idx = col + step; idx >= 0 && idx < colCount; idx += step) {
+            if (isCellFilled(row, idx)) {
+                target = idx;
+                found = true;
+            }
+        }
+        return found ? target : (step > 0 ? colCount - 1 : 0);
+    };
+
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            setIsSelecting(false);
+            if (!isFillDragging) return;
+            const anchor = fillAnchor;
+            const target = fillTarget;
+            setIsFillDragging(false);
+            setFillAnchor(null);
+            setFillTarget(null);
+            if (!anchor || !target) return;
+
+            const rowMin = Math.min(anchor.row, target.row);
+            const rowMax = Math.max(anchor.row, target.row);
+            const colMin = Math.min(anchor.col, target.col);
+            const colMax = Math.max(anchor.col, target.col);
+            const sourceColumn = columns[anchor.col];
+            if (!sourceColumn || sourceColumn.readonly) return;
+            const sourceRow = rows[anchor.row];
+            if (!sourceRow) return;
+            const sourceValueRaw = sourceColumn.computed
+                ? sourceColumn.computed(sourceRow)
+                : sourceRow[sourceColumn.key];
+            const sourceValue = sourceColumn.type === 'number'
+                ? String(toNumber(sourceValueRaw))
+                : String(sourceValueRaw ?? '');
+
+            for (let r = rowMin; r <= rowMax; r += 1) {
+                for (let c = colMin; c <= colMax; c += 1) {
+                    if (r === anchor.row && c === anchor.col) continue;
+                    const column = columns[c];
+                    if (!column || column.readonly) continue;
+                    const nextValue = column.type === 'number'
+                        ? sourceValue.replace(/[^0-9]/g, '')
+                        : sourceValue;
+                    onChange(r, column.key, nextValue);
+                }
+            }
+        };
+
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [columns, fillAnchor, fillTarget, isFillDragging, onChange, rows]);
+
+    const handleKeyDown = (event, rowIndex, colIndex) => {
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(event.key)) return;
+
+        let nextRow = rowIndex;
+        let nextCol = colIndex;
+
+        if (event.ctrlKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                nextRow = findCtrlJumpTarget(rowIndex, colIndex, event.key);
+            } else {
+                nextCol = findCtrlJumpTarget(rowIndex, colIndex, event.key);
+            }
+        } else if (event.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
+        else if (event.key === 'ArrowDown' || event.key === 'Enter') nextRow = Math.min(rowCount - 1, rowIndex + 1);
+        else if (event.key === 'ArrowLeft') nextCol = Math.max(0, colIndex - 1);
+        else if (event.key === 'ArrowRight') nextCol = Math.min(colCount - 1, colIndex + 1);
+        else if (event.key === 'Tab') nextCol = event.shiftKey ? Math.max(0, colIndex - 1) : Math.min(colCount - 1, colIndex + 1);
+
+        event.preventDefault();
+
+        if (event.shiftKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            setActiveCell({ row: nextRow, col: nextCol });
+            setSelectionEnd({ row: nextRow, col: nextCol });
+        } else {
+            setSingleCellSelection(nextRow, nextCol);
+        }
+        focusCell(nextRow, nextCol);
+    };
+
+    const handleCellMouseDown = (event, rowIndex, colIndex) => {
+        if (event.button !== 0) return;
+        if (isFillDragging) return;
+        event.preventDefault();
+        setActiveCell({ row: rowIndex, col: colIndex });
+        if (event.shiftKey) {
+            setSelectionEnd({ row: rowIndex, col: colIndex });
+        } else {
+            setSelectionStart({ row: rowIndex, col: colIndex });
+            setSelectionEnd({ row: rowIndex, col: colIndex });
+        }
+        setIsSelecting(true);
+        focusCell(rowIndex, colIndex);
+    };
+
+    const handleCellMouseEnter = (rowIndex, colIndex) => {
+        if (isFillDragging) {
+            setFillTarget({ row: rowIndex, col: colIndex });
+            return;
+        }
+        if (!isSelecting) return;
+        setSelectionEnd({ row: rowIndex, col: colIndex });
+    };
+
+    const handleFillMouseDown = (event, rowIndex, colIndex) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setIsFillDragging(true);
+        setFillAnchor({ row: rowIndex, col: colIndex });
+        setFillTarget({ row: rowIndex, col: colIndex });
+    };
+
+    useEffect(() => {
+        if (!rowCount || !colCount) return;
+        setActiveCell((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+        setSelectionStart((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+        setSelectionEnd((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+    }, [colCount, rowCount]);
 
     return (
         <>
@@ -1315,26 +1494,59 @@ const ExcelTable = ({
                                     : (rawValue || '');
                                 const isCellEditable = editable && !col.readonly;
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
+                                const isSelected = isCellInSelection(rowIndex, colIndex);
+                                const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
 
                                 if (col.options && isCellEditable) {
                                     return (
-                                        <td key={colIndex} className="p-0 border-r border-slate-100 last:border-0" data-row={rowIndex} data-col={colIndex}>
+                                        <td
+                                            key={colIndex}
+                                            className={cn(
+                                                "p-0 border-r border-slate-100 last:border-0 relative",
+                                                isSelected && "bg-blue-50/60",
+                                                isActive && "ring-1 ring-primary/40 ring-inset",
+                                            )}
+                                            data-row={rowIndex}
+                                            data-col={colIndex}
+                                            onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
+                                            onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                        >
                                             <select
                                                 className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700"
                                                 value={String(rawValue || '').toUpperCase()}
                                                 onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
                                                 onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                                onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
                                             >
                                                 {col.options.map((opt) => (
                                                     <option key={opt} value={opt}>{opt}</option>
                                                 ))}
                                             </select>
+                                            {isActive && editable && !col.readonly && (
+                                                <button
+                                                    type="button"
+                                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"
+                                                    onMouseDown={(event) => handleFillMouseDown(event, rowIndex, colIndex)}
+                                                    aria-label="자동 복사 드래그"
+                                                />
+                                            )}
                                         </td>
                                     );
                                 }
 
                                 return (
-                                    <td key={colIndex} className="p-0 border-r border-slate-100 last:border-0" data-row={rowIndex} data-col={colIndex}>
+                                    <td
+                                        key={colIndex}
+                                        className={cn(
+                                            "p-0 border-r border-slate-100 last:border-0 relative",
+                                            isSelected && "bg-blue-50/60",
+                                            isActive && "ring-1 ring-primary/40 ring-inset",
+                                        )}
+                                        data-row={rowIndex}
+                                        data-col={colIndex}
+                                        onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
+                                        onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                    >
                                         <input
                                             type="text"
                                             list={dataListId}
@@ -1351,10 +1563,21 @@ const ExcelTable = ({
                                                 if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
                                                 onChange(rowIndex, col.key, val);
                                             }}
-                                            onFocus={(event) => event.target.select()}
+                                            onFocus={(event) => {
+                                                setSingleCellSelection(rowIndex, colIndex);
+                                                event.target.select();
+                                            }}
                                             onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                             readOnly={!isCellEditable}
                                         />
+                                        {isActive && editable && !col.readonly && (
+                                            <button
+                                                type="button"
+                                                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"
+                                                onMouseDown={(event) => handleFillMouseDown(event, rowIndex, colIndex)}
+                                                aria-label="자동 복사 드래그"
+                                            />
+                                        )}
                                     </td>
                                 );
                             })}

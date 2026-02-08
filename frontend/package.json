@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortune-sheet/core": "^1.0.4",
+    "@fortune-sheet/react": "^1.0.4",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",

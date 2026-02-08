@@ -14,7 +14,6 @@ const ProjectPageHeader = ({
     return (
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
-                <BudgetBreadcrumb items={breadcrumbItems} />
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-black tracking-tight text-slate-900">{projectName || '프로젝트'}</h1>
                     {projectCode && (
@@ -36,6 +35,7 @@ const ProjectPageHeader = ({
             </div>
 
             <div className="w-full space-y-2 md:w-auto md:min-w-[540px]">
+                <BudgetBreadcrumb items={breadcrumbItems} />
                 <ProjectContextNav projectId={projectId} />
                 {actions && (
                     <div className="flex flex-wrap items-center justify-end gap-2">

@@ -407,3 +407,13 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (브레드크럼 위치 조정)
+  - 요구 반영:
+    - 브레드크럼을 트리메뉴 왼쪽이 아닌 트리메뉴 위쪽에 배치
+  - 조치:
+    - `ProjectPageHeader`에서 브레드크럼 렌더링을 우측 메뉴 블록 상단으로 이동
+  - 관련 파일:
+    - `frontend/src/components/ProjectPageHeader.jsx`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

@@ -1632,6 +1632,7 @@ const ExcelTable = ({
                                 const isSelected = isCellInSelection(rowIndex, colIndex);
                                 const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
                                 const isEditingCurrentCell = isEditing(rowIndex, colIndex);
+                                const cellCursorClass = isEditingCurrentCell ? 'cursor-text' : 'cursor-default';
 
                                 if (col.options && isCellEditable) {
                                     return (
@@ -1639,6 +1640,7 @@ const ExcelTable = ({
                                             key={colIndex}
                                             className={cn(
                                                 "p-0 border-r border-slate-200 last:border-0 relative",
+                                                cellCursorClass,
                                                 isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
                                                 isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
                                             )}
@@ -1650,7 +1652,7 @@ const ExcelTable = ({
                                         >
                                             {isEditingCurrentCell ? (
                                                 <select
-                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700"
+                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700 cursor-text"
                                                     value={String(rawValue || '').toUpperCase()}
                                                     onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
@@ -1692,6 +1694,7 @@ const ExcelTable = ({
                                         key={colIndex}
                                         className={cn(
                                             "p-0 border-r border-slate-200 last:border-0 relative",
+                                            cellCursorClass,
                                             isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
                                             isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
                                         )}

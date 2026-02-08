@@ -8,6 +8,7 @@ const Layout = ({ children }) => {
     const authed = isAuthenticated();
     const user = getCurrentUser();
     const isProjectManagementRoute = location.pathname.startsWith('/project-management');
+    const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(location.pathname);
 
     const logout = () => {
         clearSession();
@@ -21,9 +22,17 @@ const Layout = ({ children }) => {
                 <div className="flex items-center gap-3">
                     <Logo />
                     {isProjectManagementRoute && (
-                        <span className="hidden sm:inline text-sm font-semibold tracking-tight text-foreground/85">
-                            프로젝트 관리
-                        </span>
+                        <div className="hidden sm:flex items-center gap-1 text-sm font-semibold tracking-tight text-foreground/85">
+                            <Link to="/project-management" className="hover:text-primary transition-colors">
+                                프로젝트 관리
+                            </Link>
+                            {isBudgetContextRoute && (
+                                <>
+                                    <span className="text-foreground/40">-</span>
+                                    <span>예산 관리</span>
+                                </>
+                            )}
+                        </div>
                     )}
                 </div>
                 <div className="flex items-center gap-4">

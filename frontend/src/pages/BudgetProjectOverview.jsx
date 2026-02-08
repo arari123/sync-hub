@@ -47,6 +47,12 @@ const UPCOMING_MANAGEMENT_AREAS = [
     { key: 'as', label: 'AS 관리', path: 'as' },
 ];
 
+const JOBLIST_PLACEHOLDERS = [
+    { title: '이슈 → 조치', description: '이슈 발생 원인과 조치 내역이 등록됩니다.' },
+    { title: 'TODO LIST', description: '담당자별 작업 항목과 우선순위가 등록됩니다.' },
+    { title: 'Q&A', description: '프로젝트 질의응답 이력이 등록됩니다.' },
+];
+
 const BudgetProjectOverview = () => {
     const { projectId } = useParams();
     const [project, setProject] = useState(null);
@@ -229,21 +235,6 @@ const BudgetProjectOverview = () => {
         to: `${baseProjectPath}/${item.path}`,
     }));
 
-    const jobSummary = milestones.reduce(
-        (acc, item) => {
-            const status = String(item?.status || '').toLowerCase();
-            acc.total += 1;
-            if (status === 'done') acc.done += 1;
-            else if (status === 'active') acc.active += 1;
-            else acc.planned += 1;
-            return acc;
-        },
-        { total: 0, done: 0, active: 0, planned: 0 }
-    );
-    const upcomingJobs = milestones
-        .filter((item) => String(item?.status || '').toLowerCase() !== 'done')
-        .slice(0, 4);
-
     return (
         <div className="space-y-5 pb-12 animate-in fade-in duration-500">
             {/* 1. Header & Breadcrumb */}
@@ -346,6 +337,33 @@ const BudgetProjectOverview = () => {
 
                 <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
                     <div className="flex items-center justify-between mb-3">
+                        <Link to={jobListPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            잡리스트
+                        </Link>
+                        <Link to={jobListPath}>
+                            <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
+                                잡리스트
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                        <MiniStat label="이슈/조치" value={0} />
+                        <MiniStat label="TODO" value={0} tone="primary" />
+                        <MiniStat label="Q&A" value={0} />
+                    </div>
+                    <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
+                        {JOBLIST_PLACEHOLDERS.map((item) => (
+                            <div key={item.title} className="rounded-md border bg-muted/20 px-2.5 py-2">
+                                <p className="text-[11px] font-semibold truncate">{item.title}</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{item.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-3">
                         <Link to={budgetManagementPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
                             <span className="w-1 h-4 bg-primary rounded-full" />
                             예산/집행 분석
@@ -399,39 +417,6 @@ const BudgetProjectOverview = () => {
                             <p className="text-xs text-slate-400">일정 데이터가 없습니다.</p>
                         )}
                     </div>
-                </section>
-
-                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
-                    <div className="flex items-center justify-between mb-3">
-                        <Link to={jobListPath} className="text-sm font-bold flex items-center gap-2 hover:text-primary">
-                            <span className="w-1 h-4 bg-primary rounded-full" />
-                            잡리스트
-                        </Link>
-                        <Link to={jobListPath}>
-                            <Button size="sm" className="h-7 px-2.5 text-[11px] font-semibold">
-                                잡리스트
-                            </Button>
-                        </Link>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                        <MiniStat label="전체" value={jobSummary.total} />
-                        <MiniStat label="진행중" value={jobSummary.active} tone="primary" />
-                        <MiniStat label="대기" value={jobSummary.planned} />
-                    </div>
-                    {upcomingJobs.length > 0 ? (
-                        <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
-                            {upcomingJobs.map((item, index) => (
-                                <div key={`${item.key || index}-${item.label || ''}`} className="rounded-md border bg-muted/20 px-2.5 py-2">
-                                    <p className="text-[11px] font-semibold truncate">{item.label || `작업 ${index + 1}`}</p>
-                                    <p className="text-[10px] text-muted-foreground mt-0.5">목표일: {item.date || '-'}</p>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex-1 min-h-0 rounded-md border border-dashed bg-muted/10 flex items-center justify-center text-[11px] text-muted-foreground text-center px-2">
-                            등록된 작업이 없습니다.
-                        </div>
-                    )}
                 </section>
             </div>
 

@@ -208,3 +208,15 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (출장 거리 편도 입력 / 경비 왕복 계산 반영)
+  - 요구 반영:
+    - 프로젝트 기본정보의 출장 거리는 `편도(km)` 입력 기준 유지
+    - 경비 교통비 계산은 `왕복 거리(편도 * 2)` 기준으로 계산
+  - 조치:
+    - `국내 교통비` 산정 기준 문구를 `교통 횟수 * 왕복 {거리}km * km당 단가`로 변경
+    - 자동 산정 금액 및 횟수 입력 시 금액 재계산 로직 모두 `편도 * 2` 적용
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

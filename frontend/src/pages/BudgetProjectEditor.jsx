@@ -910,6 +910,7 @@ const BudgetProjectEditor = () => {
             const domesticTripDaily = toNumber(settings.domestic_trip_daily) || 36000;
             const domesticLodgingDaily = toNumber(settings.domestic_lodging_daily) || 70000;
             const domesticDistanceKm = toNumber(settings.domestic_distance_km) || 0;
+            const domesticRoundTripDistanceKm = Math.max(0, domesticDistanceKm * 2);
             const domesticTransportPerKm = toNumber(settings.domestic_transport_per_km) || 250;
             const overseasTripDaily = toNumber(settings.overseas_trip_daily) || 120000;
             const overseasLodgingDaily = toNumber(settings.overseas_lodging_daily) || 200000;
@@ -1002,9 +1003,9 @@ const BudgetProjectEditor = () => {
                 pushExpenseRow({
                     formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                     name: '국내 교통비',
-                    basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
+                    basis: `교통 횟수 * 왕복 ${domesticRoundTripDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
                     quantity: phase === 'fabrication' ? '' : transportQuantity,
-                    amount: phase === 'fabrication' ? 0 : Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
+                    amount: phase === 'fabrication' ? 0 : Math.floor(transportQuantity * domesticRoundTripDistanceKm * domesticTransportPerKm),
                 });
             } else {
                 const tripQuantity = installationManDays;
@@ -1269,9 +1270,10 @@ const BudgetProjectEditor = () => {
                         : (toNumber(settings.overseas_lodging_daily) || 200000);
                     row.amount = Math.floor(qty * rate);
                 } else if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
+                    const roundTripKm = Math.max(0, (toNumber(settings.domestic_distance_km) || 0) * 2);
                     row.amount = Math.floor(
                         qty
-                        * (toNumber(settings.domestic_distance_km) || 0)
+                        * roundTripKm
                         * (toNumber(settings.domestic_transport_per_km) || 250),
                     );
                 } else if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.AIRFARE) {

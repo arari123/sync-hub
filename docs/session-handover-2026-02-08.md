@@ -113,18 +113,11 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
     - 셀 다중 선택(마우스 드래그, Shift+화살표 확장)
     - Ctrl+화살표 입력 영역 끝 이동
     - 활성 셀 핸들 드래그 자동복사(fill)
-  - 예산 입력 표 컴포넌트 FortuneSheet 기반으로 교체:
-    - 패키지 추가: `@fortune-sheet/react`, `@fortune-sheet/core`
-    - `BudgetProjectEditor`의 커스텀 `ExcelTable` 제거
-    - `Workbook` 기반 입력으로 전환(선택 후 키보드 입력, 범위 선택/채우기 기본 동작 활용)
-    - 기존 상세 스키마(`material/labor/expense` + `execution_*`)와 양방향 매핑 유지
   - 관련 파일:
     - `frontend/src/pages/BudgetProjectEditor.jsx`
-    - `frontend/package.json`
-    - `frontend/package-lock.json`
   - 검증:
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
   - 남은 작업:
-    - FortuneSheet 툴바/메뉴 정책(노출 항목 최소화) 조정
-    - 대용량 데이터 입력 시 성능 튜닝 및 청크 로딩
+    - Undo/Redo 히스토리 고도화
+    - 다중 선택 상태에서 복사/붙여넣기 범위 매핑 개선

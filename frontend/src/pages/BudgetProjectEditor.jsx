@@ -322,18 +322,40 @@ function _injectKeyBuffers(list, builder, minRowsPerPhase = 50) {
     return [...rows, ...fabBuffer, ...instBuffer];
 }
 
+function trimMaterialEmptyRowsByScope(list, rowIsEmptyFn, maxEmptyRowsPerScope = 50) {
+    const rows = (list || []).map((item) => ({ ...item, phase: item.phase || 'fabrication' }));
+    const emptyCountByScope = new Map();
+    const normalizedMax = Math.max(0, Number(maxEmptyRowsPerScope) || 0);
+    return rows.filter((row) => {
+        if (!rowIsEmptyFn(row, 'material')) return true;
+        const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+        const equipmentName = normalizeEquipmentName(row?.equipment_name) || COMMON_EQUIPMENT_NAME;
+        const scopeKey = `${equipmentName}::${phase}`;
+        const currentCount = emptyCountByScope.get(scopeKey) || 0;
+        if (currentCount >= normalizedMax) return false;
+        emptyCountByScope.set(scopeKey, currentCount + 1);
+        return true;
+    });
+}
+
 function injectBuffers(detailsObj) {
     const result = { ...detailsObj, budget_settings: mergeBudgetSettings(detailsObj?.budget_settings) };
     Object.keys(SECTION_META).forEach((section) => {
         const meta = SECTION_META[section];
         const minRowsPerPhase = section === 'material' ? 50 : 0;
+        const budgetSource = section === 'material'
+            ? trimMaterialEmptyRowsByScope(result[meta.budgetKey], isBudgetRowEmpty, 50)
+            : result[meta.budgetKey];
+        const executionSource = section === 'material'
+            ? trimMaterialEmptyRowsByScope(result[meta.executionKey], isExecutionRowEmpty, 50)
+            : result[meta.executionKey];
         result[meta.budgetKey] = _injectKeyBuffers(
-            result[meta.budgetKey],
+            budgetSource,
             (phase) => buildEmptyBudgetRow(section, phase),
             minRowsPerPhase,
         );
         result[meta.executionKey] = _injectKeyBuffers(
-            result[meta.executionKey],
+            executionSource,
             (phase) => buildEmptyExecutionRow(section, phase),
             minRowsPerPhase,
         );

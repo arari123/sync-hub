@@ -1446,7 +1446,15 @@ const BudgetProjectEditor = () => {
             if (activeEquipmentName) {
                 row.equipment_name = activeEquipmentName;
             }
-            if (section === 'material' && activeUnitFilter && !String(row?.unit_name || '').trim()) {
+            const shouldAutoAssignScopedUnit = (
+                section === 'material'
+                && Boolean(activeUnitFilter)
+                && ['part_name', 'spec', 'quantity', 'unit_price'].includes(key)
+                && !String(row?.unit_name || '').trim()
+            );
+            if (section === 'material' && activeUnitFilter && key === 'unit_name') {
+                row.unit_name = activeUnitFilter;
+            } else if (shouldAutoAssignScopedUnit) {
                 row.unit_name = activeUnitFilter;
             }
             if (section === 'expense') {
@@ -2117,10 +2125,15 @@ const BudgetProjectEditor = () => {
                                 editable={canEditScopedRows}
                                 allowRowDelete={canEditScopedRows}
                                 isCellReadonly={(row, column) => (
-                                    activeMode === 'budget'
-                                    && section === 'expense'
-                                    && column?.key === 'quantity'
-                                    && shouldHideExpenseQuantity(row)
+                                    (section === 'material'
+                                        && Boolean(activeUnitFilter)
+                                        && column?.key === 'unit_name')
+                                    || (
+                                        activeMode === 'budget'
+                                        && section === 'expense'
+                                        && column?.key === 'quantity'
+                                        && shouldHideExpenseQuantity(row)
+                                    )
                                 )}
                                 getCellDisplayValue={(row, column, rawValue) => {
                                     if (

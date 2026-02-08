@@ -174,3 +174,27 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (교통비 계산식/출장거리 연동)
+  - 요구 반영:
+    - 제작 경비의 `국내 교통비` 산정 기준을 설치와 동일한 식(`교통 횟수 * 거리(km) * km당 단가`)으로 통일
+    - 프로젝트 기본정보에 `출장 거리(km)` 입력 필드를 추가하고 교통비 계산에 반영
+  - 조치:
+    - 백엔드:
+      - `budget_projects.business_trip_distance_km` 컬럼 추가(런타임 스키마 보정 포함)
+      - 프로젝트 생성/수정 payload 및 응답에 `business_trip_distance_km` 추가
+    - 프론트:
+      - 프로젝트 생성/상세 수정 모달에 `출장 거리(km)` 입력 UI 추가
+      - 프로젝트 상세 정보 카드에 출장 거리 표시
+      - 예산 편집기 경비 교통비 계산 시 프로젝트 출장 거리 값을 우선 사용하도록 연동
+      - 제작 `국내 교통비` 산정 기준 문구를 설치와 동일 식으로 통일
+  - 관련 파일:
+    - `app/models.py`
+    - `app/database.py`
+    - `app/api/budget.py`
+    - `frontend/src/pages/BudgetProjectCreate.jsx`
+    - `frontend/src/pages/BudgetProjectOverview.jsx`
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose restart web frontend` 후 `budget_projects` 컬럼 반영 확인

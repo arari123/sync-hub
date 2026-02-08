@@ -26,6 +26,7 @@ const BudgetProjectCreate = () => {
     const [description, setDescription] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [installationSite, setInstallationSite] = useState('');
+    const [businessTripDistanceKm, setBusinessTripDistanceKm] = useState('');
     const [managerUserId, setManagerUserId] = useState('');
     const [managerOptions, setManagerOptions] = useState([]);
     const [error, setError] = useState('');
@@ -92,6 +93,7 @@ const BudgetProjectCreate = () => {
                 description: description.trim(),
                 customer_name: customerName.trim(),
                 installation_site: installationSite.trim(),
+                business_trip_distance_km: Number(String(businessTripDistanceKm || '0').replace(/,/g, '')) || 0,
                 manager_user_id: Number(managerUserId),
             });
             const projectId = created?.data?.id;
@@ -192,6 +194,12 @@ const BudgetProjectCreate = () => {
                         placeholder="설치 장소(선택)"
                         value={installationSite}
                         onChange={(event) => setInstallationSite(event.target.value)}
+                    />
+                    <input
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        placeholder="출장 거리(km, 편도 기준)"
+                        value={businessTripDistanceKm}
+                        onChange={(event) => setBusinessTripDistanceKm(event.target.value.replace(/[^0-9.]/g, ''))}
                     />
                     <select
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"

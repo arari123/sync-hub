@@ -43,6 +43,7 @@ const EMPTY_EDIT_FORM = {
     current_stage: 'review',
     customer_name: '',
     installation_site: '',
+    business_trip_distance_km: '',
     manager_user_id: '',
     description: '',
     cover_image_url: '',
@@ -120,6 +121,7 @@ const BudgetProjectOverview = () => {
             current_stage: project.current_stage || 'review',
             customer_name: project.customer_name || '',
             installation_site: project.installation_site || '',
+            business_trip_distance_km: String(toNumber(project.business_trip_distance_km) || ''),
             manager_user_id: project.manager_user_id ? String(project.manager_user_id) : '',
             description: project.description || '',
             cover_image_url: project.cover_image_url || '',
@@ -215,6 +217,7 @@ const BudgetProjectOverview = () => {
                 current_stage: editForm.current_stage || 'review',
                 customer_name: (editForm.customer_name || '').trim(),
                 installation_site: (editForm.installation_site || '').trim(),
+                business_trip_distance_km: toNumber(editForm.business_trip_distance_km),
                 manager_user_id: editForm.manager_user_id ? Number(editForm.manager_user_id) : undefined,
                 description: (editForm.description || '').trim(),
                 cover_image_url: (editForm.cover_image_url || '').trim(),
@@ -365,6 +368,7 @@ const BudgetProjectOverview = () => {
                         <div className="grid grid-cols-1 gap-2.5">
                             <IdentityRow label="고객사" value={project.customer_name} />
                             <IdentityRow label="설치 장소" value={project.installation_site} />
+                            <IdentityRow label="출장 거리" value={`${toNumber(project.business_trip_distance_km).toLocaleString('ko-KR')}km`} />
                             <IdentityRow label="담당자" value={project.manager_name} />
                             <IdentityRow label="프로젝트 구분" value={project.project_type_label} />
                             <IdentityRow label="현재 단계" value={project.current_stage_label} />
@@ -779,6 +783,14 @@ const ProjectEditModal = ({
                                     className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                                     value={form.installation_site}
                                     onChange={(event) => updateField('installation_site', event.target.value)}
+                                />
+                            </Field>
+                            <Field label="출장 거리(km)">
+                                <input
+                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                    value={form.business_trip_distance_km}
+                                    onChange={(event) => updateField('business_trip_distance_km', event.target.value.replace(/[^0-9.]/g, ''))}
+                                    placeholder="편도 거리 입력"
                                 />
                             </Field>
                         </div>

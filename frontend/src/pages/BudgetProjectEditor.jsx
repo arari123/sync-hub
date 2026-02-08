@@ -473,12 +473,17 @@ const BudgetProjectEditor = () => {
         () => detectInstallationLocaleFromProject(project, budgetSettings.installation_locale),
         [budgetSettings.installation_locale, project],
     );
+    const projectBusinessTripDistanceKm = useMemo(
+        () => Math.max(0, toNumber(project?.business_trip_distance_km)),
+        [project?.business_trip_distance_km],
+    );
     const effectiveBudgetSettings = useMemo(
         () => ({
             ...budgetSettings,
             installation_locale: projectInstallationInfo.locale,
+            domestic_distance_km: projectBusinessTripDistanceKm,
         }),
-        [budgetSettings, projectInstallationInfo.locale],
+        [budgetSettings, projectBusinessTripDistanceKm, projectInstallationInfo.locale],
     );
 
     const activeMode = isExecutionStage ? 'execution' : 'budget';
@@ -844,6 +849,7 @@ const BudgetProjectEditor = () => {
             if (!activeEquipmentName) return prev;
             const settings = mergeBudgetSettings(prev?.budget_settings);
             settings.installation_locale = projectInstallationInfo.locale;
+            settings.domestic_distance_km = projectBusinessTripDistanceKm;
             const phase = currentPhase;
             const locale = phase === 'installation'
                 ? projectInstallationInfo.locale
@@ -996,9 +1002,7 @@ const BudgetProjectEditor = () => {
                 pushExpenseRow({
                     formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                     name: '국내 교통비',
-                    basis: phase === 'fabrication'
-                        ? `수동 입력 (횟수 * ${(domesticDistanceKm * domesticTransportPerKm).toLocaleString('ko-KR')}원)`
-                        : `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
+                    basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
                     quantity: phase === 'fabrication' ? '' : transportQuantity,
                     amount: phase === 'fabrication' ? 0 : Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
                 });
@@ -1181,7 +1185,7 @@ const BudgetProjectEditor = () => {
                 expense_items: [...otherPhaseRows, ...dedupedPhaseRows],
             };
         });
-    }, [activeEquipmentName, activeExpenseType, currentPhase, projectInstallationInfo.locale]);
+    }, [activeEquipmentName, activeExpenseType, currentPhase, projectBusinessTripDistanceKm, projectInstallationInfo.locale]);
 
     const toggleSort = (columnKey) => {
         setSortState((prev) => {
@@ -1250,6 +1254,7 @@ const BudgetProjectEditor = () => {
             ) {
                 const settings = mergeBudgetSettings(prev?.budget_settings);
                 settings.installation_locale = projectInstallationInfo.locale;
+                settings.domestic_distance_km = projectBusinessTripDistanceKm;
                 const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
                 const locale = rowPhase === 'installation' ? projectInstallationInfo.locale : 'domestic';
                 const qty = toNumber(row.quantity);

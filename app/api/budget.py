@@ -75,6 +75,7 @@ class BudgetProjectCreate(BaseModel):
     project_type: Optional[str] = Field(default="equipment", max_length=32)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
+    business_trip_distance_km: Optional[float] = Field(default=0, ge=0)
     manager_user_id: Optional[int] = Field(default=None, ge=1)
 
 
@@ -85,6 +86,7 @@ class BudgetProjectUpdate(BaseModel):
     project_type: Optional[str] = Field(default=None, max_length=32)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
+    business_trip_distance_km: Optional[float] = Field(default=None, ge=0)
     manager_user_id: Optional[int] = Field(default=None, ge=1)
     cover_image_url: Optional[str] = Field(default=None, max_length=500)
     current_stage: Optional[str] = Field(default=None, max_length=32)
@@ -783,6 +785,7 @@ def _serialize_project(
         "project_type_label": _project_type_label(project.project_type),
         "customer_name": project.customer_name or "",
         "installation_site": project.installation_site or "",
+        "business_trip_distance_km": to_number(project.business_trip_distance_km),
         "cover_image_url": custom_cover_image_url,
         "cover_image_fallback_url": generated_cover_image_url,
         "cover_image_display_url": custom_cover_image_url or generated_cover_image_url,
@@ -1088,6 +1091,7 @@ def create_project(
         project_type=project_type,
         customer_name=(payload.customer_name or "").strip() or None,
         installation_site=(payload.installation_site or "").strip() or None,
+        business_trip_distance_km=to_number(payload.business_trip_distance_km),
         created_by_user_id=int(user.id),
         manager_user_id=manager_user_id,
         current_stage="review",
@@ -1174,6 +1178,12 @@ def update_project(
         installation_site = (payload.installation_site or "").strip() or None
         if installation_site != (project.installation_site or None):
             project.installation_site = installation_site
+            changed = True
+
+    if "business_trip_distance_km" in fields_set:
+        business_trip_distance_km = to_number(payload.business_trip_distance_km)
+        if business_trip_distance_km != to_number(project.business_trip_distance_km):
+            project.business_trip_distance_km = business_trip_distance_km
             changed = True
 
     if "cover_image_url" in fields_set:

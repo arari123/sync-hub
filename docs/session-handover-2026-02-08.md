@@ -282,3 +282,17 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (입력 트리 접기/펼치기 기능 추가)
+  - 요구 반영:
+    - `입력 트리` 제목 옆에 아이콘 버튼으로 `모두 접기`, `모두 펼치기` 제공
+    - 각 트리 노드별 접기/펼치기 토글 제공
+  - 조치:
+    - 트리 노드 접힘 상태(`collapsedByKey`)를 사이드바 상태로 관리
+    - 헤더에 `Minus/Plus` 아이콘 버튼 추가
+    - 노드 라벨 왼쪽에 `Chevron` 토글 버튼 추가(개별 노드 접기/펼치기)
+    - 키보드 선택 접근성 보완(`role="button"`, Enter/Space 지원)
+  - 관련 파일:
+    - `frontend/src/components/BudgetSidebar.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

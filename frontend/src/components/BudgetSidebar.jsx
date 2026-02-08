@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 
 function formatAmount(value) {
     const number = Number(value || 0);
@@ -14,6 +15,7 @@ const BudgetSidebar = ({
     activeTreeKey = '',
     onSelectTreeNode,
 }) => {
+    const [collapsedByKey, setCollapsedByKey] = useState({});
     const { total = 0, equipments = [] } = aggregation;
     const sectionSummary = summary && typeof summary === 'object'
         ? summary
@@ -32,6 +34,35 @@ const BudgetSidebar = ({
     const treeGuide = section === 'material'
         ? '설비 > 제작/설치 > 유닛'
         : '설비 > 제작/설치';
+    const collapsibleNodeKeys = useMemo(() => {
+        const keys = [];
+        const walk = (nodes) => {
+            (nodes || []).forEach((item) => {
+                if (Array.isArray(item?.children) && item.children.length > 0) {
+                    keys.push(item.key);
+                    walk(item.children);
+                }
+            });
+        };
+        walk(treeItems);
+        return keys;
+    }, [treeItems]);
+    const collapseAll = () => {
+        const next = {};
+        collapsibleNodeKeys.forEach((key) => {
+            next[key] = true;
+        });
+        setCollapsedByKey(next);
+    };
+    const expandAll = () => {
+        setCollapsedByKey({});
+    };
+    const toggleNodeCollapse = (key) => {
+        setCollapsedByKey((prev) => ({
+            ...prev,
+            [key]: !prev[key],
+        }));
+    };
 
     return (
         <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
@@ -51,7 +82,29 @@ const BudgetSidebar = ({
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
                     <div className="px-3 py-2.5 border-b bg-slate-50">
-                        <p className="text-[11px] font-black text-slate-700">입력 트리</p>
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-black text-slate-700">입력 트리</p>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={collapseAll}
+                                    className="h-6 w-6 inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                                    title="모두 접기"
+                                    aria-label="모두 접기"
+                                >
+                                    <Minus size={12} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={expandAll}
+                                    className="h-6 w-6 inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                                    title="모두 펼치기"
+                                    aria-label="모두 펼치기"
+                                >
+                                    <Plus size={12} />
+                                </button>
+                            </div>
+                        </div>
                         <p className="text-[10px] text-slate-500 mt-0.5">{treeGuide}</p>
                     </div>
                     <div className="p-2 space-y-1">
@@ -62,6 +115,8 @@ const BudgetSidebar = ({
                                 hasParent={false}
                                 activeTreeKey={activeTreeKey}
                                 onSelectTreeNode={onSelectTreeNode}
+                                collapsedByKey={collapsedByKey}
+                                onToggleNodeCollapse={toggleNodeCollapse}
                             />
                         ))}
                         {!treeItems.length && (
@@ -81,19 +136,28 @@ const TreeNode = ({
     hasParent = false,
     activeTreeKey,
     onSelectTreeNode,
+    collapsedByKey,
+    onToggleNodeCollapse,
 }) => {
     const isActive = activeTreeKey === node.key;
     const isActivePath = !isActive
         && typeof activeTreeKey === 'string'
         && activeTreeKey.startsWith(`${node.key}::`);
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const isCollapsed = hasChildren && Boolean(collapsedByKey?.[node.key]);
     return (
         <div>
             <div className="relative">
-                <button
-                    type="button"
+                <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onSelectTreeNode?.(node)}
-                    className={`relative w-full rounded-md border px-2 py-1.5 text-left transition-all ${
+                    onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        onSelectTreeNode?.(node);
+                    }}
+                    className={`relative w-full rounded-md border px-2 py-1.5 text-left transition-all cursor-pointer ${
                         isActive
                             ? 'border-sky-400 bg-sky-50 text-sky-900 shadow-sm ring-1 ring-sky-200'
                             : isActivePath
@@ -108,7 +172,24 @@ const TreeNode = ({
                         </>
                     )}
                     <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[11px] font-black">{node.label}</span>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                            {hasChildren ? (
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onToggleNodeCollapse?.(node.key);
+                                    }}
+                                    className="h-4 w-4 shrink-0 inline-flex items-center justify-center rounded border border-slate-300 bg-white text-slate-500 hover:bg-slate-100"
+                                    aria-label={isCollapsed ? '펼치기' : '접기'}
+                                >
+                                    {isCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+                                </button>
+                            ) : (
+                                <span className="h-4 w-4 shrink-0" />
+                            )}
+                            <span className="truncate text-[11px] font-black">{node.label}</span>
+                        </div>
                         {Number.isFinite(node.count) && (
                             <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${
                                 isActive ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'
@@ -118,9 +199,9 @@ const TreeNode = ({
                             </span>
                         )}
                     </div>
-                </button>
+                </div>
             </div>
-            {hasChildren && (
+            {hasChildren && !isCollapsed && (
                 <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {node.children.map((child) => (
                         <TreeNode
@@ -129,6 +210,8 @@ const TreeNode = ({
                             hasParent
                             activeTreeKey={activeTreeKey}
                             onSelectTreeNode={onSelectTreeNode}
+                            collapsedByKey={collapsedByKey}
+                            onToggleNodeCollapse={onToggleNodeCollapse}
                         />
                     ))}
                 </div>

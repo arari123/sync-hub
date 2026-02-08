@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, PencilLine, X } from 'lucide-react';
+import { ArrowRight, X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
@@ -33,6 +33,13 @@ const EMPTY_EDIT_FORM = {
     description: '',
     cover_image_url: '',
 };
+
+const UPCOMING_MANAGEMENT_AREAS = [
+    '사양 관리',
+    '제작 관리',
+    '설치 관리',
+    'AS 관리',
+];
 
 const BudgetProjectOverview = () => {
     const { projectId } = useParams();
@@ -205,7 +212,7 @@ const BudgetProjectOverview = () => {
     const milestones = Array.isArray(project.summary_milestones) ? project.summary_milestones : [];
 
     return (
-        <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+        <div className="space-y-5 pb-12 animate-in fade-in duration-500">
             {/* 1. Header & Breadcrumb */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -220,15 +227,28 @@ const BudgetProjectOverview = () => {
                         <span className="text-xs font-bold text-slate-400 font-mono tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">{project.code || 'NO-CODE'}</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                     <Link to={`/project-management/projects/${project.id}/budget`}>
-                        <Button size="sm" className="h-9 gap-2 font-bold px-4">
+                        <Button size="sm" className="h-8 gap-1.5 font-bold px-3.5 text-xs">
                             예산 관리
                             <ArrowRight size={16} />
                         </Button>
                     </Link>
+                    {UPCOMING_MANAGEMENT_AREAS.map((label) => (
+                        <Button
+                            key={label}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="h-8 px-3 text-xs text-muted-foreground"
+                            title="준비 중"
+                        >
+                            {label}
+                        </Button>
+                    ))}
                     {!project.can_edit && (
-                        <span className="h-9 inline-flex items-center px-4 rounded-lg border bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        <span className="h-8 inline-flex items-center px-3 rounded-lg border bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             READ ONLY
                         </span>
                     )}
@@ -271,110 +291,97 @@ const BudgetProjectOverview = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column: Identity & Schedule */}
-                <div className="space-y-6">
-                    {/* Project Identity */}
-                    <section className="rounded-2xl border bg-card overflow-hidden shadow-sm">
-                        {coverImageUrl && (
-                            <div className="h-40 w-full overflow-hidden border-b border-slate-100">
-                                <img src={coverImageUrl} alt={project.name} className="h-full w-full object-cover" />
-                            </div>
-                        )}
-                        <div className="p-5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-sm font-bold">프로젝트 정보</h2>
-                                {project.can_edit && (
-                                    <button onClick={() => setIsEditOpen(true)} className="text-[10px] font-bold text-primary hover:underline underline-offset-4">상세 정보 수정</button>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-1 gap-2.5">
-                                <IdentityRow label="고객사" value={project.customer_name} />
-                                <IdentityRow label="설치 장소" value={project.installation_site} />
-                                <IdentityRow label="담당자" value={project.manager_name} />
-                                <IdentityRow label="프로젝트 구분" value={project.project_type_label} />
-                            </div>
-                            <div className="pt-3 border-t border-slate-50">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1.5">개요</p>
-                                <p className="text-xs text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
-                                    {project.description || '작성된 개요가 없습니다.'}
-                                </p>
-                            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:[grid-template-rows:minmax(0,1fr)_minmax(0,1fr)]">
+                <section className="rounded-2xl border bg-card overflow-hidden shadow-sm lg:row-span-2 h-full">
+                    {coverImageUrl && (
+                        <div className="w-full max-w-[360px] aspect-square overflow-hidden border-b border-slate-100 mx-auto">
+                            <img src={coverImageUrl} alt={project.name} className="h-full w-full object-cover" />
                         </div>
-                    </section>
-
-                    {/* Schedule (Timeline Style) */}
-                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
-                        <h2 className="text-sm font-bold mb-5 flex items-center gap-2">
-                            <span className="w-1 h-4 bg-primary rounded-full" />
-                            주요 일정 (Timeline)
-                        </h2>
-                        <div className="relative pl-3 border-l-2 border-slate-100 space-y-6 ml-1.5">
-                            {milestones.length > 0 ? (
-                                milestones.map((item, idx) => (
-                                    <TimelineItem key={item.key || idx} item={item} isLast={idx === milestones.length - 1} />
-                                ))
-                            ) : (
-                                <p className="text-xs text-slate-400">일정 데이터가 없습니다.</p>
+                    )}
+                    <div className="p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-bold">프로젝트 정보</h2>
+                            {project.can_edit && (
+                                <button onClick={() => setIsEditOpen(true)} className="text-[10px] font-bold text-primary hover:underline underline-offset-4">상세 정보 수정</button>
                             )}
                         </div>
-                    </section>
-                </div>
+                        <div className="grid grid-cols-1 gap-2.5">
+                            <IdentityRow label="고객사" value={project.customer_name} />
+                            <IdentityRow label="설치 장소" value={project.installation_site} />
+                            <IdentityRow label="담당자" value={project.manager_name} />
+                            <IdentityRow label="프로젝트 구분" value={project.project_type_label} />
+                            <IdentityRow label="현재 단계" value={project.current_stage_label} />
+                        </div>
+                        <div className="pt-3 border-t border-slate-50">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1.5">개요</p>
+                            <p className="text-xs text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
+                                {project.description || '작성된 개요가 없습니다.'}
+                            </p>
+                        </div>
+                    </div>
+                </section>
 
-                {/* Right Column: Analytics */}
-                <div className="space-y-6">
-                    {/* Financial Analysis Block */}
-                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-sm font-bold flex items-center gap-2">
-                                <span className="w-1 h-4 bg-primary rounded-full" />
-                                예산/집행 분석 (Variance Analysis)
-                            </h2>
-                        </div>
-                        <div className="space-y-6">
-                            <VarianceRow
-                                label="재료비 (Material)"
-                                confirmed={confirmedMaterial}
-                                actual={spentMaterial}
-                                color="blue"
-                            />
-                            <VarianceRow
-                                label="인건비 (Labor)"
-                                confirmed={confirmedLabor}
-                                actual={spentLabor}
-                                color="emerald"
-                            />
-                            <VarianceRow
-                                label="경비 (Expense)"
-                                confirmed={confirmedExpense}
-                                actual={spentExpense}
-                                color="indigo"
-                            />
-                        </div>
-                    </section>
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-bold flex items-center gap-2">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            예산/집행 분석
+                        </h2>
+                    </div>
+                    <div className="space-y-3">
+                        <VarianceRow
+                            label="재료비 (Material)"
+                            confirmed={confirmedMaterial}
+                            actual={spentMaterial}
+                            color="blue"
+                        />
+                        <VarianceRow
+                            label="인건비 (Labor)"
+                            confirmed={confirmedLabor}
+                            actual={spentLabor}
+                            color="emerald"
+                        />
+                        <VarianceRow
+                            label="경비 (Expense)"
+                            confirmed={confirmedExpense}
+                            actual={spentExpense}
+                            color="indigo"
+                        />
+                    </div>
+                </section>
 
-                    {/* Equipment Status */}
-                    <section className="rounded-2xl border bg-card p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-sm font-bold flex items-center gap-2">
-                                <span className="w-1 h-4 bg-primary rounded-full" />
-                                설비별 집행 현황
-                            </h2>
-                        </div>
-                        {!equipmentCards.length ? (
-                            <div className="py-10 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                                <p className="text-xs text-slate-400 font-medium whitespace-pre-wrap">설비 예산 데이터가 아직 없습니다.{"\n"}예산 관리에서 설비를 추가해 주세요.</p>
-                            </div>
+                <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0">
+                    <h2 className="text-sm font-bold mb-3 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-primary rounded-full" />
+                        주요 일정 (Timeline)
+                    </h2>
+                    <div className="relative pl-3 border-l-2 border-slate-100 space-y-4 ml-1.5 max-h-[360px] overflow-auto pr-1">
+                        {milestones.length > 0 ? (
+                            milestones.map((item, idx) => (
+                                <TimelineItem key={item.key || idx} item={item} />
+                            ))
                         ) : (
-                            <div className="flex flex-col gap-3">
-                                {equipmentCards.map((item) => (
-                                    <CompactEquipmentCard key={item.equipment_name} item={item} />
-                                ))}
-                            </div>
+                            <p className="text-xs text-slate-400">일정 데이터가 없습니다.</p>
                         )}
-                    </section>
-                </div>
+                    </div>
+                </section>
             </div>
+
+            {equipmentCards.length > 1 && (
+                <section className="rounded-2xl border bg-card p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-sm font-bold flex items-center gap-2">
+                            <span className="w-1 h-4 bg-primary rounded-full" />
+                            설비별 집행 현황
+                        </h2>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                        {equipmentCards.map((item) => (
+                            <CompactEquipmentCard key={item.equipment_name} item={item} />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {isEditOpen && (
                 <ProjectEditModal
@@ -430,22 +437,14 @@ const VarianceRow = ({ label, confirmed, actual, color = 'blue' }) => {
     };
 
     return (
-        <div className="space-y-2">
-            <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">{label}</span>
-                <div className="flex items-center gap-3">
-                    <div className="text-right">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Budget</p>
-                        <p className="text-[11px] font-bold text-slate-900">{formatAmount(confirmed)}</p>
-                    </div>
-                    <div className="w-px h-6 bg-slate-100" />
-                    <div className="text-right">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Actual</p>
-                        <p className={cn("text-[11px] font-bold", isOver ? 'text-destructive' : 'text-slate-900')}>{formatAmount(actual)}</p>
-                    </div>
-                </div>
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="font-semibold text-slate-700 truncate">{label}</span>
+                <span className={cn("font-semibold whitespace-nowrap", isOver ? 'text-destructive' : 'text-slate-700')}>
+                    {formatAmount(actual)} / {formatAmount(confirmed)}
+                </span>
             </div>
-            <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="relative h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div
                     className={cn("h-full transition-all duration-700", isOver ? 'bg-rose-500' : colorMap[color])}
                     style={{ width: `${Math.min(ratio, 100)}%` }}
@@ -454,9 +453,9 @@ const VarianceRow = ({ label, confirmed, actual, color = 'blue' }) => {
                     <div className="absolute inset-0 bg-rose-500/20 animate-pulse" />
                 )}
             </div>
-            <div className="flex justify-between items-center text-[9px] font-bold tracking-tighter uppercase px-0.5">
+            <div className="flex justify-between items-center text-[10px] px-0.5">
                 <span className={cn(isOver ? 'text-destructive' : 'text-slate-400')}>
-                    집행율: {ratio.toFixed(1)}% {isOver && '(예산 초과)'}
+                    집행율 {ratio.toFixed(1)}% {isOver && '(예산 초과)'}
                 </span>
                 <span className="text-slate-400">
                     차이: {formatAmount(confirmed - actual)}
@@ -510,7 +509,7 @@ const IdentityRow = ({ label, value }) => (
     </div>
 );
 
-const TimelineItem = ({ item, isLast }) => {
+const TimelineItem = ({ item }) => {
     const status = String(item.status || 'planned').toLowerCase();
     const isActive = status === 'active';
     const isDone = status === 'done';

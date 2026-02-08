@@ -1260,6 +1260,7 @@ const ExcelTable = ({
 }) => {
     const tableWrapperRef = useRef(null);
     const tableRef = useRef(null);
+    const preserveSelectionOnFocusRef = useRef(false);
     const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
     const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
     const [selectionEnd, setSelectionEnd] = useState({ row: 0, col: 0 });
@@ -1289,11 +1290,12 @@ const ExcelTable = ({
         && col <= range.colMax
     );
 
-    const focusCell = (row, col, { selectText = false } = {}) => {
+    const focusCell = (row, col, { selectText = false, preserveSelection = false } = {}) => {
         const nextTarget = tableRef.current?.querySelector(
             `[data-row="${row}"][data-col="${col}"] input, [data-row="${row}"][data-col="${col}"] select, [data-row="${row}"][data-col="${col}"] [data-cell-display="true"]`,
         );
         if (!nextTarget) return;
+        if (preserveSelection) preserveSelectionOnFocusRef.current = true;
         nextTarget.focus();
         if (selectText && nextTarget.select) nextTarget.select();
     };
@@ -1310,6 +1312,10 @@ const ExcelTable = ({
         const nextRow = clamp(row, 0, Math.max(rowCount - 1, 0));
         const nextCol = clamp(col, 0, Math.max(colCount - 1, 0));
         setActiveCell({ row: nextRow, col: nextCol });
+        if (preserveSelectionOnFocusRef.current) {
+            preserveSelectionOnFocusRef.current = false;
+            return;
+        }
         if (isCellInSelection(nextRow, nextCol)) return;
         setSelectionStart({ row: nextRow, col: nextCol });
         setSelectionEnd({ row: nextRow, col: nextCol });
@@ -1324,7 +1330,7 @@ const ExcelTable = ({
         if (!editable || !column || column.readonly) return;
         setEditingCell({ row, col });
         requestAnimationFrame(() => {
-            focusCell(row, col, { selectText });
+            focusCell(row, col, { selectText, preserveSelection: true });
         });
     };
 
@@ -1501,7 +1507,7 @@ const ExcelTable = ({
         } else {
             setSingleCellSelection(nextRow, nextCol);
         }
-        focusCell(nextRow, nextCol);
+        focusCell(nextRow, nextCol, { preserveSelection: true });
     };
 
     const handleCellMouseDown = (event, rowIndex, colIndex) => {
@@ -1517,7 +1523,7 @@ const ExcelTable = ({
             setSelectionEnd({ row: rowIndex, col: colIndex });
         }
         setIsSelecting(true);
-        focusCell(rowIndex, colIndex);
+        focusCell(rowIndex, colIndex, { preserveSelection: true });
     };
 
     const handleCellDoubleClick = (rowIndex, colIndex) => {
@@ -1595,10 +1601,9 @@ const ExcelTable = ({
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
                                 const isSelected = isCellInSelection(rowIndex, colIndex);
                                 const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
+                                const isEditingCurrentCell = isEditing(rowIndex, colIndex);
 
                                 if (col.options && isCellEditable) {
-                                    const isEditingCurrentCell = isEditing(rowIndex, colIndex);
-
                                     return (
                                         <td
                                             key={colIndex}
@@ -1633,7 +1638,7 @@ const ExcelTable = ({
                                                 <button
                                                     type="button"
                                                     data-cell-display="true"
-                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left text-slate-700"
+                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left text-slate-700 cursor-default"
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                 >
@@ -1674,6 +1679,7 @@ const ExcelTable = ({
                                                 isCellEditable
                                                     ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
                                                     : 'bg-slate-50 text-slate-400',
+                                                isEditingCurrentCell ? 'cursor-text' : 'cursor-default',
                                             )}
                                             value={displayValue}
                                             onChange={(event) => {

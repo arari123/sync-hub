@@ -1489,27 +1489,6 @@ const BudgetProjectEditor = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                    <button
-                                        onClick={() => setCurrentPhase('fabrication')}
-                                        className={cn(
-                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                            currentPhase === 'fabrication' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                        )}
-                                    >
-                                        제작
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentPhase('installation')}
-                                        className={cn(
-                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
-                                            currentPhase === 'installation' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
-                                        )}
-                                    >
-                                        설치
-                                    </button>
-                                </div>
-
                                 {isEquipmentProject && (
                                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
                                         {equipmentNames.length ? (
@@ -1541,6 +1520,27 @@ const BudgetProjectEditor = () => {
                                         설비 구분 없음: 공통 입력
                                     </div>
                                 )}
+
+                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                                    <button
+                                        onClick={() => setCurrentPhase('fabrication')}
+                                        className={cn(
+                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                            currentPhase === 'fabrication' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                        )}
+                                    >
+                                        제작
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPhase('installation')}
+                                        className={cn(
+                                            'px-4 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                            currentPhase === 'installation' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700',
+                                        )}
+                                    >
+                                        설치
+                                    </button>
+                                </div>
 
                                 {section === 'expense' && (
                                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">

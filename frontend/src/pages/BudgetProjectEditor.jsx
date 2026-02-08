@@ -1526,6 +1526,22 @@ const ExcelTable = ({
         focusCell(rowIndex, colIndex, { preserveSelection: true });
     };
 
+    const handleRowHeaderMouseDown = (event, rowIndex) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        stopEditingCell();
+        setActiveCell({ row: rowIndex, col: 0 });
+
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+            setSelectionEnd({ row: rowIndex, col: Math.max(colCount - 1, 0) });
+        } else {
+            setSelectionStart({ row: rowIndex, col: 0 });
+            setSelectionEnd({ row: rowIndex, col: Math.max(colCount - 1, 0) });
+        }
+        setIsSelecting(false);
+        focusCell(rowIndex, 0, { preserveSelection: true });
+    };
+
     const handleCellDoubleClick = (rowIndex, colIndex) => {
         startEditingCell(rowIndex, colIndex);
     };
@@ -1570,6 +1586,9 @@ const ExcelTable = ({
                 <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
                 <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
                     <tr>
+                        <th className="w-14 p-0 text-center font-black text-slate-500 uppercase tracking-tighter border-r border-slate-200">
+                            No
+                        </th>
                         {columns.map((col, idx) => (
                             <th key={idx} className={cn('p-0 text-left font-black text-slate-500 uppercase tracking-tighter border-r border-slate-200 last:border-0', col.width)}>
                                 <button
@@ -1592,6 +1611,17 @@ const ExcelTable = ({
                 <tbody>
                     {rows.map((row, rowIndex) => (
                         <tr key={rowIndex} className="border-b border-slate-100 hover:bg-slate-50/50 focus-within:bg-blue-50/30 group transition-colors">
+                            <td
+                                className={cn(
+                                    "w-14 h-8 px-1 text-center text-[10px] font-black border-r border-slate-200 select-none cursor-default",
+                                    rowIndex >= range.rowMin && rowIndex <= range.rowMax
+                                        ? "bg-sky-100 text-sky-700"
+                                        : "bg-slate-50 text-slate-400",
+                                )}
+                                onMouseDown={(event) => handleRowHeaderMouseDown(event, rowIndex)}
+                            >
+                                {rowIndex + 1}
+                            </td>
                             {columns.map((col, colIndex) => {
                                 const rawValue = col.computed ? col.computed(row) : row[col.key];
                                 const displayValue = col.type === 'number'
@@ -1608,9 +1638,9 @@ const ExcelTable = ({
                                         <td
                                             key={colIndex}
                                             className={cn(
-                                                "p-0 border-r border-slate-100 last:border-0 relative",
-                                                isSelected && "bg-blue-50/60",
-                                                isActive && "ring-1 ring-primary/40 ring-inset",
+                                                "p-0 border-r border-slate-200 last:border-0 relative",
+                                                isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
+                                                isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
                                             )}
                                             data-row={rowIndex}
                                             data-col={colIndex}
@@ -1661,9 +1691,9 @@ const ExcelTable = ({
                                     <td
                                         key={colIndex}
                                         className={cn(
-                                            "p-0 border-r border-slate-100 last:border-0 relative",
-                                            isSelected && "bg-blue-50/60",
-                                            isActive && "ring-1 ring-primary/40 ring-inset",
+                                            "p-0 border-r border-slate-200 last:border-0 relative",
+                                            isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
+                                            isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
                                         )}
                                         data-row={rowIndex}
                                         data-col={colIndex}
@@ -1722,7 +1752,7 @@ const ExcelTable = ({
                     ))}
                     {!rows.length && (
                         <tr>
-                            <td colSpan={columns.length + (allowRowDelete ? 1 : 0)} className="p-12 text-center text-slate-400 font-bold italic bg-white">
+                            <td colSpan={columns.length + (allowRowDelete ? 1 : 0) + 1} className="p-12 text-center text-slate-400 font-bold italic bg-white">
                                 입력된 데이터가 없습니다.
                             </td>
                         </tr>

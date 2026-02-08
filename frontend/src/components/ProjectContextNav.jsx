@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     AlertCircle,
     CalendarDays,
@@ -59,6 +59,35 @@ function isChildItemActive(pathname, basePath, childPath) {
 
 const ProjectContextNav = ({ projectId = '', className = '' }) => {
     const location = useLocation();
+    const [openMenuKey, setOpenMenuKey] = useState('');
+    const closeTimerRef = useRef(null);
+
+    const clearCloseTimer = useCallback(() => {
+        if (!closeTimerRef.current) return;
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+    }, []);
+
+    const keepMenuOpen = useCallback((menuKey) => {
+        clearCloseTimer();
+        setOpenMenuKey(menuKey);
+    }, [clearCloseTimer]);
+
+    const scheduleMenuClose = useCallback(() => {
+        clearCloseTimer();
+        closeTimerRef.current = setTimeout(() => {
+            setOpenMenuKey('');
+            closeTimerRef.current = null;
+        }, 2000);
+    }, [clearCloseTimer]);
+
+    useEffect(() => () => {
+        if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+    }, []);
+
     const isCreatePagePath = location.pathname === '/project-management/projects/new'
         || location.pathname.startsWith('/project-management/projects/new/');
 
@@ -103,8 +132,16 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
                         );
                     }
 
+                    const isOpen = openMenuKey === item.key;
                     return (
-                        <div key={item.key} className="relative group/budget-menu">
+                        <div
+                            key={item.key}
+                            className="relative"
+                            onMouseEnter={() => keepMenuOpen(item.key)}
+                            onMouseLeave={scheduleMenuClose}
+                            onFocusCapture={() => keepMenuOpen(item.key)}
+                            onBlurCapture={scheduleMenuClose}
+                        >
                             <Link
                                 to={to}
                                 className={cn(
@@ -116,10 +153,17 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
                             >
                                 <Icon className="h-3.5 w-3.5" />
                                 {item.label}
-                                <ChevronDown className="h-3 w-3 opacity-70" />
+                                <ChevronDown className={cn('h-3 w-3 opacity-70 transition-transform', isOpen && 'rotate-180')} />
                             </Link>
 
-                            <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 min-w-[170px] translate-y-1 rounded-lg border border-slate-200 bg-white p-1 opacity-0 shadow-lg transition-all group-hover/budget-menu:pointer-events-auto group-hover/budget-menu:translate-y-0 group-hover/budget-menu:opacity-100 group-focus-within/budget-menu:pointer-events-auto group-focus-within/budget-menu:translate-y-0 group-focus-within/budget-menu:opacity-100">
+                            <div
+                                className={cn(
+                                    'absolute left-0 top-full z-30 mt-1 min-w-[170px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg transition-all',
+                                    isOpen
+                                        ? 'pointer-events-auto translate-y-0 opacity-100'
+                                        : 'pointer-events-none translate-y-1 opacity-0',
+                                )}
+                            >
                                 {item.children.map((child) => {
                                     const childTo = `${basePath}${child.subPath}`;
                                     const isChildActive = isChildItemActive(location.pathname, basePath, child.subPath);

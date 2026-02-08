@@ -395,3 +395,15 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (예산 관리 드롭다운 2초 유지 UX)
+  - 요구 반영:
+    - 트리 메뉴에서 예산 관리 드롭다운이 마우스 이탈 직후 사라지지 않고 2초 유지되도록 개선
+  - 조치:
+    - `ProjectContextNav`의 예산 드롭다운을 CSS `hover` 전용 방식에서 상태+타이머 방식으로 전환
+    - 마우스/포커스 진입 시 타이머 취소 및 즉시 오픈
+    - 이탈 시 2초 후 닫힘(`setTimeout(2000)`)
+  - 관련 파일:
+    - `frontend/src/components/ProjectContextNav.jsx`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

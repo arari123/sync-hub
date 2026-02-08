@@ -56,9 +56,64 @@ const AUTO_EXPENSE_FORMULAS = {
     OTHER: 'other',
 };
 
+const COMMON_EQUIPMENT_NAME = '공통';
+
 function toNumber(value) {
     const number = Number(String(value ?? '').replace(/,/g, ''));
     return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeEquipmentName(value) {
+    return String(value || '').trim();
+}
+
+function uniqueEquipmentNames(values) {
+    const unique = [];
+    const seen = new Set();
+    (values || []).forEach((value) => {
+        const normalized = normalizeEquipmentName(value);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        unique.push(normalized);
+    });
+    return unique;
+}
+
+function extractEquipmentNamesFromDetails(detailsObj) {
+    const names = [];
+    Object.values(SECTION_META).forEach((meta) => {
+        (detailsObj?.[meta.budgetKey] || []).forEach((row) => {
+            names.push(normalizeEquipmentName(row?.equipment_name));
+        });
+        (detailsObj?.[meta.executionKey] || []).forEach((row) => {
+            names.push(normalizeEquipmentName(row?.equipment_name));
+        });
+    });
+    return uniqueEquipmentNames(names);
+}
+
+function resolveEquipmentNames({ projectType, equipmentItems = [], detailsObj }) {
+    if (projectType !== 'equipment') return [COMMON_EQUIPMENT_NAME];
+    const namesFromEquipment = equipmentItems.map((item) => normalizeEquipmentName(item?.equipment_name));
+    const namesFromDetails = extractEquipmentNamesFromDetails(detailsObj);
+    return uniqueEquipmentNames([...namesFromEquipment, ...namesFromDetails]);
+}
+
+function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
+    const target = normalizeEquipmentName(equipmentName);
+    if (!target) return detailsObj;
+    const result = { ...detailsObj };
+    Object.values(SECTION_META).forEach((meta) => {
+        result[meta.budgetKey] = (result[meta.budgetKey] || []).map((row) => ({
+            ...row,
+            equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
+        }));
+        result[meta.executionKey] = (result[meta.executionKey] || []).map((row) => ({
+            ...row,
+            equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
+        }));
+    });
+    return result;
 }
 
 function normalizeLocationType(value) {
@@ -133,23 +188,23 @@ function laborUnitToHours(unit, locationType, settings) {
 function isBudgetRowEmpty(row, section) {
     if (!row) return true;
     if (section === 'material') {
-        return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.memo);
+        return !(row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.memo);
     }
     if (section === 'labor') {
         return !(row.task_name || row.worker_type || row.quantity || row.memo);
     }
-    return !(row.equipment_name || row.expense_name || row.basis || row.amount || row.memo);
+    return !(row.expense_name || row.basis || row.amount || row.memo);
 }
 
 function isExecutionRowEmpty(row, section) {
     if (!row) return true;
     if (section === 'material') {
-        return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.executed_amount || row.memo);
+        return !(row.unit_name || row.part_name || row.spec || row.executed_amount || row.memo);
     }
     if (section === 'labor') {
         return !(row.task_name || row.worker_type || row.executed_amount || row.memo);
     }
-    return !(row.equipment_name || row.expense_name || row.basis || row.executed_amount || row.memo);
+    return !(row.expense_name || row.basis || row.executed_amount || row.memo);
 }
 
 function buildEmptyBudgetRow(section, phase = 'fabrication') {
@@ -293,9 +348,15 @@ const BudgetProjectEditor = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [currentPhase, setCurrentPhase] = useState('fabrication');
+    const [equipmentNames, setEquipmentNames] = useState([]);
+    const [currentEquipmentName, setCurrentEquipmentName] = useState('');
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
 
     const canEditProject = project?.can_edit !== false;
+    const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
+    const activeEquipmentName = isEquipmentProject
+        ? normalizeEquipmentName(currentEquipmentName || equipmentNames[0] || '')
+        : COMMON_EQUIPMENT_NAME;
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
@@ -318,6 +379,8 @@ const BudgetProjectEditor = () => {
 
     const canEditExecutionFields = canEditProject && isExecutionStage;
     const canEditBudgetFields = canEditProject && !isConfirmed && !isExecutionStage;
+    const canEditScopedRows = (canEditExecutionFields || canEditBudgetFields)
+        && (!isEquipmentProject || Boolean(activeEquipmentName));
 
     const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
     const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
@@ -325,8 +388,12 @@ const BudgetProjectEditor = () => {
     const displayRows = useMemo(
         () => rows
             .map((row, index) => ({ ...row, originalIndex: index }))
-            .filter((row) => (row.phase || 'fabrication') === currentPhase),
-        [rows, currentPhase],
+            .filter((row) => {
+                if ((row.phase || 'fabrication') !== currentPhase) return false;
+                if (!activeEquipmentName) return false;
+                return normalizeEquipmentName(row.equipment_name) === activeEquipmentName;
+            }),
+        [rows, currentPhase, activeEquipmentName],
     );
 
     const sidebarSummary = useMemo(() => {
@@ -393,7 +460,6 @@ const BudgetProjectEditor = () => {
 
     const budgetColumnsBySection = useMemo(() => ({
         material: [
-            { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'unit_name', label: '유닛', width: 'w-32' },
             { key: 'part_name', label: '파츠명', width: 'w-40' },
             { key: 'spec', label: '규격/모델명', width: 'w-48' },
@@ -403,7 +469,6 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         labor: [
-            { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'task_name', label: '부서', width: 'w-40', readonly: true },
             { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS, readonly: true },
             { key: 'worker_type', label: '직군/메모', width: 'w-32' },
@@ -420,7 +485,6 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         expense: [
-            { key: 'equipment_name', label: '설비', width: 'w-40' },
             { key: 'expense_name', label: '경비 항목', width: 'w-48', readonly: true },
             { key: 'lock_auto', label: '잠금', width: 'w-20', options: ['해제', '잠금'] },
             { key: 'basis', label: '산정 기준', width: 'w-48', readonly: true },
@@ -431,7 +495,6 @@ const BudgetProjectEditor = () => {
 
     const executionColumnsBySection = useMemo(() => ({
         material: [
-            { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'unit_name', label: '유닛(집행)', width: 'w-32' },
             { key: 'part_name', label: '파츠(집행)', width: 'w-40' },
             { key: 'spec', label: '규격/메모', width: 'w-48' },
@@ -439,7 +502,6 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         labor: [
-            { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'task_name', label: '작업명(집행)', width: 'w-40', readonly: true },
             { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS, readonly: true },
             { key: 'worker_type', label: '직군(집행)', width: 'w-32' },
@@ -447,7 +509,6 @@ const BudgetProjectEditor = () => {
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         expense: [
-            { key: 'equipment_name', label: '설비', width: 'w-40' },
             { key: 'expense_name', label: '경비 항목(집행)', width: 'w-48' },
             { key: 'basis', label: '산정 기준(집행)', width: 'w-48' },
             { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
@@ -456,16 +517,6 @@ const BudgetProjectEditor = () => {
     }), []);
 
     const columns = activeMode === 'execution' ? executionColumnsBySection[section] : budgetColumnsBySection[section];
-    const isMultiEquipmentProject = useMemo(() => {
-        const names = new Set();
-        Object.values(SECTION_META).forEach((meta) => {
-            (details[meta.budgetKey] || []).forEach((row) => {
-                const value = String(row?.equipment_name || '').trim();
-                if (value) names.add(value);
-            });
-        });
-        return names.size > 1;
-    }, [details]);
     const visibleColumns = useMemo(() => columns, [columns]);
     const sortedDisplayRows = useMemo(() => {
         if (!sortState?.key || sortState.direction === 'none') return displayRows;
@@ -484,18 +535,11 @@ const BudgetProjectEditor = () => {
         return next;
     }, [displayRows, sortState, visibleColumns]);
     const autoCompleteOptions = useMemo(() => {
-        const equipmentSet = new Set();
         const unitSet = new Set();
         const laborDeptSet = new Set([
             ...(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS),
             ...OUTSOURCE_LABOR_DEPARTMENTS,
         ]);
-        Object.values(SECTION_META).forEach((meta) => {
-            (details[meta.budgetKey] || []).forEach((row) => {
-                const equipmentName = String(row?.equipment_name || '').trim();
-                if (equipmentName) equipmentSet.add(equipmentName);
-            });
-        });
         (details.material_items || []).forEach((row) => {
             const unitName = String(row?.unit_name || '').trim();
             if (unitName) unitSet.add(unitName);
@@ -505,13 +549,12 @@ const BudgetProjectEditor = () => {
             if (taskName) laborDeptSet.add(taskName);
         });
         return {
-            equipment_name: Array.from(equipmentSet),
             unit_name: Array.from(unitSet),
             task_name: Array.from(laborDeptSet),
         };
     }, [details, budgetSettings]);
     const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
-    const canSave = canEditActiveRows;
+    const canSave = canEditScopedRows;
 
     const load = async () => {
         if (!projectId) return;
@@ -521,6 +564,7 @@ const BudgetProjectEditor = () => {
             const versionResp = await api.get(`/budget/projects/${projectId}/versions`);
             const payload = versionResp?.data || {};
             setProject(payload.project || null);
+            const projectType = (payload?.project?.project_type || 'equipment');
 
             let currentVersion = (payload.versions || []).find((item) => item.is_current);
             if (!currentVersion) {
@@ -539,8 +583,32 @@ const BudgetProjectEditor = () => {
                 execution_expense_items: [],
                 budget_settings: mergeBudgetSettings(),
             };
+            let equipmentItems = [];
+            try {
+                const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
+                equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            } catch (_err) {
+                equipmentItems = [];
+            }
+            const resolvedEquipmentNames = resolveEquipmentNames({
+                projectType,
+                equipmentItems,
+                detailsObj: loadedDetails,
+            });
+            const normalizedDetails = normalizeDetailsWithEquipment(
+                loadedDetails,
+                projectType === 'equipment'
+                    ? resolvedEquipmentNames[0]
+                    : COMMON_EQUIPMENT_NAME,
+            );
 
-            setDetails(injectBuffers(loadedDetails));
+            setEquipmentNames(resolvedEquipmentNames);
+            setCurrentEquipmentName((prev) => (
+                resolvedEquipmentNames.includes(prev)
+                    ? prev
+                    : (resolvedEquipmentNames[0] || '')
+            ));
+            setDetails(injectBuffers(normalizedDetails));
         } catch (err) {
             setError(getErrorMessage(err, '예산 상세 데이터를 불러오지 못했습니다.'));
         } finally {
@@ -566,12 +634,13 @@ const BudgetProjectEditor = () => {
     const addLaborDepartmentRow = ({ department, staffingType }) => {
         const targetDepartment = String(department || '').trim();
         const normalizedStaffingType = staffingType === '외주' ? '외주' : '자체';
-        if (!targetDepartment) return;
+        if (!targetDepartment || !activeEquipmentName) return;
         setDetails((prev) => {
             const source = [...(prev.labor_items || [])];
-            const phaseRows = source.filter((row) => (row.phase || 'fabrication') === currentPhase)
+            const phaseRows = source
+                .filter((row) => (row.phase || 'fabrication') === currentPhase)
+                .filter((row) => normalizeEquipmentName(row?.equipment_name) === activeEquipmentName)
                 .filter((row) => String(row.staffing_type || '자체') === normalizedStaffingType);
-            const equipmentFallback = phaseRows.find((row) => String(row?.equipment_name || '').trim())?.equipment_name || '';
             const duplicateCount = phaseRows.filter((row) => {
                 const name = String(row.task_name || '').trim();
                 return name === targetDepartment || name.startsWith(`${targetDepartment}(`);
@@ -582,7 +651,7 @@ const BudgetProjectEditor = () => {
 
             const newRow = {
                 ...buildEmptyBudgetRow('labor', currentPhase),
-                equipment_name: equipmentFallback,
+                equipment_name: activeEquipmentName,
                 task_name: nextDepartmentName,
                 staffing_type: normalizedStaffingType,
                 unit: normalizedStaffingType === '외주' ? 'D' : 'H',
@@ -591,7 +660,11 @@ const BudgetProjectEditor = () => {
                     : 'domestic',
             };
             const firstEmptyIndex = source.findIndex(
-                (row) => (row.phase || 'fabrication') === currentPhase && isBudgetRowEmpty(row, 'labor'),
+                (row) => (
+                    (row.phase || 'fabrication') === currentPhase
+                    && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
+                    && isBudgetRowEmpty(row, 'labor')
+                ),
             );
             if (firstEmptyIndex >= 0) {
                 source[firstEmptyIndex] = { ...source[firstEmptyIndex], ...newRow };
@@ -608,34 +681,43 @@ const BudgetProjectEditor = () => {
 
     const autoFillExpenseRows = useCallback(({ forceReset = false } = {}) => {
         setDetails((prev) => {
+            if (!activeEquipmentName) return prev;
             const settings = mergeBudgetSettings(prev?.budget_settings);
             settings.installation_locale = projectInstallationInfo.locale;
             const phase = currentPhase;
             const locale = phase === 'installation'
                 ? projectInstallationInfo.locale
                 : 'domestic';
+            const targetEquipmentName = activeEquipmentName;
 
             const materialRows = prev.material_items || [];
             const laborRows = prev.labor_items || [];
             const expenseRows = prev.expense_items || [];
+            const matchesScope = (row, targetPhase = null) => {
+                const phaseMatched = targetPhase
+                    ? (row.phase || 'fabrication') === targetPhase
+                    : true;
+                if (!phaseMatched) return false;
+                return normalizeEquipmentName(row?.equipment_name) === targetEquipmentName;
+            };
 
             const materialFabTotal = materialRows
-                .filter((row) => (row.phase || 'fabrication') === 'fabrication')
+                .filter((row) => matchesScope(row, 'fabrication'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'material', settings), 0);
             const materialInstallTotal = materialRows
-                .filter((row) => (row.phase || 'fabrication') === 'installation')
+                .filter((row) => matchesScope(row, 'installation'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'material', settings), 0);
             const materialTotal = materialFabTotal + materialInstallTotal;
             const laborFabTotal = laborRows
-                .filter((row) => (row.phase || 'fabrication') === 'fabrication')
+                .filter((row) => matchesScope(row, 'fabrication'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'labor', settings), 0);
             const laborInstallTotal = laborRows
-                .filter((row) => (row.phase || 'fabrication') === 'installation')
+                .filter((row) => matchesScope(row, 'installation'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'labor', settings), 0);
             const projectBudgetBase = materialTotal + laborFabTotal + laborInstallTotal;
 
             const installationManDays = laborRows
-                .filter((row) => (row.phase || 'fabrication') === 'installation')
+                .filter((row) => matchesScope(row, 'installation'))
                 .reduce((sum, row) => {
                     const locationType = projectInstallationInfo.locale;
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
@@ -645,6 +727,7 @@ const BudgetProjectEditor = () => {
             const autoRows = [];
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '프로젝트 운영비',
                     basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
                     amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
@@ -654,6 +737,7 @@ const BudgetProjectEditor = () => {
                 });
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
+                equipment_name: targetEquipmentName,
                 expense_name: '소모품비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.consumable_ratio_fabrication)}%`
@@ -669,6 +753,7 @@ const BudgetProjectEditor = () => {
                 });
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
+                equipment_name: targetEquipmentName,
                 expense_name: '공구비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.tool_ratio_fabrication)}%`
@@ -694,6 +779,7 @@ const BudgetProjectEditor = () => {
                 );
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '출장비',
                     basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_trip_daily) || 32000).toLocaleString('ko-KR')}원`,
                     amount: trip,
@@ -703,6 +789,7 @@ const BudgetProjectEditor = () => {
                 });
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '숙박비',
                     basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_lodging_daily) || 70000).toLocaleString('ko-KR')}원`,
                     amount: lodging,
@@ -712,6 +799,7 @@ const BudgetProjectEditor = () => {
                 });
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '국내 교통비',
                     basis: `${transportBundle}회 * ${(toNumber(settings.domestic_distance_km) || 0).toLocaleString('ko-KR')}km * ${(toNumber(settings.domestic_transport_per_km) || 250).toLocaleString('ko-KR')}원`,
                     amount: transport,
@@ -722,6 +810,7 @@ const BudgetProjectEditor = () => {
             } else {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '출장비',
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_trip_daily) || 120000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_trip_daily) || 120000)),
@@ -731,6 +820,7 @@ const BudgetProjectEditor = () => {
                 });
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '숙박비',
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_lodging_daily) || 200000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_lodging_daily) || 200000)),
@@ -740,6 +830,7 @@ const BudgetProjectEditor = () => {
                 });
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '해외 교통비',
                     basis: `해외 교통비 단가 수동 입력 필요 (자동 산정 수량: ${Math.ceil(installationManDays * (toNumber(settings.overseas_transport_daily_count) || 1))})`,
                     amount: 0,
@@ -749,6 +840,7 @@ const BudgetProjectEditor = () => {
                 });
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: '항공료',
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_airfare_daily) || 350000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_airfare_daily) || 350000)),
@@ -765,6 +857,7 @@ const BudgetProjectEditor = () => {
             ].forEach(([name, formula]) => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
+                    equipment_name: targetEquipmentName,
                     expense_name: name,
                     basis: '수동 입력',
                     amount: 0,
@@ -774,8 +867,8 @@ const BudgetProjectEditor = () => {
                 });
             });
 
-            const samePhaseRows = expenseRows.filter((row) => (row.phase || 'fabrication') === phase);
-            const otherPhaseRows = expenseRows.filter((row) => (row.phase || 'fabrication') !== phase);
+            const samePhaseRows = expenseRows.filter((row) => matchesScope(row, phase));
+            const otherPhaseRows = expenseRows.filter((row) => !matchesScope(row, phase));
             const currentByFormula = {};
             samePhaseRows.forEach((row) => {
                 const formula = String(row.auto_formula || '').trim();
@@ -797,7 +890,7 @@ const BudgetProjectEditor = () => {
                 }
                 nextPhaseRows.push({
                     ...generated,
-                    equipment_name: current?.equipment_name || generated.equipment_name,
+                    equipment_name: normalizeEquipmentName(current?.equipment_name || generated.equipment_name) || targetEquipmentName,
                     memo: current?.memo || generated.memo,
                     lock_auto: Boolean(current?.lock_auto),
                 });
@@ -814,7 +907,7 @@ const BudgetProjectEditor = () => {
                 expense_items: [...otherPhaseRows, ...nextPhaseRows],
             };
         });
-    }, [currentPhase, projectInstallationInfo.locale]);
+    }, [activeEquipmentName, currentPhase, projectInstallationInfo.locale]);
 
     const toggleSort = (columnKey) => {
         setSortState((prev) => {
@@ -831,6 +924,9 @@ const BudgetProjectEditor = () => {
         setDetails((prev) => {
             const newList = [...(prev[activeKey] || [])];
             const row = { ...newList[index] };
+            if (activeEquipmentName) {
+                row.equipment_name = activeEquipmentName;
+            }
             if (['quantity', 'unit_price', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
@@ -862,12 +958,20 @@ const BudgetProjectEditor = () => {
 
             const filteredIndices = [];
             newList.forEach((item, itemIndex) => {
-                if ((item.phase || 'fabrication') === currentPhase) filteredIndices.push(itemIndex);
+                if (
+                    (item.phase || 'fabrication') === currentPhase
+                    && normalizeEquipmentName(item?.equipment_name) === activeEquipmentName
+                ) {
+                    filteredIndices.push(itemIndex);
+                }
             });
             const positionInDisplay = filteredIndices.indexOf(index);
             if (positionInDisplay >= filteredIndices.length - 3) {
                 const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
-                const buffer = Array.from({ length: 20 }, () => builder(section, currentPhase));
+                const buffer = Array.from({ length: 20 }, () => ({
+                    ...builder(section, currentPhase),
+                    equipment_name: activeEquipmentName,
+                }));
                 newList.push(...buffer);
             }
 
@@ -887,30 +991,41 @@ const BudgetProjectEditor = () => {
 
     const saveDetail = async () => {
         if (!version?.id || !canSave) return;
+        if (isEquipmentProject && !equipmentNames.length) {
+            setError('설비 프로젝트는 기본정보에서 설비를 최소 1개 이상 등록해야 합니다.');
+            return;
+        }
 
         setIsSaving(true);
         setError('');
         try {
             const cleanDetails = {};
-            const equipmentFallback = (project?.name || '기본 설비').trim() || '기본 설비';
+            const primaryEquipmentName = activeEquipmentName || equipmentNames[0] || COMMON_EQUIPMENT_NAME;
+            const allowedEquipmentSet = new Set(equipmentNames);
             Object.keys(SECTION_META).forEach((sectionKey) => {
                 const meta = SECTION_META[sectionKey];
                 cleanDetails[meta.budgetKey] = (details[meta.budgetKey] || [])
                     .filter((row) => !isBudgetRowEmpty(row, sectionKey))
                     .map((row) => {
-                        if (isMultiEquipmentProject) return row;
+                        let equipmentName = normalizeEquipmentName(row?.equipment_name) || primaryEquipmentName;
+                        if (isEquipmentProject && allowedEquipmentSet.size > 0 && !allowedEquipmentSet.has(equipmentName)) {
+                            equipmentName = primaryEquipmentName;
+                        }
                         return {
                             ...row,
-                            equipment_name: String(row?.equipment_name || '').trim() || equipmentFallback,
+                            equipment_name: equipmentName,
                         };
                     });
                 cleanDetails[meta.executionKey] = (details[meta.executionKey] || [])
                     .filter((row) => !isExecutionRowEmpty(row, sectionKey))
                     .map((row) => {
-                        if (isMultiEquipmentProject) return row;
+                        let equipmentName = normalizeEquipmentName(row?.equipment_name) || primaryEquipmentName;
+                        if (isEquipmentProject && allowedEquipmentSet.size > 0 && !allowedEquipmentSet.has(equipmentName)) {
+                            equipmentName = primaryEquipmentName;
+                        }
                         return {
                             ...row,
-                            equipment_name: String(row?.equipment_name || '').trim() || equipmentFallback,
+                            equipment_name: equipmentName,
                         };
                     });
             });
@@ -918,7 +1033,32 @@ const BudgetProjectEditor = () => {
 
             const response = await api.put(`/budget/versions/${version.id}/details`, cleanDetails);
             const savedDetails = response?.data?.details || cleanDetails;
-            setDetails(injectBuffers(savedDetails));
+            let equipmentItems = [];
+            try {
+                const equipmentResp = await api.get(`/budget/versions/${version.id}/equipments`);
+                equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            } catch (_err) {
+                equipmentItems = [];
+            }
+            const refreshedEquipmentNames = resolveEquipmentNames({
+                projectType: project?.project_type || 'equipment',
+                equipmentItems,
+                detailsObj: savedDetails,
+            });
+            const normalizedSavedDetails = normalizeDetailsWithEquipment(
+                savedDetails,
+                (project?.project_type || 'equipment') === 'equipment'
+                    ? refreshedEquipmentNames[0]
+                    : COMMON_EQUIPMENT_NAME,
+            );
+
+            setEquipmentNames(refreshedEquipmentNames);
+            setCurrentEquipmentName((prev) => (
+                refreshedEquipmentNames.includes(prev)
+                    ? prev
+                    : (refreshedEquipmentNames[0] || '')
+            ));
+            setDetails(injectBuffers(normalizedSavedDetails));
             setVersion(response?.data?.version || version);
         } catch (err) {
             setError(getErrorMessage(err, '상세 저장에 실패했습니다.'));
@@ -957,7 +1097,32 @@ const BudgetProjectEditor = () => {
 
             setVersion(nextVersion);
             const detailResp = await api.get(`/budget/versions/${nextVersion.id}/details`);
-            setDetails(injectBuffers(detailResp?.data?.details || details));
+            const revisionDetails = detailResp?.data?.details || details;
+            let equipmentItems = [];
+            try {
+                const equipmentResp = await api.get(`/budget/versions/${nextVersion.id}/equipments`);
+                equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            } catch (_err) {
+                equipmentItems = [];
+            }
+            const refreshedEquipmentNames = resolveEquipmentNames({
+                projectType: project?.project_type || 'equipment',
+                equipmentItems,
+                detailsObj: revisionDetails,
+            });
+            const normalizedRevisionDetails = normalizeDetailsWithEquipment(
+                revisionDetails,
+                (project?.project_type || 'equipment') === 'equipment'
+                    ? refreshedEquipmentNames[0]
+                    : COMMON_EQUIPMENT_NAME,
+            );
+            setEquipmentNames(refreshedEquipmentNames);
+            setCurrentEquipmentName((prev) => (
+                refreshedEquipmentNames.includes(prev)
+                    ? prev
+                    : (refreshedEquipmentNames[0] || '')
+            ));
+            setDetails(injectBuffers(normalizedRevisionDetails));
             return nextVersion;
         } catch (err) {
             setError(getErrorMessage(err, '리비전 생성에 실패했습니다.'));
@@ -967,23 +1132,54 @@ const BudgetProjectEditor = () => {
 
     useEffect(() => {
         if (activeMode !== 'budget') return;
+        if (isEquipmentProject && !activeEquipmentName) return;
         autoFillExpenseRows({ forceReset: false });
     }, [
         activeMode,
+        activeEquipmentName,
         autoFillExpenseRows,
         currentPhase,
         details.labor_items,
         details.material_items,
         details.budget_settings,
+        isEquipmentProject,
     ]);
+
+    useEffect(() => {
+        if (!activeEquipmentName) return;
+        const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+        setDetails((prev) => {
+            const source = [...(prev[activeKey] || [])];
+            const scopedCount = source.filter((row) => (
+                (row.phase || 'fabrication') === currentPhase
+                && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
+            )).length;
+            if (scopedCount >= 50) return prev;
+            const buffer = Array.from({ length: 50 - scopedCount }, () => ({
+                ...builder(section, currentPhase),
+                equipment_name: activeEquipmentName,
+            }));
+            return {
+                ...prev,
+                [activeKey]: [...source, ...buffer],
+            };
+        });
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
 
     const handleScroll = (event) => {
         const { scrollTop, scrollHeight, clientHeight } = event.target;
         if (scrollHeight - scrollTop <= clientHeight + 100) {
+            if (!activeEquipmentName) return;
             const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
             setDetails((prev) => ({
                 ...prev,
-                [activeKey]: [...(prev[activeKey] || []), ...Array.from({ length: 50 }, () => builder(section, currentPhase))],
+                [activeKey]: [
+                    ...(prev[activeKey] || []),
+                    ...Array.from({ length: 50 }, () => ({
+                        ...builder(section, currentPhase),
+                        equipment_name: activeEquipmentName,
+                    })),
+                ],
             }));
         }
     };
@@ -1124,6 +1320,38 @@ const BudgetProjectEditor = () => {
                                     </button>
                                 </div>
 
+                                {isEquipmentProject && (
+                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
+                                        {equipmentNames.length ? (
+                                            equipmentNames.map((equipmentName) => (
+                                                <button
+                                                    key={`equipment-tab-${equipmentName}`}
+                                                    type="button"
+                                                    onClick={() => setCurrentEquipmentName(equipmentName)}
+                                                    className={cn(
+                                                        'px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                                        activeEquipmentName === equipmentName
+                                                            ? 'bg-white text-violet-700 shadow-sm ring-1 ring-slate-200'
+                                                            : 'text-slate-500 hover:text-slate-700',
+                                                    )}
+                                                >
+                                                    {equipmentName}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <span className="px-2 py-1 text-[11px] font-black text-rose-600">
+                                                설비 기본정보에서 설비를 먼저 등록해 주세요.
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {!isEquipmentProject && (
+                                    <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
+                                        설비 구분 없음: 공통 입력
+                                    </div>
+                                )}
+
                                 {activeMode === 'budget' && section === 'labor' && (
                                     <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
                                         <span className="px-2 text-[10px] font-black text-slate-500 uppercase">자체</span>
@@ -1192,7 +1420,7 @@ const BudgetProjectEditor = () => {
                             <div className="flex items-center gap-2">
                                 <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
                                     <ClipboardPaste size={12} />
-                                    <span>{canEditActiveRows ? '엑셀 붙여넣기 가능' : '현재 상태에서는 수정 불가'}</span>
+                                    <span>{canEditScopedRows ? '엑셀 붙여넣기 가능' : '현재 상태에서는 수정 불가'}</span>
                                 </div>
                             </div>
                         </div>
@@ -1212,8 +1440,8 @@ const BudgetProjectEditor = () => {
                                 autoCompleteOptions={autoCompleteOptions}
                                 onChange={(idx, key, val) => updateRow(sortedDisplayRows[idx].originalIndex, key, val)}
                                 onRemove={(idx) => removeRow(sortedDisplayRows[idx].originalIndex)}
-                                editable={canEditActiveRows}
-                                allowRowDelete={canEditActiveRows}
+                                editable={canEditScopedRows}
+                                allowRowDelete={canEditScopedRows}
                             />
                         </div>
                     </section>

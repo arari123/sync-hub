@@ -5,11 +5,24 @@ import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 
+function parseEquipmentNames(value) {
+    const raw = String(value || '');
+    return Array.from(
+        new Set(
+            raw
+                .split(/\r?\n|,/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+        ),
+    );
+}
+
 const BudgetProjectCreate = () => {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [projectType, setProjectType] = useState('equipment');
+    const [equipmentInput, setEquipmentInput] = useState('');
     const [description, setDescription] = useState('');
     const [customerName, setCustomerName] = useState('');
     const [installationSite, setInstallationSite] = useState('');
@@ -59,6 +72,11 @@ const BudgetProjectCreate = () => {
             setError('프로젝트 이름을 입력해 주세요.');
             return;
         }
+        const equipmentNames = parseEquipmentNames(equipmentInput);
+        if (projectType === 'equipment' && !equipmentNames.length) {
+            setError('설비 프로젝트는 설비를 최소 1개 이상 입력해 주세요.');
+            return;
+        }
         if (!managerUserId) {
             setError('담당자를 선택해 주세요.');
             return;
@@ -81,7 +99,13 @@ const BudgetProjectCreate = () => {
                 throw new Error('project_id_missing');
             }
 
-            await api.post(`/budget/projects/${projectId}/versions`, { stage: 'review' });
+            const createdVersion = await api.post(`/budget/projects/${projectId}/versions`, { stage: 'review' });
+            const versionId = createdVersion?.data?.id;
+            if (projectType === 'equipment' && versionId) {
+                await api.put(`/budget/versions/${versionId}/equipments`, {
+                    items: equipmentNames.map((equipmentName) => ({ equipment_name: equipmentName })),
+                });
+            }
             navigate(`/project-management/projects/${projectId}`);
         } catch (err) {
             setError(getErrorMessage(err, '프로젝트 생성에 실패했습니다.'));
@@ -148,6 +172,15 @@ const BudgetProjectCreate = () => {
                         <option value="parts">파츠</option>
                         <option value="as">AS</option>
                     </select>
+                    <textarea
+                        className="min-h-[96px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder={projectType === 'equipment'
+                            ? '설비명 입력 (필수)\n예: 설비1'
+                            : '설비 입력 불필요'}
+                        value={equipmentInput}
+                        onChange={(event) => setEquipmentInput(event.target.value)}
+                        disabled={projectType !== 'equipment'}
+                    />
                     <input
                         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                         placeholder="고객사(선택)"

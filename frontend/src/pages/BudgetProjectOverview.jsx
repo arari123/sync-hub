@@ -24,6 +24,18 @@ function formatDate(value) {
     return date.toLocaleString('ko-KR', { hour12: false });
 }
 
+function parseEquipmentNames(value) {
+    const raw = String(value || '');
+    return Array.from(
+        new Set(
+            raw
+                .split(/\r?\n|,/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+        ),
+    );
+}
+
 const EMPTY_EDIT_FORM = {
     name: '',
     code: '',
@@ -60,6 +72,7 @@ const BudgetProjectOverview = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
     const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
+    const [equipmentInput, setEquipmentInput] = useState('');
 
     useEffect(() => {
         const load = async () => {
@@ -112,6 +125,13 @@ const BudgetProjectOverview = () => {
             cover_image_url: project.cover_image_url || '',
         });
     }, [project]);
+
+    useEffect(() => {
+        const names = (equipments || [])
+            .map((item) => String(item?.equipment_name || '').trim())
+            .filter(Boolean);
+        setEquipmentInput(Array.from(new Set(names)).join('\n'));
+    }, [equipments]);
 
     useEffect(() => {
         if (!project?.can_edit) {
@@ -179,6 +199,11 @@ const BudgetProjectOverview = () => {
             setSaveError('프로젝트 이름을 입력해 주세요.');
             return;
         }
+        const equipmentNames = parseEquipmentNames(equipmentInput);
+        if ((editForm.project_type || 'equipment') === 'equipment' && !equipmentNames.length) {
+            setSaveError('설비 프로젝트는 설비를 최소 1개 이상 입력해 주세요.');
+            return;
+        }
 
         setSaveError('');
         setIsSaving(true);
@@ -197,6 +222,14 @@ const BudgetProjectOverview = () => {
             const updated = response?.data || null;
             if (updated) {
                 setProject(updated);
+            }
+            if ((editForm.project_type || 'equipment') === 'equipment' && version?.id) {
+                const equipmentResp = await api.put(`/budget/versions/${version.id}/equipments`, {
+                    items: equipmentNames.map((equipmentName) => ({ equipment_name: equipmentName })),
+                });
+                const nextItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+                setEquipments(nextItems);
+                setTotals(equipmentResp?.data?.totals || totals);
             }
             setIsEditOpen(false);
         } catch (err) {
@@ -461,6 +494,8 @@ const BudgetProjectOverview = () => {
                     canEdit={project.can_edit}
                     form={editForm}
                     setForm={setEditForm}
+                    equipmentInput={equipmentInput}
+                    setEquipmentInput={setEquipmentInput}
                     managerOptions={managerOptions}
                     isSaving={isSaving}
                     saveError={saveError}
@@ -629,7 +664,18 @@ const TimelineItem = ({ item }) => {
     );
 };
 
-const ProjectEditModal = ({ canEdit, form, setForm, managerOptions, isSaving, saveError, onClose, onSubmit }) => {
+const ProjectEditModal = ({
+    canEdit,
+    form,
+    setForm,
+    equipmentInput,
+    setEquipmentInput,
+    managerOptions,
+    isSaving,
+    saveError,
+    onClose,
+    onSubmit,
+}) => {
     if (!canEdit) return null;
 
     const updateField = (key, value) => {
@@ -682,6 +728,17 @@ const ProjectEditModal = ({ canEdit, form, setForm, managerOptions, isSaving, sa
                                     <option value="parts">파츠</option>
                                     <option value="as">AS</option>
                                 </select>
+                            </Field>
+                            <Field label="설비 목록" required={form.project_type === 'equipment'}>
+                                <textarea
+                                    className="min-h-[90px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                    placeholder={form.project_type === 'equipment'
+                                        ? '설비명 입력 (필수)\n예: 설비1'
+                                        : '설비 입력 불필요'}
+                                    value={equipmentInput}
+                                    onChange={(event) => setEquipmentInput(event.target.value)}
+                                    disabled={form.project_type !== 'equipment'}
+                                />
                             </Field>
                             <Field label="현재 진행 단계">
                                 <select

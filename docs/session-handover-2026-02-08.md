@@ -31,10 +31,19 @@
 - 대상: `frontend/src/index.css`, `frontend/src/components/ui/*`
 - 목표: 토큰 미사용 하드코딩 색상/크기 남발 방지 체크리스트/자동 점검 규칙 추가
 
+4. 예산 입력 UX Phase2-2 고급 엑셀 인터랙션 [진행중]
+- 대상: `frontend/src/pages/BudgetProjectEditor.jsx`
+- 목표:
+  - Shift+화살표 다중 선택
+  - Ctrl+화살표 입력 영역 끝 이동
+  - 셀 드래그 자동복사(fill)
+  - Undo/Redo 히스토리 고도화(미완료)
+
 ## 체크리스트
 - [x] 1) 프로젝트/문서 목록 pagination 표준화
 - [x] 2) 검색 품질 E2E 스모크 자동화
 - [x] 3) 디자인 토큰/컴포넌트 규칙 lint 가이드화
+- [ ] 4) 예산 입력 UX Phase2-2 고급 엑셀 인터랙션
 
 ## 다음 세션 바로 실행용 명령
 ```bash
@@ -99,3 +108,16 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
     - `python3 scripts/lint_frontend_design_tokens.py` 통과
     - `docker exec synchub_web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과
     - `docker exec synchub_frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (우선작업 4 진행)
+  - 예산 입력 고급 인터랙션 1차 구현:
+    - 셀 다중 선택(마우스 드래그, Shift+화살표 확장)
+    - Ctrl+화살표 입력 영역 끝 이동
+    - 활성 셀 핸들 드래그 자동복사(fill)
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+  - 남은 작업:
+    - Undo/Redo 히스토리 고도화
+    - 다중 선택 상태에서 복사/붙여넣기 범위 매핑 개선

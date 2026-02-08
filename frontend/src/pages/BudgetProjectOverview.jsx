@@ -231,6 +231,14 @@ const BudgetProjectOverview = () => {
     const latestJobEntries = Array.isArray(project?.joblist_latest_entries)
         ? project.joblist_latest_entries.filter((item) => item && typeof item === 'object')
         : [];
+    const completedJobCount = latestJobEntries.reduce((count, entry) => {
+        const status = String(entry?.status || '').trim().toLowerCase();
+        if (['done', 'completed', 'closed', 'resolved'].includes(status)) {
+            return count + 1;
+        }
+        return count;
+    }, 0);
+    const pendingJobCount = Math.max(latestJobEntries.length - completedJobCount, 0);
 
     return (
         <div className="space-y-5 pb-12 animate-in fade-in duration-500">
@@ -344,6 +352,9 @@ const BudgetProjectOverview = () => {
                             </Button>
                         </Link>
                     </div>
+                    <p className="mb-2 text-[11px] font-semibold text-muted-foreground">
+                        잔건 : {pendingJobCount}건&nbsp;&nbsp;완료 : {completedJobCount}건
+                    </p>
                     {latestJobEntries.length > 0 ? (
                         <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
                             {latestJobEntries.slice(0, 5).map((entry, index) => {

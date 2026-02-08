@@ -1158,6 +1158,8 @@ const ExcelTable = ({
     const tableWrapperRef = useRef(null);
     const tableRef = useRef(null);
     const preserveSelectionOnFocusRef = useRef(false);
+    const undoStackRef = useRef([]);
+    const isUndoingRef = useRef(false);
     const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
     const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
     const [selectionEnd, setSelectionEnd] = useState({ row: 0, col: 0 });
@@ -1194,6 +1196,63 @@ const ExcelTable = ({
             && row <= copiedRange.rowMax
             && col >= copiedRange.colMin
             && col <= copiedRange.colMax;
+    };
+
+    const normalizeHistoryValue = (value, column) => {
+        if (column?.type === 'number') return String(toNumber(value));
+        if (column?.options) return String(value ?? '').toUpperCase();
+        return String(value ?? '');
+    };
+
+    const normalizeWriteValue = (value, column) => {
+        if (column?.type === 'number') return String(value ?? '').replace(/[^0-9]/g, '');
+        if (column?.options) return String(value ?? '').trim().toUpperCase();
+        return String(value ?? '');
+    };
+
+    const pushUndoAction = (changes) => {
+        if (!changes.length) return;
+        undoStackRef.current.push(changes);
+        if (undoStackRef.current.length > 200) undoStackRef.current.shift();
+    };
+
+    const buildCellChange = (rowIndex, colIndex, nextValue) => {
+        const column = columns[colIndex];
+        const row = rows[rowIndex];
+        if (!column || column.readonly || !row) return null;
+        const currentRaw = column.computed ? column.computed(row) : row[column.key];
+        const before = normalizeHistoryValue(currentRaw, column);
+        const writeValue = normalizeWriteValue(nextValue, column);
+        const after = normalizeHistoryValue(writeValue, column);
+        if (before === after) return null;
+        return {
+            row: rowIndex,
+            key: column.key,
+            before,
+            after,
+            writeValue,
+        };
+    };
+
+    const applyCellChanges = (changes, { trackUndo = true } = {}) => {
+        if (!changes.length) return;
+        changes.forEach((change) => {
+            onChange(change.row, change.key, change.writeValue);
+        });
+        if (trackUndo && !isUndoingRef.current) {
+            pushUndoAction(changes.map(({ row, key, before, after }) => ({ row, key, before, after })));
+        }
+    };
+
+    const undoLastChange = () => {
+        const lastAction = undoStackRef.current.pop();
+        if (!lastAction?.length) return;
+        isUndoingRef.current = true;
+        lastAction.forEach((change) => {
+            onChange(change.row, change.key, change.before);
+        });
+        isUndoingRef.current = false;
+        setCopiedRange(null);
     };
 
     const focusCell = (row, col, { selectText = false, preserveSelection = false } = {}) => {
@@ -1304,6 +1363,7 @@ const ExcelTable = ({
                 ? String(toNumber(sourceValueRaw))
                 : String(sourceValueRaw ?? '');
 
+            const fillChanges = [];
             for (let r = rowMin; r <= rowMax; r += 1) {
                 for (let c = colMin; c <= colMax; c += 1) {
                     if (r === anchor.row && c === anchor.col) continue;
@@ -1312,16 +1372,18 @@ const ExcelTable = ({
                     const nextValue = column.type === 'number'
                         ? sourceValue.replace(/[^0-9]/g, '')
                         : sourceValue;
-                    onChange(r, column.key, nextValue);
+                    const change = buildCellChange(r, c, nextValue);
+                    if (change) fillChanges.push(change);
                 }
             }
+            applyCellChanges(fillChanges);
         };
 
         window.addEventListener('mouseup', handleGlobalMouseUp);
         return () => {
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [columns, fillAnchor, fillTarget, isFillDragging, onChange, rows]);
+    }, [applyCellChanges, buildCellChange, columns, fillAnchor, fillTarget, isFillDragging, rows]);
 
     useEffect(() => {
         if (!isFillDragging || !fillAnchor || !fillTarget) {
@@ -1360,8 +1422,28 @@ const ExcelTable = ({
         const isPrintableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
         const isEditingCurrentCell = isEditing(rowIndex, colIndex);
 
+        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+            event.preventDefault();
+            undoLastChange();
+            return;
+        }
+
         if (event.key === 'Escape' && copiedRange) {
             event.preventDefault();
+            setCopiedRange(null);
+            return;
+        }
+
+        if (!isEditingCurrentCell && event.key === 'Delete') {
+            event.preventDefault();
+            const clearChanges = [];
+            for (let row = range.rowMin; row <= range.rowMax; row += 1) {
+                for (let col = range.colMin; col <= range.colMax; col += 1) {
+                    const change = buildCellChange(row, col, '');
+                    if (change) clearChanges.push(change);
+                }
+            }
+            applyCellChanges(clearChanges);
             setCopiedRange(null);
             return;
         }
@@ -1385,7 +1467,8 @@ const ExcelTable = ({
                 nextValue = column.type === 'number' ? event.key.replace(/[^0-9]/g, '') : event.key;
                 if (!nextValue) return;
             }
-            onChange(rowIndex, column.key, nextValue);
+            const change = buildCellChange(rowIndex, colIndex, nextValue);
+            if (change) applyCellChanges([change]);
             startEditingCell(rowIndex, colIndex, { selectText: false });
             return;
         }
@@ -1529,6 +1612,7 @@ const ExcelTable = ({
         let hasWrite = false;
         let rowMax = startRow;
         let colMax = startCol;
+        const matrixChanges = [];
 
         matrix.forEach((cells, rowOffset) => {
             cells.forEach((cellText, colOffset) => {
@@ -1546,14 +1630,17 @@ const ExcelTable = ({
                 } else if (column.options) {
                     nextValue = nextValue.trim().toUpperCase();
                 }
-                onChange(targetRow, column.key, nextValue);
+                const change = buildCellChange(targetRow, targetCol, nextValue);
+                if (!change) return;
                 hasWrite = true;
                 rowMax = Math.max(rowMax, targetRow);
                 colMax = Math.max(colMax, targetCol);
+                matrixChanges.push(change);
             });
         });
 
-        if (!hasWrite) return;
+        if (!hasWrite || !matrixChanges.length) return;
+        applyCellChanges(matrixChanges);
         stopEditingCell();
         setActiveCell({ row: startRow, col: startCol });
         setSelectionStart({ row: startRow, col: startCol });
@@ -1653,7 +1740,10 @@ const ExcelTable = ({
                                                 <select
                                                     className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700 cursor-text"
                                                     value={String(rawValue || '').toUpperCase()}
-                                                    onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
+                                                    onChange={(event) => {
+                                                        const change = buildCellChange(rowIndex, colIndex, event.target.value);
+                                                        if (change) applyCellChanges([change]);
+                                                    }}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onBlur={() => {
@@ -1717,9 +1807,8 @@ const ExcelTable = ({
                                             value={displayValue}
                                             onChange={(event) => {
                                                 if (!isCellEditable) return;
-                                                let val = event.target.value;
-                                                if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
-                                                onChange(rowIndex, col.key, val);
+                                                const change = buildCellChange(rowIndex, colIndex, event.target.value);
+                                                if (change) applyCellChanges([change]);
                                             }}
                                             onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                             onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}

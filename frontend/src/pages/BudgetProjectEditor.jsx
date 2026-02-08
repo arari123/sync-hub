@@ -421,9 +421,9 @@ const BudgetProjectEditor = () => {
         ],
         expense: [
             { key: 'equipment_name', label: '설비', width: 'w-40' },
-            { key: 'expense_name', label: '경비 항목', width: 'w-48' },
+            { key: 'expense_name', label: '경비 항목', width: 'w-48', readonly: true },
             { key: 'lock_auto', label: '잠금', width: 'w-20', options: ['해제', '잠금'] },
-            { key: 'basis', label: '산정 기준', width: 'w-48' },
+            { key: 'basis', label: '산정 기준', width: 'w-48', readonly: true },
             { key: 'amount', label: '예산금액', width: 'w-32', type: 'number' },
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
@@ -1379,6 +1379,7 @@ const ExcelTable = ({
     const startEditingCell = (row, col, { selectText = true } = {}) => {
         const column = columns[col];
         if (!editable || !column || column.readonly) return;
+        if (column.key === 'lock_auto') return;
         setEditingCell({ row, col });
         requestAnimationFrame(() => {
             focusCell(row, col, { selectText, preserveSelection: true });
@@ -1654,6 +1655,8 @@ const ExcelTable = ({
     };
 
     const handleCellDoubleClick = (rowIndex, colIndex) => {
+        const column = columns[colIndex];
+        if (column?.key === 'lock_auto') return;
         startEditingCell(rowIndex, colIndex);
     };
 
@@ -1837,6 +1840,8 @@ const ExcelTable = ({
                                 const isEditingCurrentCell = isEditing(rowIndex, colIndex);
                                 const isCopied = isCellInCopiedRange(rowIndex, colIndex);
                                 const cellCursorClass = isEditingCurrentCell ? 'cursor-text' : 'cursor-default';
+                                const isLockAutoColumn = col.key === 'lock_auto';
+                                const isLockedAuto = Boolean(rawValue);
 
                                 if (col.options && isCellEditable) {
                                     return (
@@ -1845,6 +1850,7 @@ const ExcelTable = ({
                                             className={cn(
                                                 "p-0 border-r border-slate-200 last:border-0 relative",
                                                 cellCursorClass,
+                                                !isSelected && isLockAutoColumn && (isLockedAuto ? 'bg-amber-50' : 'bg-emerald-50'),
                                                 isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
                                                 isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
                                                 isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-50/60",
@@ -1878,7 +1884,20 @@ const ExcelTable = ({
                                                 <button
                                                     type="button"
                                                     data-cell-display="true"
-                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left text-slate-700 cursor-default"
+                                                    className={cn(
+                                                        "w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left cursor-default",
+                                                        isLockAutoColumn
+                                                            ? (isLockedAuto ? 'text-amber-700 font-black' : 'text-emerald-700 font-black')
+                                                            : 'text-slate-700',
+                                                    )}
+                                                    onClick={(event) => {
+                                                        if (!isLockAutoColumn) return;
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        const nextValue = isLockedAuto ? '해제' : '잠금';
+                                                        const change = buildCellChange(rowIndex, colIndex, nextValue);
+                                                        if (change) applyCellChanges([change]);
+                                                    }}
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                 >

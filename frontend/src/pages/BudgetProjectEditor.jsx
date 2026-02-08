@@ -134,7 +134,7 @@ function isBudgetRowEmpty(row, section) {
         return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.quantity || row.unit_price || row.memo);
     }
     if (section === 'labor') {
-        return !(row.equipment_name || row.task_name || row.worker_type || row.unit || row.quantity || row.hourly_rate || row.memo);
+        return !(row.task_name || row.worker_type || row.quantity || row.hourly_rate || row.memo);
     }
     return !(row.equipment_name || row.expense_name || row.basis || row.amount || row.memo);
 }
@@ -145,7 +145,7 @@ function isExecutionRowEmpty(row, section) {
         return !(row.equipment_name || row.unit_name || row.part_name || row.spec || row.executed_amount || row.memo);
     }
     if (section === 'labor') {
-        return !(row.equipment_name || row.task_name || row.worker_type || row.executed_amount || row.memo);
+        return !(row.task_name || row.worker_type || row.executed_amount || row.memo);
     }
     return !(row.equipment_name || row.expense_name || row.basis || row.executed_amount || row.memo);
 }
@@ -169,7 +169,7 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
             task_name: '',
             staffing_type: '',
             worker_type: '',
-            unit: 'H',
+            unit: '',
             quantity: '',
             location_type: 'domestic',
             hourly_rate: '',

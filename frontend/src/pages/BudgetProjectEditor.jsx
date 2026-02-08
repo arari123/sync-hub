@@ -514,11 +514,12 @@ const BudgetProjectEditor = () => {
 
         sourceRows.forEach((row) => {
             if (rowIsEmpty(row, 'material')) return;
+            const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            const phaseLabel = phase === 'installation' ? '설치' : '제작';
             const unitName = String(row?.unit_name || '').trim() || String(row?.part_name || '').trim();
             if (!unitName) return;
             const equipmentName = normalizeEquipmentName(row?.equipment_name) || '미지정 설비';
-            const key = `${equipmentName}::${unitName}`;
-            const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            const key = `${equipmentName}::${phase}::${unitName}`;
             const amount = useExecutionRows
                 ? toNumber(row.executed_amount)
                 : calcBudgetAmount(row, 'material', effectiveBudgetSettings);
@@ -527,16 +528,15 @@ const BudgetProjectEditor = () => {
                 buckets.set(key, {
                     key,
                     equipment_name: equipmentName,
+                    phase,
+                    phase_label: phaseLabel,
                     unit_name: unitName,
-                    fabrication_total: 0,
-                    installation_total: 0,
                     total: 0,
                     items: [],
                 });
             }
 
             const bucket = buckets.get(key);
-            bucket[`${phase}_total`] += amount;
             bucket.total += amount;
             bucket.items.push({
                 unit_name: unitName,
@@ -550,6 +550,9 @@ const BudgetProjectEditor = () => {
         });
 
         return Array.from(buckets.values()).sort((a, b) => {
+            const equipmentCompare = String(a.equipment_name).localeCompare(String(b.equipment_name), 'ko-KR');
+            if (equipmentCompare !== 0) return equipmentCompare;
+            if (a.phase !== b.phase) return a.phase === 'fabrication' ? -1 : 1;
             if (b.total !== a.total) return b.total - a.total;
             return String(a.unit_name).localeCompare(String(b.unit_name), 'ko-KR');
         });
@@ -1496,24 +1499,29 @@ const BudgetProjectEditor = () => {
         setIsMaterialUnitDragOver(false);
     }, [section]);
 
-    const handleScroll = (event) => {
+    const appendMaterialBufferRows = useCallback((count = 50) => {
         if (section !== 'material') return;
-        const { scrollTop, scrollHeight, clientHeight } = event.target;
+        if (!activeEquipmentName) return;
+        const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+        setDetails((prev) => ({
+            ...prev,
+            [activeKey]: [
+                ...(prev[activeKey] || []),
+                ...Array.from({ length: count }, () => ({
+                    ...builder(section, currentPhase),
+                    equipment_name: activeEquipmentName,
+                })),
+            ],
+        }));
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
+
+    const handleMaterialTableScroll = useCallback((event) => {
+        if (section !== 'material') return;
+        const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
         if (scrollHeight - scrollTop <= clientHeight + 100) {
-            if (!activeEquipmentName) return;
-            const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
-            setDetails((prev) => ({
-                ...prev,
-                [activeKey]: [
-                    ...(prev[activeKey] || []),
-                    ...Array.from({ length: 50 }, () => ({
-                        ...builder(section, currentPhase),
-                        equipment_name: activeEquipmentName,
-                    })),
-                ],
-            }));
+            appendMaterialBufferRows(30);
         }
-    };
+    }, [appendMaterialBufferRows, section]);
 
     if (isLoading) {
         return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
@@ -1529,7 +1537,7 @@ const BudgetProjectEditor = () => {
                 materialUnitLibrary={materialUnitLibrary}
             />
 
-            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0" onScroll={handleScroll}>
+            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
                 <div className="flex-none">
                     <div className="flex items-center justify-between mb-2">
                         <BudgetBreadcrumb
@@ -1786,6 +1794,7 @@ const BudgetProjectEditor = () => {
 
                         <div
                             className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative"
+                            onScroll={handleMaterialTableScroll}
                             onDragOver={handleMaterialUnitDragOver}
                             onDrop={handleMaterialUnitDrop}
                             onDragLeave={handleMaterialUnitDragLeave}

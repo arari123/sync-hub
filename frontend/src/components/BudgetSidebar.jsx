@@ -80,7 +80,7 @@ const BudgetSidebar = ({
                                             <span className="text-[10px] font-black text-slate-700">{formatAmount(unit.total || 0)}</span>
                                         </div>
                                         <p className="mt-0.5 text-[10px] text-slate-500 truncate">
-                                            설비: {unit.equipment_name} · 파츠 {unit.items?.length || 0}개
+                                            설비: {unit.equipment_name} · 단계: {unit.phase_label} · 파츠 {unit.items?.length || 0}개
                                         </p>
                                     </button>
                                 );

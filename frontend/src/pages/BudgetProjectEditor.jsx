@@ -388,6 +388,7 @@ const BudgetProjectEditor = () => {
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [currentEquipmentName, setCurrentEquipmentName] = useState('');
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
+    const [isMaterialUnitDragOver, setIsMaterialUnitDragOver] = useState(false);
 
     const canEditProject = project?.can_edit !== false;
     const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
@@ -502,6 +503,57 @@ const BudgetProjectEditor = () => {
         total: Number(sidebarSummary?.[section]?.fabrication_total || 0) + Number(sidebarSummary?.[section]?.installation_total || 0),
         equipments: sidebarSummary?.material?.equipments || [],
     }), [sidebarSummary, section]);
+    const materialUnitLibrary = useMemo(() => {
+        const executionRows = details.execution_material_items || [];
+        const budgetRows = details.material_items || [];
+        const useExecutionRows = activeMode === 'execution'
+            && executionRows.some((row) => !isExecutionRowEmpty(row, 'material'));
+        const sourceRows = useExecutionRows ? executionRows : budgetRows;
+        const rowIsEmpty = useExecutionRows ? isExecutionRowEmpty : isBudgetRowEmpty;
+        const buckets = new Map();
+
+        sourceRows.forEach((row) => {
+            if (rowIsEmpty(row, 'material')) return;
+            const unitName = String(row?.unit_name || '').trim() || String(row?.part_name || '').trim();
+            if (!unitName) return;
+            const equipmentName = normalizeEquipmentName(row?.equipment_name) || '미지정 설비';
+            const key = `${equipmentName}::${unitName}`;
+            const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            const amount = useExecutionRows
+                ? toNumber(row.executed_amount)
+                : calcBudgetAmount(row, 'material', effectiveBudgetSettings);
+
+            if (!buckets.has(key)) {
+                buckets.set(key, {
+                    key,
+                    equipment_name: equipmentName,
+                    unit_name: unitName,
+                    fabrication_total: 0,
+                    installation_total: 0,
+                    total: 0,
+                    items: [],
+                });
+            }
+
+            const bucket = buckets.get(key);
+            bucket[`${phase}_total`] += amount;
+            bucket.total += amount;
+            bucket.items.push({
+                unit_name: unitName,
+                part_name: String(row?.part_name || '').trim(),
+                spec: String(row?.spec || '').trim(),
+                quantity: toNumber(row?.quantity),
+                unit_price: toNumber(row?.unit_price),
+                executed_amount: toNumber(row?.executed_amount),
+                memo: String(row?.memo || '').trim(),
+            });
+        });
+
+        return Array.from(buckets.values()).sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            return String(a.unit_name).localeCompare(String(b.unit_name), 'ko-KR');
+        });
+    }, [activeMode, details.execution_material_items, details.material_items, effectiveBudgetSettings]);
 
     const budgetColumnsBySection = useMemo(() => ({
         material: [
@@ -1138,6 +1190,106 @@ const BudgetProjectEditor = () => {
         }));
     };
 
+    const insertMaterialTemplateRows = useCallback((templateRows) => {
+        if (section !== 'material' || !activeEquipmentName) return;
+        const normalizedRows = (templateRows || [])
+            .map((row) => ({
+                unit_name: String(row?.unit_name || '').trim(),
+                part_name: String(row?.part_name || '').trim(),
+                spec: String(row?.spec || '').trim(),
+                memo: String(row?.memo || '').trim(),
+                quantity: toNumber(row?.quantity),
+                unit_price: toNumber(row?.unit_price),
+                executed_amount: toNumber(row?.executed_amount),
+            }))
+            .filter((row) => (
+                row.unit_name
+                || row.part_name
+                || row.spec
+                || row.memo
+                || row.quantity
+                || row.unit_price
+                || row.executed_amount
+            ));
+        if (!normalizedRows.length) return;
+
+        setDetails((prev) => {
+            const source = [...(prev[activeKey] || [])];
+            const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+            const rowIsEmpty = activeMode === 'execution' ? isExecutionRowEmpty : isBudgetRowEmpty;
+
+            normalizedRows.forEach((item) => {
+                const nextRow = {
+                    ...builder('material', currentPhase),
+                    equipment_name: activeEquipmentName,
+                    unit_name: item.unit_name,
+                    part_name: item.part_name,
+                    spec: item.spec,
+                    memo: item.memo,
+                };
+                if (activeMode === 'execution') {
+                    nextRow.executed_amount = item.executed_amount;
+                } else {
+                    nextRow.quantity = item.quantity;
+                    nextRow.unit_price = item.unit_price;
+                }
+
+                const scopedEmptyIndex = source.findIndex((row) => (
+                    (row.phase || 'fabrication') === currentPhase
+                    && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
+                    && rowIsEmpty(row, 'material')
+                ));
+                if (scopedEmptyIndex >= 0) {
+                    source[scopedEmptyIndex] = { ...source[scopedEmptyIndex], ...nextRow };
+                } else {
+                    source.push(nextRow);
+                }
+            });
+
+            return {
+                ...prev,
+                [activeKey]: source,
+            };
+        });
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
+
+    const handleMaterialUnitDragOver = useCallback((event) => {
+        if (section !== 'material') return;
+        const types = Array.from(event.dataTransfer?.types || []);
+        if (!types.includes('application/json') && !types.includes('text/plain')) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        setIsMaterialUnitDragOver(true);
+    }, [section]);
+
+    const handleMaterialUnitDrop = useCallback((event) => {
+        if (section !== 'material') return;
+        event.preventDefault();
+        setIsMaterialUnitDragOver(false);
+        const raw = event.dataTransfer?.getData('application/json')
+            || event.dataTransfer?.getData('text/plain')
+            || '';
+        if (!raw) return;
+        try {
+            const payload = JSON.parse(raw);
+            if (payload?.kind !== 'material_unit_template') return;
+            const fallbackUnitName = String(payload?.unit_name || '').trim();
+            const templateRows = (payload?.rows || []).map((row) => ({
+                ...row,
+                unit_name: String(row?.unit_name || fallbackUnitName).trim(),
+            }));
+            insertMaterialTemplateRows(templateRows);
+        } catch (_error) {
+            // ignore malformed drop payload
+        }
+    }, [insertMaterialTemplateRows, section]);
+
+    const handleMaterialUnitDragLeave = useCallback((event) => {
+        if (section !== 'material') return;
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setIsMaterialUnitDragOver(false);
+    }, [section]);
+
     const saveDetail = async () => {
         if (!version?.id || !canSave) return;
         if (isEquipmentProject && !equipmentNames.length) {
@@ -1322,6 +1474,11 @@ const BudgetProjectEditor = () => {
         });
     }, [activeEquipmentName, activeKey, activeMode, currentPhase, section]);
 
+    useEffect(() => {
+        if (section === 'material') return;
+        setIsMaterialUnitDragOver(false);
+    }, [section]);
+
     const handleScroll = (event) => {
         if (section !== 'material') return;
         const { scrollTop, scrollHeight, clientHeight } = event.target;
@@ -1347,7 +1504,13 @@ const BudgetProjectEditor = () => {
 
     return (
         <div className="flex h-screen border-t border-slate-200 overflow-hidden">
-            <BudgetSidebar aggregation={aggregation} summary={sidebarSummary} modeLabel={aggregationModeLabel} />
+            <BudgetSidebar
+                aggregation={aggregation}
+                summary={sidebarSummary}
+                modeLabel={aggregationModeLabel}
+                section={section}
+                materialUnitLibrary={materialUnitLibrary}
+            />
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0" onScroll={handleScroll}>
                 <div className="flex-none">
@@ -1604,7 +1767,12 @@ const BudgetProjectEditor = () => {
                             </div>
                         )}
 
-                        <div className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative">
+                        <div
+                            className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative"
+                            onDragOver={handleMaterialUnitDragOver}
+                            onDrop={handleMaterialUnitDrop}
+                            onDragLeave={handleMaterialUnitDragLeave}
+                        >
                             <ExcelTable
                                 columns={visibleColumns}
                                 rows={sortedDisplayRows}
@@ -1616,6 +1784,13 @@ const BudgetProjectEditor = () => {
                                 editable={canEditScopedRows}
                                 allowRowDelete={canEditScopedRows}
                             />
+                            {section === 'material' && isMaterialUnitDragOver && (
+                                <div className="pointer-events-none absolute inset-2 rounded-xl border-2 border-dashed border-sky-400 bg-sky-50/70 flex items-center justify-center z-20">
+                                    <div className="rounded-lg border border-sky-200 bg-white px-4 py-2 text-[11px] font-black text-sky-700 shadow-sm">
+                                        유닛 템플릿을 여기에 놓으면 현재 설비/단계에 파츠가 입력됩니다.
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </section>
                 </div>

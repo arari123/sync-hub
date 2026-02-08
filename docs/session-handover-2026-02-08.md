@@ -198,3 +198,13 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose restart web frontend` 후 `budget_projects` 컬럼 반영 확인
+- 2026-02-08 (제작 자체경비 교통비 산정 기준 문구 갱신 보정)
+  - 문제:
+    - 계산식은 반영되어 있으나, 기존 행 보존 로직으로 `산정 기준` 문구가 과거 텍스트로 유지됨
+  - 조치:
+    - 경비 자동 병합(`forceReset=false`) 시 값(`횟수/금액`)은 보존하되, `basis`는 최신 생성 문구(`generated.basis`)로 갱신
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

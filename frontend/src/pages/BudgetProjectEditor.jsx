@@ -1101,7 +1101,7 @@ const BudgetProjectEditor = () => {
                         expense_type: normalizeExpenseType(current?.expense_type || generated.expense_type || targetExpenseType),
                         expense_name: String(current?.expense_name || generated.expense_name || '').trim()
                             || generated.expense_name,
-                        basis: String(current?.basis || '').trim() || generated.basis,
+                        basis: generated.basis,
                         auto_formula: resolvedCurrentFormula,
                     });
                     return;

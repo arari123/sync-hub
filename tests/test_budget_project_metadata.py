@@ -37,7 +37,7 @@ class BudgetProjectMetadataTests(unittest.TestCase):
         self.assertEqual(milestones[1]["status"], "done")
         self.assertEqual(milestones[2]["status"], "active")
 
-    def test_monitoring_payload_has_spent_and_variance(self):
+    def test_monitoring_payload_defaults_spent_to_zero_without_execution(self):
         project = self._sample_project(current_stage="warranty")
         monitoring = _build_monitoring_payload(
             project,
@@ -52,10 +52,10 @@ class BudgetProjectMetadataTests(unittest.TestCase):
         self.assertEqual(monitoring["confirmed_budget_material"], 500000)
         self.assertEqual(monitoring["confirmed_budget_labor"], 300000)
         self.assertEqual(monitoring["confirmed_budget_expense"], 200000)
-        self.assertGreater(monitoring["actual_spent_material"], 0)
-        self.assertGreater(monitoring["actual_spent_labor"], 0)
-        self.assertGreater(monitoring["actual_spent_expense"], 0)
-        self.assertGreater(monitoring["actual_spent_total"], 0)
+        self.assertEqual(monitoring["actual_spent_material"], 0)
+        self.assertEqual(monitoring["actual_spent_labor"], 0)
+        self.assertEqual(monitoring["actual_spent_expense"], 0)
+        self.assertEqual(monitoring["actual_spent_total"], 0)
         self.assertIsNotNone(monitoring["variance_material"])
         self.assertIsNotNone(monitoring["variance_labor"])
         self.assertIsNotNone(monitoring["variance_expense"])

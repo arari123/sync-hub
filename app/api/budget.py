@@ -384,18 +384,6 @@ def _project_stage_rank(stage: Optional[str]) -> int:
     return order.get((stage or "").strip().lower(), 0)
 
 
-def _project_spent_ratio(stage: Optional[str], project_id: int) -> float:
-    base = {
-        "review": 0.12,
-        "fabrication": 0.48,
-        "installation": 0.82,
-        "warranty": 0.94,
-        "closure": 1.0,
-    }.get((stage or "").strip().lower(), 0.12)
-    variation = ((int(project_id) % 9) - 4) * 0.015
-    return max(0.0, min(1.15, base + variation))
-
-
 def _build_monitoring_payload(
     project: models.BudgetProject,
     totals: dict,
@@ -415,12 +403,6 @@ def _build_monitoring_payload(
         actual_spent_labor = round(executed_labor, 2)
         actual_spent_expense = round(executed_expense, 2)
         actual_spent_total = round(executed_total, 2)
-    elif confirmed_budget_total > 0:
-        spent_ratio = _project_spent_ratio(project.current_stage, int(project.id or 0))
-        actual_spent_material = round(confirmed_material * spent_ratio, 2)
-        actual_spent_labor = round(confirmed_labor * spent_ratio, 2)
-        actual_spent_expense = round(confirmed_expense * spent_ratio, 2)
-        actual_spent_total = round(confirmed_budget_total * spent_ratio, 2)
     else:
         actual_spent_material = 0.0
         actual_spent_labor = 0.0

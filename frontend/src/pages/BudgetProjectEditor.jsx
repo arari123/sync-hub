@@ -1300,6 +1300,12 @@ const BudgetProjectEditor = () => {
         setIsSaving(true);
         setError('');
         try {
+            const preservedMaterialEmptyRows = (details.material_items || [])
+                .filter((row) => isBudgetRowEmpty(row, 'material'))
+                .map((row) => ({ ...row }));
+            const preservedExecutionMaterialEmptyRows = (details.execution_material_items || [])
+                .filter((row) => isExecutionRowEmpty(row, 'material'))
+                .map((row) => ({ ...row }));
             const cleanDetails = {};
             const primaryEquipmentName = activeEquipmentName || equipmentNames[0] || COMMON_EQUIPMENT_NAME;
             const allowedEquipmentSet = new Set(equipmentNames);
@@ -1340,6 +1346,17 @@ const BudgetProjectEditor = () => {
 
             const response = await api.put(`/budget/versions/${version.id}/details`, cleanDetails);
             const savedDetails = response?.data?.details || cleanDetails;
+            const savedWithMaterialBuffers = {
+                ...savedDetails,
+                material_items: [
+                    ...(savedDetails.material_items || []),
+                    ...preservedMaterialEmptyRows,
+                ],
+                execution_material_items: [
+                    ...(savedDetails.execution_material_items || []),
+                    ...preservedExecutionMaterialEmptyRows,
+                ],
+            };
             let equipmentItems = [];
             try {
                 const equipmentResp = await api.get(`/budget/versions/${version.id}/equipments`);
@@ -1353,7 +1370,7 @@ const BudgetProjectEditor = () => {
                 detailsObj: savedDetails,
             });
             const normalizedSavedDetails = normalizeDetailsWithEquipment(
-                savedDetails,
+                savedWithMaterialBuffers,
                 (project?.project_type || 'equipment') === 'equipment'
                     ? refreshedEquipmentNames[0]
                     : COMMON_EQUIPMENT_NAME,

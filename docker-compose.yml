@@ -22,6 +22,8 @@ services:
       - .:/app
     ports:
       - "8001:8000"
+    environment:
+      - UVICORN_RELOAD=${UVICORN_RELOAD:-true}
     env_file:
       - .env
     depends_on:

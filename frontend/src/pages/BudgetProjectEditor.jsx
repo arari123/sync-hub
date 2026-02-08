@@ -154,8 +154,12 @@ function extractEquipmentNamesFromDetails(detailsObj) {
 function resolveEquipmentNames({ projectType, equipmentItems = [], detailsObj }) {
     if (projectType !== 'equipment') return [COMMON_EQUIPMENT_NAME];
     const namesFromEquipment = equipmentItems.map((item) => normalizeEquipmentName(item?.equipment_name));
+    const uniqueFromEquipment = uniqueEquipmentNames(namesFromEquipment);
+    if (uniqueFromEquipment.length > 0) {
+        return uniqueFromEquipment;
+    }
     const namesFromDetails = extractEquipmentNamesFromDetails(detailsObj);
-    return uniqueEquipmentNames([...namesFromEquipment, ...namesFromDetails]);
+    return uniqueEquipmentNames(namesFromDetails);
 }
 
 function normalizeDetailsWithEquipment(detailsObj, equipmentName) {

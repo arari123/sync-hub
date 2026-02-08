@@ -256,3 +256,15 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (트리 가시성 개선)
+  - 요구 반영:
+    - 사이드바 트리 구조 가시성이 낮아 연결선/활성 구분 강화 필요
+  - 조치:
+    - 트리 자식 영역에 세로 연결선(`border-l`) 추가
+    - 자식 노드에 가지선 + 포인트 도트 표시
+    - 활성 노드/활성 경로 노드 스타일 대비 강화(테두리/배경/뱃지 색상)
+  - 관련 파일:
+    - `frontend/src/components/BudgetSidebar.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

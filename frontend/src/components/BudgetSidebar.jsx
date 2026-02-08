@@ -59,7 +59,7 @@ const BudgetSidebar = ({
                             <TreeNode
                                 key={item.key}
                                 node={item}
-                                depth={0}
+                                hasParent={false}
                                 activeTreeKey={activeTreeKey}
                                 onSelectTreeNode={onSelectTreeNode}
                             />
@@ -78,40 +78,55 @@ const BudgetSidebar = ({
 
 const TreeNode = ({
     node,
-    depth,
+    hasParent = false,
     activeTreeKey,
     onSelectTreeNode,
 }) => {
-    const paddingLeft = 10 + depth * 14;
     const isActive = activeTreeKey === node.key;
+    const isActivePath = !isActive
+        && typeof activeTreeKey === 'string'
+        && activeTreeKey.startsWith(`${node.key}::`);
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     return (
         <div>
-            <button
-                type="button"
-                onClick={() => onSelectTreeNode?.(node)}
-                className={`w-full rounded-md border px-2 py-1.5 text-left transition-all ${
-                    isActive
-                        ? 'border-sky-300 bg-sky-50 text-sky-800'
-                        : 'border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50'
-                }`}
-                style={{ paddingLeft }}
-            >
-                <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[11px] font-black">{node.label}</span>
-                    {Number.isFinite(node.count) && (
-                        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-500">
-                            {node.count}
-                        </span>
+            <div className="relative">
+                <button
+                    type="button"
+                    onClick={() => onSelectTreeNode?.(node)}
+                    className={`relative w-full rounded-md border px-2 py-1.5 text-left transition-all ${
+                        isActive
+                            ? 'border-sky-400 bg-sky-50 text-sky-900 shadow-sm ring-1 ring-sky-200'
+                            : isActivePath
+                                ? 'border-slate-300 bg-slate-50 text-slate-900'
+                                : 'border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50'
+                    }`}
+                >
+                    {hasParent && (
+                        <>
+                            <span className="pointer-events-none absolute -left-3 top-1/2 h-px w-3 -translate-y-1/2 bg-slate-300" />
+                            <span className="pointer-events-none absolute -left-0.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-slate-300" />
+                        </>
                     )}
-                </div>
-            </button>
-            {Array.isArray(node.children) && node.children.length > 0 && (
-                <div className="mt-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-[11px] font-black">{node.label}</span>
+                        {Number.isFinite(node.count) && (
+                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${
+                                isActive ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'
+                            }`}
+                            >
+                                {node.count}
+                            </span>
+                        )}
+                    </div>
+                </button>
+            </div>
+            {hasChildren && (
+                <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {node.children.map((child) => (
                         <TreeNode
                             key={child.key}
                             node={child}
-                            depth={depth + 1}
+                            hasParent
                             activeTreeKey={activeTreeKey}
                             onSelectTreeNode={onSelectTreeNode}
                         />

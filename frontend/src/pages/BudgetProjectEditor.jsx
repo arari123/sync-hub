@@ -1890,47 +1890,46 @@ const BudgetProjectEditor = () => {
                             { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
                             { label: `${SECTION_META[section].label} 입력` },
                         ]}
-                        actions={(
-                            <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                                <span className="text-sm font-black text-slate-700">
-                                    {project?.name || '프로젝트'}
-                                </span>
-                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                    {canSave && (
-                                        <button
-                                            type="button"
-                                            onClick={saveDetail}
-                                            disabled={isSaving}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
-                                        >
-                                            <Save size={16} />
-                                            {isSaving ? '저장 중...' : '전체 저장'}
-                                        </button>
-                                    )}
-                                    {canEditProject && !isConfirmed && (
-                                        <button
-                                            type="button"
-                                            onClick={confirmCurrentVersion}
-                                            disabled={isConfirming}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
-                                        >
-                                            <CheckCircle2 size={16} />
-                                            {isConfirming ? '확정 중...' : '버전 확정'}
-                                        </button>
-                                    )}
-                                    {canEditProject && isConfirmed && (
-                                        <button
-                                            type="button"
-                                            onClick={() => createRevision()}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 transition-colors"
-                                        >
-                                            리비전 생성
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     />
+
+                    <div className="mt-1 flex w-full flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-black text-slate-700">
+                            {project?.name || '프로젝트'}
+                        </span>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {canSave && (
+                                <button
+                                    type="button"
+                                    onClick={saveDetail}
+                                    disabled={isSaving}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
+                                >
+                                    <Save size={16} />
+                                    {isSaving ? '저장 중...' : '전체 저장'}
+                                </button>
+                            )}
+                            {canEditProject && !isConfirmed && (
+                                <button
+                                    type="button"
+                                    onClick={confirmCurrentVersion}
+                                    disabled={isConfirming}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                                >
+                                    <CheckCircle2 size={16} />
+                                    {isConfirming ? '확정 중...' : '버전 확정'}
+                                </button>
+                            )}
+                            {canEditProject && isConfirmed && (
+                                <button
+                                    type="button"
+                                    onClick={() => createRevision()}
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 transition-colors"
+                                >
+                                    리비전 생성
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
                     <section className="mt-1 rounded-2xl border bg-card p-4 shadow-sm">
                         <p className="text-xs font-bold text-slate-500">

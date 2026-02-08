@@ -430,3 +430,14 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (입력 페이지 프로젝트명 좌측 정렬 보정)
+  - 요구 반영:
+    - 재료비/인건비/경비 입력 페이지에서 프로젝트명이 왼쪽 사이드바 쪽 기준으로 정렬되도록 보정
+  - 조치:
+    - `ProjectPageHeader` 액션 슬롯 대신, `BudgetProjectEditor` 본문에서 별도 행(`좌측 프로젝트명 + 우측 버튼`)으로 분리
+    - 프로젝트명은 배경/테두리 없이 텍스트만 유지
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

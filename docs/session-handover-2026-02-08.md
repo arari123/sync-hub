@@ -382,3 +382,16 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+- 2026-02-08 (상단 메뉴 슬림화/아이콘 스타일 개선)
+  - 요구 반영:
+    - 메뉴에서 `프로젝트 관리` 버튼 제거
+    - 메뉴 버튼 크기를 더 작고 슬림하게 조정
+    - 모든 메뉴 및 예산 하위 드롭다운에 아이콘 추가
+  - 조치:
+    - `ProjectContextNav` 메뉴 메타에 아이콘 필드 추가
+    - 1차/2차 메뉴 버튼 높이/패딩/폰트 크기 축소 및 활성 스타일 정리
+  - 관련 파일:
+    - `frontend/src/components/ProjectContextNav.jsx`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

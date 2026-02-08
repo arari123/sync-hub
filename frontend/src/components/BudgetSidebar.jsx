@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 
 function formatAmount(value) {
@@ -14,8 +14,11 @@ const BudgetSidebar = ({
     treeItems = [],
     activeTreeKey = '',
     onSelectTreeNode,
+    onTreeContextAction,
+    hasCopiedUnit = false,
 }) => {
     const [collapsedByKey, setCollapsedByKey] = useState({});
+    const [contextMenuState, setContextMenuState] = useState(null);
     const { total = 0, equipments = [] } = aggregation;
     const sectionSummary = summary && typeof summary === 'object'
         ? summary
@@ -62,6 +65,33 @@ const BudgetSidebar = ({
             ...prev,
             [key]: !prev[key],
         }));
+    };
+    useEffect(() => {
+        const closeMenu = () => {
+            setContextMenuState(null);
+        };
+        window.addEventListener('click', closeMenu);
+        window.addEventListener('scroll', closeMenu, true);
+        return () => {
+            window.removeEventListener('click', closeMenu);
+            window.removeEventListener('scroll', closeMenu, true);
+        };
+    }, []);
+    const handleNodeContextMenu = (event, node) => {
+        if (section !== 'material') return;
+        if (String(node?.nodeType || '') !== 'unit') return;
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenuState({
+            x: event.clientX,
+            y: event.clientY,
+            node,
+        });
+    };
+    const runContextAction = (action) => {
+        if (!contextMenuState?.node) return;
+        onTreeContextAction?.(action, contextMenuState.node);
+        setContextMenuState(null);
     };
 
     return (
@@ -117,6 +147,7 @@ const BudgetSidebar = ({
                                 onSelectTreeNode={onSelectTreeNode}
                                 collapsedByKey={collapsedByKey}
                                 onToggleNodeCollapse={toggleNodeCollapse}
+                                onNodeContextMenu={handleNodeContextMenu}
                             />
                         ))}
                         {!treeItems.length && (
@@ -127,6 +158,20 @@ const BudgetSidebar = ({
                     </div>
                 </div>
             </div>
+            {contextMenuState && (
+                <div
+                    className="fixed z-50 min-w-[120px] rounded-md border border-slate-200 bg-white p-1 shadow-xl"
+                    style={{
+                        left: contextMenuState.x,
+                        top: contextMenuState.y,
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <ContextMenuButton label="복사" onClick={() => runContextAction('copy')} />
+                    <ContextMenuButton label="붙여넣기" onClick={() => runContextAction('paste')} disabled={!hasCopiedUnit} />
+                    <ContextMenuButton label="삭제" onClick={() => runContextAction('delete')} danger />
+                </div>
+            )}
         </aside>
     );
 };
@@ -138,6 +183,7 @@ const TreeNode = ({
     onSelectTreeNode,
     collapsedByKey,
     onToggleNodeCollapse,
+    onNodeContextMenu,
 }) => {
     const isActive = activeTreeKey === node.key;
     const isActivePath = !isActive
@@ -158,6 +204,7 @@ const TreeNode = ({
                     role="button"
                     tabIndex={0}
                     onClick={handleNodeClick}
+                    onContextMenu={(event) => onNodeContextMenu?.(event, node)}
                     onKeyDown={(event) => {
                         if (event.key !== 'Enter' && event.key !== ' ') return;
                         event.preventDefault();
@@ -218,6 +265,7 @@ const TreeNode = ({
                             onSelectTreeNode={onSelectTreeNode}
                             collapsedByKey={collapsedByKey}
                             onToggleNodeCollapse={onToggleNodeCollapse}
+                            onNodeContextMenu={onNodeContextMenu}
                         />
                     ))}
                 </div>
@@ -231,6 +279,23 @@ const SummaryRow = ({ label, value }) => (
         <span className="text-slate-300">{label}</span>
         <span className="font-bold text-white">{formatAmount(value)}</span>
     </div>
+);
+
+const ContextMenuButton = ({ label, onClick, disabled = false, danger = false }) => (
+    <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={`flex h-7 w-full items-center rounded px-2 text-[11px] font-semibold transition-colors ${
+            disabled
+                ? 'cursor-not-allowed text-slate-300'
+                : danger
+                    ? 'text-rose-600 hover:bg-rose-50'
+                    : 'text-slate-700 hover:bg-slate-100'
+        }`}
+    >
+        {label}
+    </button>
 );
 
 export default BudgetSidebar;

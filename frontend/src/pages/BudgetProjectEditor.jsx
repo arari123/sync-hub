@@ -480,6 +480,20 @@ function resolveMaterialUnitLabel(row) {
     return String(row?.unit_name || row?.part_name || '').trim();
 }
 
+function buildDuplicatedUnitName(sourceName, existingNameSet) {
+    const baseName = String(sourceName || '').trim() || '유닛';
+    if (!existingNameSet.has(baseName)) return baseName;
+    for (let index = 1; index < 9999; index += 1) {
+        const candidate = index === 1
+            ? `${baseName}(복사)`
+            : `${baseName}(복사${index})`;
+        if (!existingNameSet.has(candidate)) {
+            return candidate;
+        }
+    }
+    return `${baseName}(복사)`;
+}
+
 const BudgetProjectEditor = () => {
     const { projectId, section = 'material' } = useParams();
 
@@ -509,6 +523,7 @@ const BudgetProjectEditor = () => {
         expense: { equipment: '', phase: 'all', unit: '', expenseType: '' },
     }));
     const [materialUnitCountByScope, setMaterialUnitCountByScope] = useState({});
+    const [materialUnitClipboard, setMaterialUnitClipboard] = useState(null);
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
 
     const canEditProject = project?.can_edit !== false;
@@ -712,6 +727,7 @@ const BudgetProjectEditor = () => {
                                     key: buildScopeTreeKey(normalizedEquipment, phase, unitLabel),
                                     label: unitLabel,
                                     count: unitCount,
+                                    nodeType: 'unit',
                                     scope: { equipment: normalizedEquipment, phase, unit: unitLabel },
                                 });
                             });
@@ -726,6 +742,7 @@ const BudgetProjectEditor = () => {
                                 key: buildScopeTreeKey(normalizedEquipment, phase, '', expenseType),
                                 label: expenseType,
                                 count: typeCount,
+                                nodeType: 'expense_type',
                                 scope: { equipment: normalizedEquipment, phase, unit: '', expenseType },
                             });
                         });
@@ -734,6 +751,7 @@ const BudgetProjectEditor = () => {
                         key: buildScopeTreeKey(normalizedEquipment, phase),
                         label: phase === 'installation' ? '설치' : '제작',
                         count: phaseCount,
+                        nodeType: 'phase',
                         scope: { equipment: normalizedEquipment, phase, unit: '', expenseType: '' },
                         children,
                     };
@@ -742,6 +760,7 @@ const BudgetProjectEditor = () => {
                     key: buildScopeTreeKey(normalizedEquipment, 'all'),
                     label: normalizedEquipment,
                     count: equipmentCount,
+                    nodeType: 'equipment',
                     scope: { equipment: normalizedEquipment, phase: 'all', unit: '', expenseType: '' },
                     children: phaseNodes,
                 };
@@ -1063,6 +1082,165 @@ const BudgetProjectEditor = () => {
             },
         }));
     }, [activeEquipmentName, equipmentNames, isEquipmentProject, section]);
+
+    const handleMaterialTreeContextAction = useCallback((action, node) => {
+        if (section !== 'material') return;
+        const scope = node?.scope || {};
+        const targetEquipment = normalizeEquipmentName(
+            scope.equipment || activeEquipmentName || equipmentNames[0] || '',
+        );
+        const targetPhase = scope.phase === 'installation' ? 'installation' : 'fabrication';
+        const targetUnit = String(scope.unit || '').trim();
+        if (!targetEquipment || !targetUnit) return;
+
+        const sourceRows = details[activeKey] || [];
+        const scopeMatchedRows = sourceRows.filter((row) => {
+            const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+            const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            return (
+                rowEquipment === targetEquipment
+                && rowPhase === targetPhase
+                && resolveMaterialUnitLabel(row) === targetUnit
+            );
+        });
+
+        if (action === 'copy') {
+            const copiedRows = scopeMatchedRows.filter((row) => !rowIsEmptyFn(row, 'material'));
+            if (!copiedRows.length) {
+                setMaterialUnitClipboard(null);
+                return;
+            }
+            const copiedScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
+            const unitCountMap = normalizeMaterialUnitCountMap(details?.budget_settings?.material_unit_counts);
+            setMaterialUnitClipboard({
+                rows: copiedRows.map((row) => ({ ...row })),
+                sourceUnitName: targetUnit,
+                sourceScopeKey: copiedScopeKey,
+                sourceUnitCount: Math.max(1, Number(unitCountMap[copiedScopeKey] || 1)),
+            });
+            return;
+        }
+
+        if (action === 'paste') {
+            if (!materialUnitClipboard?.rows?.length) return;
+            const existingUnitNames = new Set(
+                sourceRows
+                    .filter((row) => {
+                        const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+                        const rowPhase = (row.phase || 'fabrication') === 'installation'
+                            ? 'installation'
+                            : 'fabrication';
+                        return (
+                            rowEquipment === targetEquipment
+                            && rowPhase === targetPhase
+                            && !rowIsEmptyFn(row, 'material')
+                        );
+                    })
+                    .map((row) => resolveMaterialUnitLabel(row))
+                    .filter(Boolean),
+            );
+            const nextUnitName = buildDuplicatedUnitName(
+                materialUnitClipboard.sourceUnitName,
+                existingUnitNames,
+            );
+            const pastedRows = materialUnitClipboard.rows.map((row) => ({
+                ...row,
+                equipment_name: targetEquipment,
+                phase: targetPhase,
+                unit_name: nextUnitName,
+            }));
+            const nextScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, nextUnitName);
+            const copiedUnitCount = Math.max(1, Number(materialUnitClipboard.sourceUnitCount || 1));
+
+            setDetails((prev) => {
+                const mergedSettings = mergeBudgetSettings(prev?.budget_settings);
+                const unitCountMap = normalizeMaterialUnitCountMap(mergedSettings.material_unit_counts);
+                if (nextScopeKey) {
+                    if (copiedUnitCount <= 1) {
+                        delete unitCountMap[nextScopeKey];
+                    } else {
+                        unitCountMap[nextScopeKey] = copiedUnitCount;
+                    }
+                }
+                return {
+                    ...prev,
+                    [activeKey]: [...(prev[activeKey] || []), ...pastedRows],
+                    budget_settings: {
+                        ...mergedSettings,
+                        material_unit_counts: unitCountMap,
+                    },
+                };
+            });
+            setTreeSelectionBySection((prev) => ({
+                ...prev,
+                material: {
+                    equipment: targetEquipment,
+                    phase: targetPhase,
+                    unit: nextUnitName,
+                    expenseType: '',
+                },
+            }));
+            return;
+        }
+
+        if (action === 'delete') {
+            const targetScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
+            setDetails((prev) => {
+                const nextRows = (prev[activeKey] || []).filter((row) => {
+                    const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+                    const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                    const rowUnit = resolveMaterialUnitLabel(row);
+                    return !(
+                        rowEquipment === targetEquipment
+                        && rowPhase === targetPhase
+                        && rowUnit === targetUnit
+                    );
+                });
+                const mergedSettings = mergeBudgetSettings(prev?.budget_settings);
+                const unitCountMap = normalizeMaterialUnitCountMap(mergedSettings.material_unit_counts);
+                if (targetScopeKey) {
+                    delete unitCountMap[targetScopeKey];
+                }
+                return {
+                    ...prev,
+                    [activeKey]: nextRows,
+                    budget_settings: {
+                        ...mergedSettings,
+                        material_unit_counts: unitCountMap,
+                    },
+                };
+            });
+            setTreeSelectionBySection((prev) => {
+                const current = prev.material || {};
+                const isSelectedTarget = (
+                    normalizeEquipmentName(current.equipment) === targetEquipment
+                    && current.phase === targetPhase
+                    && String(current.unit || '').trim() === targetUnit
+                );
+                if (!isSelectedTarget) return prev;
+                return {
+                    ...prev,
+                    material: {
+                        equipment: targetEquipment,
+                        phase: targetPhase,
+                        unit: '',
+                        expenseType: '',
+                    },
+                };
+            });
+            if (materialUnitClipboard?.sourceScopeKey === targetScopeKey) {
+                setMaterialUnitClipboard(null);
+            }
+        }
+    }, [
+        section,
+        activeEquipmentName,
+        equipmentNames,
+        details,
+        activeKey,
+        rowIsEmptyFn,
+        materialUnitClipboard,
+    ]);
 
     const addLaborDepartmentRow = ({ department, staffingType }) => {
         const targetDepartment = String(department || '').trim();
@@ -1930,6 +2108,8 @@ const BudgetProjectEditor = () => {
                 treeItems={sidebarTreeItems}
                 activeTreeKey={activeTreeKey}
                 onSelectTreeNode={handleSelectScopeNode}
+                onTreeContextAction={handleMaterialTreeContextAction}
+                hasCopiedUnit={Boolean(materialUnitClipboard?.rows?.length)}
             />
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">

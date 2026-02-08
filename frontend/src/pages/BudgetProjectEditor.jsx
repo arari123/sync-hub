@@ -1829,7 +1829,6 @@ const BudgetProjectEditor = () => {
             const buffer = Array.from({ length: 50 - scopedCount }, () => ({
                 ...builder(section, currentPhase),
                 equipment_name: activeEquipmentName,
-                ...(activeUnitFilter ? { unit_name: activeUnitFilter } : {}),
             }));
             return {
                 ...prev,
@@ -1850,7 +1849,6 @@ const BudgetProjectEditor = () => {
                 ...Array.from({ length: count }, () => ({
                     ...builder(section, currentPhase),
                     equipment_name: activeEquipmentName,
-                    ...(activeUnitFilter ? { unit_name: activeUnitFilter } : {}),
                 })),
             ],
         }));

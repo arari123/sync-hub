@@ -2249,48 +2249,50 @@ const BudgetProjectEditor = () => {
                         <span className="text-sm font-black text-slate-700">
                             {project?.name || '프로젝트'}
                         </span>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                            {canSave && (
-                                <button
-                                    type="button"
-                                    onClick={saveDetail}
-                                    disabled={isSaving}
-                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-[12px] font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
-                                >
-                                    <Save size={14} />
-                                    {isSaving ? '저장 중...' : '전체 저장'}
-                                </button>
-                            )}
-                            {canEditProject && !isConfirmed && (
-                                <button
-                                    type="button"
-                                    onClick={confirmCurrentVersion}
-                                    disabled={isConfirming}
-                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
-                                >
-                                    <CheckCircle2 size={14} />
-                                    {isConfirming ? '확정 중...' : '버전 확정'}
-                                </button>
-                            )}
-                            {canEditProject && isConfirmed && (
-                                <button
-                                    type="button"
-                                    onClick={() => createRevision()}
-                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 text-[12px] font-bold text-white hover:bg-slate-800 transition-colors"
-                                >
-                                    리비전 생성
-                                </button>
-                            )}
-                        </div>
                     </div>
 
                     <section className="mt-1 rounded-2xl border bg-card p-4 shadow-sm">
-                        <p className="text-xs font-bold text-slate-500">
-                            버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
-                            {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} ·
-                            상태: <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none">{version?.status || '-'}</span>
-                            <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none text-blue-700">{entryModeLabel}</span>
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-slate-500">
+                                버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
+                                {version?.revision_no > 0 ? `-r${version.revision_no}` : ''} ·
+                                상태: <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none">{version?.status || '-'}</span>
+                                <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none text-blue-700">{entryModeLabel}</span>
+                            </p>
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {canSave && (
+                                    <button
+                                        type="button"
+                                        onClick={saveDetail}
+                                        disabled={isSaving}
+                                        className="inline-flex h-7 items-center justify-center gap-1 rounded-md bg-primary px-3 text-[11px] font-black text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
+                                    >
+                                        <Save size={12} />
+                                        {isSaving ? '저장 중...' : '전체 저장'}
+                                    </button>
+                                )}
+                                {canEditProject && !isConfirmed && (
+                                    <button
+                                        type="button"
+                                        onClick={confirmCurrentVersion}
+                                        disabled={isConfirming}
+                                        className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                                    >
+                                        <CheckCircle2 size={12} />
+                                        {isConfirming ? '확정 중...' : '버전 확정'}
+                                    </button>
+                                )}
+                                {canEditProject && isConfirmed && (
+                                    <button
+                                        type="button"
+                                        onClick={() => createRevision()}
+                                        className="inline-flex h-7 items-center justify-center gap-1 rounded-md bg-slate-900 px-3 text-[11px] font-bold text-white hover:bg-slate-800 transition-colors"
+                                    >
+                                        리비전 생성
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </section>
                 </div>
 

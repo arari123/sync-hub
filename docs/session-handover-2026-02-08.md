@@ -268,3 +268,17 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (경비 트리 3단계 확장: 자체/외주)
+  - 요구 반영:
+    - 경비 입력 트리를 `설비 > 제작/설치 > 자체/외주`로 확장
+  - 조치:
+    - 트리 선택 상태에 `expenseType` 추가
+    - 경비 트리에서 단계 하위 노드로 `자체`, `외주` 노드 생성
+    - 경비 목록 필터를 트리의 `자체/외주` 선택값과 연동
+    - 경비 행 수정 시 트리에서 선택된 `expense_type`을 유지하도록 보강
+    - `경비 자동 산정` 버튼을 경비 트리 선택 범위(단계/자체외주)에 맞춰 동작하도록 조정
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

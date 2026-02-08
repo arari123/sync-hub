@@ -458,9 +458,9 @@ const BudgetProjectEditor = () => {
     const [isConfirming, setIsConfirming] = useState(false);
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [treeSelectionBySection, setTreeSelectionBySection] = useState(() => ({
-        material: { equipment: '', phase: 'all', unit: '' },
-        labor: { equipment: '', phase: 'all', unit: '' },
-        expense: { equipment: '', phase: 'all', unit: '' },
+        material: { equipment: '', phase: 'all', unit: '', expenseType: '' },
+        labor: { equipment: '', phase: 'all', unit: '', expenseType: '' },
+        expense: { equipment: '', phase: 'all', unit: '', expenseType: '' },
     }));
     const [materialUnitCountByScope, setMaterialUnitCountByScope] = useState({});
     const [appliedMaterialUnitCountByScope, setAppliedMaterialUnitCountByScope] = useState({});
@@ -468,7 +468,7 @@ const BudgetProjectEditor = () => {
 
     const canEditProject = project?.can_edit !== false;
     const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
-    const activeTreeSelection = treeSelectionBySection[section] || { equipment: '', phase: 'all', unit: '' };
+    const activeTreeSelection = treeSelectionBySection[section] || { equipment: '', phase: 'all', unit: '', expenseType: '' };
     const activePhaseFilter = activeTreeSelection.phase === 'installation' || activeTreeSelection.phase === 'fabrication'
         ? activeTreeSelection.phase
         : 'all';
@@ -478,6 +478,10 @@ const BudgetProjectEditor = () => {
     const activeUnitFilter = section === 'material'
         ? String(activeTreeSelection.unit || '').trim()
         : '';
+    const activeExpenseTypeFilter = section === 'expense'
+        ? (String(activeTreeSelection.expenseType || '').trim() ? normalizeExpenseType(activeTreeSelection.expenseType) : '')
+        : '';
+    const activeExpenseType = activeExpenseTypeFilter || '자체';
     const currentPhase = activePhaseFilter === 'installation' ? 'installation' : 'fabrication';
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
@@ -540,6 +544,9 @@ const BudgetProjectEditor = () => {
                     return true;
                 }
                 if (section === 'expense') {
+                    if (activeExpenseTypeFilter && normalizeExpenseType(row?.expense_type) !== activeExpenseTypeFilter) {
+                        return false;
+                    }
                     if (activePhaseFilter === 'all') {
                         return String(row?.expense_name || '').trim().length > 0;
                     }
@@ -547,7 +554,7 @@ const BudgetProjectEditor = () => {
                 }
                 return true;
             }),
-        [rows, activeEquipmentName, activePhaseFilter, section, activeUnitFilter, rowIsEmptyFn],
+        [rows, activeEquipmentName, activePhaseFilter, section, activeUnitFilter, activeExpenseTypeFilter, rowIsEmptyFn],
     );
 
     const sidebarSummary = useMemo(() => {
@@ -611,12 +618,18 @@ const BudgetProjectEditor = () => {
         total: Number(sidebarSummary?.[section]?.fabrication_total || 0) + Number(sidebarSummary?.[section]?.installation_total || 0),
         equipments: sidebarSummary?.material?.equipments || [],
     }), [sidebarSummary, section]);
-    const buildScopeTreeKey = useCallback((equipmentName, phase = 'all', unitName = '') => {
+    const buildScopeTreeKey = useCallback((equipmentName, phase = 'all', unitName = '', expenseType = '') => {
         const normalizedEquipment = normalizeEquipmentName(equipmentName) || COMMON_EQUIPMENT_NAME;
         const normalizedPhase = phase === 'fabrication' || phase === 'installation' ? phase : 'all';
         const normalizedUnitName = String(unitName || '').trim();
+        const normalizedExpenseType = String(expenseType || '').trim()
+            ? normalizeExpenseType(expenseType)
+            : '';
         if (section === 'material' && normalizedPhase !== 'all' && normalizedUnitName) {
             return `${section}::${normalizedEquipment}::${normalizedPhase}::${normalizedUnitName}`;
+        }
+        if (section === 'expense' && normalizedPhase !== 'all' && normalizedExpenseType) {
+            return `${section}::${normalizedEquipment}::${normalizedPhase}::${normalizedExpenseType}`;
         }
         return `${section}::${normalizedEquipment}::${normalizedPhase}`;
     }, [section]);
@@ -658,11 +671,25 @@ const BudgetProjectEditor = () => {
                                 });
                             });
                     }
+                    if (section === 'expense') {
+                        EXPENSE_TYPE_OPTIONS.forEach((expenseType) => {
+                            const typeCount = phaseRows.filter((row) => (
+                                !rowIsEmptyFn(row, 'expense')
+                                && normalizeExpenseType(row?.expense_type) === expenseType
+                            )).length;
+                            children.push({
+                                key: buildScopeTreeKey(normalizedEquipment, phase, '', expenseType),
+                                label: expenseType,
+                                count: typeCount,
+                                scope: { equipment: normalizedEquipment, phase, unit: '', expenseType },
+                            });
+                        });
+                    }
                     return {
                         key: buildScopeTreeKey(normalizedEquipment, phase),
                         label: phase === 'installation' ? '설치' : '제작',
                         count: phaseCount,
-                        scope: { equipment: normalizedEquipment, phase, unit: '' },
+                        scope: { equipment: normalizedEquipment, phase, unit: '', expenseType: '' },
                         children,
                     };
                 });
@@ -670,15 +697,15 @@ const BudgetProjectEditor = () => {
                     key: buildScopeTreeKey(normalizedEquipment, 'all'),
                     label: normalizedEquipment,
                     count: equipmentCount,
-                    scope: { equipment: normalizedEquipment, phase: 'all', unit: '' },
+                    scope: { equipment: normalizedEquipment, phase: 'all', unit: '', expenseType: '' },
                     children: phaseNodes,
                 };
             });
     }, [isEquipmentProject, equipmentNames, rows, rowIsEmptyFn, section, buildScopeTreeKey]);
 
     const activeTreeKey = useMemo(
-        () => buildScopeTreeKey(activeEquipmentName, activePhaseFilter, activeUnitFilter),
-        [buildScopeTreeKey, activeEquipmentName, activePhaseFilter, activeUnitFilter],
+        () => buildScopeTreeKey(activeEquipmentName, activePhaseFilter, activeUnitFilter, activeExpenseTypeFilter),
+        [buildScopeTreeKey, activeEquipmentName, activePhaseFilter, activeUnitFilter, activeExpenseTypeFilter],
     );
 
     const budgetColumnsBySection = useMemo(() => ({
@@ -943,12 +970,16 @@ const BudgetProjectEditor = () => {
                 const unit = targetSection === 'material'
                     ? String(current.unit || '').trim()
                     : '';
-                const normalized = { equipment: equipmentName, phase, unit };
+                const expenseType = targetSection === 'expense'
+                    ? (String(current.expenseType || '').trim() ? normalizeExpenseType(current.expenseType) : '')
+                    : '';
+                const normalized = { equipment: equipmentName, phase, unit, expenseType };
                 if (
                     !current
                     || current.equipment !== normalized.equipment
                     || current.phase !== normalized.phase
                     || String(current.unit || '') !== normalized.unit
+                    || String(current.expenseType || '') !== normalized.expenseType
                 ) {
                     next[targetSection] = normalized;
                     changed = true;
@@ -969,12 +1000,16 @@ const BudgetProjectEditor = () => {
         const nextUnit = section === 'material'
             ? String(scope.unit || '').trim()
             : '';
+        const nextExpenseType = section === 'expense'
+            ? (String(scope.expenseType || '').trim() ? normalizeExpenseType(scope.expenseType) : '')
+            : '';
         setTreeSelectionBySection((prev) => ({
             ...prev,
             [section]: {
                 equipment: nextEquipmentName,
                 phase: nextPhase,
                 unit: nextUnit,
+                expenseType: nextExpenseType,
             },
         }));
     }, [activeEquipmentName, equipmentNames, isEquipmentProject, section]);
@@ -1395,6 +1430,13 @@ const BudgetProjectEditor = () => {
             }
             if (section === 'material' && activeUnitFilter && !String(row?.unit_name || '').trim()) {
                 row.unit_name = activeUnitFilter;
+            }
+            if (section === 'expense') {
+                if (activeExpenseTypeFilter) {
+                    row.expense_type = activeExpenseTypeFilter;
+                } else if (!String(row?.expense_type || '').trim()) {
+                    row.expense_type = activeExpenseType;
+                }
             }
             if (
                 section === 'expense'
@@ -2023,8 +2065,11 @@ const BudgetProjectEditor = () => {
                                             const phaseTargets = activePhaseFilter === 'all'
                                                 ? ['fabrication', 'installation']
                                                 : [currentPhase];
+                                            const expenseTypeTargets = activeExpenseTypeFilter
+                                                ? [activeExpenseType]
+                                                : EXPENSE_TYPE_OPTIONS;
                                             phaseTargets.forEach((phase) => {
-                                                EXPENSE_TYPE_OPTIONS.forEach((expenseType) => {
+                                                expenseTypeTargets.forEach((expenseType) => {
                                                     autoFillExpenseRows({
                                                         forceReset: true,
                                                         phaseOverride: phase,

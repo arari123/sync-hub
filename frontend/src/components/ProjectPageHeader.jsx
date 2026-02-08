@@ -12,22 +12,10 @@ const ProjectPageHeader = ({
     actions = null,
 }) => {
     return (
-        <div className="space-y-3">
-            <div className="rounded-xl border bg-white/95 p-2 shadow-sm">
-                <div className="overflow-x-auto">
-                    <div className="flex min-w-max items-center gap-2">
-                        <BudgetBreadcrumb items={breadcrumbItems} className="mb-0 shrink-0" />
-                        <ProjectContextNav
-                            projectId={projectId}
-                            className="shrink-0 border-0 bg-transparent p-0 shadow-none"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+                <BudgetBreadcrumb items={breadcrumbItems} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-black tracking-tight text-slate-900">{projectName || '프로젝트'}</h1>
                     {projectCode && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-bold tracking-tight text-slate-500">
@@ -45,8 +33,10 @@ const ProjectPageHeader = ({
                         </span>
                     )}
                 </div>
-                </div>
+            </div>
 
+            <div className="w-full space-y-2 md:w-auto md:min-w-[540px]">
+                <ProjectContextNav projectId={projectId} />
                 {actions && (
                     <div className="flex flex-wrap items-center justify-end gap-2">
                         {actions}

@@ -78,7 +78,7 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
         closeTimerRef.current = setTimeout(() => {
             setOpenMenuKey('');
             closeTimerRef.current = null;
-        }, 1000);
+        }, 2000);
     }, [clearCloseTimer]);
 
     useEffect(() => () => {

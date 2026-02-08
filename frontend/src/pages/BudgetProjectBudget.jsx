@@ -569,8 +569,8 @@ const BudgetProjectBudget = () => {
             <section className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-6">
                 <StatCard icon={Calculator} label="총 예산" value={formatAmount(dashboard.budget.grand)} tone="primary" />
                 <StatCard icon={Boxes} label="재료비 합계" value={formatAmount(dashboard.budget.material)} />
-                <StatCard icon={HardHat} label="인건비 합계" value={formatAmount(dashboard.budget.labor)} />
-                <StatCard icon={ClipboardList} label="경비 합계" value={formatAmount(dashboard.budget.expense)} />
+                <StatCard icon={Users} label="인건비 합계" value={formatAmount(dashboard.budget.labor)} />
+                <StatCard icon={Receipt} label="경비 합계" value={formatAmount(dashboard.budget.expense)} />
                 <StatCard icon={BriefcaseBusiness} label="제작 예산" value={formatAmount(dashboard.budget.fabrication)} />
                 <StatCard icon={BriefcaseBusiness} label="설치 예산" value={formatAmount(dashboard.budget.installation)} />
                 {showExecution && (

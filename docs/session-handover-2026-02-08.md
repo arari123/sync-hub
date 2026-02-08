@@ -220,3 +220,17 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (재료비 유닛 템플릿 개수 지정 반영)
+  - 요구 반영:
+    - 재료비 사이드바 `유닛 템플릿`에 `개수` 입력(기본값 1) 추가
+    - 템플릿 카드 금액 표시를 `유닛합계 x 개수`로 반영
+    - 드래그 payload에 `unit_count` 포함
+    - 템플릿 드롭 시 `개수`를 반영해 행 생성:
+      - 예산 모드: `수량 = 원본수량 x 개수`
+      - 집행 모드: `집행금액 = 원본금액 x 개수`
+  - 관련 파일:
+    - `frontend/src/components/BudgetSidebar.jsx`
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

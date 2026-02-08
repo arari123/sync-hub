@@ -13,6 +13,7 @@ const BudgetSidebar = ({
     materialUnitLibrary = [],
 }) => {
     const [selectedUnitKey, setSelectedUnitKey] = useState('');
+    const [unitCountByKey, setUnitCountByKey] = useState({});
     const { total = 0, equipments = [] } = aggregation;
     const sectionSummary = summary && typeof summary === 'object'
         ? summary
@@ -28,6 +29,12 @@ const BudgetSidebar = ({
     const laborTotal = Number(laborSummary.fabrication_total || 0) + Number(laborSummary.installation_total || 0);
     const expenseTotal = Number(expenseSummary.fabrication_total || 0) + Number(expenseSummary.installation_total || 0);
     const grandTotal = materialTotal + laborTotal + expenseTotal;
+    const resolveUnitCount = (unitKey) => {
+        const raw = String(unitCountByKey[unitKey] ?? '1').trim();
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) return 1;
+        return Math.max(1, Math.floor(parsed));
+    };
 
     return (
         <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
@@ -54,20 +61,18 @@ const BudgetSidebar = ({
                         <div className="p-2 space-y-1.5">
                             {materialUnitLibrary.map((unit) => {
                                 const isSelected = selectedUnitKey === unit.key;
+                                const unitCount = resolveUnitCount(unit.key);
+                                const multipliedTotal = Number(unit.total || 0) * unitCount;
                                 return (
-                                    <button
+                                    <div
                                         key={unit.key}
-                                        type="button"
-                                        draggable
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => setSelectedUnitKey(unit.key)}
-                                        onDragStart={(event) => {
-                                            event.dataTransfer.effectAllowed = 'copy';
-                                            event.dataTransfer.setData('application/json', JSON.stringify({
-                                                kind: 'material_unit_template',
-                                                unit_key: unit.key,
-                                                unit_name: unit.unit_name,
-                                                rows: unit.items,
-                                            }));
+                                        onKeyDown={(event) => {
+                                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                                            event.preventDefault();
+                                            setSelectedUnitKey(unit.key);
                                         }}
                                         className={`w-full text-left rounded-lg border px-2.5 py-2 transition-all ${
                                             isSelected
@@ -77,12 +82,59 @@ const BudgetSidebar = ({
                                     >
                                         <div className="flex items-center justify-between gap-2">
                                             <span className="text-[11px] font-black text-slate-900 truncate">{unit.unit_name}</span>
-                                            <span className="text-[10px] font-black text-slate-700">{formatAmount(unit.total || 0)}</span>
+                                            <span className="text-[10px] font-black text-slate-700">{formatAmount(multipliedTotal)}</span>
                                         </div>
                                         <p className="mt-0.5 text-[10px] text-slate-500 truncate">
                                             설비: {unit.equipment_name} · 단계: {unit.phase_label} · 파츠 {unit.items?.length || 0}개
                                         </p>
-                                    </button>
+                                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                                            <label
+                                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600"
+                                                onClick={(event) => event.stopPropagation()}
+                                            >
+                                                개수
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={String(unitCountByKey[unit.key] ?? '1')}
+                                                    onChange={(event) => {
+                                                        const next = event.target.value.replace(/[^0-9]/g, '');
+                                                        setUnitCountByKey((prev) => ({
+                                                            ...prev,
+                                                            [unit.key]: next,
+                                                        }));
+                                                    }}
+                                                    onBlur={() => {
+                                                        const normalized = String(resolveUnitCount(unit.key));
+                                                        setUnitCountByKey((prev) => ({
+                                                            ...prev,
+                                                            [unit.key]: normalized,
+                                                        }));
+                                                    }}
+                                                    className="h-6 w-12 rounded border border-slate-300 bg-white px-1 text-center text-[10px] font-semibold text-slate-800"
+                                                />
+                                            </label>
+                                            <button
+                                                type="button"
+                                                draggable
+                                                onClick={(event) => event.stopPropagation()}
+                                                onDragStart={(event) => {
+                                                    event.stopPropagation();
+                                                    event.dataTransfer.effectAllowed = 'copy';
+                                                    event.dataTransfer.setData('application/json', JSON.stringify({
+                                                        kind: 'material_unit_template',
+                                                        unit_key: unit.key,
+                                                        unit_name: unit.unit_name,
+                                                        unit_count: resolveUnitCount(unit.key),
+                                                        rows: unit.items,
+                                                    }));
+                                                }}
+                                                className="h-6 rounded border border-sky-300 bg-sky-50 px-2 text-[10px] font-black text-sky-700"
+                                            >
+                                                드래그
+                                            </button>
+                                        </div>
+                                    </div>
                                 );
                             })}
                             {!materialUnitLibrary.length && (

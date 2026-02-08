@@ -1318,8 +1318,12 @@ const BudgetProjectEditor = () => {
         }));
     };
 
-    const insertMaterialTemplateRows = useCallback((templateRows) => {
+    const insertMaterialTemplateRows = useCallback((templateRows, unitCount = 1) => {
         if (section !== 'material' || !activeEquipmentName) return;
+        const parsedUnitCount = Number(unitCount);
+        const normalizedUnitCount = Number.isFinite(parsedUnitCount)
+            ? Math.max(1, Math.floor(parsedUnitCount))
+            : 1;
         const normalizedRows = (templateRows || [])
             .map((row) => ({
                 unit_name: String(row?.unit_name || '').trim(),
@@ -1356,9 +1360,9 @@ const BudgetProjectEditor = () => {
                     memo: item.memo,
                 };
                 if (activeMode === 'execution') {
-                    nextRow.executed_amount = item.executed_amount;
+                    nextRow.executed_amount = toNumber(item.executed_amount) * normalizedUnitCount;
                 } else {
-                    nextRow.quantity = item.quantity;
+                    nextRow.quantity = toNumber(item.quantity) * normalizedUnitCount;
                     nextRow.unit_price = item.unit_price;
                 }
 
@@ -1406,7 +1410,7 @@ const BudgetProjectEditor = () => {
                 ...row,
                 unit_name: String(row?.unit_name || fallbackUnitName).trim(),
             }));
-            insertMaterialTemplateRows(templateRows);
+            insertMaterialTemplateRows(templateRows, payload?.unit_count);
         } catch (_error) {
             // ignore malformed drop payload
         }

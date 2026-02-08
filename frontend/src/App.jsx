@@ -6,6 +6,7 @@ import SearchResults from './pages/SearchResults';
 import BudgetManagement from './pages/BudgetManagement';
 import BudgetProjectCreate from './pages/BudgetProjectCreate';
 import BudgetProjectOverview from './pages/BudgetProjectOverview';
+import BudgetProjectInfoEdit from './pages/BudgetProjectInfoEdit';
 import BudgetProjectBudget from './pages/BudgetProjectBudget';
 import BudgetProjectEditor from './pages/BudgetProjectEditor';
 import Login from './pages/Login';
@@ -33,6 +34,7 @@ function App() {
           <Route path="/project-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
           <Route path="/project-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/info/edit" element={<ProtectedRoute><BudgetProjectInfoEdit /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/budget" element={<ProtectedRoute><BudgetProjectBudget /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/joblist" element={<ProtectedRoute><PlaceholderPage title="이슈 관리" description="이슈 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/schedule" element={<ProtectedRoute><PlaceholderPage title="일정 관리" description="일정 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />

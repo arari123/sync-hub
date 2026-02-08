@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
@@ -24,31 +23,6 @@ function formatDate(value) {
     return date.toLocaleString('ko-KR', { hour12: false });
 }
 
-function parseEquipmentNames(value) {
-    const raw = String(value || '');
-    return Array.from(
-        new Set(
-            raw
-                .split(/\r?\n|,/)
-                .map((item) => item.trim())
-                .filter(Boolean),
-        ),
-    );
-}
-
-const EMPTY_EDIT_FORM = {
-    name: '',
-    code: '',
-    project_type: 'equipment',
-    current_stage: 'review',
-    customer_name: '',
-    installation_site: '',
-    business_trip_distance_km: '',
-    manager_user_id: '',
-    description: '',
-    cover_image_url: '',
-};
-
 const ACTIVE_MANAGEMENT_AREAS = [
     { key: 'budget', label: '예산 관리', path: 'budget' },
     { key: 'joblist', label: '이슈 관리', path: 'joblist' },
@@ -66,14 +40,8 @@ const BudgetProjectOverview = () => {
     const [version, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
     const [totals, setTotals] = useState(null);
-    const [managerOptions, setManagerOptions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState('');
-    const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
-    const [equipmentInput, setEquipmentInput] = useState('');
 
     useEffect(() => {
         const load = async () => {
@@ -108,55 +76,6 @@ const BudgetProjectOverview = () => {
 
         load();
     }, [projectId]);
-
-    useEffect(() => {
-        if (!project) {
-            setEditForm(EMPTY_EDIT_FORM);
-            return;
-        }
-        setEditForm({
-            name: project.name || '',
-            code: project.code || '',
-            project_type: project.project_type || 'equipment',
-            current_stage: project.current_stage || 'review',
-            customer_name: project.customer_name || '',
-            installation_site: project.installation_site || '',
-            business_trip_distance_km: String(toNumber(project.business_trip_distance_km) || ''),
-            manager_user_id: project.manager_user_id ? String(project.manager_user_id) : '',
-            description: project.description || '',
-            cover_image_url: project.cover_image_url || '',
-        });
-    }, [project]);
-
-    useEffect(() => {
-        const names = (equipments || [])
-            .map((item) => String(item?.equipment_name || '').trim())
-            .filter(Boolean);
-        setEquipmentInput(Array.from(new Set(names)).join('\n'));
-    }, [equipments]);
-
-    useEffect(() => {
-        if (!project?.can_edit) {
-            setManagerOptions([]);
-            return;
-        }
-        let mounted = true;
-        const loadManagers = async () => {
-            try {
-                const response = await api.get('/auth/users');
-                if (!mounted) return;
-                const items = Array.isArray(response?.data) ? response.data : [];
-                setManagerOptions(items);
-            } catch (_err) {
-                if (!mounted) return;
-                setManagerOptions([]);
-            }
-        };
-        loadManagers();
-        return () => {
-            mounted = false;
-        };
-    }, [project?.can_edit]);
 
     const monitoring = project?.monitoring || {};
     const projectGrandTotal = Math.max(toNumber(totals?.grand_total), 0);
@@ -193,55 +112,6 @@ const BudgetProjectOverview = () => {
         [equipments, projectActualSpentTotal, projectGrandTotal]
     );
 
-    const saveProjectBasics = async (event) => {
-        event.preventDefault();
-        if (!project?.id) return;
-        const name = (editForm.name || '').trim();
-        if (!name) {
-            setSaveError('프로젝트 이름을 입력해 주세요.');
-            return;
-        }
-        const equipmentNames = parseEquipmentNames(equipmentInput);
-        if ((editForm.project_type || 'equipment') === 'equipment' && !equipmentNames.length) {
-            setSaveError('설비 프로젝트는 설비를 최소 1개 이상 입력해 주세요.');
-            return;
-        }
-
-        setSaveError('');
-        setIsSaving(true);
-        try {
-            const response = await api.put(`/budget/projects/${project.id}`, {
-                name,
-                code: (editForm.code || '').trim(),
-                project_type: editForm.project_type || 'equipment',
-                current_stage: editForm.current_stage || 'review',
-                customer_name: (editForm.customer_name || '').trim(),
-                installation_site: (editForm.installation_site || '').trim(),
-                business_trip_distance_km: toNumber(editForm.business_trip_distance_km),
-                manager_user_id: editForm.manager_user_id ? Number(editForm.manager_user_id) : undefined,
-                description: (editForm.description || '').trim(),
-                cover_image_url: (editForm.cover_image_url || '').trim(),
-            });
-            const updated = response?.data || null;
-            if (updated) {
-                setProject(updated);
-            }
-            if ((editForm.project_type || 'equipment') === 'equipment' && version?.id) {
-                const equipmentResp = await api.put(`/budget/versions/${version.id}/equipments`, {
-                    items: equipmentNames.map((equipmentName) => ({ equipment_name: equipmentName })),
-                });
-                const nextItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-                setEquipments(nextItems);
-                setTotals(equipmentResp?.data?.totals || totals);
-            }
-            setIsEditOpen(false);
-        } catch (err) {
-            setSaveError(getErrorMessage(err, '기본 정보 저장에 실패했습니다.'));
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     if (isLoading) {
         return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
     }
@@ -253,6 +123,7 @@ const BudgetProjectOverview = () => {
     const coverImageUrl = (project.cover_image_url || '').trim();
     const milestones = Array.isArray(project.summary_milestones) ? project.summary_milestones : [];
     const baseProjectPath = `/project-management/projects/${project.id}`;
+    const projectInfoEditPath = `${baseProjectPath}/info/edit`;
     const budgetManagementPath = `${baseProjectPath}/budget`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
     const issueManagementPath = `${baseProjectPath}/joblist`;
@@ -362,7 +233,7 @@ const BudgetProjectOverview = () => {
                         <div className="flex items-center justify-between">
                             <h2 className="text-sm font-bold">프로젝트 정보</h2>
                             {project.can_edit && (
-                                <button onClick={() => setIsEditOpen(true)} className="text-[10px] font-bold text-primary hover:underline underline-offset-4">상세 정보 수정</button>
+                                <Link to={projectInfoEditPath} className="text-[10px] font-bold text-primary hover:underline underline-offset-4">상세 정보 수정</Link>
                             )}
                         </div>
                         <div className="grid grid-cols-1 gap-2.5">
@@ -493,24 +364,6 @@ const BudgetProjectOverview = () => {
                 </section>
             )}
 
-            {isEditOpen && (
-                <ProjectEditModal
-                    canEdit={project.can_edit}
-                    form={editForm}
-                    setForm={setEditForm}
-                    equipmentInput={equipmentInput}
-                    setEquipmentInput={setEquipmentInput}
-                    managerOptions={managerOptions}
-                    isSaving={isSaving}
-                    saveError={saveError}
-                    onClose={() => {
-                        if (isSaving) return;
-                        setSaveError('');
-                        setIsEditOpen(false);
-                    }}
-                    onSubmit={saveProjectBasics}
-                />
-            )}
         </div>
     );
 };
@@ -667,174 +520,5 @@ const TimelineItem = ({ item }) => {
         </div>
     );
 };
-
-const ProjectEditModal = ({
-    canEdit,
-    form,
-    setForm,
-    equipmentInput,
-    setEquipmentInput,
-    managerOptions,
-    isSaving,
-    saveError,
-    onClose,
-    onSubmit,
-}) => {
-    if (!canEdit) return null;
-
-    const updateField = (key, value) => {
-        setForm((prev) => ({
-            ...prev,
-            [key]: value,
-        }));
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 bg-black/50 p-4 md:p-6">
-            <div className="mx-auto max-w-2xl rounded-xl border bg-background shadow-2xl">
-                <form onSubmit={onSubmit}>
-                    <div className="flex items-center justify-between border-b px-5 py-4">
-                        <h3 className="text-base font-semibold">프로젝트 기본 정보 수정</h3>
-                        <button type="button" className="rounded-md p-1.5 hover:bg-accent" onClick={onClose}>
-                            <X className="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <div className="space-y-4 px-5 py-4 max-h-[70vh] overflow-y-auto">
-                        {saveError && (
-                            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                                {saveError}
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label="프로젝트 이름" required>
-                                <input
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.name}
-                                    onChange={(event) => updateField('name', event.target.value)}
-                                />
-                            </Field>
-                            <Field label="프로젝트 코드">
-                                <input
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.code}
-                                    onChange={(event) => updateField('code', event.target.value)}
-                                />
-                            </Field>
-                            <Field label="프로젝트 종류">
-                                <select
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.project_type}
-                                    onChange={(event) => updateField('project_type', event.target.value)}
-                                >
-                                    <option value="equipment">설비</option>
-                                    <option value="parts">파츠</option>
-                                    <option value="as">AS</option>
-                                </select>
-                            </Field>
-                            <Field label="설비 목록" required={form.project_type === 'equipment'}>
-                                <textarea
-                                    className="min-h-[90px] w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                    placeholder={form.project_type === 'equipment'
-                                        ? '설비명 입력 (필수)\n예: 설비1'
-                                        : '설비 입력 불필요'}
-                                    value={equipmentInput}
-                                    onChange={(event) => setEquipmentInput(event.target.value)}
-                                    disabled={form.project_type !== 'equipment'}
-                                />
-                            </Field>
-                            <Field label="현재 진행 단계">
-                                <select
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.current_stage}
-                                    onChange={(event) => updateField('current_stage', event.target.value)}
-                                >
-                                    <option value="review">검토</option>
-                                    <option value="fabrication">제작</option>
-                                    <option value="installation">설치</option>
-                                    <option value="warranty">AS</option>
-                                    <option value="closure">종료</option>
-                                </select>
-                            </Field>
-                            <Field label="담당자">
-                                <select
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.manager_user_id}
-                                    onChange={(event) => updateField('manager_user_id', event.target.value)}
-                                >
-                                    <option value="">담당자 선택</option>
-                                    {managerOptions.map((user) => (
-                                        <option key={user.id} value={String(user.id)}>
-                                            {(user.full_name || '').trim() || user.email}
-                                        </option>
-                                    ))}
-                                </select>
-                            </Field>
-                            <Field label="고객사">
-                                <input
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.customer_name}
-                                    onChange={(event) => updateField('customer_name', event.target.value)}
-                                />
-                            </Field>
-                            <Field label="설치 장소">
-                                <input
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.installation_site}
-                                    onChange={(event) => updateField('installation_site', event.target.value)}
-                                />
-                            </Field>
-                            <Field label="출장 거리(km)">
-                                <input
-                                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                    value={form.business_trip_distance_km}
-                                    onChange={(event) => updateField('business_trip_distance_km', event.target.value.replace(/[^0-9.]/g, ''))}
-                                    placeholder="편도 거리 입력"
-                                />
-                            </Field>
-                        </div>
-
-                        <Field label="개요">
-                            <textarea
-                                className="min-h-[90px] w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                value={form.description}
-                                onChange={(event) => updateField('description', event.target.value)}
-                            />
-                        </Field>
-
-                        <Field label="대표 이미지 URL">
-                            <input
-                                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                                placeholder="비워두면 자동 생성 이미지 사용"
-                                value={form.cover_image_url}
-                                onChange={(event) => updateField('cover_image_url', event.target.value)}
-                            />
-                        </Field>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
-                        <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSaving}>
-                            취소
-                        </Button>
-                        <Button type="submit" size="sm" isLoading={isSaving}>
-                            저장
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-const Field = ({ label, children, required = false }) => (
-    <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">
-            {label}
-            {required ? ' *' : ''}
-        </span>
-        {children}
-    </label>
-);
 
 export default BudgetProjectOverview;

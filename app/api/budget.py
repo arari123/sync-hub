@@ -250,6 +250,48 @@ def _replace_equipments_from_aggregate(
         )
 
 
+def _sync_detail_with_equipment_names(detail_dict: dict, equipment_names: list[str]) -> dict:
+    allowed_names = [
+        (name or "").strip()
+        for name in equipment_names
+        if (name or "").strip()
+    ]
+    allowed_set = set(allowed_names)
+    fallback_name = allowed_names[0] if allowed_names else ""
+    result = {
+        "material_items": [],
+        "labor_items": [],
+        "expense_items": [],
+        "execution_material_items": [],
+        "execution_labor_items": [],
+        "execution_expense_items": [],
+        "budget_settings": dict(detail_dict.get("budget_settings") or {}),
+    }
+    for key in (
+        "material_items",
+        "labor_items",
+        "expense_items",
+        "execution_material_items",
+        "execution_labor_items",
+        "execution_expense_items",
+    ):
+        rows = detail_dict.get(key) or []
+        if not isinstance(rows, list):
+            continue
+        filtered_rows: list[dict] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            equipment_name = (row.get("equipment_name") or "").strip()
+            if not equipment_name and fallback_name:
+                equipment_name = fallback_name
+            if equipment_name not in allowed_set:
+                continue
+            filtered_rows.append({**row, "equipment_name": equipment_name})
+        result[key] = filtered_rows
+    return result
+
+
 def _serialize_version(version: models.BudgetVersion, db: Session) -> dict:
     equipments = _version_equipments(version.id, db)
     totals = summarize_costs(equipments)
@@ -1426,21 +1468,36 @@ def replace_equipments(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
 
     now_iso = to_iso(utcnow())
-    aggregated_items = []
-    for index, item in enumerate(payload.items):
+    equipment_names: list[str] = []
+    seen_names: set[str] = set()
+    for item in payload.items:
         name = (item.equipment_name or "").strip()
-        if not name:
+        if not name or name in seen_names:
             continue
+        seen_names.add(name)
+        equipment_names.append(name)
+
+    detail_dict = parse_detail_payload(version.budget_detail_json or "")
+    synced_detail = _sync_detail_with_equipment_names(detail_dict, equipment_names)
+    version.budget_detail_json = detail_payload_to_json(synced_detail)
+
+    aggregated_by_name = {
+        (item.get("equipment_name") or "").strip(): item
+        for item in aggregate_equipment_costs_from_detail(synced_detail)
+    }
+    aggregated_items = []
+    for index, name in enumerate(equipment_names):
+        source = aggregated_by_name.get(name) or {}
         aggregated_items.append(
             {
                 "equipment_name": name,
-                "material_fab_cost": to_number(item.material_fab_cost),
-                "material_install_cost": to_number(item.material_install_cost),
-                "labor_fab_cost": to_number(item.labor_fab_cost),
-                "labor_install_cost": to_number(item.labor_install_cost),
-                "expense_fab_cost": to_number(item.expense_fab_cost),
-                "expense_install_cost": to_number(item.expense_install_cost),
-                "currency": (item.currency or "KRW").strip() or "KRW",
+                "material_fab_cost": to_number(source.get("material_fab_cost")),
+                "material_install_cost": to_number(source.get("material_install_cost")),
+                "labor_fab_cost": to_number(source.get("labor_fab_cost")),
+                "labor_install_cost": to_number(source.get("labor_install_cost")),
+                "expense_fab_cost": to_number(source.get("expense_fab_cost")),
+                "expense_install_cost": to_number(source.get("expense_install_cost")),
+                "currency": (source.get("currency") or "KRW").strip() or "KRW",
                 "sort_order": index,
             }
         )

@@ -307,3 +307,26 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (프로젝트 상세정보 수정 페이지 전환 및 설비 동기화 보강)
+  - 요구 반영:
+    - 프로젝트 상세 정보 수정을 팝업이 아닌 별도 페이지 이동 방식으로 전환
+    - 설비 추가/삭제 시 현재 등록 설비를 모두 보면서 관리 가능하도록 개선
+    - 상세 정보에서 설비 삭제 시 예산관리 페이지에 반영되지 않던 버그(삭제 미반영) 수정
+  - 조치:
+    - 프론트:
+      - 신규 페이지 추가: `BudgetProjectInfoEdit`
+      - 라우트 추가: `/project-management/projects/:projectId/info/edit`
+      - `BudgetProjectOverview`에서 기존 팝업 편집 제거 및 페이지 이동 링크로 교체
+      - 설비 편집 UI를 리스트+추가/삭제 방식으로 구성(기존 설비 전체 표시, 개별 삭제)
+    - 백엔드:
+      - `PUT /budget/versions/{version_id}/equipments` 호출 시 버전 상세 JSON의 설비 항목을 선택 설비 목록과 동기화
+      - 삭제된 설비에 연결된 재료/인건비/경비 및 집행 상세 행을 제거하도록 보강
+      - 동기화된 상세 기준으로 설비 합계 재계산 저장하여 예산관리 화면과 일관성 유지
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectInfoEdit.jsx`
+    - `frontend/src/pages/BudgetProjectOverview.jsx`
+    - `frontend/src/App.jsx`
+    - `app/api/budget.py`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

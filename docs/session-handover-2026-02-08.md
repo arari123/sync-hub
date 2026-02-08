@@ -121,3 +121,19 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 남은 작업:
     - Undo/Redo 히스토리 고도화
     - 다중 선택 상태에서 복사/붙여넣기 범위 매핑 개선
+- 2026-02-08 (경비 UX 구조 개편 반영)
+  - 경비 입력 스코프를 `설비 > 제작/설치 > 자체/외주`로 분리:
+    - 경비 섹션 상단에 `자체 경비 / 외주 경비` 토글 추가
+    - 입력 스코프 배지에 현재 경로 표시(`재료비/인건비는 설비 > 제작/설치 유지`)
+  - 경비 자동 산정/수정/저장 로직에 `expense_type` 반영:
+    - 자동 산정 rows가 현재 자체/외주 스코프 기준으로 생성/병합되도록 보강
+    - 저장 시 `expense_type` 정규화 및 왕복 유지
+  - 백엔드 호환 반영:
+    - `ExpenseDetailItem`, `ExpenseExecutionItem`에 `expense_type` 필드 추가
+    - 확정 버전 예산락 시그니처에 `expense_type` 포함(구버전 누락 데이터는 `자체`로 정규화)
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+  - 커밋/배포:
+    - `c4adf92 feat: 경비 자체/외주 스코프 전환 및 저장 일관화`
+    - `git push` 완료 (`main`)

@@ -74,6 +74,8 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(parsed["execution_material_items"], [])
         self.assertEqual(parsed["execution_labor_items"], [])
         self.assertEqual(parsed["execution_expense_items"], [])
+        self.assertIn("budget_settings", parsed)
+        self.assertEqual(parsed["budget_settings"]["installation_locale"], "domestic")
 
     def test_aggregate_equipment_costs_from_detail(self):
         payload = {
@@ -95,6 +97,8 @@ class BudgetLogicTests(unittest.TestCase):
                 {
                     "equipment_name": "검사기A",
                     "quantity": 2,
+                    "headcount": 2,
+                    "location_type": "domestic",
                     "hourly_rate": 30000,
                     "unit": "D",
                     "phase": "installation",
@@ -114,8 +118,40 @@ class BudgetLogicTests(unittest.TestCase):
         self.assertEqual(item["equipment_name"], "검사기A")
         self.assertEqual(item["material_fab_cost"], 30000)
         self.assertEqual(item["material_install_cost"], 5000)
-        self.assertEqual(item["labor_install_cost"], 480000)
+        self.assertEqual(item["labor_install_cost"], 960000)
         self.assertEqual(item["expense_fab_cost"], 120000)
+
+    def test_aggregate_equipment_costs_supports_overseas_week_month_units(self):
+        payload = {
+            "budget_settings": {
+                "installation_locale": "overseas",
+            },
+            "labor_items": [
+                {
+                    "equipment_name": "검사기B",
+                    "quantity": 1,
+                    "headcount": 1,
+                    "location_type": "overseas",
+                    "hourly_rate": 10000,
+                    "unit": "W",
+                    "phase": "installation",
+                },
+                {
+                    "equipment_name": "검사기B",
+                    "quantity": 1,
+                    "headcount": 1,
+                    "location_type": "overseas",
+                    "hourly_rate": 10000,
+                    "unit": "M",
+                    "phase": "installation",
+                },
+            ],
+        }
+        results = aggregate_equipment_costs_from_detail(payload)
+        self.assertEqual(len(results), 1)
+        item = results[0]
+        # W=7D=56H, M=30D=240H
+        self.assertEqual(item["labor_install_cost"], 2960000)
 
     def test_summarize_executed_costs_from_detail(self):
         payload = {

@@ -48,8 +48,23 @@ _PHASE_MAP = {
 _LABOR_UNIT_HOURS = {
     "H": 1.0,
     "D": 8.0,
-    "W": 40.0,
-    "M": 160.0,
+}
+
+_LOCATION_TYPE_MAP = {
+    "domestic": "domestic",
+    "국내": "domestic",
+    "home": "domestic",
+    "overseas": "overseas",
+    "abroad": "overseas",
+    "해외": "overseas",
+}
+
+_DEFAULT_BUDGET_SETTINGS = {
+    "installation_locale": "domestic",
+    "labor_days_per_week_domestic": 5.0,
+    "labor_days_per_week_overseas": 7.0,
+    "labor_days_per_month_domestic": 22.0,
+    "labor_days_per_month_overseas": 30.0,
 }
 
 
@@ -87,9 +102,38 @@ def normalize_phase(phase: str) -> str:
     return _PHASE_MAP.get(value, "fabrication")
 
 
-def labor_unit_to_hours(unit: str) -> float:
+def normalize_location_type(location_type: str) -> str:
+    value = (location_type or "").strip().lower()
+    return _LOCATION_TYPE_MAP.get(value, "domestic")
+
+
+def _setting_number(settings: dict, key: str, default_value: float) -> float:
+    parsed = to_number((settings or {}).get(key))
+    return parsed if parsed > 0 else default_value
+
+
+def labor_unit_to_hours(unit: str, location_type: str = "domestic", settings: dict | None = None) -> float:
     value = (unit or "").strip().upper()
-    return _LABOR_UNIT_HOURS.get(value, 1.0)
+    if value in _LABOR_UNIT_HOURS:
+        return _LABOR_UNIT_HOURS[value]
+
+    normalized_location = normalize_location_type(location_type)
+    normalized_settings = {**_DEFAULT_BUDGET_SETTINGS, **(settings or {})}
+    if value == "W":
+        days = _setting_number(
+            normalized_settings,
+            "labor_days_per_week_overseas" if normalized_location == "overseas" else "labor_days_per_week_domestic",
+            7.0 if normalized_location == "overseas" else 5.0,
+        )
+        return days * _LABOR_UNIT_HOURS["D"]
+    if value == "M":
+        days = _setting_number(
+            normalized_settings,
+            "labor_days_per_month_overseas" if normalized_location == "overseas" else "labor_days_per_month_domestic",
+            30.0 if normalized_location == "overseas" else 22.0,
+        )
+        return days * _LABOR_UNIT_HOURS["D"]
+    return 1.0
 
 
 def summarize_costs(items: Iterable[object]) -> dict[str, float]:
@@ -131,6 +175,7 @@ def default_detail_payload() -> dict:
         "execution_material_items": [],
         "execution_labor_items": [],
         "execution_expense_items": [],
+        "budget_settings": dict(_DEFAULT_BUDGET_SETTINGS),
     }
 
 
@@ -157,6 +202,9 @@ def parse_detail_payload(raw_text: str) -> dict:
         value = parsed.get(key)
         if isinstance(value, list):
             base[key] = value
+    settings = parsed.get("budget_settings")
+    if isinstance(settings, dict):
+        base["budget_settings"] = {**_DEFAULT_BUDGET_SETTINGS, **settings}
     return base
 
 
@@ -169,6 +217,7 @@ def detail_payload_to_json(payload: dict) -> str:
             "execution_material_items": payload.get("execution_material_items", []),
             "execution_labor_items": payload.get("execution_labor_items", []),
             "execution_expense_items": payload.get("execution_expense_items", []),
+            "budget_settings": payload.get("budget_settings", dict(_DEFAULT_BUDGET_SETTINGS)),
         },
         ensure_ascii=False,
     )
@@ -176,6 +225,9 @@ def detail_payload_to_json(payload: dict) -> str:
 
 def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
     equipment_map: dict[str, dict] = {}
+    settings = payload.get("budget_settings")
+    if not isinstance(settings, dict):
+        settings = {}
 
     def _bucket(name: str) -> dict:
         key = (name or "").strip() or "미지정 설비"
@@ -207,8 +259,18 @@ def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
         target = _bucket(item.get("equipment_name") or "")
         quantity = to_number(item.get("quantity"))
         rate = to_number(item.get("hourly_rate"))
-        factor = labor_unit_to_hours(item.get("unit") or "H")
-        amount = quantity * factor * rate
+        headcount = to_number(item.get("headcount")) or 1.0
+        location_type = normalize_location_type(
+            item.get("location_type")
+            or settings.get("installation_locale")
+            or "domestic"
+        )
+        factor = labor_unit_to_hours(
+            item.get("unit") or "H",
+            location_type=location_type,
+            settings=settings,
+        )
+        amount = quantity * factor * rate * headcount
         phase = normalize_phase(item.get("phase") or "fabrication")
         if phase == "installation":
             target["labor_install_cost"] += amount

@@ -4,7 +4,7 @@ import json
 import os
 import re
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -131,6 +131,8 @@ class LaborDetailItem(BaseModel):
     worker_type: str = Field(default="", max_length=120)
     unit: str = Field(default="H", max_length=8)
     quantity: float = 0.0
+    headcount: float = 1.0
+    location_type: str = Field(default="domestic", max_length=32)
     hourly_rate: float = 0.0
     executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
@@ -142,6 +144,8 @@ class ExpenseDetailItem(BaseModel):
     expense_name: str = Field(default="", max_length=180)
     basis: str = Field(default="", max_length=180)
     amount: float = 0.0
+    is_auto: bool = False
+    auto_formula: str = Field(default="", max_length=120)
     executed_amount: float = 0.0
     phase: str = Field(default="fabrication", max_length=32)
     memo: str = Field(default="", max_length=300)
@@ -182,6 +186,7 @@ class BudgetDetailPayload(BaseModel):
     execution_material_items: list[MaterialExecutionItem] = Field(default_factory=list)
     execution_labor_items: list[LaborExecutionItem] = Field(default_factory=list)
     execution_expense_items: list[ExpenseExecutionItem] = Field(default_factory=list)
+    budget_settings: dict[str, Any] = Field(default_factory=dict)
 
 
 def _get_project_or_404(project_id: int, db: Session) -> models.BudgetProject:
@@ -696,6 +701,8 @@ def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
                 (item.get("worker_type") or "").strip(),
                 (item.get("unit") or "H").strip().upper(),
                 to_number(item.get("quantity")),
+                to_number(item.get("headcount")) or 1.0,
+                (item.get("location_type") or "domestic").strip().lower(),
                 to_number(item.get("hourly_rate")),
                 normalize_phase(item.get("phase") or "fabrication"),
             )
@@ -1453,6 +1460,7 @@ def upsert_version_details(
         "execution_material_items": [item.model_dump() for item in payload.execution_material_items],
         "execution_labor_items": [item.model_dump() for item in payload.execution_labor_items],
         "execution_expense_items": [item.model_dump() for item in payload.execution_expense_items],
+        "budget_settings": dict(payload.budget_settings or {}),
     }
 
     if version.status == "confirmed":

@@ -1882,7 +1882,7 @@ const BudgetProjectEditor = () => {
                         projectId={projectId}
                         projectName=""
                         projectCode=""
-                        pageLabel={`${SECTION_META[section].label} 입력`}
+                        pageLabel=""
                         canEdit={project?.can_edit}
                         breadcrumbItems={[
                             { label: '프로젝트 관리', to: '/project-management' },
@@ -1902,9 +1902,9 @@ const BudgetProjectEditor = () => {
                                     type="button"
                                     onClick={saveDetail}
                                     disabled={isSaving}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-[12px] font-black text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 disabled:opacity-60 transition-all active:scale-95"
                                 >
-                                    <Save size={16} />
+                                    <Save size={14} />
                                     {isSaving ? '저장 중...' : '전체 저장'}
                                 </button>
                             )}
@@ -1913,9 +1913,9 @@ const BudgetProjectEditor = () => {
                                     type="button"
                                     onClick={confirmCurrentVersion}
                                     disabled={isConfirming}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
                                 >
-                                    <CheckCircle2 size={16} />
+                                    <CheckCircle2 size={14} />
                                     {isConfirming ? '확정 중...' : '버전 확정'}
                                 </button>
                             )}
@@ -1923,7 +1923,7 @@ const BudgetProjectEditor = () => {
                                 <button
                                     type="button"
                                     onClick={() => createRevision()}
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white hover:bg-slate-800 transition-colors"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 text-[12px] font-bold text-white hover:bg-slate-800 transition-colors"
                                 >
                                     리비전 생성
                                 </button>

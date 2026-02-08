@@ -341,3 +341,19 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (프로젝트 상세 공통 상단 메뉴 개편)
+  - 요구 반영:
+    - 프로젝트 상세 하위 모든 페이지에서 동일한 상단 메뉴 유지
+    - 상세/예산/이슈/일정/사양/데이터/프로젝트 정보 수정으로 즉시 이동 가능
+    - 예산 관리 하위(재료비/인건비/경비 입력) 2단 메뉴를 상단에 고정 제공
+  - 조치:
+    - 프로젝트 경로(`:projectId`) 감지형 공통 메뉴 컴포넌트 신규 추가
+    - `Layout` 헤더 하단에 공통 메뉴 삽입하여 프로젝트 하위 전체 페이지에 일괄 노출
+    - 현재 경로 기준 활성 상태 스타일 반영(예산 관리는 `/budget` 및 `/edit/*` 포함)
+  - 관련 파일:
+    - `frontend/src/components/ProjectContextNav.jsx`
+    - `frontend/src/components/Layout.jsx`
+    - `.agent/execplans/2026-02-08-project-global-top-menu.md`
+  - 검증:
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)

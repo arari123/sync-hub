@@ -603,11 +603,11 @@ const BudgetProjectBudget = () => {
                                     return (
                                         <div key={`${equipment.name}-${phase}`} className="rounded-lg border bg-slate-50/70 p-3">
                                             <p className="mb-1 text-xs font-bold text-slate-700">{PHASE_LABEL[phase]}</p>
-                                            <AmountLine label="재료비" budget={phaseData.material.budget} execution={phaseData.material.execution} showExecution={showExecution} />
-                                            <AmountLine label="인건비" budget={phaseData.labor.budget} execution={phaseData.labor.execution} showExecution={showExecution} />
-                                            <AmountLine label="경비" budget={phaseData.expense.budget} execution={phaseData.expense.execution} showExecution={showExecution} />
+                                            <AmountLine label="재료비" budget={phaseData.material.budget} execution={phaseData.material.execution} showExecution={showExecution} layout="vertical" />
+                                            <AmountLine label="인건비" budget={phaseData.labor.budget} execution={phaseData.labor.execution} showExecution={showExecution} layout="vertical" />
+                                            <AmountLine label="경비" budget={phaseData.expense.budget} execution={phaseData.expense.execution} showExecution={showExecution} layout="vertical" />
                                             <div className="mt-2 border-t border-slate-200 pt-2">
-                                                <AmountLine label="소계" budget={phaseData.total.budget} execution={phaseData.total.execution} showExecution={showExecution} strong />
+                                                <AmountLine label="소계" budget={phaseData.total.budget} execution={phaseData.total.execution} showExecution={showExecution} strong layout="vertical" />
                                                 <CompareBar budget={phaseData.total.budget} execution={phaseData.total.execution} showExecution={showExecution} />
                                             </div>
                                         </div>
@@ -794,8 +794,17 @@ const StatCard = ({ icon: Icon, label, value, tone = 'default' }) => (
     </div>
 );
 
-const AmountLine = ({ label, budget, execution, showExecution, strong = false }) => {
+const AmountLine = ({ label, budget, execution, showExecution, strong = false, layout = 'default' }) => {
+    const isVertical = layout === 'vertical';
     if (!showExecution) {
+        if (isVertical) {
+            return (
+                <div className="mb-2 rounded-md border border-slate-200 bg-white/80 px-2.5 py-2">
+                    <p className={cn('text-[12px] text-slate-500', strong && 'font-bold text-slate-700')}>{label}</p>
+                    <p className={cn('mt-1 text-[16px] font-bold text-slate-800', strong && 'text-[17px]')}>{formatAmount(budget)}</p>
+                </div>
+            );
+        }
         return (
             <div className="flex items-center justify-between gap-2 text-[11px]">
                 <span className={cn('text-slate-500', strong && 'font-bold text-slate-700')}>{label}</span>
@@ -805,6 +814,18 @@ const AmountLine = ({ label, budget, execution, showExecution, strong = false })
     }
 
     const remaining = toNumber(budget) - toNumber(execution);
+    if (isVertical) {
+        return (
+            <div className="mb-2 rounded-md border border-slate-200 bg-white/80 px-2.5 py-2">
+                <p className={cn('text-[12px] text-slate-500', strong && 'font-bold text-slate-700')}>{label}</p>
+                <p className={cn('mt-1 text-[16px] font-bold text-slate-800', strong && 'text-[17px]')}>예산 {formatAmount(budget)}</p>
+                <p className="mt-0.5 text-[12px] text-slate-500">집행 {formatAmount(execution)}</p>
+                <p className={cn('mt-0.5 text-[12px] font-semibold', remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                    잔액 {formatAmount(remaining)}
+                </p>
+            </div>
+        );
+    }
     return (
         <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
             <span className={cn('text-slate-500', strong && 'font-bold text-slate-700')}>{label}</span>

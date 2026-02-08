@@ -1348,30 +1348,60 @@ const ExcelTable = ({
             setFillTarget(null);
             if (!anchor || !target) return;
 
-            const rowMin = Math.min(anchor.row, target.row);
-            const rowMax = Math.max(anchor.row, target.row);
-            const colMin = Math.min(anchor.col, target.col);
-            const colMax = Math.max(anchor.col, target.col);
-            const sourceColumn = columns[anchor.col];
-            if (!sourceColumn || sourceColumn.readonly) return;
-            const sourceRow = rows[anchor.row];
-            if (!sourceRow) return;
-            const sourceValueRaw = sourceColumn.computed
-                ? sourceColumn.computed(sourceRow)
-                : sourceRow[sourceColumn.key];
-            const sourceValue = sourceColumn.type === 'number'
-                ? String(toNumber(sourceValueRaw))
-                : String(sourceValueRaw ?? '');
+            const isAnchorInSelection = (
+                anchor.row >= range.rowMin
+                && anchor.row <= range.rowMax
+                && anchor.col >= range.colMin
+                && anchor.col <= range.colMax
+            );
+            const sourceRange = isAnchorInSelection
+                ? {
+                    rowMin: range.rowMin,
+                    rowMax: range.rowMax,
+                    colMin: range.colMin,
+                    colMax: range.colMax,
+                }
+                : {
+                    rowMin: anchor.row,
+                    rowMax: anchor.row,
+                    colMin: anchor.col,
+                    colMax: anchor.col,
+                };
+
+            const fillRect = {
+                rowMin: Math.min(sourceRange.rowMin, target.row),
+                rowMax: Math.max(sourceRange.rowMax, target.row),
+                colMin: Math.min(sourceRange.colMin, target.col),
+                colMax: Math.max(sourceRange.colMax, target.col),
+            };
+
+            const sourceHeight = sourceRange.rowMax - sourceRange.rowMin + 1;
+            const sourceWidth = sourceRange.colMax - sourceRange.colMin + 1;
+            const mod = (value, base) => ((value % base) + base) % base;
 
             const fillChanges = [];
-            for (let r = rowMin; r <= rowMax; r += 1) {
-                for (let c = colMin; c <= colMax; c += 1) {
-                    if (r === anchor.row && c === anchor.col) continue;
-                    const column = columns[c];
-                    if (!column || column.readonly) continue;
-                    const nextValue = column.type === 'number'
-                        ? sourceValue.replace(/[^0-9]/g, '')
-                        : sourceValue;
+            for (let r = fillRect.rowMin; r <= fillRect.rowMax; r += 1) {
+                for (let c = fillRect.colMin; c <= fillRect.colMax; c += 1) {
+                    const isInSourceRange = (
+                        r >= sourceRange.rowMin
+                        && r <= sourceRange.rowMax
+                        && c >= sourceRange.colMin
+                        && c <= sourceRange.colMax
+                    );
+                    if (isInSourceRange) continue;
+
+                    const sourceRowIndex = sourceRange.rowMin + mod(r - sourceRange.rowMin, sourceHeight);
+                    const sourceColIndex = sourceRange.colMin + mod(c - sourceRange.colMin, sourceWidth);
+                    const sourceColumn = columns[sourceColIndex];
+                    const sourceRow = rows[sourceRowIndex];
+                    if (!sourceColumn || !sourceRow) continue;
+                    const sourceValueRaw = sourceColumn.computed
+                        ? sourceColumn.computed(sourceRow)
+                        : sourceRow[sourceColumn.key];
+                    const nextValue = sourceColumn.type === 'number'
+                        ? String(toNumber(sourceValueRaw))
+                        : String(sourceValueRaw ?? '');
+
                     const change = buildCellChange(r, c, nextValue);
                     if (change) fillChanges.push(change);
                 }
@@ -1383,7 +1413,7 @@ const ExcelTable = ({
         return () => {
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
-    }, [applyCellChanges, buildCellChange, columns, fillAnchor, fillTarget, isFillDragging, rows]);
+    }, [applyCellChanges, buildCellChange, columns, fillAnchor, fillTarget, isFillDragging, range, rows]);
 
     useEffect(() => {
         if (!isFillDragging || !fillAnchor || !fillTarget) {

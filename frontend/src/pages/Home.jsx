@@ -1,7 +1,6 @@
 import React from 'react';
 import SearchInput from '../components/SearchInput';
 import UploadWidget from '../components/UploadWidget';
-import HealthStatus from '../components/HealthStatus';
 import { UploadCloud } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 
@@ -40,34 +39,8 @@ const Home = () => {
                     </div>
                 </div>
             )}
-
-            <div className="w-full max-w-4xl mt-6 px-4">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                        <ActivityIcon />
-                        <h3 className="text-sm font-medium uppercase tracking-wider">시스템 상태</h3>
-                    </div>
-                    <HealthStatus />
-                </div>
-            </div>
         </div>
     );
 };
-
-const ActivityIcon = () => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-    >
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
-);
 
 export default Home;

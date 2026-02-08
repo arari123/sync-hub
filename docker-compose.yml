@@ -57,6 +57,7 @@ services:
     build:
       context: ./frontend
     container_name: synchub_frontend
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 3000"
     ports:
       - "8000:3000"
     volumes:

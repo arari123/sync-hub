@@ -923,12 +923,15 @@ const BudgetProjectEditor = () => {
                 const isFabricationManualFormula = phase === 'fabrication' && fabricationManualFormulas.has(formula);
                 const autoEnabled = !isFabricationManualFormula
                     && (!isOutsourceExpense || outsourceAutoFormulas.has(formula));
+                const basisText = isFabricationManualFormula
+                    ? basis
+                    : (autoEnabled ? basis : '수동 입력');
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
                     expense_type: targetExpenseType,
                     expense_name: name,
-                    basis: autoEnabled ? basis : '수동 입력',
+                    basis: basisText,
                     quantity: autoEnabled ? quantity : '',
                     amount: autoEnabled ? amount : 0,
                     is_auto: autoEnabled,
@@ -1400,6 +1403,8 @@ const BudgetProjectEditor = () => {
                     basis: String(row?.basis || '').trim(),
                     quantity: toNumber(row?.quantity),
                     amount: toNumber(row?.amount),
+                    is_auto: Boolean(row?.is_auto),
+                    auto_formula: String(row?.auto_formula || '').trim(),
                     lock_auto: parseLockAutoValue(row?.lock_auto),
                     memo: String(row?.memo || '').trim(),
                     ...(sectionKey === 'expense'

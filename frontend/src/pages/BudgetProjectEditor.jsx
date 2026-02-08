@@ -494,100 +494,6 @@ const BudgetProjectEditor = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
 
-    const handlePaste = (event) => {
-        if (!canEditActiveRows) return;
-
-        event.preventDefault();
-        const clipboardData = event.clipboardData || window.clipboardData;
-        const pastedData = clipboardData.getData('text');
-        const pasteRows = pastedData.split(/\r\n|\n/).filter((line) => line.trim() !== '');
-
-        const parsedRows = pasteRows.map((rowText) => {
-            const cols = rowText.split('\t');
-
-            if (activeMode === 'execution') {
-                if (section === 'material') {
-                    return {
-                        equipment_name: cols[0] || '',
-                        unit_name: cols[1] || '',
-                        part_name: cols[2] || '',
-                        spec: cols[3] || '',
-                        executed_amount: toNumber(cols[4]),
-                        phase: (cols[5] || '').includes('설치') ? 'installation' : currentPhase,
-                        memo: cols[6] || '',
-                    };
-                }
-                if (section === 'labor') {
-                    return {
-                        equipment_name: cols[0] || '',
-                        task_name: cols[1] || '',
-                        worker_type: cols[2] || '',
-                        executed_amount: toNumber(cols[3]),
-                        phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
-                        memo: cols[5] || '',
-                    };
-                }
-                return {
-                    equipment_name: cols[0] || '',
-                    expense_name: cols[1] || '',
-                    basis: cols[2] || '',
-                    executed_amount: toNumber(cols[3]),
-                    phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
-                    memo: cols[5] || '',
-                };
-            }
-
-            if (section === 'material') {
-                return {
-                    equipment_name: cols[0] || '',
-                    unit_name: cols[1] || '',
-                    part_name: cols[2] || '',
-                    spec: cols[3] || '',
-                    quantity: toNumber(cols[4]),
-                    unit_price: toNumber(cols[5]),
-                    phase: (cols[6] || '').includes('설치') ? 'installation' : currentPhase,
-                    memo: cols[7] || '',
-                };
-            }
-            if (section === 'labor') {
-                return {
-                    equipment_name: cols[0] || '',
-                    task_name: cols[1] || '',
-                    headcount: toNumber(cols[2]) || 1,
-                    worker_type: cols[3] || '',
-                    unit: cols[4] || 'H',
-                    quantity: toNumber(cols[5]),
-                    hourly_rate: toNumber(cols[6]),
-                    location_type: currentPhase === 'installation' ? normalizeLocationType(budgetSettings.installation_locale) : 'domestic',
-                    phase: (cols[7] || '').includes('설치') ? 'installation' : currentPhase,
-                    memo: cols[8] || '',
-                };
-            }
-            return {
-                equipment_name: cols[0] || '',
-                expense_name: cols[1] || '',
-                basis: cols[2] || '',
-                amount: toNumber(cols[3]),
-                phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
-                memo: cols[5] || '',
-            };
-        });
-
-        setDetails((prev) => {
-            const currentRows = prev[activeKey] || [];
-            const currentPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') === currentPhase);
-            const otherPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') !== currentPhase);
-            const mergedCurrent = [...currentPhaseExisting.filter((row) => !(activeMode === 'execution'
-                ? isExecutionRowEmpty(row, section)
-                : isBudgetRowEmpty(row, section))), ...parsedRows];
-
-            return injectBuffers({
-                ...prev,
-                [activeKey]: [...mergedCurrent, ...otherPhaseExisting],
-            });
-        });
-    };
-
     const updateBudgetSettings = (patch) => {
         setDetails((prev) => ({
             ...prev,
@@ -978,7 +884,7 @@ const BudgetProjectEditor = () => {
     }
 
     return (
-        <div className="flex h-screen border-t border-slate-200 overflow-hidden" onPaste={handlePaste}>
+        <div className="flex h-screen border-t border-slate-200 overflow-hidden">
             <BudgetSidebar aggregation={aggregation} summary={sidebarSummary} modeLabel={aggregationModeLabel} />
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0" onScroll={handleScroll}>
@@ -1270,6 +1176,7 @@ const ExcelTable = ({
     const [fillAnchor, setFillAnchor] = useState(null);
     const [fillTarget, setFillTarget] = useState(null);
     const [fillOverlayRect, setFillOverlayRect] = useState(null);
+    const [copiedRange, setCopiedRange] = useState(null);
 
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
     const rowCount = rows.length;
@@ -1289,6 +1196,14 @@ const ExcelTable = ({
         && col >= range.colMin
         && col <= range.colMax
     );
+
+    const isCellInCopiedRange = (row, col) => {
+        if (!copiedRange) return false;
+        return row >= copiedRange.rowMin
+            && row <= copiedRange.rowMax
+            && col >= copiedRange.colMin
+            && col <= copiedRange.colMax;
+    };
 
     const focusCell = (row, col, { selectText = false, preserveSelection = false } = {}) => {
         const nextTarget = tableRef.current?.querySelector(
@@ -1564,6 +1479,91 @@ const ExcelTable = ({
         setFillTarget({ row: rowIndex, col: colIndex });
     };
 
+    const handleCopy = (event) => {
+        if (!tableWrapperRef.current?.contains(event.target)) return;
+        if (editingCell) return;
+
+        const { rowMin, rowMax, colMin, colMax } = range;
+        const lines = [];
+        for (let rowIndex = rowMin; rowIndex <= rowMax; rowIndex += 1) {
+            const cells = [];
+            for (let colIndex = colMin; colIndex <= colMax; colIndex += 1) {
+                const column = columns[colIndex];
+                if (!column || !rows[rowIndex]) {
+                    cells.push('');
+                    continue;
+                }
+                const rawValue = column.computed ? column.computed(rows[rowIndex]) : rows[rowIndex][column.key];
+                const normalizedValue = column.type === 'number'
+                    ? String(toNumber(rawValue))
+                    : String(rawValue ?? '');
+                cells.push(normalizedValue);
+            }
+            lines.push(cells.join('\t'));
+        }
+
+        const payload = lines.join('\n');
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.clipboardData) {
+            event.clipboardData.setData('text/plain', payload);
+        }
+        setCopiedRange({ rowMin, rowMax, colMin, colMax });
+    };
+
+    const handlePasteToCells = (event) => {
+        if (!editable) return;
+        if (!tableWrapperRef.current?.contains(event.target)) return;
+        if (editingCell) return;
+
+        const pastedText = event.clipboardData?.getData('text/plain') || '';
+        if (!pastedText) return;
+
+        const lines = pastedText.replace(/\r/g, '').split('\n');
+        while (lines.length && lines[lines.length - 1] === '') lines.pop();
+        if (!lines.length) return;
+        const matrix = lines.map((line) => line.split('\t'));
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const startRow = activeCell.row;
+        const startCol = activeCell.col;
+        let hasWrite = false;
+        let rowMax = startRow;
+        let colMax = startCol;
+
+        matrix.forEach((cells, rowOffset) => {
+            cells.forEach((cellText, colOffset) => {
+                const targetRow = startRow + rowOffset;
+                const targetCol = startCol + colOffset;
+                if (targetRow < 0 || targetRow >= rowCount) return;
+                if (targetCol < 0 || targetCol >= colCount) return;
+
+                const column = columns[targetCol];
+                if (!column || column.readonly) return;
+
+                let nextValue = String(cellText ?? '');
+                if (column.type === 'number') {
+                    nextValue = nextValue.replace(/[^0-9]/g, '');
+                } else if (column.options) {
+                    nextValue = nextValue.trim().toUpperCase();
+                }
+                onChange(targetRow, column.key, nextValue);
+                hasWrite = true;
+                rowMax = Math.max(rowMax, targetRow);
+                colMax = Math.max(colMax, targetCol);
+            });
+        });
+
+        if (!hasWrite) return;
+        stopEditingCell();
+        setActiveCell({ row: startRow, col: startCol });
+        setSelectionStart({ row: startRow, col: startCol });
+        setSelectionEnd({ row: rowMax, col: colMax });
+        focusCell(startRow, startCol, { preserveSelection: true });
+    };
+
     useEffect(() => {
         if (!rowCount || !colCount) return;
         setActiveCell((prev) => ({
@@ -1582,7 +1582,7 @@ const ExcelTable = ({
 
     return (
         <>
-            <div className="relative" ref={tableWrapperRef}>
+            <div className="relative" ref={tableWrapperRef} onCopy={handleCopy} onPaste={handlePasteToCells}>
                 <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
                 <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
                     <tr>
@@ -1632,6 +1632,7 @@ const ExcelTable = ({
                                 const isSelected = isCellInSelection(rowIndex, colIndex);
                                 const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
                                 const isEditingCurrentCell = isEditing(rowIndex, colIndex);
+                                const isCopied = isCellInCopiedRange(rowIndex, colIndex);
                                 const cellCursorClass = isEditingCurrentCell ? 'cursor-text' : 'cursor-default';
 
                                 if (col.options && isCellEditable) {
@@ -1643,6 +1644,7 @@ const ExcelTable = ({
                                                 cellCursorClass,
                                                 isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
                                                 isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
+                                                isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-50/60",
                                             )}
                                             data-row={rowIndex}
                                             data-col={colIndex}
@@ -1697,6 +1699,7 @@ const ExcelTable = ({
                                             cellCursorClass,
                                             isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
                                             isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
+                                            isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-50/60",
                                         )}
                                         data-row={rowIndex}
                                         data-col={colIndex}

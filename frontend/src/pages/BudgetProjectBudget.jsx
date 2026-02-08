@@ -186,6 +186,7 @@ function ensureMaterialUnitBucket(map, unitName) {
     if (!map.has(unitName)) {
         map.set(unitName, {
             unitName,
+            unitCount: 1,
             partCount: 0,
             quantityTotal: 0,
             budgetAmount: 0,
@@ -325,6 +326,7 @@ const BudgetProjectBudget = () => {
             const unitBucket = ensureMaterialUnitBucket(phaseBucket.materialUnits, unitName);
 
             phaseBucket.totals.material.budget += amount;
+            unitBucket.unitCount = Math.max(1, toNumber(unitCount));
             unitBucket.partCount += 1;
             unitBucket.quantityTotal += toNumber(row?.quantity);
             unitBucket.budgetAmount += amount;
@@ -335,6 +337,8 @@ const BudgetProjectBudget = () => {
             if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
+            const unitScopeKey = materialUnitScopeKeyFromRow(row);
+            const unitCount = Math.max(1, Number(materialUnitCountMap[unitScopeKey] || 1));
             const amount = toNumber(row?.executed_amount);
 
             const equipment = ensureEquipmentBucket(equipmentMap, equipmentName);
@@ -342,6 +346,7 @@ const BudgetProjectBudget = () => {
             const unitBucket = ensureMaterialUnitBucket(phaseBucket.materialUnits, unitName);
 
             phaseBucket.totals.material.execution += amount;
+            unitBucket.unitCount = Math.max(1, toNumber(unitCount));
             unitBucket.executionAmount += amount;
         });
 
@@ -680,7 +685,7 @@ const BudgetProjectBudget = () => {
                                                                 <p className="text-[11px] font-semibold text-slate-700">{formatAmount(unit.budgetAmount)}</p>
                                                             </div>
                                                             <p className="mt-0.5 text-[10px] text-muted-foreground">
-                                                                포함 파츠 {formatCount(unit.partCount)} · 파츠 수량 합계 {toNumber(unit.quantityTotal).toLocaleString('ko-KR')}
+                                                                유닛 개수 {formatCount(unit.unitCount)} · 포함 파츠 {formatCount(unit.partCount)} · 파츠 수량 합계 {toNumber(unit.quantityTotal).toLocaleString('ko-KR')}
                                                             </p>
                                                         </div>
                                                     ))}

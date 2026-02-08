@@ -913,15 +913,33 @@ const BudgetProjectEditor = () => {
                 });
             });
 
+            const autoExpenseNameSet = new Set(
+                autoRows.map((item) => String(item?.expense_name || '').trim()).filter(Boolean),
+            );
             samePhaseRows.forEach((row) => {
                 if (!row.auto_formula) {
+                    const normalizedName = String(row?.expense_name || '').trim();
+                    if (autoExpenseNameSet.has(normalizedName)) {
+                        return;
+                    }
                     nextPhaseRows.push(row);
                 }
             });
 
+            const dedupedPhaseRows = [];
+            const seenAutoFormula = new Set();
+            nextPhaseRows.forEach((row) => {
+                const formulaKey = String(row?.auto_formula || '').trim();
+                if (formulaKey) {
+                    if (seenAutoFormula.has(formulaKey)) return;
+                    seenAutoFormula.add(formulaKey);
+                }
+                dedupedPhaseRows.push(row);
+            });
+
             return {
                 ...prev,
-                expense_items: [...otherPhaseRows, ...nextPhaseRows],
+                expense_items: [...otherPhaseRows, ...dedupedPhaseRows],
             };
         });
     }, [activeEquipmentName, currentPhase, projectInstallationInfo.locale]);

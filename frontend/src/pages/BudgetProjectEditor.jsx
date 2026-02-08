@@ -69,6 +69,13 @@ const AUTO_EXPENSE_FORMULA_BY_NAME = {
     '도비 비용': AUTO_EXPENSE_FORMULAS.DOBI,
     '기타 비용': AUTO_EXPENSE_FORMULAS.OTHER,
 };
+const HIDDEN_EXPENSE_QUANTITY_FORMULAS = new Set([
+    AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
+    AUTO_EXPENSE_FORMULAS.CONSUMABLES,
+    AUTO_EXPENSE_FORMULAS.TOOLS,
+    AUTO_EXPENSE_FORMULAS.LOCAL_HIRE,
+    AUTO_EXPENSE_FORMULAS.DOBI,
+]);
 
 const COMMON_EQUIPMENT_NAME = '공통';
 
@@ -108,6 +115,11 @@ function resolveExpenseAutoFormula(row) {
     if (explicit) return explicit;
     const name = String(row?.expense_name || '').trim();
     return AUTO_EXPENSE_FORMULA_BY_NAME[name] || '';
+}
+
+function shouldHideExpenseQuantity(row) {
+    const formula = resolveExpenseAutoFormula(row);
+    return HIDDEN_EXPENSE_QUANTITY_FORMULAS.has(formula);
 }
 
 function normalizeEquipmentName(value) {
@@ -1192,7 +1204,14 @@ const BudgetProjectEditor = () => {
             if (section === 'expense') {
                 row.expense_type = activeExpenseType;
             }
-            if (['quantity', 'unit_price', 'amount', 'executed_amount'].includes(key)) {
+            if (
+                section === 'expense'
+                && activeMode === 'budget'
+                && key === 'quantity'
+                && shouldHideExpenseQuantity(row)
+            ) {
+                row.quantity = '';
+            } else if (['quantity', 'unit_price', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
                 row[key] = String(value || '').toUpperCase();
@@ -1990,6 +2009,23 @@ const BudgetProjectEditor = () => {
                                 onRemove={(idx) => removeRow(sortedDisplayRows[idx].originalIndex)}
                                 editable={canEditScopedRows}
                                 allowRowDelete={canEditScopedRows}
+                                isCellReadonly={(row, column) => (
+                                    activeMode === 'budget'
+                                    && section === 'expense'
+                                    && column?.key === 'quantity'
+                                    && shouldHideExpenseQuantity(row)
+                                )}
+                                getCellDisplayValue={(row, column, rawValue) => {
+                                    if (
+                                        activeMode === 'budget'
+                                        && section === 'expense'
+                                        && column?.key === 'quantity'
+                                        && shouldHideExpenseQuantity(row)
+                                    ) {
+                                        return '';
+                                    }
+                                    return rawValue;
+                                }}
                             />
                             {section === 'material' && isMaterialUnitDragOver && (
                                 <div className="pointer-events-none absolute inset-2 rounded-xl border-2 border-dashed border-sky-400 bg-sky-50/70 flex items-center justify-center z-20">
@@ -2016,6 +2052,8 @@ const ExcelTable = ({
     onRemove,
     editable,
     allowRowDelete,
+    isCellReadonly,
+    getCellDisplayValue,
 }) => {
     const tableWrapperRef = useRef(null);
     const tableRef = useRef(null);
@@ -2079,6 +2117,19 @@ const ExcelTable = ({
         return String(value ?? '');
     };
 
+    const isCellLocked = (rowIndex, colIndex, columnArg = null, rowArg = null) => {
+        const column = columnArg || columns[colIndex];
+        const row = rowArg || rows[rowIndex];
+        if (!column || !row) return true;
+        if (column.readonly) return true;
+        return Boolean(isCellReadonly?.(row, column, rowIndex, colIndex));
+    };
+
+    const resolveCellDisplayRawValue = (rowIndex, colIndex, row, column, rawValue) => {
+        if (!getCellDisplayValue) return rawValue;
+        return getCellDisplayValue(row, column, rawValue, rowIndex, colIndex);
+    };
+
     const pushUndoAction = (changes) => {
         if (!changes.length) return;
         undoStackRef.current.push(changes);
@@ -2088,7 +2139,7 @@ const ExcelTable = ({
     const buildCellChange = (rowIndex, colIndex, nextValue) => {
         const column = columns[colIndex];
         const row = rows[rowIndex];
-        if (!column || column.readonly || !row) return null;
+        if (!column || !row || isCellLocked(rowIndex, colIndex, column, row)) return null;
         const currentRaw = column.computed ? column.computed(row) : row[column.key];
         const before = normalizeHistoryValue(currentRaw, column);
         const writeValue = normalizeWriteValue(nextValue, column);
@@ -2161,7 +2212,7 @@ const ExcelTable = ({
 
     const startEditingCell = (row, col, { selectText = true } = {}) => {
         const column = columns[col];
-        if (!editable || !column || column.readonly) return;
+        if (!editable || !column || isCellLocked(row, col, column, rows[row])) return;
         if (column.key === 'lock_auto') return;
         setEditingCell({ row, col });
         requestAnimationFrame(() => {
@@ -2318,7 +2369,7 @@ const ExcelTable = ({
 
     const handleKeyDown = (event, rowIndex, colIndex) => {
         const column = columns[colIndex];
-        const isCellEditable = editable && column && !column.readonly;
+        const isCellEditable = editable && column && !isCellLocked(rowIndex, colIndex, column, rows[rowIndex]);
         const isPrintableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
         const isEditingCurrentCell = isEditing(rowIndex, colIndex);
 
@@ -2421,7 +2472,7 @@ const ExcelTable = ({
         const isToggleLockCell = (
             column?.key === 'lock_auto'
             && editable
-            && !column?.readonly
+            && !isCellLocked(rowIndex, colIndex, column, rows[rowIndex])
             && !event.shiftKey
             && !event.ctrlKey
             && !event.metaKey
@@ -2492,9 +2543,16 @@ const ExcelTable = ({
                     continue;
                 }
                 const rawValue = column.computed ? column.computed(rows[rowIndex]) : rows[rowIndex][column.key];
+                const displayRawValue = resolveCellDisplayRawValue(
+                    rowIndex,
+                    colIndex,
+                    rows[rowIndex],
+                    column,
+                    rawValue,
+                );
                 const normalizedValue = column.type === 'number'
-                    ? String(toNumber(rawValue))
-                    : String(rawValue ?? '');
+                    ? (displayRawValue === '' ? '' : String(toNumber(displayRawValue)))
+                    : String(displayRawValue ?? '');
                 cells.push(normalizedValue);
             }
             lines.push(cells.join('\t'));
@@ -2540,7 +2598,7 @@ const ExcelTable = ({
                 if (targetCol < 0 || targetCol >= colCount) return;
 
                 const column = columns[targetCol];
-                if (!column || column.readonly) return;
+                if (!column || isCellLocked(targetRow, targetCol, column, rows[targetRow])) return;
 
                 let nextValue = String(cellText ?? '');
                 if (column.type === 'number') {
@@ -2626,16 +2684,23 @@ const ExcelTable = ({
                             </td>
                             {columns.map((col, colIndex) => {
                                 const rawValue = col.computed ? col.computed(row) : row[col.key];
+                                const displayRawFromMeta = resolveCellDisplayRawValue(
+                                    rowIndex,
+                                    colIndex,
+                                    row,
+                                    col,
+                                    rawValue,
+                                );
                                 const normalizedRawValue = col.key === 'staffing_type'
                                     ? resolveLaborStaffingType(row)
-                                    : rawValue;
+                                    : displayRawFromMeta;
                                 const displayValue = col.type === 'number'
                                     ? (normalizedRawValue === null || normalizedRawValue === undefined || normalizedRawValue === '' ? '' : toNumber(normalizedRawValue).toLocaleString('ko-KR'))
                                     : (normalizedRawValue || '');
                                 const optionValue = col.key === 'lock_auto'
                                     ? (parseLockAutoValue(rawValue) ? '잠금' : '해제')
                                     : String(normalizedRawValue || '');
-                                const isCellEditable = editable && !col.readonly;
+                                const isCellEditable = editable && !isCellLocked(rowIndex, colIndex, col, row);
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
                                 const isSelected = isCellInSelection(rowIndex, colIndex);
                                 const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
@@ -2698,7 +2763,7 @@ const ExcelTable = ({
                                                     {optionValue}
                                                 </button>
                                             )}
-                                            {isActive && editable && !col.readonly && (
+                                            {isActive && isCellEditable && (
                                                 <button
                                                     type="button"
                                                     className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"
@@ -2750,7 +2815,7 @@ const ExcelTable = ({
                                             }}
                                             readOnly={!isCellEditable || !isEditing(rowIndex, colIndex)}
                                         />
-                                        {isActive && editable && !col.readonly && (
+                                        {isActive && isCellEditable && (
                                             <button
                                                 type="button"
                                                 className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"

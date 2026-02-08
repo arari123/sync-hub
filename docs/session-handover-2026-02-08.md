@@ -162,3 +162,15 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
     - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
     - `docker-compose restart web frontend` 재기동 완료
+- 2026-02-08 (경비 횟수/MD 비대상 항목 잠금/숨김)
+  - 요구 반영:
+    - `프로젝트 운영비`, `소모품비`, `공구비`, `현지인원채용 비용`, `도비 비용`은 `횟수/MD` 입력 대상에서 제외
+  - 조치:
+    - 해당 항목의 `횟수/MD` 셀을 행 단위 읽기전용으로 잠금
+    - 저장값이 `0`이어도 화면 표시/복사 시 빈칸으로 보이도록 렌더링 보정
+    - 키보드 입력/붙여넣기/드래그복사로도 해당 셀은 수정되지 않도록 테이블 공통 편집 경로에 잠금 로직 적용
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

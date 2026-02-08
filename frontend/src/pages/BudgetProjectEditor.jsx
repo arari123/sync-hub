@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Navigate, useParams } from 'react-router-dom';
 import { BarChart3, CheckCircle2, ClipboardPaste, Package, Save, Users, Wallet } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
@@ -15,6 +15,8 @@ const SECTION_META = {
 };
 
 const DEFAULT_LABOR_DEPARTMENTS = ['PM', '설계', 'SW', '검사기술', '제어1', '제어2'];
+const OUTSOURCE_LABOR_DEPARTMENTS = ['PM', '설계', '기구', '전장', '제어', 'SW'];
+const STAFFING_TYPE_OPTIONS = ['자체', '외주'];
 
 const DEFAULT_BUDGET_SETTINGS = {
     labor_departments: DEFAULT_LABOR_DEPARTMENTS,
@@ -71,6 +73,38 @@ function mergeBudgetSettings(settings) {
     merged.labor_departments = departments.length ? departments : DEFAULT_LABOR_DEPARTMENTS;
     merged.installation_locale = normalizeLocationType(merged.installation_locale);
     return merged;
+}
+
+function detectInstallationLocaleFromProject(project, fallbackLocale = 'domestic') {
+    const site = String(project?.installation_site || '').trim();
+    const lowered = site.toLowerCase();
+    const overseasKeywords = ['해외', 'overseas', 'abroad', 'global'];
+    const domesticKeywords = [
+        '국내',
+        '대한민국',
+        '한국',
+        'korea',
+        'seoul',
+        'busan',
+        'incheon',
+        'daejeon',
+        'daegu',
+        'ulsan',
+        'gwangju',
+    ];
+
+    let locale = normalizeLocationType(fallbackLocale);
+    if (overseasKeywords.some((token) => lowered.includes(token))) {
+        locale = 'overseas';
+    } else if (domesticKeywords.some((token) => lowered.includes(token))) {
+        locale = 'domestic';
+    }
+
+    const label = locale === 'overseas'
+        ? `해외${site ? ` (${site})` : ''}`
+        : `국내${site ? ` (${site})` : ''}`;
+
+    return { locale, label };
 }
 
 function laborUnitToHours(unit, locationType, settings) {
@@ -133,6 +167,7 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
         return {
             equipment_name: '',
             task_name: '',
+            staffing_type: '자체',
             worker_type: '',
             unit: 'H',
             quantity: 0,
@@ -146,6 +181,7 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
     return {
         equipment_name: '',
         expense_name: '',
+        lock_auto: false,
         basis: '',
         amount: 0,
         is_auto: false,
@@ -171,6 +207,7 @@ function buildEmptyExecutionRow(section, phase = 'fabrication') {
         return {
             equipment_name: '',
             task_name: '',
+            staffing_type: '자체',
             worker_type: '',
             executed_amount: 0,
             phase,
@@ -215,7 +252,10 @@ function injectBuffers(detailsObj) {
 function calcBudgetAmount(row, section, settings) {
     if (section === 'material') return toNumber(row.quantity) * toNumber(row.unit_price);
     if (section === 'labor') {
-        const locationType = normalizeLocationType(row.location_type || settings?.installation_locale);
+        const phase = (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+        const locationType = phase === 'installation'
+            ? normalizeLocationType(settings?.installation_locale)
+            : 'domestic';
         const hours = laborUnitToHours(row.unit, locationType, settings);
         const headcount = toNumber(row.headcount) || 1;
         return toNumber(row.quantity) * hours * headcount * toNumber(row.hourly_rate);
@@ -246,7 +286,6 @@ const BudgetProjectEditor = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [currentPhase, setCurrentPhase] = useState('fabrication');
-    const [budgetViewMode, setBudgetViewMode] = useState(false);
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
 
     const canEditProject = project?.can_edit !== false;
@@ -254,8 +293,19 @@ const BudgetProjectEditor = () => {
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
     const budgetSettings = useMemo(() => mergeBudgetSettings(details?.budget_settings), [details?.budget_settings]);
+    const projectInstallationInfo = useMemo(
+        () => detectInstallationLocaleFromProject(project, budgetSettings.installation_locale),
+        [budgetSettings.installation_locale, project],
+    );
+    const effectiveBudgetSettings = useMemo(
+        () => ({
+            ...budgetSettings,
+            installation_locale: projectInstallationInfo.locale,
+        }),
+        [budgetSettings, projectInstallationInfo.locale],
+    );
 
-    const activeMode = isExecutionStage && !budgetViewMode ? 'execution' : 'budget';
+    const activeMode = isExecutionStage ? 'execution' : 'budget';
     const activeKey = activeMode === 'execution' ? SECTION_META[section].executionKey : SECTION_META[section].budgetKey;
     const rows = details[activeKey] || [];
 
@@ -263,11 +313,7 @@ const BudgetProjectEditor = () => {
     const canEditBudgetFields = canEditProject && !isConfirmed && !isExecutionStage;
 
     const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
-    const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : (isExecutionStage ? '예산 조회 모드' : '예산 입력 모드');
-
-    useEffect(() => {
-        setBudgetViewMode(false);
-    }, [projectId, section, currentStage]);
+    const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
 
     const displayRows = useMemo(
         () => rows
@@ -290,7 +336,7 @@ const BudgetProjectEditor = () => {
                 const phase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
                 const amount = activeMode === 'execution'
                     ? toNumber(row.executed_amount)
-                    : calcBudgetAmount(row, sectionKey, budgetSettings);
+                    : calcBudgetAmount(row, sectionKey, effectiveBudgetSettings);
                 const phaseKey = `${phase}_total`;
                 summary[sectionKey][phaseKey] += amount;
 
@@ -331,7 +377,7 @@ const BudgetProjectEditor = () => {
             delete item.unitOrder;
         });
         return summary;
-    }, [details, activeMode, budgetSettings]);
+    }, [details, activeMode, effectiveBudgetSettings]);
 
     const aggregation = useMemo(() => ({
         total: Number(sidebarSummary?.[section]?.fabrication_total || 0) + Number(sidebarSummary?.[section]?.installation_total || 0),
@@ -352,6 +398,7 @@ const BudgetProjectEditor = () => {
         labor: [
             { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'task_name', label: '부서', width: 'w-40' },
+            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS },
             { key: 'headcount', label: '인원', width: 'w-20', type: 'number' },
             { key: 'worker_type', label: '직군/메모', width: 'w-32' },
             { key: 'unit', label: '단위', width: 'w-20', options: ['H', 'D', 'W', 'M'] },
@@ -363,18 +410,19 @@ const BudgetProjectEditor = () => {
                 width: 'w-36',
                 type: 'number',
                 readonly: true,
-                computed: (row) => calcBudgetAmount(row, 'labor', budgetSettings),
+                computed: (row) => calcBudgetAmount(row, 'labor', effectiveBudgetSettings),
             },
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
         expense: [
             { key: 'equipment_name', label: '설비', width: 'w-40' },
             { key: 'expense_name', label: '경비 항목', width: 'w-48' },
+            { key: 'lock_auto', label: '잠금', width: 'w-20', options: ['해제', '잠금'] },
             { key: 'basis', label: '산정 기준', width: 'w-48' },
             { key: 'amount', label: '예산금액', width: 'w-32', type: 'number' },
             { key: 'memo', label: '비고', width: 'w-48' },
         ],
-    }), [budgetSettings]);
+    }), [effectiveBudgetSettings]);
 
     const executionColumnsBySection = useMemo(() => ({
         material: [
@@ -388,6 +436,7 @@ const BudgetProjectEditor = () => {
         labor: [
             { key: 'equipment_name', label: '설비', width: 'w-32' },
             { key: 'task_name', label: '작업명(집행)', width: 'w-40' },
+            { key: 'staffing_type', label: '구분', width: 'w-24', options: STAFFING_TYPE_OPTIONS },
             { key: 'worker_type', label: '직군(집행)', width: 'w-32' },
             { key: 'executed_amount', label: '집행금액', width: 'w-32', type: 'number' },
             { key: 'memo', label: '비고', width: 'w-48' },
@@ -432,6 +481,10 @@ const BudgetProjectEditor = () => {
     const autoCompleteOptions = useMemo(() => {
         const equipmentSet = new Set();
         const unitSet = new Set();
+        const laborDeptSet = new Set([
+            ...(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS),
+            ...OUTSOURCE_LABOR_DEPARTMENTS,
+        ]);
         Object.values(SECTION_META).forEach((meta) => {
             (details[meta.budgetKey] || []).forEach((row) => {
                 const equipmentName = String(row?.equipment_name || '').trim();
@@ -442,10 +495,14 @@ const BudgetProjectEditor = () => {
             const unitName = String(row?.unit_name || '').trim();
             if (unitName) unitSet.add(unitName);
         });
+        (details.labor_items || []).forEach((row) => {
+            const taskName = String(row?.task_name || '').trim();
+            if (taskName) laborDeptSet.add(taskName);
+        });
         return {
             equipment_name: Array.from(equipmentSet),
             unit_name: Array.from(unitSet),
-            task_name: budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS,
+            task_name: Array.from(laborDeptSet),
         };
     }, [details, budgetSettings]);
     const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
@@ -501,29 +558,30 @@ const BudgetProjectEditor = () => {
         }));
     };
 
-    const applyDefaultLaborDepartments = () => {
+    const addLaborDepartmentRow = ({ department, staffingType }) => {
+        const targetDepartment = String(department || '').trim();
+        if (!targetDepartment) return;
         setDetails((prev) => {
-            const settings = mergeBudgetSettings(prev?.budget_settings);
-            const departments = settings.labor_departments || DEFAULT_LABOR_DEPARTMENTS;
             const source = [...(prev.labor_items || [])];
-            const phaseRows = source.filter((row) => (row.phase || 'fabrication') === currentPhase);
-            const existingDepartments = new Set(
-                phaseRows
-                    .map((row) => String(row.task_name || '').trim())
-                    .filter(Boolean),
-            );
+            const phaseRows = source.filter((row) => (row.phase || 'fabrication') === currentPhase)
+                .filter((row) => String(row.staffing_type || '자체') === staffingType);
             const equipmentFallback = phaseRows.find((row) => String(row?.equipment_name || '').trim())?.equipment_name || '';
+            const duplicateCount = phaseRows.filter((row) => {
+                const name = String(row.task_name || '').trim();
+                return name === targetDepartment || name.startsWith(`${targetDepartment}(`);
+            }).length;
+            const nextDepartmentName = duplicateCount > 0
+                ? `${targetDepartment}(${duplicateCount + 1})`
+                : targetDepartment;
 
-            departments.forEach((department) => {
-                if (existingDepartments.has(department)) return;
-                source.push({
-                    ...buildEmptyBudgetRow('labor', currentPhase),
-                    equipment_name: equipmentFallback,
-                    task_name: department,
-                    location_type: currentPhase === 'installation'
-                        ? normalizeLocationType(settings.installation_locale)
-                        : 'domestic',
-                });
+            source.push({
+                ...buildEmptyBudgetRow('labor', currentPhase),
+                equipment_name: equipmentFallback,
+                task_name: nextDepartmentName,
+                staffing_type: staffingType,
+                location_type: currentPhase === 'installation'
+                    ? projectInstallationInfo.locale
+                    : 'domestic',
             });
 
             return {
@@ -533,12 +591,13 @@ const BudgetProjectEditor = () => {
         });
     };
 
-    const autoFillExpenseRows = () => {
+    const autoFillExpenseRows = useCallback(({ forceReset = false } = {}) => {
         setDetails((prev) => {
             const settings = mergeBudgetSettings(prev?.budget_settings);
+            settings.installation_locale = projectInstallationInfo.locale;
             const phase = currentPhase;
             const locale = phase === 'installation'
-                ? normalizeLocationType(settings.installation_locale)
+                ? projectInstallationInfo.locale
                 : 'domestic';
 
             const materialRows = prev.material_items || [];
@@ -564,48 +623,51 @@ const BudgetProjectEditor = () => {
                 .filter((row) => (row.phase || 'fabrication') === 'installation')
                 .reduce((sum, row) => {
                     const headcount = toNumber(row.headcount) || 1;
-                    const locationType = normalizeLocationType(row.location_type || settings.installation_locale);
+                    const locationType = projectInstallationInfo.locale;
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
                     return sum + ((hours / 8) * headcount);
                 }, 0);
 
             const autoRows = [];
-            autoRows.push({
-                ...buildEmptyBudgetRow('expense', phase),
-                expense_name: '프로젝트 운영비',
-                basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
-                amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
-                is_auto: true,
-                auto_formula: AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
-            });
+                autoRows.push({
+                    ...buildEmptyBudgetRow('expense', phase),
+                    expense_name: '프로젝트 운영비',
+                    basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
+                    amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
+                    is_auto: true,
+                    lock_auto: false,
+                    auto_formula: AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
+                });
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
                 expense_name: '소모품비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.consumable_ratio_fabrication)}%`
                     : `총 재료비 ${toNumber(settings.consumable_ratio_installation)}%`,
-                amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
-                    phase === 'fabrication'
-                        ? toNumber(settings.consumable_ratio_fabrication)
-                        : toNumber(settings.consumable_ratio_installation)
-                ) / 100),
-                is_auto: true,
-                auto_formula: AUTO_EXPENSE_FORMULAS.CONSUMABLES,
-            });
+                    amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
+                        phase === 'fabrication'
+                            ? toNumber(settings.consumable_ratio_fabrication)
+                            : toNumber(settings.consumable_ratio_installation)
+                    ) / 100),
+                    is_auto: true,
+                    lock_auto: false,
+                    auto_formula: AUTO_EXPENSE_FORMULAS.CONSUMABLES,
+                });
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
                 expense_name: '공구비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.tool_ratio_fabrication)}%`
                     : `총 재료비 ${toNumber(settings.tool_ratio_installation)}%`,
-                amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
-                    phase === 'fabrication'
-                        ? toNumber(settings.tool_ratio_fabrication)
-                        : toNumber(settings.tool_ratio_installation)
-                ) / 100),
-                is_auto: true,
-                auto_formula: AUTO_EXPENSE_FORMULAS.TOOLS,
-            });
+                    amount: Math.floor((phase === 'fabrication' ? materialFabTotal : materialTotal) * (
+                        phase === 'fabrication'
+                            ? toNumber(settings.tool_ratio_fabrication)
+                            : toNumber(settings.tool_ratio_installation)
+                    ) / 100),
+                    is_auto: true,
+                    lock_auto: false,
+                    auto_formula: AUTO_EXPENSE_FORMULAS.TOOLS,
+                });
 
             if (phase === 'fabrication' || locale === 'domestic') {
                 const trip = Math.floor(installationManDays * (toNumber(settings.domestic_trip_daily) || 32000));
@@ -622,6 +684,7 @@ const BudgetProjectEditor = () => {
                     basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_trip_daily) || 32000).toLocaleString('ko-KR')}원`,
                     amount: trip,
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
                 });
                 autoRows.push({
@@ -630,6 +693,7 @@ const BudgetProjectEditor = () => {
                     basis: `설치 인원 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.domestic_lodging_daily) || 70000).toLocaleString('ko-KR')}원`,
                     amount: lodging,
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
                 });
                 autoRows.push({
@@ -638,6 +702,7 @@ const BudgetProjectEditor = () => {
                     basis: `${transportBundle}회 * ${(toNumber(settings.domestic_distance_km) || 0).toLocaleString('ko-KR')}km * ${(toNumber(settings.domestic_transport_per_km) || 250).toLocaleString('ko-KR')}원`,
                     amount: transport,
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                 });
             } else {
@@ -647,6 +712,7 @@ const BudgetProjectEditor = () => {
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_trip_daily) || 120000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_trip_daily) || 120000)),
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.TRIP,
                 });
                 autoRows.push({
@@ -655,6 +721,7 @@ const BudgetProjectEditor = () => {
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_lodging_daily) || 200000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_lodging_daily) || 200000)),
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.LODGING,
                 });
                 autoRows.push({
@@ -663,6 +730,7 @@ const BudgetProjectEditor = () => {
                     basis: `해외 교통비 단가 수동 입력 필요 (자동 산정 수량: ${Math.ceil(installationManDays * (toNumber(settings.overseas_transport_daily_count) || 1))})`,
                     amount: 0,
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
                 });
                 autoRows.push({
@@ -671,6 +739,7 @@ const BudgetProjectEditor = () => {
                     basis: `해외 설치 MD ${installationManDays.toFixed(1)} * ${(toNumber(settings.overseas_airfare_daily) || 350000).toLocaleString('ko-KR')}원`,
                     amount: Math.floor(installationManDays * (toNumber(settings.overseas_airfare_daily) || 350000)),
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: AUTO_EXPENSE_FORMULAS.AIRFARE,
                 });
             }
@@ -686,6 +755,7 @@ const BudgetProjectEditor = () => {
                     basis: '수동 입력',
                     amount: 0,
                     is_auto: true,
+                    lock_auto: false,
                     auto_formula: formula,
                 });
             });
@@ -702,7 +772,12 @@ const BudgetProjectEditor = () => {
             const nextPhaseRows = [];
             autoRows.forEach((generated) => {
                 const current = currentByFormula[generated.auto_formula];
-                if (current && current.is_auto === false) {
+                const isLocked = Boolean(current?.lock_auto);
+                if (isLocked) {
+                    nextPhaseRows.push(current);
+                    return;
+                }
+                if (!forceReset && current && current.is_auto === false) {
                     nextPhaseRows.push(current);
                     return;
                 }
@@ -710,11 +785,12 @@ const BudgetProjectEditor = () => {
                     ...generated,
                     equipment_name: current?.equipment_name || generated.equipment_name,
                     memo: current?.memo || generated.memo,
+                    lock_auto: Boolean(current?.lock_auto),
                 });
             });
 
             samePhaseRows.forEach((row) => {
-                if (!row.auto_formula || row.is_auto === false) {
+                if (!row.auto_formula) {
                     nextPhaseRows.push(row);
                 }
             });
@@ -724,7 +800,7 @@ const BudgetProjectEditor = () => {
                 expense_items: [...otherPhaseRows, ...nextPhaseRows],
             };
         });
-    };
+    }, [currentPhase, projectInstallationInfo.locale]);
 
     const toggleSort = (columnKey) => {
         setSortState((prev) => {
@@ -745,13 +821,28 @@ const BudgetProjectEditor = () => {
                 row[key] = toNumber(value);
             } else if (key === 'unit') {
                 row[key] = String(value || '').toUpperCase();
+            } else if (key === 'staffing_type') {
+                row[key] = String(value || '자체');
+            } else if (key === 'lock_auto') {
+                row[key] = String(value || '해제') === '잠금';
             } else if (key === 'location_type') {
                 row[key] = normalizeLocationType(value);
             } else {
                 row[key] = value;
             }
-            if (section === 'expense' && activeMode === 'budget' && key === 'amount' && row.is_auto) {
+            if (
+                section === 'expense'
+                && activeMode === 'budget'
+                && row.auto_formula
+                && ['equipment_name', 'expense_name', 'basis', 'amount'].includes(key)
+                && row.is_auto
+            ) {
                 row.is_auto = false;
+            }
+            if (section === 'labor' && activeMode === 'budget') {
+                row.location_type = (row.phase || 'fabrication') === 'installation'
+                    ? projectInstallationInfo.locale
+                    : 'domestic';
             }
             newList[index] = row;
 
@@ -860,10 +951,17 @@ const BudgetProjectEditor = () => {
         }
     };
 
-    const switchMode = (mode) => {
-        if (!isExecutionStage) return;
-        setBudgetViewMode(mode === 'budget');
-    };
+    useEffect(() => {
+        if (activeMode !== 'budget') return;
+        autoFillExpenseRows({ forceReset: false });
+    }, [
+        activeMode,
+        autoFillExpenseRows,
+        currentPhase,
+        details.labor_items,
+        details.material_items,
+        details.budget_settings,
+    ]);
 
     const handleScroll = (event) => {
         const { scrollTop, scrollHeight, clientHeight } = event.target;
@@ -1012,81 +1110,37 @@ const BudgetProjectEditor = () => {
                                     </button>
                                 </div>
 
-                                {isExecutionStage && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                        <button
-                                            type="button"
-                                            onClick={() => switchMode('execution')}
-                                            className={cn(
-                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
-                                                !budgetViewMode ? 'bg-white text-blue-700 ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-800',
-                                            )}
-                                        >
-                                            집행 입력
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => switchMode('budget')}
-                                            className={cn(
-                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
-                                                budgetViewMode ? 'bg-white text-amber-700 ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-800',
-                                            )}
-                                        >
-                                            예산 보기
-                                        </button>
-                                    </div>
-                                )}
-
                                 {activeMode === 'budget' && section === 'labor' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                        <button
-                                            type="button"
-                                            onClick={applyDefaultLaborDepartments}
-                                            className="h-8 rounded-lg px-3 text-[11px] font-black bg-white text-emerald-700 ring-1 ring-slate-200"
-                                        >
-                                            기본 부서 적용
-                                        </button>
-                                        <input
-                                            value={(budgetSettings.labor_departments || []).join(', ')}
-                                            onChange={(event) => {
-                                                const departments = event.target.value
-                                                    .split(',')
-                                                    .map((item) => item.trim())
-                                                    .filter(Boolean);
-                                                updateBudgetSettings({ labor_departments: departments });
-                                            }}
-                                            className="h-8 w-64 rounded-md border bg-white px-2 text-[11px]"
-                                            placeholder="부서명 콤마(,) 구분"
-                                        />
+                                    <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
+                                        <span className="px-2 text-[10px] font-black text-slate-500 uppercase">자체</span>
+                                        {(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS).map((department) => (
+                                            <button
+                                                key={`inhouse-${department}`}
+                                                type="button"
+                                                onClick={() => addLaborDepartmentRow({ department, staffingType: '자체' })}
+                                                className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-emerald-700 ring-1 ring-slate-200 hover:bg-emerald-50"
+                                            >
+                                                {department}
+                                            </button>
+                                        ))}
+                                        <span className="mx-1 h-5 w-px bg-slate-300" />
+                                        <span className="px-2 text-[10px] font-black text-slate-500 uppercase">외주</span>
+                                        {OUTSOURCE_LABOR_DEPARTMENTS.map((department) => (
+                                            <button
+                                                key={`outsource-${department}`}
+                                                type="button"
+                                                onClick={() => addLaborDepartmentRow({ department, staffingType: '외주' })}
+                                                className="h-8 rounded-lg px-2.5 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200 hover:bg-indigo-50"
+                                            >
+                                                {department}
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
 
                                 {activeMode === 'budget' && (section === 'labor' || section === 'expense') && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-                                        <button
-                                            type="button"
-                                            onClick={() => updateBudgetSettings({ installation_locale: 'domestic' })}
-                                            className={cn(
-                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
-                                                budgetSettings.installation_locale === 'domestic'
-                                                    ? 'bg-white text-blue-700 ring-1 ring-slate-200'
-                                                    : 'text-slate-600 hover:text-slate-800',
-                                            )}
-                                        >
-                                            국내 설치
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => updateBudgetSettings({ installation_locale: 'overseas' })}
-                                            className={cn(
-                                                'h-8 rounded-lg px-3 text-[11px] font-black transition-colors',
-                                                budgetSettings.installation_locale === 'overseas'
-                                                    ? 'bg-white text-indigo-700 ring-1 ring-slate-200'
-                                                    : 'text-slate-600 hover:text-slate-800',
-                                            )}
-                                        >
-                                            해외 설치
-                                        </button>
+                                    <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
+                                        설치 기준: <span className="ml-1 text-slate-900">{projectInstallationInfo.label}</span>
                                     </div>
                                 )}
 
@@ -1094,10 +1148,10 @@ const BudgetProjectEditor = () => {
                                     <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
                                         <button
                                             type="button"
-                                            onClick={autoFillExpenseRows}
+                                            onClick={() => autoFillExpenseRows({ forceReset: true })}
                                             className="h-8 rounded-lg px-3 text-[11px] font-black bg-white text-indigo-700 ring-1 ring-slate-200"
                                         >
-                                            경비 자동 산정
+                                            경비 자동 산정 초기화
                                         </button>
                                         <input
                                             type="text"
@@ -1113,7 +1167,7 @@ const BudgetProjectEditor = () => {
                             <div className="flex items-center gap-2">
                                 <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 mr-2">
                                     <ClipboardPaste size={12} />
-                                    <span>{canEditActiveRows ? '엑셀 붙여넣기 가능' : '예산 보기 모드(수정 불가)'}</span>
+                                    <span>{canEditActiveRows ? '엑셀 붙여넣기 가능' : '현재 상태에서는 수정 불가'}</span>
                                 </div>
                             </div>
                         </div>
@@ -1199,14 +1253,21 @@ const ExcelTable = ({
     };
 
     const normalizeHistoryValue = (value, column) => {
+        if (column?.key === 'lock_auto') return value ? '잠금' : '해제';
         if (column?.type === 'number') return String(toNumber(value));
-        if (column?.options) return String(value ?? '').toUpperCase();
+        if (column?.key === 'unit') return String(value ?? '').toUpperCase();
         return String(value ?? '');
     };
 
     const normalizeWriteValue = (value, column) => {
+        if (column?.key === 'lock_auto') {
+            const text = String(value ?? '').trim();
+            if (text === '잠금') return '잠금';
+            if (text === '해제') return '해제';
+            return value ? '잠금' : '해제';
+        }
         if (column?.type === 'number') return String(value ?? '').replace(/[^0-9]/g, '');
-        if (column?.options) return String(value ?? '').trim().toUpperCase();
+        if (column?.key === 'unit') return String(value ?? '').trim().toUpperCase();
         return String(value ?? '');
     };
 
@@ -1657,7 +1718,7 @@ const ExcelTable = ({
                 let nextValue = String(cellText ?? '');
                 if (column.type === 'number') {
                     nextValue = nextValue.replace(/[^0-9]/g, '');
-                } else if (column.options) {
+                } else if (column.key === 'unit') {
                     nextValue = nextValue.trim().toUpperCase();
                 }
                 const change = buildCellChange(targetRow, targetCol, nextValue);
@@ -1741,6 +1802,9 @@ const ExcelTable = ({
                                 const displayValue = col.type === 'number'
                                     ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
                                     : (rawValue || '');
+                                const optionValue = col.key === 'lock_auto'
+                                    ? (rawValue ? '잠금' : '해제')
+                                    : String(rawValue || '');
                                 const isCellEditable = editable && !col.readonly;
                                 const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
                                 const isSelected = isCellInSelection(rowIndex, colIndex);
@@ -1769,7 +1833,7 @@ const ExcelTable = ({
                                             {isEditingCurrentCell ? (
                                                 <select
                                                     className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700 cursor-text"
-                                                    value={String(rawValue || '').toUpperCase()}
+                                                    value={optionValue}
                                                     onChange={(event) => {
                                                         const change = buildCellChange(rowIndex, colIndex, event.target.value);
                                                         if (change) applyCellChanges([change]);
@@ -1793,7 +1857,7 @@ const ExcelTable = ({
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                 >
-                                                    {String(rawValue || '').toUpperCase()}
+                                                    {optionValue}
                                                 </button>
                                             )}
                                             {isActive && editable && !col.readonly && (

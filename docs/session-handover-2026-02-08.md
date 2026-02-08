@@ -137,3 +137,14 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 커밋/배포:
     - `c4adf92 feat: 경비 자체/외주 스코프 전환 및 저장 일관화`
     - `git push` 완료 (`main`)
+- 2026-02-08 (경비 수동값 저장 초기화 버그 보정)
+  - `전체 저장` 이후 경비 수동 입력값이 자동값으로 덮이는 레거시 데이터 경로 보정:
+    - `expense_name` 기반 `auto_formula` 복원 맵 추가
+    - 경비 자동 병합 시 `auto_formula` 미보유 행도 `공식키/항목명` 기준으로 동일 행 매칭
+    - 셀 수정 시 `auto_formula` 미보유 레거시 행도 즉시 공식키를 복원해 수동 전환(`is_auto=false`)이 유지되도록 보강
+    - 저장 정규화 시 `auto_formula`를 이름 기반으로 복원하여 왕복 저장 일관성 확보
+  - 관련 파일:
+    - `frontend/src/pages/BudgetProjectEditor.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

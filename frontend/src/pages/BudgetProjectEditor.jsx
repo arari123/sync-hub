@@ -63,6 +63,19 @@ const AUTO_EXPENSE_QUANTITY_FORMULAS = new Set([
     AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
     AUTO_EXPENSE_FORMULAS.AIRFARE,
 ]);
+const AUTO_EXPENSE_FORMULA_BY_NAME = {
+    '프로젝트 운영비': AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION,
+    '소모품비': AUTO_EXPENSE_FORMULAS.CONSUMABLES,
+    '공구비': AUTO_EXPENSE_FORMULAS.TOOLS,
+    '출장비': AUTO_EXPENSE_FORMULAS.TRIP,
+    '숙박비': AUTO_EXPENSE_FORMULAS.LODGING,
+    '국내 교통비': AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
+    '해외 교통비': AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
+    '항공료': AUTO_EXPENSE_FORMULAS.AIRFARE,
+    '현지인원채용 비용': AUTO_EXPENSE_FORMULAS.LOCAL_HIRE,
+    '도비 비용': AUTO_EXPENSE_FORMULAS.DOBI,
+    '기타 비용': AUTO_EXPENSE_FORMULAS.OTHER,
+};
 
 const COMMON_EQUIPMENT_NAME = '공통';
 
@@ -95,6 +108,13 @@ function resolveLaborStaffingType(row) {
     const unit = String(row?.unit || '').trim().toUpperCase();
     if (unit === 'D') return '외주';
     return '자체';
+}
+
+function resolveExpenseAutoFormula(row) {
+    const explicit = String(row?.auto_formula || '').trim();
+    if (explicit) return explicit;
+    const name = String(row?.expense_name || '').trim();
+    return AUTO_EXPENSE_FORMULA_BY_NAME[name] || '';
 }
 
 function normalizeEquipmentName(value) {
@@ -142,7 +162,10 @@ function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
             ...row,
             equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
             ...(meta.budgetKey === SECTION_META.expense.budgetKey
-                ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                ? {
+                    expense_type: normalizeExpenseType(row?.expense_type),
+                    auto_formula: resolveExpenseAutoFormula(row),
+                }
                 : {}),
             ...(meta.budgetKey === SECTION_META.labor.budgetKey
                 ? { staffing_type: resolveLaborStaffingType(row) }
@@ -1053,30 +1076,41 @@ const BudgetProjectEditor = () => {
             const samePhaseRows = expenseRows.filter((row) => matchesExpenseScope(row, phase));
             const otherPhaseRows = expenseRows.filter((row) => !matchesExpenseScope(row, phase));
             const currentByFormula = {};
-            samePhaseRows.forEach((row) => {
-                const formula = String(row.auto_formula || '').trim();
-                if (!formula) return;
-                const current = currentByFormula[formula];
-                if (!current) {
-                    currentByFormula[formula] = row;
-                    return;
-                }
+            const currentByName = {};
+            const selectPreferredExpenseRow = (current, next) => {
+                if (!current) return next;
                 const currentLocked = Boolean(current?.lock_auto);
-                const nextLocked = Boolean(row?.lock_auto);
+                const nextLocked = Boolean(next?.lock_auto);
                 const currentManual = current?.is_auto !== true;
-                const nextManual = row?.is_auto !== true;
-                if (nextLocked && !currentLocked) {
-                    currentByFormula[formula] = row;
-                    return;
+                const nextManual = next?.is_auto !== true;
+                if (nextLocked && !currentLocked) return next;
+                if (nextManual && !currentManual) return next;
+                return current;
+            };
+            samePhaseRows.forEach((row) => {
+                const normalizedName = String(row?.expense_name || '').trim();
+                const formula = resolveExpenseAutoFormula(row);
+                const normalizedRow = formula && String(row?.auto_formula || '').trim() !== formula
+                    ? { ...row, auto_formula: formula }
+                    : row;
+                if (formula) {
+                    currentByFormula[formula] = selectPreferredExpenseRow(
+                        currentByFormula[formula],
+                        normalizedRow,
+                    );
                 }
-                if (nextManual && !currentManual) {
-                    currentByFormula[formula] = row;
+                if (normalizedName) {
+                    currentByName[normalizedName] = selectPreferredExpenseRow(
+                        currentByName[normalizedName],
+                        normalizedRow,
+                    );
                 }
             });
 
             const nextPhaseRows = [];
             autoRows.forEach((generated) => {
-                const current = currentByFormula[generated.auto_formula];
+                const current = currentByFormula[generated.auto_formula]
+                    || currentByName[String(generated?.expense_name || '').trim()];
                 const isLocked = Boolean(current?.lock_auto);
                 if (isLocked) {
                     nextPhaseRows.push(current);
@@ -1121,7 +1155,7 @@ const BudgetProjectEditor = () => {
                 autoRows.map((item) => String(item?.expense_name || '').trim()).filter(Boolean),
             );
             samePhaseRows.forEach((row) => {
-                if (!row.auto_formula) {
+                if (!resolveExpenseAutoFormula(row)) {
                     const normalizedName = String(row?.expense_name || '').trim();
                     if (autoExpenseNameSet.has(normalizedName)) {
                         return;
@@ -1133,12 +1167,16 @@ const BudgetProjectEditor = () => {
             const dedupedPhaseRows = [];
             const seenAutoFormula = new Set();
             nextPhaseRows.forEach((row) => {
-                const formulaKey = String(row?.auto_formula || '').trim();
+                const formulaKey = resolveExpenseAutoFormula(row);
                 if (formulaKey) {
                     if (seenAutoFormula.has(formulaKey)) return;
                     seenAutoFormula.add(formulaKey);
                 }
-                dedupedPhaseRows.push(row);
+                dedupedPhaseRows.push(
+                    formulaKey && String(row?.auto_formula || '').trim() !== formulaKey
+                        ? { ...row, auto_formula: formulaKey }
+                        : row,
+                );
             });
 
             return {
@@ -1182,10 +1220,14 @@ const BudgetProjectEditor = () => {
             } else {
                 row[key] = value;
             }
+            const resolvedExpenseFormula = section === 'expense' ? resolveExpenseAutoFormula(row) : '';
+            if (section === 'expense' && resolvedExpenseFormula && !String(row?.auto_formula || '').trim()) {
+                row.auto_formula = resolvedExpenseFormula;
+            }
             if (
                 section === 'expense'
                 && activeMode === 'budget'
-                && row.auto_formula
+                && resolvedExpenseFormula
                 && ['equipment_name', 'expense_name', 'basis', 'amount'].includes(key)
                 && row.is_auto
             ) {
@@ -1200,30 +1242,30 @@ const BudgetProjectEditor = () => {
                 section === 'expense'
                 && activeMode === 'budget'
                 && key === 'quantity'
-                && row.auto_formula
+                && resolvedExpenseFormula
             ) {
                 const settings = mergeBudgetSettings(prev?.budget_settings);
                 settings.installation_locale = projectInstallationInfo.locale;
                 const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
                 const locale = rowPhase === 'installation' ? projectInstallationInfo.locale : 'domestic';
                 const qty = toNumber(row.quantity);
-                if (row.auto_formula === AUTO_EXPENSE_FORMULAS.TRIP) {
+                if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.TRIP) {
                     const rate = (rowPhase === 'fabrication' || locale === 'domestic')
                         ? (toNumber(settings.domestic_trip_daily) || 36000)
                         : (toNumber(settings.overseas_trip_daily) || 120000);
                     row.amount = Math.floor(qty * rate);
-                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.LODGING) {
+                } else if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.LODGING) {
                     const rate = (rowPhase === 'fabrication' || locale === 'domestic')
                         ? (toNumber(settings.domestic_lodging_daily) || 70000)
                         : (toNumber(settings.overseas_lodging_daily) || 200000);
                     row.amount = Math.floor(qty * rate);
-                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
+                } else if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT) {
                     row.amount = Math.floor(
                         qty
                         * (toNumber(settings.domestic_distance_km) || 0)
                         * (toNumber(settings.domestic_transport_per_km) || 250),
                     );
-                } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.AIRFARE) {
+                } else if (resolvedExpenseFormula === AUTO_EXPENSE_FORMULAS.AIRFARE) {
                     row.amount = Math.floor(qty * (toNumber(settings.overseas_airfare_daily) || 350000));
                 }
             }
@@ -1419,7 +1461,7 @@ const BudgetProjectEditor = () => {
                     quantity: toNumber(row?.quantity),
                     amount: toNumber(row?.amount),
                     is_auto: Boolean(row?.is_auto),
-                    auto_formula: String(row?.auto_formula || '').trim(),
+                    auto_formula: resolveExpenseAutoFormula(row),
                     lock_auto: parseLockAutoValue(row?.lock_auto),
                     memo: String(row?.memo || '').trim(),
                     ...(sectionKey === 'expense'

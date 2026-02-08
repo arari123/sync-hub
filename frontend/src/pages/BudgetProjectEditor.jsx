@@ -1258,6 +1258,7 @@ const ExcelTable = ({
     editable,
     allowRowDelete,
 }) => {
+    const tableWrapperRef = useRef(null);
     const tableRef = useRef(null);
     const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
     const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
@@ -1267,6 +1268,7 @@ const ExcelTable = ({
     const [isFillDragging, setIsFillDragging] = useState(false);
     const [fillAnchor, setFillAnchor] = useState(null);
     const [fillTarget, setFillTarget] = useState(null);
+    const [fillOverlayRect, setFillOverlayRect] = useState(null);
 
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
     const rowCount = rows.length;
@@ -1300,6 +1302,15 @@ const ExcelTable = ({
         const nextRow = clamp(row, 0, Math.max(rowCount - 1, 0));
         const nextCol = clamp(col, 0, Math.max(colCount - 1, 0));
         setActiveCell({ row: nextRow, col: nextCol });
+        setSelectionStart({ row: nextRow, col: nextCol });
+        setSelectionEnd({ row: nextRow, col: nextCol });
+    };
+
+    const handleCellFocus = (row, col) => {
+        const nextRow = clamp(row, 0, Math.max(rowCount - 1, 0));
+        const nextCol = clamp(col, 0, Math.max(colCount - 1, 0));
+        setActiveCell({ row: nextRow, col: nextCol });
+        if (isCellInSelection(nextRow, nextCol)) return;
         setSelectionStart({ row: nextRow, col: nextCol });
         setSelectionEnd({ row: nextRow, col: nextCol });
     };
@@ -1400,6 +1411,37 @@ const ExcelTable = ({
         };
     }, [columns, fillAnchor, fillTarget, isFillDragging, onChange, rows]);
 
+    useEffect(() => {
+        if (!isFillDragging || !fillAnchor || !fillTarget) {
+            setFillOverlayRect(null);
+            return;
+        }
+
+        const containerEl = tableWrapperRef.current;
+        const anchorCell = tableRef.current?.querySelector(
+            `td[data-row="${fillAnchor.row}"][data-col="${fillAnchor.col}"]`,
+        );
+        const targetCell = tableRef.current?.querySelector(
+            `td[data-row="${fillTarget.row}"][data-col="${fillTarget.col}"]`,
+        );
+        if (!containerEl || !anchorCell || !targetCell) return;
+
+        const containerRect = containerEl.getBoundingClientRect();
+        const anchorRect = anchorCell.getBoundingClientRect();
+        const targetRect = targetCell.getBoundingClientRect();
+        const left = Math.min(anchorRect.left, targetRect.left) - containerRect.left + containerEl.scrollLeft;
+        const top = Math.min(anchorRect.top, targetRect.top) - containerRect.top + containerEl.scrollTop;
+        const right = Math.max(anchorRect.right, targetRect.right) - containerRect.left + containerEl.scrollLeft;
+        const bottom = Math.max(anchorRect.bottom, targetRect.bottom) - containerRect.top + containerEl.scrollTop;
+
+        setFillOverlayRect({
+            left,
+            top,
+            width: Math.max(0, right - left),
+            height: Math.max(0, bottom - top),
+        });
+    }, [fillAnchor, fillTarget, isFillDragging]);
+
     const handleKeyDown = (event, rowIndex, colIndex) => {
         const column = columns[colIndex];
         const isCellEditable = editable && column && !column.readonly;
@@ -1468,7 +1510,7 @@ const ExcelTable = ({
         event.preventDefault();
         stopEditingCell();
         setActiveCell({ row: rowIndex, col: colIndex });
-        if (event.shiftKey) {
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
             setSelectionEnd({ row: rowIndex, col: colIndex });
         } else {
             setSelectionStart({ row: rowIndex, col: colIndex });
@@ -1518,7 +1560,8 @@ const ExcelTable = ({
 
     return (
         <>
-            <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
+            <div className="relative" ref={tableWrapperRef}>
+                <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
                 <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
                     <tr>
                         {columns.map((col, idx) => (
@@ -1576,7 +1619,7 @@ const ExcelTable = ({
                                                     value={String(rawValue || '').toUpperCase()}
                                                     onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
-                                                    onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
+                                                    onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onBlur={() => {
                                                         if (!isEditing(rowIndex, colIndex)) return;
                                                         stopEditingCell();
@@ -1591,7 +1634,7 @@ const ExcelTable = ({
                                                     type="button"
                                                     data-cell-display="true"
                                                     className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left text-slate-700"
-                                                    onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
+                                                    onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                                 >
                                                     {String(rawValue || '').toUpperCase()}
@@ -1639,9 +1682,7 @@ const ExcelTable = ({
                                                 if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
                                                 onChange(rowIndex, col.key, val);
                                             }}
-                                            onFocus={() => {
-                                                setSingleCellSelection(rowIndex, colIndex);
-                                            }}
+                                            onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                             onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                                             onBlur={() => {
                                                 if (!isEditing(rowIndex, colIndex)) return;
@@ -1681,7 +1722,23 @@ const ExcelTable = ({
                         </tr>
                     )}
                 </tbody>
-            </table>
+                </table>
+                {isFillDragging && fillOverlayRect && (
+                    <div
+                        className="pointer-events-none absolute z-30 rounded-[2px] border-2 border-primary/70 bg-primary/10"
+                        style={{
+                            left: `${fillOverlayRect.left}px`,
+                            top: `${fillOverlayRect.top}px`,
+                            width: `${fillOverlayRect.width}px`,
+                            height: `${fillOverlayRect.height}px`,
+                        }}
+                    >
+                        <div className="absolute -top-6 right-0 rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                            복사 범위 선택 중
+                        </div>
+                    </div>
+                )}
+            </div>
             {Object.entries(autoCompleteOptions).map(([key, values]) => {
                 if (!Array.isArray(values) || !values.length) return null;
                 return (

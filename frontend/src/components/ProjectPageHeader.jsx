@@ -15,7 +15,9 @@ const ProjectPageHeader = ({
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-black tracking-tight text-slate-900">{projectName || '프로젝트'}</h1>
+                    {projectName && (
+                        <h1 className="text-2xl font-black tracking-tight text-slate-900">{projectName}</h1>
+                    )}
                     {projectCode && (
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-bold tracking-tight text-slate-500">
                             {projectCode}

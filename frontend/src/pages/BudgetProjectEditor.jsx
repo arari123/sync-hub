@@ -89,6 +89,14 @@ function normalizeStaffingType(value) {
     return normalized === '외주' ? '외주' : '자체';
 }
 
+function resolveLaborStaffingType(row) {
+    const explicit = String(row?.staffing_type || '').trim();
+    if (explicit === '외주' || explicit === '자체') return explicit;
+    const unit = String(row?.unit || '').trim().toUpperCase();
+    if (unit === 'D') return '외주';
+    return '자체';
+}
+
 function normalizeEquipmentName(value) {
     return String(value || '').trim();
 }
@@ -137,7 +145,7 @@ function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
                 ? { expense_type: normalizeExpenseType(row?.expense_type) }
                 : {}),
             ...(meta.budgetKey === SECTION_META.labor.budgetKey
-                ? { staffing_type: normalizeStaffingType(row?.staffing_type) }
+                ? { staffing_type: resolveLaborStaffingType(row) }
                 : {}),
         }));
         result[meta.executionKey] = (result[meta.executionKey] || []).map((row) => ({
@@ -147,7 +155,7 @@ function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
                 ? { expense_type: normalizeExpenseType(row?.expense_type) }
                 : {}),
             ...(meta.executionKey === SECTION_META.labor.executionKey
-                ? { staffing_type: normalizeStaffingType(row?.staffing_type) }
+                ? { staffing_type: resolveLaborStaffingType(row) }
                 : {}),
         }));
     });
@@ -384,7 +392,7 @@ function calcBudgetAmount(row, section, settings) {
         const hours = laborUnitToHours(row.unit, locationType, settings);
         const quantity = toNumber(row.quantity);
         const headcount = toNumber(row.headcount) || 1;
-        const isOutsource = String(row?.staffing_type || '자체').trim() === '외주';
+        const isOutsource = resolveLaborStaffingType(row) === '외주';
         if (isOutsource) {
             const days = hours / 8;
             return quantity * days * OUTSOURCE_LABOR_RATE_PER_DAY * headcount;
@@ -764,7 +772,7 @@ const BudgetProjectEditor = () => {
             const phaseRows = source
                 .filter((row) => (row.phase || 'fabrication') === currentPhase)
                 .filter((row) => normalizeEquipmentName(row?.equipment_name) === activeEquipmentName)
-                .filter((row) => String(row.staffing_type || '자체') === normalizedStaffingType);
+                .filter((row) => resolveLaborStaffingType(row) === normalizedStaffingType);
             const duplicateCount = phaseRows.filter((row) => {
                 const name = String(row.task_name || '').trim();
                 return name === targetDepartment || name.startsWith(`${targetDepartment}(`);
@@ -1359,7 +1367,7 @@ const BudgetProjectEditor = () => {
                     };
                 }
                 if (sectionKey === 'labor') {
-                    const staffingType = normalizeStaffingType(row?.staffing_type);
+                    const staffingType = resolveLaborStaffingType(row);
                     return {
                         ...baseRow,
                         task_name: String(row?.task_name || '').trim(),
@@ -1402,7 +1410,7 @@ const BudgetProjectEditor = () => {
                     };
                 }
                 if (sectionKey === 'labor') {
-                    const staffingType = normalizeStaffingType(row?.staffing_type);
+                    const staffingType = resolveLaborStaffingType(row);
                     return {
                         ...baseRow,
                         task_name: String(row?.task_name || '').trim(),
@@ -2559,7 +2567,7 @@ const ExcelTable = ({
                             {columns.map((col, colIndex) => {
                                 const rawValue = col.computed ? col.computed(row) : row[col.key];
                                 const normalizedRawValue = col.key === 'staffing_type'
-                                    ? normalizeStaffingType(rawValue)
+                                    ? resolveLaborStaffingType(row)
                                     : rawValue;
                                 const displayValue = col.type === 'number'
                                     ? (normalizedRawValue === null || normalizedRawValue === undefined || normalizedRawValue === '' ? '' : toNumber(normalizedRawValue).toLocaleString('ko-KR'))

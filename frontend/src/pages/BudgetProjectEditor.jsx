@@ -33,7 +33,7 @@ const DEFAULT_BUDGET_SETTINGS = {
     consumable_ratio_installation: 2,
     tool_ratio_fabrication: 1,
     tool_ratio_installation: 1,
-    domestic_trip_daily: 32000,
+    domestic_trip_daily: 36000,
     domestic_lodging_daily: 70000,
     domestic_transport_per_km: 250,
     domestic_distance_km: 0,
@@ -829,6 +829,11 @@ const BudgetProjectEditor = () => {
                 AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                 AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT,
             ]);
+            const fabricationManualFormulas = new Set([
+                AUTO_EXPENSE_FORMULAS.TRIP,
+                AUTO_EXPENSE_FORMULAS.LODGING,
+                AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
+            ]);
 
             const materialRows = prev.material_items || [];
             const laborRows = prev.labor_items || [];
@@ -862,12 +867,13 @@ const BudgetProjectEditor = () => {
 
             const installationManDays = laborRows
                 .filter((row) => matchesCoreScope(row, 'installation'))
+                .filter((row) => resolveLaborStaffingType(row) === targetExpenseType)
                 .reduce((sum, row) => {
                     const locationType = projectInstallationInfo.locale;
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
                     return sum + (hours / 8);
                 }, 0);
-            const domesticTripDaily = toNumber(settings.domestic_trip_daily) || 32000;
+            const domesticTripDaily = toNumber(settings.domestic_trip_daily) || 36000;
             const domesticLodgingDaily = toNumber(settings.domestic_lodging_daily) || 70000;
             const domesticDistanceKm = toNumber(settings.domestic_distance_km) || 0;
             const domesticTransportPerKm = toNumber(settings.domestic_transport_per_km) || 250;
@@ -914,7 +920,9 @@ const BudgetProjectEditor = () => {
                 amount = 0,
                 quantity = '',
             }) => {
-                const autoEnabled = !isOutsourceExpense || outsourceAutoFormulas.has(formula);
+                const isFabricationManualFormula = phase === 'fabrication' && fabricationManualFormulas.has(formula);
+                const autoEnabled = !isFabricationManualFormula
+                    && (!isOutsourceExpense || outsourceAutoFormulas.has(formula));
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
@@ -967,23 +975,29 @@ const BudgetProjectEditor = () => {
                 pushExpenseRow({
                     formula: AUTO_EXPENSE_FORMULAS.TRIP,
                     name: '출장비',
-                    basis: `출장 횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원`,
-                    quantity: tripQuantity,
-                    amount: Math.floor(tripQuantity * domesticTripDaily),
+                    basis: phase === 'fabrication'
+                        ? `수동 입력 (횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원)`
+                        : `출장 횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원`,
+                    quantity: phase === 'fabrication' ? '' : tripQuantity,
+                    amount: phase === 'fabrication' ? 0 : Math.floor(tripQuantity * domesticTripDaily),
                 });
                 pushExpenseRow({
                     formula: AUTO_EXPENSE_FORMULAS.LODGING,
                     name: '숙박비',
-                    basis: `숙박 횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원`,
-                    quantity: lodgingQuantity,
-                    amount: Math.floor(lodgingQuantity * domesticLodgingDaily),
+                    basis: phase === 'fabrication'
+                        ? `수동 입력 (횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원)`
+                        : `숙박 횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원`,
+                    quantity: phase === 'fabrication' ? '' : lodgingQuantity,
+                    amount: phase === 'fabrication' ? 0 : Math.floor(lodgingQuantity * domesticLodgingDaily),
                 });
                 pushExpenseRow({
                     formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT,
                     name: '국내 교통비',
-                    basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
-                    quantity: transportQuantity,
-                    amount: Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
+                    basis: phase === 'fabrication'
+                        ? `수동 입력 (횟수 * ${(domesticDistanceKm * domesticTransportPerKm).toLocaleString('ko-KR')}원)`
+                        : `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
+                    quantity: phase === 'fabrication' ? '' : transportQuantity,
+                    amount: phase === 'fabrication' ? 0 : Math.floor(transportQuantity * domesticDistanceKm * domesticTransportPerKm),
                 });
             } else {
                 const tripQuantity = installationManDays;
@@ -1168,7 +1182,6 @@ const BudgetProjectEditor = () => {
                 section === 'expense'
                 && activeMode === 'budget'
                 && key === 'quantity'
-                && row.is_auto
                 && row.auto_formula
             ) {
                 const settings = mergeBudgetSettings(prev?.budget_settings);
@@ -1178,7 +1191,7 @@ const BudgetProjectEditor = () => {
                 const qty = toNumber(row.quantity);
                 if (row.auto_formula === AUTO_EXPENSE_FORMULAS.TRIP) {
                     const rate = (rowPhase === 'fabrication' || locale === 'domestic')
-                        ? (toNumber(settings.domestic_trip_daily) || 32000)
+                        ? (toNumber(settings.domestic_trip_daily) || 36000)
                         : (toNumber(settings.overseas_trip_daily) || 120000);
                     row.amount = Math.floor(qty * rate);
                 } else if (row.auto_formula === AUTO_EXPENSE_FORMULAS.LODGING) {

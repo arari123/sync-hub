@@ -17,6 +17,7 @@ const SECTION_META = {
 const DEFAULT_LABOR_DEPARTMENTS = ['PM', '설계', 'SW', '검사기술', '제어1', '제어2'];
 const OUTSOURCE_LABOR_DEPARTMENTS = ['PM', '설계', '기구', '전장', '제어', 'SW'];
 const STAFFING_TYPE_OPTIONS = ['자체', '외주'];
+const EXPENSE_TYPE_OPTIONS = ['자체', '외주'];
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 
@@ -78,6 +79,11 @@ function parseLockAutoValue(value) {
     return ['잠금', 'locked', 'true', '1', 'yes', 'y'].includes(text);
 }
 
+function normalizeExpenseType(value) {
+    const normalized = String(value || '').trim();
+    return normalized === '외주' ? '외주' : '자체';
+}
+
 function normalizeEquipmentName(value) {
     return String(value || '').trim();
 }
@@ -122,10 +128,16 @@ function normalizeDetailsWithEquipment(detailsObj, equipmentName) {
         result[meta.budgetKey] = (result[meta.budgetKey] || []).map((row) => ({
             ...row,
             equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
+            ...(meta.budgetKey === SECTION_META.expense.budgetKey
+                ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                : {}),
         }));
         result[meta.executionKey] = (result[meta.executionKey] || []).map((row) => ({
             ...row,
             equipment_name: normalizeEquipmentName(row?.equipment_name) || target,
+            ...(meta.executionKey === SECTION_META.expense.executionKey
+                ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                : {}),
         }));
     });
     return result;
@@ -251,6 +263,7 @@ function buildEmptyBudgetRow(section, phase = 'fabrication') {
     }
     return {
         equipment_name: '',
+        expense_type: '자체',
         expense_name: '',
         lock_auto: false,
         basis: '',
@@ -288,6 +301,7 @@ function buildEmptyExecutionRow(section, phase = 'fabrication') {
     }
     return {
         equipment_name: '',
+        expense_type: '자체',
         expense_name: '',
         basis: '',
         executed_amount: 0,
@@ -370,6 +384,7 @@ const BudgetProjectEditor = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
     const [currentPhase, setCurrentPhase] = useState('fabrication');
+    const [currentExpenseType, setCurrentExpenseType] = useState('자체');
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [currentEquipmentName, setCurrentEquipmentName] = useState('');
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
@@ -379,6 +394,7 @@ const BudgetProjectEditor = () => {
     const activeEquipmentName = isEquipmentProject
         ? normalizeEquipmentName(currentEquipmentName || equipmentNames[0] || '')
         : COMMON_EQUIPMENT_NAME;
+    const activeExpenseType = normalizeExpenseType(currentExpenseType);
     const isConfirmed = version?.status === 'confirmed';
     const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
@@ -406,6 +422,7 @@ const BudgetProjectEditor = () => {
 
     const aggregationModeLabel = activeMode === 'execution' ? '집행금액' : '예산';
     const entryModeLabel = activeMode === 'execution' ? '집행금액 입력 모드' : '예산 입력 모드';
+    const currentPhaseLabel = currentPhase === 'installation' ? '설치' : '제작';
 
     const displayRows = useMemo(
         () => rows
@@ -415,10 +432,13 @@ const BudgetProjectEditor = () => {
                 if (!activeEquipmentName) return false;
                 if (normalizeEquipmentName(row.equipment_name) !== activeEquipmentName) return false;
                 if (section === 'labor') return String(row?.task_name || '').trim().length > 0;
-                if (section === 'expense') return String(row?.expense_name || '').trim().length > 0;
+                if (section === 'expense') {
+                    if (normalizeExpenseType(row?.expense_type) !== activeExpenseType) return false;
+                    return String(row?.expense_name || '').trim().length > 0;
+                }
                 return true;
             }),
-        [rows, currentPhase, activeEquipmentName, section],
+        [rows, currentPhase, activeEquipmentName, activeExpenseType, section],
     );
 
     const sidebarSummary = useMemo(() => {
@@ -715,35 +735,40 @@ const BudgetProjectEditor = () => {
                 ? projectInstallationInfo.locale
                 : 'domestic';
             const targetEquipmentName = activeEquipmentName;
+            const targetExpenseType = activeExpenseType;
 
             const materialRows = prev.material_items || [];
             const laborRows = prev.labor_items || [];
             const expenseRows = prev.expense_items || [];
-            const matchesScope = (row, targetPhase = null) => {
+            const matchesCoreScope = (row, targetPhase = null) => {
                 const phaseMatched = targetPhase
                     ? (row.phase || 'fabrication') === targetPhase
                     : true;
                 if (!phaseMatched) return false;
                 return normalizeEquipmentName(row?.equipment_name) === targetEquipmentName;
             };
+            const matchesExpenseScope = (row, targetPhase = null) => (
+                matchesCoreScope(row, targetPhase)
+                && normalizeExpenseType(row?.expense_type) === targetExpenseType
+            );
 
             const materialFabTotal = materialRows
-                .filter((row) => matchesScope(row, 'fabrication'))
+                .filter((row) => matchesCoreScope(row, 'fabrication'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'material', settings), 0);
             const materialInstallTotal = materialRows
-                .filter((row) => matchesScope(row, 'installation'))
+                .filter((row) => matchesCoreScope(row, 'installation'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'material', settings), 0);
             const materialTotal = materialFabTotal + materialInstallTotal;
             const laborFabTotal = laborRows
-                .filter((row) => matchesScope(row, 'fabrication'))
+                .filter((row) => matchesCoreScope(row, 'fabrication'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'labor', settings), 0);
             const laborInstallTotal = laborRows
-                .filter((row) => matchesScope(row, 'installation'))
+                .filter((row) => matchesCoreScope(row, 'installation'))
                 .reduce((sum, row) => sum + calcBudgetAmount(row, 'labor', settings), 0);
             const projectBudgetBase = materialTotal + laborFabTotal + laborInstallTotal;
 
             const installationManDays = laborRows
-                .filter((row) => matchesScope(row, 'installation'))
+                .filter((row) => matchesCoreScope(row, 'installation'))
                 .reduce((sum, row) => {
                     const locationType = projectInstallationInfo.locale;
                     const hours = toNumber(row.quantity) * laborUnitToHours(row.unit, locationType, settings);
@@ -792,6 +817,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '프로젝트 운영비',
                     basis: `총 예산 기준 ${toNumber(settings.project_overhead_ratio)}%`,
                     amount: Math.floor(projectBudgetBase * (toNumber(settings.project_overhead_ratio) / 100)),
@@ -802,6 +828,7 @@ const BudgetProjectEditor = () => {
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
                 equipment_name: targetEquipmentName,
+                expense_type: targetExpenseType,
                 expense_name: '소모품비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.consumable_ratio_fabrication)}%`
@@ -818,6 +845,7 @@ const BudgetProjectEditor = () => {
             autoRows.push({
                 ...buildEmptyBudgetRow('expense', phase),
                 equipment_name: targetEquipmentName,
+                expense_type: targetExpenseType,
                 expense_name: '공구비',
                 basis: phase === 'fabrication'
                     ? `제작 재료비 ${toNumber(settings.tool_ratio_fabrication)}%`
@@ -839,6 +867,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '출장비',
                     basis: `출장 횟수/MD * ${domesticTripDaily.toLocaleString('ko-KR')}원`,
                     quantity: tripQuantity,
@@ -850,6 +879,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '숙박비',
                     basis: `숙박 횟수/MD * ${domesticLodgingDaily.toLocaleString('ko-KR')}원`,
                     quantity: lodgingQuantity,
@@ -861,6 +891,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '국내 교통비',
                     basis: `교통 횟수 * ${domesticDistanceKm.toLocaleString('ko-KR')}km * ${domesticTransportPerKm.toLocaleString('ko-KR')}원`,
                     quantity: transportQuantity,
@@ -877,6 +908,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '출장비',
                     basis: `출장 횟수/MD * ${overseasTripDaily.toLocaleString('ko-KR')}원`,
                     quantity: tripQuantity,
@@ -888,6 +920,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '숙박비',
                     basis: `숙박 횟수/MD * ${overseasLodgingDaily.toLocaleString('ko-KR')}원`,
                     quantity: lodgingQuantity,
@@ -899,6 +932,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '해외 교통비',
                     basis: '해외 교통비 단가 수동 입력 (횟수 자동 제안)',
                     quantity: transportQuantity,
@@ -910,6 +944,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: '항공료',
                     basis: `항공 횟수/MD * ${overseasAirfareDaily.toLocaleString('ko-KR')}원`,
                     quantity: airfareQuantity,
@@ -928,6 +963,7 @@ const BudgetProjectEditor = () => {
                 autoRows.push({
                     ...buildEmptyBudgetRow('expense', phase),
                     equipment_name: targetEquipmentName,
+                    expense_type: targetExpenseType,
                     expense_name: name,
                     basis: '수동 입력',
                     amount: 0,
@@ -937,8 +973,8 @@ const BudgetProjectEditor = () => {
                 });
             });
 
-            const samePhaseRows = expenseRows.filter((row) => matchesScope(row, phase));
-            const otherPhaseRows = expenseRows.filter((row) => !matchesScope(row, phase));
+            const samePhaseRows = expenseRows.filter((row) => matchesExpenseScope(row, phase));
+            const otherPhaseRows = expenseRows.filter((row) => !matchesExpenseScope(row, phase));
             const currentByFormula = {};
             samePhaseRows.forEach((row) => {
                 const formula = String(row.auto_formula || '').trim();
@@ -961,6 +997,7 @@ const BudgetProjectEditor = () => {
                 nextPhaseRows.push({
                     ...generated,
                     equipment_name: normalizeEquipmentName(current?.equipment_name || generated.equipment_name) || targetEquipmentName,
+                    expense_type: normalizeExpenseType(current?.expense_type || generated.expense_type || targetExpenseType),
                     quantity: (
                         !forceReset
                         && current
@@ -1015,7 +1052,7 @@ const BudgetProjectEditor = () => {
                 expense_items: [...otherPhaseRows, ...dedupedPhaseRows],
             };
         });
-    }, [activeEquipmentName, currentPhase, projectInstallationInfo.locale]);
+    }, [activeEquipmentName, activeExpenseType, currentPhase, projectInstallationInfo.locale]);
 
     const toggleSort = (columnKey) => {
         setSortState((prev) => {
@@ -1034,6 +1071,9 @@ const BudgetProjectEditor = () => {
             const row = { ...newList[index] };
             if (activeEquipmentName) {
                 row.equipment_name = activeEquipmentName;
+            }
+            if (section === 'expense') {
+                row.expense_type = activeExpenseType;
             }
             if (['quantity', 'unit_price', 'amount', 'executed_amount'].includes(key)) {
                 row[key] = toNumber(value);
@@ -1097,9 +1137,12 @@ const BudgetProjectEditor = () => {
 
             const filteredIndices = [];
             newList.forEach((item, itemIndex) => {
+                const isExpenseTypeMatched = section !== 'expense'
+                    || normalizeExpenseType(item?.expense_type) === activeExpenseType;
                 if (
                     (item.phase || 'fabrication') === currentPhase
                     && normalizeEquipmentName(item?.equipment_name) === activeEquipmentName
+                    && isExpenseTypeMatched
                 ) {
                     filteredIndices.push(itemIndex);
                 }
@@ -1153,6 +1196,9 @@ const BudgetProjectEditor = () => {
                         return {
                             ...row,
                             equipment_name: equipmentName,
+                            ...(sectionKey === 'expense'
+                                ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                                : {}),
                         };
                     });
                 cleanDetails[meta.executionKey] = (details[meta.executionKey] || [])
@@ -1165,6 +1211,9 @@ const BudgetProjectEditor = () => {
                         return {
                             ...row,
                             equipment_name: equipmentName,
+                            ...(sectionKey === 'expense'
+                                ? { expense_type: normalizeExpenseType(row?.expense_type) }
+                                : {}),
                         };
                     });
             });
@@ -1492,6 +1541,36 @@ const BudgetProjectEditor = () => {
                                         설비 구분 없음: 공통 입력
                                     </div>
                                 )}
+
+                                {section === 'expense' && (
+                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                                        {EXPENSE_TYPE_OPTIONS.map((expenseType) => (
+                                            <button
+                                                key={`expense-type-${expenseType}`}
+                                                type="button"
+                                                onClick={() => setCurrentExpenseType(expenseType)}
+                                                className={cn(
+                                                    'px-3 py-1.5 rounded-lg text-[11px] font-black transition-all',
+                                                    activeExpenseType === expenseType
+                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200'
+                                                        : 'text-slate-500 hover:text-slate-700',
+                                                )}
+                                            >
+                                                {expenseType} 경비
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="inline-flex items-center rounded-lg border bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600">
+                                    입력 스코프:
+                                    <span className="ml-1 text-slate-900">
+                                        {isEquipmentProject ? activeEquipmentName || '설비 미선택' : '공통'}
+                                        {' > '}
+                                        {currentPhaseLabel}
+                                        {section === 'expense' ? ` > ${activeExpenseType} 경비` : ''}
+                                    </span>
+                                </div>
 
                                 {activeMode === 'budget' && section === 'labor' && (
                                     <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">

@@ -141,6 +141,7 @@ class LaborDetailItem(BaseModel):
 
 class ExpenseDetailItem(BaseModel):
     equipment_name: str = Field(..., min_length=1, max_length=180)
+    expense_type: str = Field(default="자체", max_length=16)
     expense_name: str = Field(default="", max_length=180)
     basis: str = Field(default="", max_length=180)
     quantity: float = 0.0
@@ -173,6 +174,7 @@ class LaborExecutionItem(BaseModel):
 
 class ExpenseExecutionItem(BaseModel):
     equipment_name: str = Field(..., min_length=1, max_length=180)
+    expense_type: str = Field(default="자체", max_length=16)
     expense_name: str = Field(default="", max_length=180)
     basis: str = Field(default="", max_length=180)
     executed_amount: float = 0.0
@@ -675,6 +677,10 @@ def _require_version_edit_permission(version: models.BudgetVersion, user: models
 
 
 def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
+    def _normalize_expense_type(raw_value: Any) -> str:
+        normalized = str(raw_value or "").strip()
+        return "외주" if normalized == "외주" else "자체"
+
     signature = {
         "material_items": [],
         "labor_items": [],
@@ -713,6 +719,7 @@ def _budget_lock_signature(detail_payload: dict) -> dict[str, list[tuple]]:
         signature["expense_items"].append(
             (
                 (item.get("equipment_name") or "").strip(),
+                _normalize_expense_type(item.get("expense_type")),
                 (item.get("expense_name") or "").strip(),
                 (item.get("basis") or "").strip(),
                 to_number(item.get("quantity")),

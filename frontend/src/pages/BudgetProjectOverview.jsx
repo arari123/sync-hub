@@ -47,12 +47,6 @@ const UPCOMING_MANAGEMENT_AREAS = [
     { key: 'as', label: 'AS 관리', path: 'as' },
 ];
 
-const JOBLIST_PLACEHOLDERS = [
-    { title: '이슈 → 조치', description: '이슈 발생 원인과 조치 내역이 등록됩니다.' },
-    { title: 'TODO LIST', description: '담당자별 작업 항목과 우선순위가 등록됩니다.' },
-    { title: 'Q&A', description: '프로젝트 질의응답 이력이 등록됩니다.' },
-];
-
 const BudgetProjectOverview = () => {
     const { projectId } = useParams();
     const [project, setProject] = useState(null);
@@ -220,7 +214,7 @@ const BudgetProjectOverview = () => {
         return <p className="text-sm text-muted-foreground">프로젝트를 찾을 수 없습니다.</p>;
     }
 
-    const coverImageUrl = (project.cover_image_display_url || project.cover_image_url || project.cover_image_fallback_url || '').trim();
+    const coverImageUrl = (project.cover_image_url || '').trim();
     const milestones = Array.isArray(project.summary_milestones) ? project.summary_milestones : [];
     const baseProjectPath = `/project-management/projects/${project.id}`;
     const budgetManagementPath = `${baseProjectPath}/budget`;
@@ -234,6 +228,9 @@ const BudgetProjectOverview = () => {
         ...item,
         to: `${baseProjectPath}/${item.path}`,
     }));
+    const latestJobEntries = Array.isArray(project?.joblist_latest_entries)
+        ? project.joblist_latest_entries.filter((item) => item && typeof item === 'object')
+        : [];
 
     return (
         <div className="space-y-5 pb-12 animate-in fade-in duration-500">
@@ -347,19 +344,26 @@ const BudgetProjectOverview = () => {
                             </Button>
                         </Link>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                        <MiniStat label="이슈/조치" value={0} />
-                        <MiniStat label="TODO" value={0} tone="primary" />
-                        <MiniStat label="Q&A" value={0} />
-                    </div>
-                    <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
-                        {JOBLIST_PLACEHOLDERS.map((item) => (
-                            <div key={item.title} className="rounded-md border bg-muted/20 px-2.5 py-2">
-                                <p className="text-[11px] font-semibold truncate">{item.title}</p>
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{item.description}</p>
-                            </div>
-                        ))}
-                    </div>
+                    {latestJobEntries.length > 0 ? (
+                        <div className="space-y-2 overflow-auto flex-1 min-h-0 pr-1">
+                            {latestJobEntries.slice(0, 5).map((entry, index) => {
+                                const title = String(entry?.title || entry?.subject || entry?.content || '').trim() || `최신 등록 ${index + 1}`;
+                                const content = String(entry?.content || entry?.summary || '').trim();
+                                const createdAt = String(entry?.created_at || entry?.createdAt || '').trim();
+                                return (
+                                    <div key={`${title}-${index}`} className="rounded-md border bg-muted/20 px-2.5 py-2">
+                                        <p className="text-[11px] font-semibold truncate">{title}</p>
+                                        {content && <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{content}</p>}
+                                        {createdAt && <p className="text-[10px] text-muted-foreground mt-0.5">{createdAt}</p>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="flex-1 min-h-0 rounded-md border border-dashed bg-muted/10 flex items-center justify-center text-[11px] text-muted-foreground text-center px-2">
+                            최신 등록 내용이 없습니다.
+                        </div>
+                    )}
                 </section>
 
                 <section className="rounded-2xl border bg-card p-4 shadow-sm h-full min-h-0 flex flex-col">
@@ -567,18 +571,6 @@ const ManagementLinkButton = ({ to, label, upcoming = false }) => (
     >
         {label}
     </Link>
-);
-
-const MiniStat = ({ label, value, tone = 'default' }) => (
-    <div
-        className={cn(
-            'rounded-md border px-2 py-1.5 text-center',
-            tone === 'primary' ? 'border-primary/30 bg-primary/5' : 'bg-muted/15'
-        )}
-    >
-        <p className="text-[9px] text-muted-foreground">{label}</p>
-        <p className={cn('text-[12px] font-bold', tone === 'primary' ? 'text-primary' : 'text-foreground')}>{value}</p>
-    </div>
 );
 
 const IdentityRow = ({ label, value }) => (

@@ -145,17 +145,23 @@ const TreeNode = ({
         && activeTreeKey.startsWith(`${node.key}::`);
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const isCollapsed = hasChildren && Boolean(collapsedByKey?.[node.key]);
+    const handleNodeClick = () => {
+        onSelectTreeNode?.(node);
+        if (hasChildren) {
+            onToggleNodeCollapse?.(node.key);
+        }
+    };
     return (
         <div>
             <div className="relative">
                 <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => onSelectTreeNode?.(node)}
+                    onClick={handleNodeClick}
                     onKeyDown={(event) => {
                         if (event.key !== 'Enter' && event.key !== ' ') return;
                         event.preventDefault();
-                        onSelectTreeNode?.(node);
+                        handleNodeClick();
                     }}
                     className={`relative w-full rounded-md border px-2 py-1.5 text-left transition-all cursor-pointer ${
                         isActive

@@ -296,3 +296,14 @@ curl -X DELETE 'http://localhost:9200/documents_index?ignore_unavailable=true'
   - 검증:
     - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
     - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
+- 2026-02-08 (트리 항목 본문 클릭 시 접기/펼치기 연동)
+  - 요구 반영:
+    - 트리 항목 텍스트/영역 자체를 클릭해도 접기/펼치기 동작 필요
+  - 조치:
+    - 자식이 있는 노드는 항목 본문 클릭 시 `선택 + 접기/펼치기` 동시 동작으로 변경
+    - 키보드 Enter/Space 동작도 동일하게 연동
+  - 관련 파일:
+    - `frontend/src/components/BudgetSidebar.jsx`
+  - 검증:
+    - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (`Ran 77 tests ... OK`)
+    - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과

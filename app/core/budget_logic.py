@@ -251,6 +251,17 @@ def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
     settings = payload.get("budget_settings")
     if not isinstance(settings, dict):
         settings = {}
+    material_unit_counts_raw = settings.get("material_unit_counts")
+    material_unit_counts: dict[str, float] = {}
+    if isinstance(material_unit_counts_raw, dict):
+        for scope_key, raw_count in material_unit_counts_raw.items():
+            key = str(scope_key or "").strip()
+            if not key:
+                continue
+            count = to_number(raw_count)
+            if count <= 0:
+                continue
+            material_unit_counts[key] = max(1.0, float(int(count)))
 
     def _bucket(name: str) -> dict:
         key = (name or "").strip() or "미지정 설비"
@@ -271,8 +282,15 @@ def aggregate_equipment_costs_from_detail(payload: dict) -> list[dict]:
         target = _bucket(item.get("equipment_name") or "")
         quantity = to_number(item.get("quantity"))
         unit_price = to_number(item.get("unit_price"))
-        amount = quantity * unit_price
         phase = normalize_phase(item.get("phase") or "fabrication")
+        unit_name = str(item.get("unit_name") or item.get("part_name") or "").strip()
+        unit_scope_key = (
+            f"{target['equipment_name']}::{phase}::{unit_name}"
+            if unit_name
+            else ""
+        )
+        unit_count = material_unit_counts.get(unit_scope_key, 1.0)
+        amount = quantity * unit_price * unit_count
         if phase == "installation":
             target["material_install_cost"] += amount
         else:

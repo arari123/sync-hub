@@ -60,6 +60,27 @@ function normalizeExpenseType(value) {
     return String(value || '').trim() === '외주' ? '외주' : '자체';
 }
 
+function normalizeMaterialUnitCountMap(source) {
+    const result = {};
+    if (!source || typeof source !== 'object') return result;
+    Object.entries(source).forEach(([scopeKey, rawValue]) => {
+        const key = String(scopeKey || '').trim();
+        if (!key) return;
+        const parsed = Number(rawValue);
+        if (!Number.isFinite(parsed)) return;
+        result[key] = Math.max(1, Math.floor(parsed));
+    });
+    return result;
+}
+
+function materialUnitScopeKeyFromRow(row) {
+    const equipmentName = normalizeEquipmentName(row?.equipment_name, '미지정 설비');
+    const phase = normalizePhase(row?.phase);
+    const unitName = String(row?.unit_name || row?.part_name || '').trim();
+    if (!unitName) return '';
+    return `${equipmentName}::${phase}::${unitName}`;
+}
+
 function laborUnitToHours(unit, locationType, settings) {
     const normalizedUnit = String(unit || 'H').trim().toUpperCase();
     if (normalizedUnit === 'H') return 1;
@@ -274,6 +295,7 @@ const BudgetProjectBudget = () => {
 
     const dashboard = useMemo(() => {
         const settings = { ...DEFAULT_LABOR_SETTINGS, ...(details?.budget_settings || {}) };
+        const materialUnitCountMap = normalizeMaterialUnitCountMap(settings?.material_unit_counts);
         const isEquipmentProject = (project?.project_type || 'equipment') === 'equipment';
         const equipmentNames = collectEquipmentNames(project?.project_type || 'equipment', equipments, details);
         const allowedEquipmentSet = new Set(equipmentNames);
@@ -297,7 +319,9 @@ const BudgetProjectBudget = () => {
             if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
-            const amount = toNumber(row?.quantity) * toNumber(row?.unit_price);
+            const unitScopeKey = materialUnitScopeKeyFromRow(row);
+            const unitCount = Math.max(1, Number(materialUnitCountMap[unitScopeKey] || 1));
+            const amount = toNumber(row?.quantity) * toNumber(row?.unit_price) * unitCount;
 
             const equipment = ensureEquipmentBucket(equipmentMap, equipmentName);
             const phaseBucket = equipment.phases[phase];

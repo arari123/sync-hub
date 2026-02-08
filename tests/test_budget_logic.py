@@ -151,6 +151,28 @@ class BudgetLogicTests(unittest.TestCase):
         # W=7D=56H, M=30D=240H
         self.assertEqual(item["labor_install_cost"], 10360000)
 
+    def test_aggregate_equipment_costs_applies_material_unit_count_multiplier(self):
+        payload = {
+            "budget_settings": {
+                "material_unit_counts": {
+                    "검사기C::fabrication::로더유닛": 3,
+                },
+            },
+            "material_items": [
+                {
+                    "equipment_name": "검사기C",
+                    "unit_name": "로더유닛",
+                    "quantity": 2,
+                    "unit_price": 10000,
+                    "phase": "fabrication",
+                },
+            ],
+        }
+        results = aggregate_equipment_costs_from_detail(payload)
+        self.assertEqual(len(results), 1)
+        item = results[0]
+        self.assertEqual(item["material_fab_cost"], 60000)
+
     def test_summarize_executed_costs_from_detail(self):
         payload = {
             "material_items": [

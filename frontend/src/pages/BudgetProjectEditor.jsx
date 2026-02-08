@@ -204,6 +204,39 @@ function normalizeLocationType(value) {
     return 'domestic';
 }
 
+function buildMaterialUnitScopeKey(equipmentName, phase, unitName) {
+    const normalizedEquipment = normalizeEquipmentName(equipmentName) || COMMON_EQUIPMENT_NAME;
+    const normalizedPhase = phase === 'installation' ? 'installation' : 'fabrication';
+    const normalizedUnitName = String(unitName || '').trim();
+    if (!normalizedUnitName) return '';
+    return `${normalizedEquipment}::${normalizedPhase}::${normalizedUnitName}`;
+}
+
+function normalizeMaterialUnitCountMap(source) {
+    const result = {};
+    if (!source || typeof source !== 'object') return result;
+    Object.entries(source).forEach(([scopeKey, rawValue]) => {
+        const key = String(scopeKey || '').trim();
+        if (!key) return;
+        const parsed = Number(rawValue);
+        if (!Number.isFinite(parsed)) return;
+        const normalized = Math.max(1, Math.floor(parsed));
+        result[key] = normalized;
+    });
+    return result;
+}
+
+function resolveMaterialUnitCountForRow(row, settings) {
+    const scopeKey = buildMaterialUnitScopeKey(
+        row?.equipment_name,
+        (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication',
+        resolveMaterialUnitLabel(row),
+    );
+    if (!scopeKey) return 1;
+    const unitCountMap = normalizeMaterialUnitCountMap(settings?.material_unit_counts);
+    return Math.max(1, Number(unitCountMap[scopeKey] || 1));
+}
+
 function mergeBudgetSettings(settings) {
     const merged = { ...DEFAULT_BUDGET_SETTINGS, ...(settings || {}) };
     const departments = Array.isArray(merged.labor_departments)
@@ -211,6 +244,7 @@ function mergeBudgetSettings(settings) {
         : [];
     merged.labor_departments = departments.length ? departments : DEFAULT_LABOR_DEPARTMENTS;
     merged.installation_locale = normalizeLocationType(merged.installation_locale);
+    merged.material_unit_counts = normalizeMaterialUnitCountMap(merged.material_unit_counts);
     return merged;
 }
 
@@ -419,7 +453,11 @@ function injectBuffers(detailsObj) {
 }
 
 function calcBudgetAmount(row, section, settings) {
-    if (section === 'material') return toNumber(row.quantity) * toNumber(row.unit_price);
+    if (section === 'material') {
+        const baseAmount = toNumber(row.quantity) * toNumber(row.unit_price);
+        const unitCount = resolveMaterialUnitCountForRow(row, settings);
+        return baseAmount * unitCount;
+    }
     if (section === 'labor') {
         const phase = (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
         const locationType = phase === 'installation'
@@ -471,7 +509,6 @@ const BudgetProjectEditor = () => {
         expense: { equipment: '', phase: 'all', unit: '', expenseType: '' },
     }));
     const [materialUnitCountByScope, setMaterialUnitCountByScope] = useState({});
-    const [appliedMaterialUnitCountByScope, setAppliedMaterialUnitCountByScope] = useState({});
     const [sortState, setSortState] = useState({ key: '', direction: 'none' });
 
     const canEditProject = project?.can_edit !== false;
@@ -826,20 +863,24 @@ const BudgetProjectEditor = () => {
     }, [details, budgetSettings]);
     const canSave = canEditScopedRows;
     const canAppendLaborDepartment = canEditScopedRows && activePhaseFilter !== 'all';
+    const materialUnitCountSettings = useMemo(
+        () => normalizeMaterialUnitCountMap(budgetSettings.material_unit_counts),
+        [budgetSettings.material_unit_counts],
+    );
     const activeMaterialUnitScopeKey = section === 'material'
         && activePhaseFilter !== 'all'
         && activeUnitFilter
-        ? `${activeEquipmentName}::${activePhaseFilter}::${activeUnitFilter}`
+        ? buildMaterialUnitScopeKey(activeEquipmentName, activePhaseFilter, activeUnitFilter)
         : '';
     const activeMaterialUnitCountInput = activeMaterialUnitScopeKey
-        ? String(materialUnitCountByScope[activeMaterialUnitScopeKey] ?? '1')
+        ? String(materialUnitCountByScope[activeMaterialUnitScopeKey] ?? materialUnitCountSettings[activeMaterialUnitScopeKey] ?? '1')
         : '1';
     const resolveMaterialUnitCount = useCallback((scopeKey) => {
-        const raw = String(materialUnitCountByScope[scopeKey] ?? '1').trim();
+        const raw = String(materialUnitCountByScope[scopeKey] ?? materialUnitCountSettings[scopeKey] ?? '1').trim();
         const parsed = Number(raw);
         if (!Number.isFinite(parsed)) return 1;
         return Math.max(1, Math.floor(parsed));
-    }, [materialUnitCountByScope]);
+    }, [materialUnitCountByScope, materialUnitCountSettings]);
     const handleMaterialUnitCountInputChange = useCallback((nextValue) => {
         if (!activeMaterialUnitScopeKey) return;
         const digitsOnly = String(nextValue || '').replace(/[^0-9]/g, '');
@@ -848,58 +889,50 @@ const BudgetProjectEditor = () => {
             [activeMaterialUnitScopeKey]: digitsOnly,
         }));
     }, [activeMaterialUnitScopeKey]);
+    useEffect(() => {
+        if (!activeMaterialUnitScopeKey) return;
+        setMaterialUnitCountByScope((prev) => {
+            if (Object.prototype.hasOwnProperty.call(prev, activeMaterialUnitScopeKey)) {
+                return prev;
+            }
+            const initialValue = String(materialUnitCountSettings[activeMaterialUnitScopeKey] ?? 1);
+            return {
+                ...prev,
+                [activeMaterialUnitScopeKey]: initialValue,
+            };
+        });
+    }, [activeMaterialUnitScopeKey, materialUnitCountSettings]);
     const applyMaterialUnitCount = useCallback(() => {
         if (!canEditScopedRows) return;
         if (!activeMaterialUnitScopeKey || !activeEquipmentName || !activeUnitFilter) return;
-        const previousCount = Math.max(
-            1,
-            Math.floor(Number(appliedMaterialUnitCountByScope[activeMaterialUnitScopeKey] || 1)),
-        );
         const nextCount = resolveMaterialUnitCount(activeMaterialUnitScopeKey);
-        if (previousCount === nextCount) return;
         setDetails((prev) => {
-            const source = [...(prev[activeKey] || [])];
-            const updated = source.map((row) => {
-                const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
-                if (rowPhase !== activePhaseFilter) return row;
-                if (normalizeEquipmentName(row?.equipment_name) !== activeEquipmentName) return row;
-                if (resolveMaterialUnitLabel(row) !== activeUnitFilter) return row;
-                if (rowIsEmptyFn(row, 'material')) return row;
-                if (activeMode === 'execution') {
-                    return {
-                        ...row,
-                        executed_amount: (toNumber(row.executed_amount) / previousCount) * nextCount,
-                    };
-                }
-                return {
-                    ...row,
-                    quantity: (toNumber(row.quantity) / previousCount) * nextCount,
-                };
-            });
+            const merged = mergeBudgetSettings(prev?.budget_settings);
+            const currentMap = normalizeMaterialUnitCountMap(merged.material_unit_counts);
+            const nextMap = { ...currentMap };
+            if (nextCount <= 1) {
+                delete nextMap[activeMaterialUnitScopeKey];
+            } else {
+                nextMap[activeMaterialUnitScopeKey] = nextCount;
+            }
             return {
                 ...prev,
-                [activeKey]: updated,
+                budget_settings: {
+                    ...merged,
+                    material_unit_counts: nextMap,
+                },
             };
         });
         setMaterialUnitCountByScope((prev) => ({
             ...prev,
             [activeMaterialUnitScopeKey]: String(nextCount),
         }));
-        setAppliedMaterialUnitCountByScope((prev) => ({
-            ...prev,
-            [activeMaterialUnitScopeKey]: nextCount,
-        }));
     }, [
         activeEquipmentName,
-        activeKey,
         activeMaterialUnitScopeKey,
-        activeMode,
-        activePhaseFilter,
         activeUnitFilter,
-        appliedMaterialUnitCountByScope,
         canEditScopedRows,
         resolveMaterialUnitCount,
-        rowIsEmptyFn,
     ]);
 
     const load = async () => {
@@ -907,7 +940,6 @@ const BudgetProjectEditor = () => {
         setIsLoading(true);
         setError('');
         setMaterialUnitCountByScope({});
-        setAppliedMaterialUnitCountByScope({});
         try {
             const versionResp = await api.get(`/budget/projects/${projectId}/versions`);
             const payload = versionResp?.data || {};

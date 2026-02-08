@@ -31,7 +31,11 @@ function scoreProject(project, queryTokens, queryLower) {
     const customer = String(project?.customer_name || '').toLowerCase();
     const manager = String(project?.manager_name || project?.author_name || '').toLowerCase();
     const code = String(project?.code || '').toLowerCase();
-    const haystack = `${name} ${description} ${customer} ${manager} ${code}`.trim();
+    const installationSite = String(project?.installation_site || '').toLowerCase();
+    const equipmentNames = Array.isArray(project?.equipment_names)
+        ? project.equipment_names.map((item) => String(item || '').toLowerCase()).join(' ')
+        : '';
+    const haystack = `${name} ${description} ${customer} ${manager} ${code} ${installationSite} ${equipmentNames}`.trim();
     if (!haystack) return 0;
     const hasExactPhrase = Boolean(queryLower) && haystack.includes(queryLower);
     const matchedTokens = queryTokens.filter((token) => haystack.includes(token)).length;
@@ -49,6 +53,8 @@ function scoreProject(project, queryTokens, queryLower) {
     if (queryLower && code.includes(queryLower)) score += 3;
     if (queryLower && customer.includes(queryLower)) score += 2;
     if (queryLower && manager.includes(queryLower)) score += 2;
+    if (queryLower && installationSite.includes(queryLower)) score += 2;
+    if (queryLower && equipmentNames.includes(queryLower)) score += 2.5;
 
     for (const token of queryTokens) {
         if (name.includes(token)) score += 1.5;
@@ -56,6 +62,8 @@ function scoreProject(project, queryTokens, queryLower) {
         if (customer.includes(token)) score += 1.0;
         if (manager.includes(token)) score += 1.0;
         if (code.includes(token)) score += 1.2;
+        if (installationSite.includes(token)) score += 0.9;
+        if (equipmentNames.includes(token)) score += 1.1;
     }
     return score;
 }

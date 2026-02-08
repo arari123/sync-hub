@@ -1085,46 +1085,166 @@ const BudgetProjectEditor = () => {
 
     const handleMaterialTreeContextAction = useCallback((action, node) => {
         if (section !== 'material') return;
+        const rowsInScope = details[activeKey] || [];
         const nodeType = String(node?.nodeType || '');
-        const scope = node?.scope || {};
-        const targetEquipment = normalizeEquipmentName(
-            scope.equipment || activeEquipmentName || equipmentNames[0] || '',
-        );
-        const targetPhase = scope.phase === 'installation' ? 'installation' : 'fabrication';
-        const targetUnit = String(scope.unit || '').trim();
-        if (!targetEquipment) return;
-
-        if (action === 'paste') {
-            if (nodeType !== 'phase') return;
-            if (!materialUnitClipboard?.rows?.length) return;
-            const sourceRows = details[activeKey] || [];
-            const existingUnitNames = new Set(
-                sourceRows
+        const readScope = (scopeInput = {}) => ({
+            equipment: normalizeEquipmentName(scopeInput?.equipment || activeEquipmentName || equipmentNames[0] || ''),
+            phase: scopeInput?.phase === 'installation' ? 'installation' : 'fabrication',
+            unit: String(scopeInput?.unit || '').trim(),
+        });
+        const scopeMatches = (row, scopeInput) => {
+            const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+            const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+            const rowUnit = resolveMaterialUnitLabel(row);
+            return (
+                rowEquipment === scopeInput.equipment
+                && rowPhase === scopeInput.phase
+                && rowUnit === scopeInput.unit
+            );
+        };
+        const moveUnitRows = ({
+            sourceScope,
+            targetScope,
+            targetUnitName,
+            clearClipboard = false,
+        }) => {
+            if (!sourceScope?.equipment || !sourceScope?.unit || !targetScope?.equipment) return;
+            if (!targetUnitName) return;
+            const sourceScopeKey = buildMaterialUnitScopeKey(sourceScope.equipment, sourceScope.phase, sourceScope.unit);
+            const targetScopeKey = buildMaterialUnitScopeKey(targetScope.equipment, targetScope.phase, targetUnitName);
+            setDetails((prev) => {
+                const source = [...(prev[activeKey] || [])];
+                const sourceRows = source.filter((row) => scopeMatches(row, sourceScope));
+                const movedRows = sourceRows.filter((row) => !rowIsEmptyFn(row, 'material'));
+                if (!movedRows.length) return prev;
+                const nextRows = source
+                    .filter((row) => !scopeMatches(row, sourceScope))
+                    .concat(
+                        movedRows.map((row) => ({
+                            ...row,
+                            equipment_name: targetScope.equipment,
+                            phase: targetScope.phase,
+                            unit_name: targetUnitName,
+                        })),
+                    );
+                const mergedSettings = mergeBudgetSettings(prev?.budget_settings);
+                const unitCountMap = normalizeMaterialUnitCountMap(mergedSettings.material_unit_counts);
+                const sourceUnitCount = Math.max(1, Number(unitCountMap[sourceScopeKey] || 1));
+                if (sourceScopeKey) {
+                    delete unitCountMap[sourceScopeKey];
+                }
+                if (targetScopeKey) {
+                    if (sourceUnitCount <= 1) {
+                        delete unitCountMap[targetScopeKey];
+                    } else {
+                        unitCountMap[targetScopeKey] = sourceUnitCount;
+                    }
+                }
+                return {
+                    ...prev,
+                    [activeKey]: nextRows,
+                    budget_settings: {
+                        ...mergedSettings,
+                        material_unit_counts: unitCountMap,
+                    },
+                };
+            });
+            setTreeSelectionBySection((prev) => ({
+                ...prev,
+                material: {
+                    equipment: targetScope.equipment,
+                    phase: targetScope.phase,
+                    unit: targetUnitName,
+                    expenseType: '',
+                },
+            }));
+            if (clearClipboard) {
+                setMaterialUnitClipboard(null);
+            }
+        };
+        if (action === 'move') {
+            const sourceScope = readScope(node?.sourceNode?.scope || {});
+            const targetScope = readScope(node?.targetNode?.scope || {});
+            if (!sourceScope.equipment || !sourceScope.unit || !targetScope.equipment) return;
+            const sameContainer = (
+                sourceScope.equipment === targetScope.equipment
+                && sourceScope.phase === targetScope.phase
+            );
+            const targetUnitNames = new Set(
+                rowsInScope
                     .filter((row) => {
                         const rowEquipment = normalizeEquipmentName(row?.equipment_name);
                         const rowPhase = (row.phase || 'fabrication') === 'installation'
                             ? 'installation'
                             : 'fabrication';
                         return (
-                            rowEquipment === targetEquipment
-                            && rowPhase === targetPhase
+                            rowEquipment === targetScope.equipment
+                            && rowPhase === targetScope.phase
                             && !rowIsEmptyFn(row, 'material')
                         );
                     })
                     .map((row) => resolveMaterialUnitLabel(row))
                     .filter(Boolean),
             );
-            const nextUnitName = buildDuplicatedUnitName(
-                materialUnitClipboard.sourceUnitName,
-                existingUnitNames,
+            const targetUnitName = sameContainer
+                ? sourceScope.unit
+                : buildDuplicatedUnitName(sourceScope.unit, targetUnitNames);
+            moveUnitRows({ sourceScope, targetScope, targetUnitName });
+            return;
+        }
+
+        if (action === 'paste') {
+            if (nodeType !== 'phase') return;
+            if (!materialUnitClipboard?.rows?.length) return;
+            const targetScope = readScope(node?.scope || {});
+            if (!targetScope.equipment) return;
+            const sourceScope = readScope({
+                equipment: materialUnitClipboard.sourceEquipmentName,
+                phase: materialUnitClipboard.sourcePhase,
+                unit: materialUnitClipboard.sourceUnitName,
+            });
+            const sameContainer = (
+                sourceScope.equipment
+                && sourceScope.phase === targetScope.phase
+                && sourceScope.equipment === targetScope.equipment
             );
+            const targetUnitNames = new Set(
+                rowsInScope
+                    .filter((row) => {
+                        const rowEquipment = normalizeEquipmentName(row?.equipment_name);
+                        const rowPhase = (row.phase || 'fabrication') === 'installation'
+                            ? 'installation'
+                            : 'fabrication';
+                        return (
+                            rowEquipment === targetScope.equipment
+                            && rowPhase === targetScope.phase
+                            && !rowIsEmptyFn(row, 'material')
+                        );
+                    })
+                    .map((row) => resolveMaterialUnitLabel(row))
+                    .filter(Boolean),
+            );
+            const targetUnitName = sameContainer
+                ? sourceScope.unit
+                : buildDuplicatedUnitName(materialUnitClipboard.sourceUnitName, targetUnitNames);
+            const isCutMode = materialUnitClipboard.mode === 'cut';
+            if (isCutMode && sourceScope.equipment && sourceScope.unit) {
+                moveUnitRows({
+                    sourceScope,
+                    targetScope,
+                    targetUnitName,
+                    clearClipboard: true,
+                });
+                return;
+            }
+
             const pastedRows = materialUnitClipboard.rows.map((row) => ({
                 ...row,
-                equipment_name: targetEquipment,
-                phase: targetPhase,
-                unit_name: nextUnitName,
+                equipment_name: targetScope.equipment,
+                phase: targetScope.phase,
+                unit_name: targetUnitName,
             }));
-            const nextScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, nextUnitName);
+            const nextScopeKey = buildMaterialUnitScopeKey(targetScope.equipment, targetScope.phase, targetUnitName);
             const copiedUnitCount = Math.max(1, Number(materialUnitClipboard.sourceUnitCount || 1));
 
             setDetails((prev) => {
@@ -1149,58 +1269,50 @@ const BudgetProjectEditor = () => {
             setTreeSelectionBySection((prev) => ({
                 ...prev,
                 material: {
-                    equipment: targetEquipment,
-                    phase: targetPhase,
-                    unit: nextUnitName,
+                    equipment: targetScope.equipment,
+                    phase: targetScope.phase,
+                    unit: targetUnitName,
                     expenseType: '',
                 },
             }));
             return;
         }
 
-        if (nodeType !== 'unit' || !targetUnit) return;
-
-        const sourceRows = details[activeKey] || [];
-        const scopeMatchedRows = sourceRows.filter((row) => {
-            const rowEquipment = normalizeEquipmentName(row?.equipment_name);
-            const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
-            return (
-                rowEquipment === targetEquipment
-                && rowPhase === targetPhase
-                && resolveMaterialUnitLabel(row) === targetUnit
-            );
-        });
-
-        if (action === 'copy') {
+        const sourceScope = readScope(node?.scope || {});
+        if (nodeType !== 'unit' || !sourceScope.unit || !sourceScope.equipment) return;
+        const scopeMatchedRows = rowsInScope.filter((row) => scopeMatches(row, sourceScope));
+        if (action === 'copy' || action === 'cut') {
             const copiedRows = scopeMatchedRows.filter((row) => !rowIsEmptyFn(row, 'material'));
             if (!copiedRows.length) {
                 setMaterialUnitClipboard(null);
                 return;
             }
-            const copiedScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
+            const sourceScopeKey = buildMaterialUnitScopeKey(
+                sourceScope.equipment,
+                sourceScope.phase,
+                sourceScope.unit,
+            );
             const unitCountMap = normalizeMaterialUnitCountMap(details?.budget_settings?.material_unit_counts);
             setMaterialUnitClipboard({
+                mode: action,
                 rows: copiedRows.map((row) => ({ ...row })),
-                sourceUnitName: targetUnit,
-                sourceScopeKey: copiedScopeKey,
-                sourceUnitCount: Math.max(1, Number(unitCountMap[copiedScopeKey] || 1)),
+                sourceEquipmentName: sourceScope.equipment,
+                sourcePhase: sourceScope.phase,
+                sourceUnitName: sourceScope.unit,
+                sourceScopeKey,
+                sourceUnitCount: Math.max(1, Number(unitCountMap[sourceScopeKey] || 1)),
             });
             return;
         }
 
         if (action === 'delete') {
-            const targetScopeKey = buildMaterialUnitScopeKey(targetEquipment, targetPhase, targetUnit);
+            const targetScopeKey = buildMaterialUnitScopeKey(
+                sourceScope.equipment,
+                sourceScope.phase,
+                sourceScope.unit,
+            );
             setDetails((prev) => {
-                const nextRows = (prev[activeKey] || []).filter((row) => {
-                    const rowEquipment = normalizeEquipmentName(row?.equipment_name);
-                    const rowPhase = (row.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
-                    const rowUnit = resolveMaterialUnitLabel(row);
-                    return !(
-                        rowEquipment === targetEquipment
-                        && rowPhase === targetPhase
-                        && rowUnit === targetUnit
-                    );
-                });
+                const nextRows = (prev[activeKey] || []).filter((row) => !scopeMatches(row, sourceScope));
                 const mergedSettings = mergeBudgetSettings(prev?.budget_settings);
                 const unitCountMap = normalizeMaterialUnitCountMap(mergedSettings.material_unit_counts);
                 if (targetScopeKey) {
@@ -1218,16 +1330,16 @@ const BudgetProjectEditor = () => {
             setTreeSelectionBySection((prev) => {
                 const current = prev.material || {};
                 const isSelectedTarget = (
-                    normalizeEquipmentName(current.equipment) === targetEquipment
-                    && current.phase === targetPhase
-                    && String(current.unit || '').trim() === targetUnit
+                    normalizeEquipmentName(current.equipment) === sourceScope.equipment
+                    && current.phase === sourceScope.phase
+                    && String(current.unit || '').trim() === sourceScope.unit
                 );
                 if (!isSelectedTarget) return prev;
                 return {
                     ...prev,
                     material: {
-                        equipment: targetEquipment,
-                        phase: targetPhase,
+                        equipment: sourceScope.equipment,
+                        phase: sourceScope.phase,
                         unit: '',
                         expenseType: '',
                     },

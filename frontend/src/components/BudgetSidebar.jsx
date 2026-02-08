@@ -19,6 +19,8 @@ const BudgetSidebar = ({
 }) => {
     const [collapsedByKey, setCollapsedByKey] = useState({});
     const [contextMenuState, setContextMenuState] = useState(null);
+    const [draggedUnitNode, setDraggedUnitNode] = useState(null);
+    const [dropTargetKey, setDropTargetKey] = useState('');
     const { total = 0, equipments = [] } = aggregation;
     const sectionSummary = summary && typeof summary === 'object'
         ? summary
@@ -94,6 +96,41 @@ const BudgetSidebar = ({
         onTreeContextAction?.(action, contextMenuState.node);
         setContextMenuState(null);
     };
+    const handleNodeDragStart = (event, node) => {
+        if (section !== 'material') return;
+        if (String(node?.nodeType || '') !== 'unit') return;
+        setDraggedUnitNode(node);
+        event.dataTransfer.effectAllowed = 'move';
+        try {
+            event.dataTransfer.setData('text/plain', node?.key || '');
+        } catch (_err) {
+            // no-op: 일부 브라우저는 setData 제한이 있습니다.
+        }
+    };
+    const handleNodeDragOver = (event, node) => {
+        if (section !== 'material') return;
+        if (!draggedUnitNode) return;
+        if (String(node?.nodeType || '') !== 'phase') return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDropTargetKey(String(node?.key || ''));
+    };
+    const handleNodeDrop = (event, node) => {
+        if (section !== 'material') return;
+        if (!draggedUnitNode) return;
+        if (String(node?.nodeType || '') !== 'phase') return;
+        event.preventDefault();
+        onTreeContextAction?.('move', {
+            sourceNode: draggedUnitNode,
+            targetNode: node,
+        });
+        setDropTargetKey('');
+        setDraggedUnitNode(null);
+    };
+    const handleNodeDragEnd = () => {
+        setDropTargetKey('');
+        setDraggedUnitNode(null);
+    };
 
     return (
         <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
@@ -149,6 +186,11 @@ const BudgetSidebar = ({
                                 collapsedByKey={collapsedByKey}
                                 onToggleNodeCollapse={toggleNodeCollapse}
                                 onNodeContextMenu={handleNodeContextMenu}
+                                onNodeDragStart={handleNodeDragStart}
+                                onNodeDragOver={handleNodeDragOver}
+                                onNodeDrop={handleNodeDrop}
+                                onNodeDragEnd={handleNodeDragEnd}
+                                dropTargetKey={dropTargetKey}
                             />
                         ))}
                         {!treeItems.length && (
@@ -171,6 +213,7 @@ const BudgetSidebar = ({
                     {String(contextMenuState?.node?.nodeType || '') === 'unit' && (
                         <>
                             <ContextMenuButton label="복사" onClick={() => runContextAction('copy')} />
+                            <ContextMenuButton label="잘라내기" onClick={() => runContextAction('cut')} />
                             <ContextMenuButton label="삭제" onClick={() => runContextAction('delete')} danger />
                         </>
                     )}
@@ -195,6 +238,11 @@ const TreeNode = ({
     collapsedByKey,
     onToggleNodeCollapse,
     onNodeContextMenu,
+    onNodeDragStart,
+    onNodeDragOver,
+    onNodeDrop,
+    onNodeDragEnd,
+    dropTargetKey,
 }) => {
     const isActive = activeTreeKey === node.key;
     const isActivePath = !isActive
@@ -208,12 +256,20 @@ const TreeNode = ({
             onToggleNodeCollapse?.(node.key);
         }
     };
+    const nodeType = String(node?.nodeType || '');
+    const isDraggableUnit = nodeType === 'unit';
+    const isPhaseDropTarget = nodeType === 'phase' && dropTargetKey === node.key;
     return (
         <div>
             <div className="relative">
                 <div
                     role="button"
                     tabIndex={0}
+                    draggable={isDraggableUnit}
+                    onDragStart={(event) => onNodeDragStart?.(event, node)}
+                    onDragOver={(event) => onNodeDragOver?.(event, node)}
+                    onDrop={(event) => onNodeDrop?.(event, node)}
+                    onDragEnd={onNodeDragEnd}
                     onClick={handleNodeClick}
                     onContextMenu={(event) => onNodeContextMenu?.(event, node)}
                     onKeyDown={(event) => {
@@ -222,7 +278,9 @@ const TreeNode = ({
                         handleNodeClick();
                     }}
                     className={`relative w-full rounded-md border px-2 py-1.5 text-left transition-all cursor-pointer ${
-                        isActive
+                        isPhaseDropTarget
+                            ? 'border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200'
+                            : isActive
                             ? 'border-sky-400 bg-sky-50 text-sky-900 shadow-sm ring-1 ring-sky-200'
                             : isActivePath
                                 ? 'border-slate-300 bg-slate-50 text-slate-900'
@@ -277,6 +335,11 @@ const TreeNode = ({
                             collapsedByKey={collapsedByKey}
                             onToggleNodeCollapse={onToggleNodeCollapse}
                             onNodeContextMenu={onNodeContextMenu}
+                            onNodeDragStart={onNodeDragStart}
+                            onNodeDragOver={onNodeDragOver}
+                            onNodeDrop={onNodeDrop}
+                            onNodeDragEnd={onNodeDragEnd}
+                            dropTargetKey={dropTargetKey}
                         />
                     ))}
                 </div>

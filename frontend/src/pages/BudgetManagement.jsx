@@ -41,8 +41,10 @@ function stageLabel(value) {
 }
 
 function formatAmount(value) {
-    const number = Number(value || 0);
-    return `${number.toLocaleString('ko-KR')}원`;
+    const parsed = Number(value || 0);
+    const number = Number.isFinite(parsed) ? parsed : 0;
+    const manwon = number >= 0 ? Math.floor(number / 10000) : Math.ceil(number / 10000);
+    return `${manwon.toLocaleString('ko-KR')}만원`;
 }
 
 function extractCustomerOptions(projectList) {

@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Navigate, useParams } from 'react-router-dom';
 import { BarChart3, CheckCircle2, ClipboardPaste, Package, Save, Users, Wallet } from 'lucide-react';
-import { Workbook } from '@fortune-sheet/react';
-import '@fortune-sheet/react/dist/index.css';
 import { api, getErrorMessage } from '../lib/api';
 import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
 import BudgetSidebar from '../components/BudgetSidebar';
@@ -249,6 +247,7 @@ const BudgetProjectEditor = () => {
     const [isConfirming, setIsConfirming] = useState(false);
     const [currentPhase, setCurrentPhase] = useState('fabrication');
     const [budgetViewMode, setBudgetViewMode] = useState(false);
+    const [sortState, setSortState] = useState({ key: '', direction: 'none' });
 
     const canEditProject = project?.can_edit !== false;
     const isConfirmed = version?.status === 'confirmed';
@@ -417,6 +416,41 @@ const BudgetProjectEditor = () => {
         () => columns.filter((col) => isMultiEquipmentProject || col.key !== 'equipment_name'),
         [columns, isMultiEquipmentProject],
     );
+    const sortedDisplayRows = useMemo(() => {
+        if (!sortState?.key || sortState.direction === 'none') return displayRows;
+        const next = [...displayRows];
+        const targetColumn = visibleColumns.find((item) => item.key === sortState.key);
+        const isNumeric = targetColumn?.type === 'number';
+        next.sort((a, b) => {
+            const rawA = targetColumn?.computed ? targetColumn.computed(a) : a?.[sortState.key];
+            const rawB = targetColumn?.computed ? targetColumn.computed(b) : b?.[sortState.key];
+            const valueA = isNumeric ? toNumber(rawA) : String(rawA || '').toLowerCase();
+            const valueB = isNumeric ? toNumber(rawB) : String(rawB || '').toLowerCase();
+            if (valueA < valueB) return sortState.direction === 'asc' ? -1 : 1;
+            if (valueA > valueB) return sortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return next;
+    }, [displayRows, sortState, visibleColumns]);
+    const autoCompleteOptions = useMemo(() => {
+        const equipmentSet = new Set();
+        const unitSet = new Set();
+        Object.values(SECTION_META).forEach((meta) => {
+            (details[meta.budgetKey] || []).forEach((row) => {
+                const equipmentName = String(row?.equipment_name || '').trim();
+                if (equipmentName) equipmentSet.add(equipmentName);
+            });
+        });
+        (details.material_items || []).forEach((row) => {
+            const unitName = String(row?.unit_name || '').trim();
+            if (unitName) unitSet.add(unitName);
+        });
+        return {
+            equipment_name: Array.from(equipmentSet),
+            unit_name: Array.from(unitSet),
+            task_name: budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS,
+        };
+    }, [details, budgetSettings]);
     const canEditActiveRows = activeMode === 'execution' ? canEditExecutionFields : canEditBudgetFields;
     const canSave = canEditActiveRows;
 
@@ -459,6 +493,100 @@ const BudgetProjectEditor = () => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
+
+    const handlePaste = (event) => {
+        if (!canEditActiveRows) return;
+
+        event.preventDefault();
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedData = clipboardData.getData('text');
+        const pasteRows = pastedData.split(/\r\n|\n/).filter((line) => line.trim() !== '');
+
+        const parsedRows = pasteRows.map((rowText) => {
+            const cols = rowText.split('\t');
+
+            if (activeMode === 'execution') {
+                if (section === 'material') {
+                    return {
+                        equipment_name: cols[0] || '',
+                        unit_name: cols[1] || '',
+                        part_name: cols[2] || '',
+                        spec: cols[3] || '',
+                        executed_amount: toNumber(cols[4]),
+                        phase: (cols[5] || '').includes('설치') ? 'installation' : currentPhase,
+                        memo: cols[6] || '',
+                    };
+                }
+                if (section === 'labor') {
+                    return {
+                        equipment_name: cols[0] || '',
+                        task_name: cols[1] || '',
+                        worker_type: cols[2] || '',
+                        executed_amount: toNumber(cols[3]),
+                        phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
+                        memo: cols[5] || '',
+                    };
+                }
+                return {
+                    equipment_name: cols[0] || '',
+                    expense_name: cols[1] || '',
+                    basis: cols[2] || '',
+                    executed_amount: toNumber(cols[3]),
+                    phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
+                    memo: cols[5] || '',
+                };
+            }
+
+            if (section === 'material') {
+                return {
+                    equipment_name: cols[0] || '',
+                    unit_name: cols[1] || '',
+                    part_name: cols[2] || '',
+                    spec: cols[3] || '',
+                    quantity: toNumber(cols[4]),
+                    unit_price: toNumber(cols[5]),
+                    phase: (cols[6] || '').includes('설치') ? 'installation' : currentPhase,
+                    memo: cols[7] || '',
+                };
+            }
+            if (section === 'labor') {
+                return {
+                    equipment_name: cols[0] || '',
+                    task_name: cols[1] || '',
+                    headcount: toNumber(cols[2]) || 1,
+                    worker_type: cols[3] || '',
+                    unit: cols[4] || 'H',
+                    quantity: toNumber(cols[5]),
+                    hourly_rate: toNumber(cols[6]),
+                    location_type: currentPhase === 'installation' ? normalizeLocationType(budgetSettings.installation_locale) : 'domestic',
+                    phase: (cols[7] || '').includes('설치') ? 'installation' : currentPhase,
+                    memo: cols[8] || '',
+                };
+            }
+            return {
+                equipment_name: cols[0] || '',
+                expense_name: cols[1] || '',
+                basis: cols[2] || '',
+                amount: toNumber(cols[3]),
+                phase: (cols[4] || '').includes('설치') ? 'installation' : currentPhase,
+                memo: cols[5] || '',
+            };
+        });
+
+        setDetails((prev) => {
+            const currentRows = prev[activeKey] || [];
+            const currentPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') === currentPhase);
+            const otherPhaseExisting = currentRows.filter((row) => (row.phase || 'fabrication') !== currentPhase);
+            const mergedCurrent = [...currentPhaseExisting.filter((row) => !(activeMode === 'execution'
+                ? isExecutionRowEmpty(row, section)
+                : isBudgetRowEmpty(row, section))), ...parsedRows];
+
+            return injectBuffers({
+                ...prev,
+                [activeKey]: [...mergedCurrent, ...otherPhaseExisting],
+            });
+        });
+    };
 
     const updateBudgetSettings = (patch) => {
         setDetails((prev) => ({
@@ -695,63 +823,44 @@ const BudgetProjectEditor = () => {
         });
     };
 
-    const handleSheetRowsChange = (nextDisplayRows) => {
+    const toggleSort = (columnKey) => {
+        setSortState((prev) => {
+            if (prev.key !== columnKey) {
+                return { key: columnKey, direction: 'asc' };
+            }
+            if (prev.direction === 'asc') return { key: columnKey, direction: 'desc' };
+            if (prev.direction === 'desc') return { key: '', direction: 'none' };
+            return { key: columnKey, direction: 'asc' };
+        });
+    };
+
+    const updateRow = (index, key, value) => {
         setDetails((prev) => {
             const newList = [...(prev[activeKey] || [])];
-            const phaseIndices = [];
-            newList.forEach((item, itemIndex) => {
-                if ((item.phase || 'fabrication') === currentPhase) phaseIndices.push(itemIndex);
-            });
-
-            const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
-            const targetCount = Math.max(nextDisplayRows.length, phaseIndices.length);
-            for (let displayIndex = 0; displayIndex < targetCount; displayIndex += 1) {
-                const sourceRow = nextDisplayRows[displayIndex];
-                const targetIndex = phaseIndices[displayIndex];
-                if (targetIndex === undefined) {
-                    if (!sourceRow) continue;
-                    newList.push({
-                        ...builder(section, currentPhase),
-                        ...sourceRow,
-                        phase: currentPhase,
-                    });
-                    continue;
-                }
-
-                const base = { ...newList[targetIndex] };
-                if (!sourceRow) {
-                    newList[targetIndex] = {
-                        ...builder(section, currentPhase),
-                        phase: currentPhase,
-                    };
-                    continue;
-                }
-
-                const normalized = { ...sourceRow };
-                Object.keys(normalized).forEach((key) => {
-                    if (normalized[key] === undefined || normalized[key] === null) {
-                        normalized[key] = '';
-                    }
-                });
-
-                if (section === 'expense' && activeMode === 'budget' && base.is_auto) {
-                    const currentAmount = toNumber(base.amount);
-                    const nextAmount = toNumber(normalized.amount);
-                    if (currentAmount !== nextAmount) {
-                        base.is_auto = false;
-                    }
-                }
-
-                newList[targetIndex] = {
-                    ...base,
-                    ...normalized,
-                    phase: currentPhase,
-                };
+            const row = { ...newList[index] };
+            if (['quantity', 'unit_price', 'hourly_rate', 'amount', 'executed_amount', 'headcount'].includes(key)) {
+                row[key] = toNumber(value);
+            } else if (key === 'unit') {
+                row[key] = String(value || '').toUpperCase();
+            } else if (key === 'location_type') {
+                row[key] = normalizeLocationType(value);
+            } else {
+                row[key] = value;
             }
+            if (section === 'expense' && activeMode === 'budget' && key === 'amount' && row.is_auto) {
+                row.is_auto = false;
+            }
+            newList[index] = row;
 
-            const currentPhaseCount = newList.filter((item) => (item.phase || 'fabrication') === currentPhase).length;
-            if (currentPhaseCount < 120) {
-                newList.push(...Array.from({ length: 120 - currentPhaseCount }, () => builder(section, currentPhase)));
+            const filteredIndices = [];
+            newList.forEach((item, itemIndex) => {
+                if ((item.phase || 'fabrication') === currentPhase) filteredIndices.push(itemIndex);
+            });
+            const positionInDisplay = filteredIndices.indexOf(index);
+            if (positionInDisplay >= filteredIndices.length - 3) {
+                const builder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+                const buffer = Array.from({ length: 20 }, () => builder(section, currentPhase));
+                newList.push(...buffer);
             }
 
             return {
@@ -759,6 +868,13 @@ const BudgetProjectEditor = () => {
                 [activeKey]: newList,
             };
         });
+    };
+
+    const removeRow = (index) => {
+        setDetails((prev) => ({
+            ...prev,
+            [activeKey]: (prev[activeKey] || []).filter((_, rowIndex) => rowIndex !== index),
+        }));
     };
 
     const saveDetail = async () => {
@@ -862,7 +978,7 @@ const BudgetProjectEditor = () => {
     }
 
     return (
-        <div className="flex h-screen border-t border-slate-200 overflow-hidden">
+        <div className="flex h-screen border-t border-slate-200 overflow-hidden" onPaste={handlePaste}>
             <BudgetSidebar aggregation={aggregation} summary={sidebarSummary} modeLabel={aggregationModeLabel} />
 
             <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0" onScroll={handleScroll}>
@@ -1112,11 +1228,16 @@ const BudgetProjectEditor = () => {
                         )}
 
                         <div className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-slate-50/20 custom-scrollbar relative">
-                            <FortuneSheetTable
+                            <ExcelTable
                                 columns={visibleColumns}
-                                rows={displayRows}
-                                onRowsChange={handleSheetRowsChange}
+                                rows={sortedDisplayRows}
+                                sortState={sortState}
+                                onSort={toggleSort}
+                                autoCompleteOptions={autoCompleteOptions}
+                                onChange={(idx, key, val) => updateRow(sortedDisplayRows[idx].originalIndex, key, val)}
+                                onRemove={(idx) => removeRow(sortedDisplayRows[idx].originalIndex)}
                                 editable={canEditActiveRows}
+                                allowRowDelete={canEditActiveRows}
                             />
                         </div>
                     </section>
@@ -1126,123 +1247,373 @@ const BudgetProjectEditor = () => {
     );
 };
 
-function _normalizeFortuneCellValue(cell) {
-    if (cell === null || cell === undefined) return '';
-    if (typeof cell === 'object') {
-        if (cell.v !== undefined && cell.v !== null) return cell.v;
-        if (cell.m !== undefined && cell.m !== null) return cell.m;
-    }
-    return cell;
-}
+const ExcelTable = ({
+    columns,
+    rows,
+    sortState,
+    onSort,
+    autoCompleteOptions = {},
+    onChange,
+    onRemove,
+    editable,
+    allowRowDelete,
+}) => {
+    const tableRef = useRef(null);
+    const [activeCell, setActiveCell] = useState({ row: 0, col: 0 });
+    const [selectionStart, setSelectionStart] = useState({ row: 0, col: 0 });
+    const [selectionEnd, setSelectionEnd] = useState({ row: 0, col: 0 });
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [isFillDragging, setIsFillDragging] = useState(false);
+    const [fillAnchor, setFillAnchor] = useState(null);
+    const [fillTarget, setFillTarget] = useState(null);
 
-function _rowsSignature(rows, columns) {
-    const normalized = (rows || []).map((row) => {
-        const mapped = {};
-        (columns || []).forEach((col) => {
-            if (col.readonly || col.computed) return;
-            mapped[col.key] = row?.[col.key] ?? '';
-        });
-        return mapped;
-    });
-    return JSON.stringify(normalized);
-}
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const rowCount = rows.length;
+    const colCount = columns.length;
 
-function _buildFortuneSheetData(columns, rows) {
-    const headerRow = columns.map((col) => ({
-        v: col.label,
-        m: col.label,
-        bg: '#f1f5f9',
-        bl: 1,
-    }));
-    const bodyRows = (rows || []).map((row) => columns.map((col) => {
-        const raw = col.computed ? col.computed(row) : row?.[col.key];
-        if (raw === '' || raw === null || raw === undefined) return null;
-        if (col.type === 'number') {
-            const numeric = toNumber(raw);
-            return { v: numeric, m: String(numeric) };
-        }
-        return { v: raw, m: String(raw) };
-    }));
-    const matrix = [headerRow, ...bodyRows];
-    return [
-        {
-            name: '예산입력',
-            id: 'budget-sheet-1',
-            order: 0,
-            status: 1,
-            row: Math.max((rows?.length || 0) + 120, 160),
-            column: columns.length,
-            data: matrix,
-        },
-    ];
-}
+    const range = useMemo(() => {
+        const rowMin = Math.min(selectionStart.row, selectionEnd.row);
+        const rowMax = Math.max(selectionStart.row, selectionEnd.row);
+        const colMin = Math.min(selectionStart.col, selectionEnd.col);
+        const colMax = Math.max(selectionStart.col, selectionEnd.col);
+        return { rowMin, rowMax, colMin, colMax };
+    }, [selectionStart, selectionEnd]);
 
-function _parseFortuneRows(columns, workbookSheets, fallbackRowCount) {
-    const matrix = Array.isArray(workbookSheets?.[0]?.data) ? workbookSheets[0].data : [];
-    const dataRowCount = Math.max(fallbackRowCount, Math.max(matrix.length - 1, 0));
-    const parsed = [];
+    const isCellInSelection = (row, col) => (
+        row >= range.rowMin
+        && row <= range.rowMax
+        && col >= range.colMin
+        && col <= range.colMax
+    );
 
-    for (let rowIndex = 0; rowIndex < dataRowCount; rowIndex += 1) {
-        const sourceRow = matrix[rowIndex + 1] || [];
-        const nextRow = {};
-        columns.forEach((col, colIndex) => {
-            if (col.readonly || col.computed) return;
-            const value = _normalizeFortuneCellValue(sourceRow[colIndex]);
-            if (col.type === 'number') {
-                nextRow[col.key] = toNumber(value);
-            } else if (col.options && col.options.length > 0) {
-                const normalized = String(value || '').trim().toUpperCase();
-                nextRow[col.key] = col.options.includes(normalized) ? normalized : (col.options[0] || '');
-            } else {
-                nextRow[col.key] = String(value ?? '');
+    const focusCell = (row, col) => {
+        const nextTarget = tableRef.current?.querySelector(
+            `[data-row="${row}"][data-col="${col}"] input, [data-row="${row}"][data-col="${col}"] select`,
+        );
+        if (!nextTarget) return;
+        nextTarget.focus();
+        if (nextTarget.select) nextTarget.select();
+    };
+
+    const setSingleCellSelection = (row, col) => {
+        const nextRow = clamp(row, 0, Math.max(rowCount - 1, 0));
+        const nextCol = clamp(col, 0, Math.max(colCount - 1, 0));
+        setActiveCell({ row: nextRow, col: nextCol });
+        setSelectionStart({ row: nextRow, col: nextCol });
+        setSelectionEnd({ row: nextRow, col: nextCol });
+    };
+
+    const isCellFilled = (row, col) => {
+        const colDef = columns[col];
+        if (!colDef || !rows[row]) return false;
+        const value = colDef.computed ? colDef.computed(rows[row]) : rows[row][colDef.key];
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'number') return Number.isFinite(value);
+        return String(value).trim() !== '';
+    };
+
+    const findCtrlJumpTarget = (row, col, direction) => {
+        if (direction === 'ArrowUp' || direction === 'ArrowDown') {
+            const step = direction === 'ArrowUp' ? -1 : 1;
+            let target = row;
+            let found = false;
+            for (let idx = row + step; idx >= 0 && idx < rowCount; idx += step) {
+                if (isCellFilled(idx, col)) {
+                    target = idx;
+                    found = true;
+                }
             }
-        });
-        parsed.push(nextRow);
-    }
-
-    return parsed;
-}
-
-const FortuneSheetTable = ({ columns, rows, onRowsChange, editable }) => {
-    const [sheetData, setSheetData] = useState(() => _buildFortuneSheetData(columns, rows));
-    const rowsSignatureRef = useRef(_rowsSignature(rows, columns));
+            return found ? target : (step > 0 ? rowCount - 1 : 0);
+        }
+        const step = direction === 'ArrowLeft' ? -1 : 1;
+        let target = col;
+        let found = false;
+        for (let idx = col + step; idx >= 0 && idx < colCount; idx += step) {
+            if (isCellFilled(row, idx)) {
+                target = idx;
+                found = true;
+            }
+        }
+        return found ? target : (step > 0 ? colCount - 1 : 0);
+    };
 
     useEffect(() => {
-        const nextSignature = _rowsSignature(rows, columns);
-        rowsSignatureRef.current = nextSignature;
-        setSheetData(_buildFortuneSheetData(columns, rows));
-    }, [columns, rows]);
+        const handleGlobalMouseUp = () => {
+            setIsSelecting(false);
+            if (!isFillDragging) return;
+            const anchor = fillAnchor;
+            const target = fillTarget;
+            setIsFillDragging(false);
+            setFillAnchor(null);
+            setFillTarget(null);
+            if (!anchor || !target) return;
+
+            const rowMin = Math.min(anchor.row, target.row);
+            const rowMax = Math.max(anchor.row, target.row);
+            const colMin = Math.min(anchor.col, target.col);
+            const colMax = Math.max(anchor.col, target.col);
+            const sourceColumn = columns[anchor.col];
+            if (!sourceColumn || sourceColumn.readonly) return;
+            const sourceRow = rows[anchor.row];
+            if (!sourceRow) return;
+            const sourceValueRaw = sourceColumn.computed
+                ? sourceColumn.computed(sourceRow)
+                : sourceRow[sourceColumn.key];
+            const sourceValue = sourceColumn.type === 'number'
+                ? String(toNumber(sourceValueRaw))
+                : String(sourceValueRaw ?? '');
+
+            for (let r = rowMin; r <= rowMax; r += 1) {
+                for (let c = colMin; c <= colMax; c += 1) {
+                    if (r === anchor.row && c === anchor.col) continue;
+                    const column = columns[c];
+                    if (!column || column.readonly) continue;
+                    const nextValue = column.type === 'number'
+                        ? sourceValue.replace(/[^0-9]/g, '')
+                        : sourceValue;
+                    onChange(r, column.key, nextValue);
+                }
+            }
+        };
+
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [columns, fillAnchor, fillTarget, isFillDragging, onChange, rows]);
+
+    const handleKeyDown = (event, rowIndex, colIndex) => {
+        if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(event.key)) return;
+
+        let nextRow = rowIndex;
+        let nextCol = colIndex;
+
+        if (event.ctrlKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                nextRow = findCtrlJumpTarget(rowIndex, colIndex, event.key);
+            } else {
+                nextCol = findCtrlJumpTarget(rowIndex, colIndex, event.key);
+            }
+        } else if (event.key === 'ArrowUp') nextRow = Math.max(0, rowIndex - 1);
+        else if (event.key === 'ArrowDown' || event.key === 'Enter') nextRow = Math.min(rowCount - 1, rowIndex + 1);
+        else if (event.key === 'ArrowLeft') nextCol = Math.max(0, colIndex - 1);
+        else if (event.key === 'ArrowRight') nextCol = Math.min(colCount - 1, colIndex + 1);
+        else if (event.key === 'Tab') nextCol = event.shiftKey ? Math.max(0, colIndex - 1) : Math.min(colCount - 1, colIndex + 1);
+
+        event.preventDefault();
+
+        if (event.shiftKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            setActiveCell({ row: nextRow, col: nextCol });
+            setSelectionEnd({ row: nextRow, col: nextCol });
+        } else {
+            setSingleCellSelection(nextRow, nextCol);
+        }
+        focusCell(nextRow, nextCol);
+    };
+
+    const handleCellMouseDown = (event, rowIndex, colIndex) => {
+        if (event.button !== 0) return;
+        if (isFillDragging) return;
+        event.preventDefault();
+        setActiveCell({ row: rowIndex, col: colIndex });
+        if (event.shiftKey) {
+            setSelectionEnd({ row: rowIndex, col: colIndex });
+        } else {
+            setSelectionStart({ row: rowIndex, col: colIndex });
+            setSelectionEnd({ row: rowIndex, col: colIndex });
+        }
+        setIsSelecting(true);
+        focusCell(rowIndex, colIndex);
+    };
+
+    const handleCellMouseEnter = (rowIndex, colIndex) => {
+        if (isFillDragging) {
+            setFillTarget({ row: rowIndex, col: colIndex });
+            return;
+        }
+        if (!isSelecting) return;
+        setSelectionEnd({ row: rowIndex, col: colIndex });
+    };
+
+    const handleFillMouseDown = (event, rowIndex, colIndex) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setIsFillDragging(true);
+        setFillAnchor({ row: rowIndex, col: colIndex });
+        setFillTarget({ row: rowIndex, col: colIndex });
+    };
+
+    useEffect(() => {
+        if (!rowCount || !colCount) return;
+        setActiveCell((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+        setSelectionStart((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+        setSelectionEnd((prev) => ({
+            row: clamp(prev.row, 0, rowCount - 1),
+            col: clamp(prev.col, 0, colCount - 1),
+        }));
+    }, [colCount, rowCount]);
 
     return (
-        <div className="h-full min-h-[560px] overflow-hidden rounded-xl">
-            <Workbook
-                data={sheetData}
-                allowEdit={editable}
-                showToolbar
-                showFormulaBar
-                showSheetTabs={false}
-                row={Math.max((rows?.length || 0) + 120, 160)}
-                column={columns.length}
-                hooks={{
-                    beforeUpdateCell: (r, c) => {
-                        if (!editable) return false;
-                        if (r === 0) return false;
-                        const column = columns[c];
-                        if (!column) return false;
-                        if (column.readonly || column.computed) return false;
-                        return true;
-                    },
-                }}
-                onChange={(nextSheets) => {
-                    setSheetData(nextSheets);
-                    const parsedRows = _parseFortuneRows(columns, nextSheets, rows.length);
-                    const nextSignature = _rowsSignature(parsedRows, columns);
-                    if (nextSignature === rowsSignatureRef.current) return;
-                    rowsSignatureRef.current = nextSignature;
-                    onRowsChange(parsedRows);
-                }}
-            />
-        </div>
+        <>
+            <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
+                <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
+                    <tr>
+                        {columns.map((col, idx) => (
+                            <th key={idx} className={cn('p-0 text-left font-black text-slate-500 uppercase tracking-tighter border-r border-slate-200 last:border-0', col.width)}>
+                                <button
+                                    type="button"
+                                    onClick={() => onSort?.(col.key)}
+                                    className="flex h-9 w-full items-center justify-between px-2 hover:bg-slate-200/60"
+                                >
+                                    <span>{col.label}</span>
+                                    <span className="text-[10px] text-slate-400">
+                                        {sortState?.key === col.key
+                                            ? (sortState.direction === 'asc' ? '▲' : sortState.direction === 'desc' ? '▼' : '·')
+                                            : '·'}
+                                    </span>
+                                </button>
+                            </th>
+                        ))}
+                        {allowRowDelete && <th className="p-2 w-16 text-center text-slate-500 font-bold border-r-0 uppercase tracking-tighter">삭제</th>}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-slate-100 hover:bg-slate-50/50 focus-within:bg-blue-50/30 group transition-colors">
+                            {columns.map((col, colIndex) => {
+                                const rawValue = col.computed ? col.computed(row) : row[col.key];
+                                const displayValue = col.type === 'number'
+                                    ? (rawValue === null || rawValue === undefined || rawValue === '' ? '' : toNumber(rawValue).toLocaleString('ko-KR'))
+                                    : (rawValue || '');
+                                const isCellEditable = editable && !col.readonly;
+                                const dataListId = (autoCompleteOptions[col.key] || []).length ? `editor-autocomplete-${col.key}` : undefined;
+                                const isSelected = isCellInSelection(rowIndex, colIndex);
+                                const isActive = activeCell.row === rowIndex && activeCell.col === colIndex;
+
+                                if (col.options && isCellEditable) {
+                                    return (
+                                        <td
+                                            key={colIndex}
+                                            className={cn(
+                                                "p-0 border-r border-slate-100 last:border-0 relative",
+                                                isSelected && "bg-blue-50/60",
+                                                isActive && "ring-1 ring-primary/40 ring-inset",
+                                            )}
+                                            data-row={rowIndex}
+                                            data-col={colIndex}
+                                            onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
+                                            onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                        >
+                                            <select
+                                                className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700"
+                                                value={String(rawValue || '').toUpperCase()}
+                                                onChange={(event) => onChange(rowIndex, col.key, event.target.value)}
+                                                onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                                onFocus={() => setSingleCellSelection(rowIndex, colIndex)}
+                                            >
+                                                {col.options.map((opt) => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                            {isActive && editable && !col.readonly && (
+                                                <button
+                                                    type="button"
+                                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"
+                                                    onMouseDown={(event) => handleFillMouseDown(event, rowIndex, colIndex)}
+                                                    aria-label="자동 복사 드래그"
+                                                />
+                                            )}
+                                        </td>
+                                    );
+                                }
+
+                                return (
+                                    <td
+                                        key={colIndex}
+                                        className={cn(
+                                            "p-0 border-r border-slate-100 last:border-0 relative",
+                                            isSelected && "bg-blue-50/60",
+                                            isActive && "ring-1 ring-primary/40 ring-inset",
+                                        )}
+                                        data-row={rowIndex}
+                                        data-col={colIndex}
+                                        onMouseDown={(event) => handleCellMouseDown(event, rowIndex, colIndex)}
+                                        onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                    >
+                                        <input
+                                            type="text"
+                                            list={dataListId}
+                                            className={cn(
+                                                'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
+                                                isCellEditable
+                                                    ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
+                                                    : 'bg-slate-50 text-slate-400',
+                                            )}
+                                            value={displayValue}
+                                            onChange={(event) => {
+                                                if (!isCellEditable) return;
+                                                let val = event.target.value;
+                                                if (col.type === 'number') val = val.replace(/[^0-9]/g, '');
+                                                onChange(rowIndex, col.key, val);
+                                            }}
+                                            onFocus={(event) => {
+                                                setSingleCellSelection(rowIndex, colIndex);
+                                                event.target.select();
+                                            }}
+                                            onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
+                                            readOnly={!isCellEditable}
+                                        />
+                                        {isActive && editable && !col.readonly && (
+                                            <button
+                                                type="button"
+                                                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-sm bg-primary border border-white cursor-crosshair"
+                                                onMouseDown={(event) => handleFillMouseDown(event, rowIndex, colIndex)}
+                                                aria-label="자동 복사 드래그"
+                                            />
+                                        )}
+                                    </td>
+                                );
+                            })}
+                            {allowRowDelete && (
+                                <td className="p-0 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => onRemove(rowIndex)}
+                                        className="p-2 text-slate-300 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all font-black text-[10px] uppercase"
+                                    >
+                                        Del
+                                    </button>
+                                </td>
+                            )}
+                        </tr>
+                    ))}
+                    {!rows.length && (
+                        <tr>
+                            <td colSpan={columns.length + (allowRowDelete ? 1 : 0)} className="p-12 text-center text-slate-400 font-bold italic bg-white">
+                                입력된 데이터가 없습니다.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+            {Object.entries(autoCompleteOptions).map(([key, values]) => {
+                if (!Array.isArray(values) || !values.length) return null;
+                return (
+                    <datalist key={key} id={`editor-autocomplete-${key}`}>
+                        {values.map((item) => (
+                            <option key={`${key}-${item}`} value={item} />
+                        ))}
+                    </datalist>
+                );
+            })}
+        </>
     );
 };
 

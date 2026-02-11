@@ -42,6 +42,12 @@ const STAGE_LABEL_ALIAS = {
     progress: '제작',
 };
 
+const PROJECT_TYPE_LABEL_ALIAS = {
+    equipment: '설비',
+    parts: '파츠',
+    as: '유지보수',
+};
+
 function toNumber(value) {
     const number = Number(value || 0);
     return Number.isFinite(number) ? number : 0;
@@ -81,6 +87,26 @@ function localizeStageLabel(value) {
     if (raw === 'A/S') return '유지보수';
     if (/[A-Za-z]/.test(raw)) return '';
     return raw;
+}
+
+function localizeProjectTypeLabel(labelValue, typeValue) {
+    const rawLabel = String(labelValue || '').trim();
+    const normalizedLabel = rawLabel.toLowerCase();
+    if (rawLabel && PROJECT_TYPE_LABEL_ALIAS[normalizedLabel]) {
+        return PROJECT_TYPE_LABEL_ALIAS[normalizedLabel];
+    }
+    if (rawLabel && !/[A-Za-z]/.test(rawLabel)) {
+        return rawLabel;
+    }
+
+    const normalizedType = String(typeValue || '').trim().toLowerCase();
+    if (PROJECT_TYPE_LABEL_ALIAS[normalizedType]) {
+        return PROJECT_TYPE_LABEL_ALIAS[normalizedType];
+    }
+
+    if (rawLabel) return rawLabel;
+    if (typeValue && !/[A-Za-z]/.test(String(typeValue))) return String(typeValue);
+    return '미분류';
 }
 
 const BudgetProjectOverview = () => {
@@ -210,6 +236,7 @@ const BudgetProjectOverview = () => {
     const currentStageLabel = localizeStageLabel(project?.current_stage_label)
         || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label
         || '-';
+    const currentProjectTypeLabel = localizeProjectTypeLabel(project?.project_type_label, project?.project_type);
     const coverImageUrl = String(
         project?.cover_image_display_url || project?.cover_image_fallback_url || project?.cover_image_url || ''
     ).trim();
@@ -508,6 +535,9 @@ const BudgetProjectOverview = () => {
                                                 <h1 className="text-2xl font-bold text-slate-900">{projectName}</h1>
                                                 <span className="bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 rounded border border-primary/20">
                                                     {currentStageLabel}
+                                                </span>
+                                                <span className="text-xs font-semibold px-2 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-700">
+                                                    {currentProjectTypeLabel}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-muted-foreground max-w-2xl">

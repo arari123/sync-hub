@@ -656,6 +656,8 @@ const SearchResults = () => {
                                         })}
                                     </div>
 
+                                    <div className="hidden h-6 w-px bg-border md:block" />
+
                                     <div className="flex items-center gap-1 overflow-x-auto">
                                         <button
                                             type="button"

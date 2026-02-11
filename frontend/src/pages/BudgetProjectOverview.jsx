@@ -245,11 +245,10 @@ const BudgetProjectOverview = () => {
             </header>
 
             <div className="border-b border-border bg-secondary/80">
-                <div className="mx-auto h-10 max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
-                    <div className="w-44 shrink-0" aria-hidden />
+                <div className="mx-auto h-10 max-w-[1600px] px-4 lg:px-6 flex items-center">
                     <nav
                         aria-label="현재 경로"
-                        className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
+                        className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                     >
                         <Link to="/" className="font-medium hover:text-primary">
                             메인
@@ -263,7 +262,6 @@ const BudgetProjectOverview = () => {
                             {trimmedProjectName || '프로젝트'}
                         </span>
                     </nav>
-                    <div className="w-40 shrink-0" aria-hidden />
                 </div>
             </div>
 

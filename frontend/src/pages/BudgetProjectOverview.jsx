@@ -14,19 +14,33 @@ import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
 
 const STAGE_SEGMENTS = [
-    { key: 'review', label: 'Review' },
-    { key: 'design', label: 'Design' },
-    { key: 'production', label: 'Production' },
-    { key: 'install', label: 'Install' },
-    { key: 'as', label: 'AS' },
-    { key: 'closed', label: 'Closed' },
+    { key: 'review', label: '검토' },
+    { key: 'design', label: '설계' },
+    { key: 'production', label: '제작' },
+    { key: 'install', label: '설치' },
+    { key: 'as', label: '유지보수' },
+    { key: 'closed', label: '종료' },
 ];
 
 const MOCK_TIMELINE_ITEMS = [
-    { key: 'design', label: 'Design', status: 'completed', statusLabel: 'Completed', date: '2026-03-15' },
-    { key: 'production', label: 'Production', status: 'in_progress', statusLabel: 'In Progress', date: '2026-04-30' },
-    { key: 'install', label: 'Installation', status: 'pending', statusLabel: 'Pending', date: '2026-05-20' },
+    { key: 'design', label: '설계', status: 'completed', statusLabel: '완료', date: '2026-03-15' },
+    { key: 'production', label: '제작', status: 'in_progress', statusLabel: '진행 중', date: '2026-04-30' },
+    { key: 'install', label: '설치', status: 'pending', statusLabel: '대기', date: '2026-05-20' },
 ];
+
+const STAGE_LABEL_ALIAS = {
+    review: '검토',
+    design: '설계',
+    production: '제작',
+    install: '설치',
+    installation: '설치',
+    as: '유지보수',
+    warranty: '유지보수',
+    closed: '종료',
+    closure: '종료',
+    fabrication: '제작',
+    progress: '제작',
+};
 
 function toNumber(value) {
     const number = Number(value || 0);
@@ -57,6 +71,15 @@ function resolveStageKey(value) {
 function ratio(actual, total) {
     if (total <= 0) return 0;
     return Math.max(0, Math.min(100, (actual / total) * 100));
+}
+
+function localizeStageLabel(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const normalized = raw.toLowerCase();
+    if (STAGE_LABEL_ALIAS[normalized]) return STAGE_LABEL_ALIAS[normalized];
+    if (raw === 'A/S') return '유지보수';
+    return raw;
 }
 
 const BudgetProjectOverview = () => {
@@ -183,7 +206,9 @@ const BudgetProjectOverview = () => {
     const projectName = String(project?.name || '프로젝트').trim() || '프로젝트';
     const trimmedProjectName = truncateProjectName(projectName, 10);
     const currentStageKey = resolveStageKey(project?.current_stage);
-    const currentStageLabel = String(project?.current_stage_label || '').trim() || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label || '-';
+    const currentStageLabel = localizeStageLabel(project?.current_stage_label)
+        || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label
+        || '-';
     const coverImageUrl = String(
         project?.cover_image_display_url || project?.cover_image_fallback_url || project?.cover_image_url || ''
     ).trim();
@@ -228,7 +253,7 @@ const BudgetProjectOverview = () => {
                         <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
                         <div className="leading-tight">
                             <p className="font-extrabold tracking-tight text-sm">sync-hub</p>
-                            <p className="text-[10px] text-muted-foreground">Search Workspace</p>
+                            <p className="text-[10px] text-muted-foreground">검색 워크스페이스</p>
                         </div>
                     </Link>
 
@@ -239,7 +264,7 @@ const BudgetProjectOverview = () => {
                                 type="text"
                                 value={inputQuery}
                                 onChange={(event) => setInputQuery(event.target.value)}
-                                placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
+                                placeholder="프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색"
                                 className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
                             />
                         </label>
@@ -512,10 +537,10 @@ const BudgetProjectOverview = () => {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-y-4 gap-x-8 border-t border-border pt-5">
-                                        <InfoField label="Client Contacts" value={project.customer_name || '-'} />
-                                        <InfoField label="Location" value={project.installation_site || '-'} />
-                                        <InfoField label="Manager" value={project.manager_name || '-'} />
-                                        <InfoField label="ERP Code" value={project.code || 'NO-CODE'} mono />
+                                        <InfoField label="고객사" value={project.customer_name || '-'} />
+                                        <InfoField label="위치" value={project.installation_site || '-'} />
+                                        <InfoField label="담당자" value={project.manager_name || '-'} />
+                                        <InfoField label="프로젝트 코드" value={project.code || '코드 없음'} mono />
                                     </div>
                                 </div>
                             </div>
@@ -525,15 +550,15 @@ const BudgetProjectOverview = () => {
                             <section className="bg-card rounded-xl shadow-sm border border-border flex-1 flex flex-col">
                                 <div className="p-5 border-b border-border flex justify-between items-center">
                                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                        <span className="w-1.5 h-6 bg-red-500 rounded-full" /> Latest issues
+                                        <span className="w-1.5 h-6 bg-red-500 rounded-full" /> 마지막 안건
                                     </h2>
                                     <Link className="text-xs font-medium text-primary hover:text-primary/80" to={issueManagementPath}>
-                                        View All
+                                        전체 보기
                                     </Link>
                                 </div>
                                 <div className="p-3 overflow-y-auto flex-1 h-[280px]">
                                     <div className="h-full rounded-lg border border-dashed border-border bg-secondary/40 flex items-center justify-center text-sm text-muted-foreground">
-                                        Empty (이슈 등록 미구현)
+                                        비어 있음 (이슈 등록 미구현)
                                     </div>
                                 </div>
                             </section>
@@ -541,7 +566,7 @@ const BudgetProjectOverview = () => {
                             <section className="bg-card rounded-xl shadow-sm border border-border p-5">
                                 <div className="flex items-center justify-between mb-6">
                                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                        <span className="w-1.5 h-6 bg-teal-500 rounded-full" /> Timeline
+                                        <span className="w-1.5 h-6 bg-teal-500 rounded-full" /> 일정 타임라인
                                     </h2>
                                     <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">향후 일정 연동 예정</span>
                                 </div>
@@ -566,7 +591,7 @@ const BudgetProjectOverview = () => {
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-1">
-                                            <span className="w-1.5 h-6 bg-primary rounded-full" /> Budget vs. Execution
+                                            <span className="w-1.5 h-6 bg-primary rounded-full" /> 예산 대비 집행
                                         </h2>
                                         <p className="text-xs text-muted-foreground">프로젝트 예산/집행 현황</p>
                                     </div>
@@ -574,7 +599,7 @@ const BudgetProjectOverview = () => {
                                         <div className="text-3xl font-bold text-slate-900 font-mono tracking-tight">
                                             {formatAmount(balanceTotal)}
                                         </div>
-                                        <div className="text-xs font-medium text-emerald-600">Balance Available</div>
+                                        <div className="text-xs font-medium text-emerald-600">사용 가능 잔액</div>
                                     </div>
                                 </div>
 
@@ -589,7 +614,7 @@ const BudgetProjectOverview = () => {
                                             <div className="h-full w-full rounded-full bg-card border border-border flex items-center justify-center text-center">
                                                 <div>
                                                     <span className="block text-3xl font-bold text-slate-800">{executionRate.toFixed(0)}%</span>
-                                                    <span className="text-xs text-muted-foreground uppercase font-medium tracking-wide">Executed</span>
+                                                    <span className="text-xs text-muted-foreground font-medium tracking-wide">집행률</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -597,32 +622,32 @@ const BudgetProjectOverview = () => {
                                         <div className="absolute bottom-0 right-0 md:-right-4 flex flex-col gap-2 bg-card/95 p-3 rounded-lg shadow-sm border border-border backdrop-blur-sm">
                                             <div className="flex items-center gap-2 text-xs">
                                                 <span className="w-3 h-3 rounded-full bg-primary" />
-                                                <span className="text-slate-600">Used: {formatAmount(spentTotal)}</span>
+                                                <span className="text-slate-600">집행: {formatAmount(spentTotal)}</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs">
                                                 <span className="w-3 h-3 rounded-full bg-secondary" />
-                                                <span className="text-slate-600">Total: {formatAmount(confirmedTotal)}</span>
+                                                <span className="text-slate-600">총액: {formatAmount(confirmedTotal)}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="space-y-6">
                                         <BudgetBar
-                                            label="Material"
+                                            label="재료비"
                                             actual={spentMaterial}
                                             total={confirmedMaterial}
                                             percent={materialRate}
                                             colorClass="from-primary to-blue-400"
                                         />
                                         <BudgetBar
-                                            label="Labor"
+                                            label="인건비"
                                             actual={spentLabor}
                                             total={confirmedLabor}
                                             percent={laborRate}
                                             colorClass="from-teal-500 to-emerald-400"
                                         />
                                         <BudgetBar
-                                            label="Expense"
+                                            label="경비"
                                             actual={spentExpense}
                                             total={confirmedExpense}
                                             percent={expenseRate}
@@ -634,14 +659,14 @@ const BudgetProjectOverview = () => {
 
                             <div className="grid grid-cols-2 gap-6">
                                 <StatCard
-                                    label="Registered Issues"
+                                    label="등록 안건 수"
                                     value={`${issueCount}`}
-                                    subText="Latest issues 비어 있음"
+                                    subText="마지막 안건 비어 있음"
                                     accentClass="text-orange-500"
                                     boxClass="bg-orange-50 text-orange-500"
                                 />
                                 <StatCard
-                                    label="Resources / Data"
+                                    label="자료/데이터"
                                     value={`${resourcesCount}`}
                                     subText={`설비 ${equipments.length}개 / 버전 ${version?.version_no || '-'} `}
                                     accentClass="text-primary"

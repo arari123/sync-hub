@@ -399,7 +399,7 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
+            <header className="h-20 border-b border-border bg-card/95 backdrop-blur">
                 <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
                     <Link to="/" className="w-44 shrink-0 flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
@@ -409,17 +409,28 @@ const SearchResults = () => {
                         </div>
                     </Link>
 
-                    <form onSubmit={handleSearchSubmit} className="flex-1">
-                        <label className="relative block">
-                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <input
-                                type="text"
-                                value={inputQuery}
-                                onChange={(event) => setInputQuery(event.target.value)}
-                                placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
-                                className="h-11 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
-                            />
-                        </label>
+                    <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0">
+                        <div className="flex flex-col gap-1.5">
+                            <nav
+                                aria-label="현재 경로"
+                                className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                            >
+                                <span className="font-semibold text-foreground/85">메인</span>
+                                <span>/</span>
+                                <span>글로벌 검색</span>
+                            </nav>
+
+                            <label className="relative block">
+                                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    value={inputQuery}
+                                    onChange={(event) => setInputQuery(event.target.value)}
+                                    placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
+                                    className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
+                                />
+                            </label>
+                        </div>
                     </form>
 
                     <div className="w-40 shrink-0 flex items-center justify-end gap-2">
@@ -471,7 +482,7 @@ const SearchResults = () => {
                 </div>
             </header>
 
-            <div className="mx-auto min-h-[calc(100vh-4rem)] max-w-[1600px]">
+            <div className="mx-auto min-h-[calc(100vh-5rem)] max-w-[1600px]">
                 <main className="overflow-y-auto p-4 lg:p-6 space-y-4">
                     {error && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

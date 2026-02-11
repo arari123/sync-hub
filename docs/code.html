@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html class="dark" lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>sync-hub 글로벌 검색/프로젝트 모니터링</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+    darkMode: 'class',
+    theme: {
+        extend: {
+            colors: {
+                primary: '#1a73e8',
+                'primary-hover': '#1557b0',
+                'surface-dark': '#1a2234',
+                'surface-light': '#ffffff',
+                'background-light': '#f7f9fc',
+                'background-dark': '#0f172a',
+                'border-light': '#dfe5ef',
+                'border-dark': '#273449'
+            },
+            fontFamily: {
+                display: ['Inter', 'sans-serif']
+            }
+        }
+    }
+};
+</script>
+<style>
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 20;
+    font-size: 20px;
+}
+.icon-filled {
+    font-variation-settings: 'FILL' 1, 'wght' 350, 'GRAD' 0, 'opsz' 20;
+}
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 10px;
+}
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+</style>
+</head>
+<body class="h-screen overflow-hidden bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 font-display">
+<header class="h-16 border-b border-border-light dark:border-border-dark bg-white dark:bg-surface-dark shadow-sm">
+    <div class="h-full px-4 lg:px-6 flex items-center gap-4">
+        <div class="w-44 shrink-0 flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-primary text-white grid place-items-center text-xs font-bold">S</div>
+            <div class="leading-tight">
+                <p class="font-extrabold text-sm tracking-tight">sync-hub</p>
+                <p class="text-[10px] text-slate-500">Global Project Workspace</p>
+            </div>
+        </div>
+
+        <div class="flex-1 max-w-4xl">
+            <label class="relative block">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">search</span>
+                <input class="w-full rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 pl-12 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" placeholder="글로벌 검색: 프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색" type="text"/>
+            </label>
+        </div>
+
+        <div class="w-36 shrink-0 flex justify-end items-center gap-2">
+            <button class="relative w-9 h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-primary">
+                <span class="material-symbols-outlined">notifications</span>
+                <span class="absolute right-2 top-2 w-2 h-2 rounded-full bg-red-500"></span>
+            </button>
+            <button class="w-9 h-9 rounded-full border border-slate-300 dark:border-slate-700 grid place-items-center overflow-hidden bg-slate-100 dark:bg-slate-800">
+                <img alt="사용자 아이콘" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC9SQjXg0c5jVAAmeYO4vRn0mFy57xAsryxGc95-D6Q9W6m7R0jQfGDXuePE3FkM7m5QY3zg1QmNn8YfKuZQeVhBP0Sx4c4L4J9zR3q_Gjk8IknVx2n5-A6QF9h8tqgNyn0QdZfXJ2P5PQq7owkOLCFozUQ9ZivEw3vPqf2i3F5kr7YJQxQ2gG9GzC4dV1ncfWlQOw8uLZlX6kW4F0RX9jo2Iu0nAa8P_DXFW4Pj2RfoE6kkbLsHf8"/>
+            </button>
+        </div>
+    </div>
+</header>
+
+<div class="h-[calc(100vh-4rem)] flex overflow-hidden">
+    <aside class="hidden lg:flex w-60 shrink-0 border-r border-border-light dark:border-border-dark bg-white dark:bg-surface-dark flex-col">
+        <div class="px-4 py-4 border-b border-slate-200 dark:border-border-dark">
+            <p class="text-xs uppercase tracking-wider text-slate-500">공통 레이아웃</p>
+            <h2 class="text-sm font-bold mt-1">사이드바 (페이지별 변경)</h2>
+        </div>
+        <nav class="p-3 space-y-1 text-sm">
+            <a class="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+                <span class="material-symbols-outlined text-base">dashboard</span> 대시보드
+            </a>
+            <a class="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+                <span class="material-symbols-outlined text-base">travel_explore</span> 글로벌 검색
+            </a>
+            <a class="flex items-center gap-2 rounded-lg px-3 py-2 bg-primary/10 text-primary font-semibold" href="#">
+                <span class="material-symbols-outlined text-base">folder_data</span> 프로젝트 리스트
+            </a>
+            <a class="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+                <span class="material-symbols-outlined text-base">description</span> 자료 보관함
+            </a>
+            <a class="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+                <span class="material-symbols-outlined text-base">settings</span> 설정
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto px-4 lg:px-6 py-5 space-y-5">
+        <section class="rounded-2xl border border-slate-200 dark:border-border-dark bg-white dark:bg-surface-dark p-4 lg:p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-slate-500">Project Monitoring</p>
+                    <h1 class="text-xl font-bold mt-1">프로젝트 요약 현황</h1>
+                    <p class="text-sm text-slate-500 mt-1">검색창 아래에서 내 프로젝트 상태와 전체 모니터링 지표를 함께 확인합니다.</p>
+                </div>
+                <button class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">
+                    <span class="material-symbols-outlined text-base">add</span>
+                    새 프로젝트 생성
+                </button>
+            </div>
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark bg-slate-50/80 dark:bg-slate-900/40 p-4">
+                    <p class="text-xs text-slate-500">내 프로젝트</p>
+                    <p class="text-2xl font-bold mt-1">10</p>
+                    <p class="text-xs text-emerald-600 mt-1">기본 표시 대상</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark bg-slate-50/80 dark:bg-slate-900/40 p-4">
+                    <p class="text-xs text-slate-500">전체 프로젝트</p>
+                    <p class="text-2xl font-bold mt-1">42</p>
+                    <p class="text-xs text-slate-500 mt-1">토글로 즉시 전환</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark bg-slate-50/80 dark:bg-slate-900/40 p-4">
+                    <p class="text-xs text-slate-500">미확인 업데이트</p>
+                    <p class="text-2xl font-bold mt-1 text-amber-500">17</p>
+                    <p class="text-xs text-slate-500 mt-1">안건/예산/사양/기본정보</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark bg-slate-50/80 dark:bg-slate-900/40 p-4">
+                    <p class="text-xs text-slate-500">인덱싱 자료</p>
+                    <p class="text-2xl font-bold mt-1">1,286</p>
+                    <p class="text-xs text-slate-500 mt-1">PDF + EXCEL + 프로젝트 데이터</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 dark:border-border-dark bg-white dark:bg-surface-dark p-4 lg:p-5">
+            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                <div>
+                    <h2 class="font-bold text-lg">글로벌 검색 정책</h2>
+                    <p class="text-sm text-slate-500 mt-1">프로젝트 정보와 등록 자료(PDF, EXCEL)를 자연어로 통합 검색합니다.</p>
+                </div>
+                <div class="text-xs rounded-lg border border-blue-200 bg-blue-50 text-blue-700 px-3 py-2 dark:bg-blue-900/20 dark:border-blue-900/40 dark:text-blue-300">
+                    검색 범위 한정 명령어: <span class="font-semibold">프로젝트코드:삼성전자 설계 승인 지연</span>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark p-4">
+                    <p class="text-xs uppercase tracking-wider text-slate-500">검색 대상 데이터</p>
+                    <ul class="mt-2 text-sm space-y-1.5 text-slate-700 dark:text-slate-300">
+                        <li>프로젝트 기본정보, 예산, 안건, 사양</li>
+                        <li>업로드된 PDF/EXCEL 자료 전문</li>
+                        <li>UNIT, PART'S 단위 데이터</li>
+                    </ul>
+                </div>
+                <div class="rounded-xl border border-slate-200 dark:border-border-dark p-4">
+                    <p class="text-xs uppercase tracking-wider text-slate-500">결과 노출 우선순위</p>
+                    <p class="mt-2 text-sm font-medium">프로젝트 정보 > 안건 > 사양 > 자료 > UNIT > PART'S</p>
+                    <p class="text-xs text-slate-500 mt-2">검색 스코어가 높은 데이터가 상단에 노출됩니다.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div class="inline-flex rounded-lg border border-slate-200 dark:border-border-dark p-1 bg-white dark:bg-surface-dark">
+                    <button class="px-3 py-1.5 rounded-md text-sm font-semibold bg-primary text-white">내 프로젝트</button>
+                    <button class="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">전체 프로젝트</button>
+                </div>
+                <div class="text-sm text-slate-500">기본값은 내 프로젝트이며, 필요 시 전체 프로젝트로 전환해 모니터링합니다.</div>
+            </div>
+
+            <details class="group rounded-2xl border border-slate-200 dark:border-border-dark bg-white dark:bg-surface-dark">
+                <summary class="cursor-pointer list-none p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-wider text-slate-500">강력 필터링</p>
+                        <p class="font-semibold mt-0.5">필터 패널 (초기 접힘 상태)</p>
+                    </div>
+                    <span class="material-symbols-outlined text-slate-500 group-open:rotate-180 transition-transform">expand_more</span>
+                </summary>
+                <div class="px-4 pb-4 border-t border-slate-200 dark:border-border-dark">
+                    <div class="pt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <div class="rounded-xl border border-slate-200 dark:border-border-dark p-3">
+                            <p class="text-xs font-semibold">프로젝트 상태</p>
+                            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded-full bg-primary/10 text-primary">진행중</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">검토</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">지연</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 dark:border-border-dark p-3">
+                            <p class="text-xs font-semibold">고객사</p>
+                            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">삼성전자</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">현대차</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">POSCO</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 dark:border-border-dark p-3">
+                            <p class="text-xs font-semibold">업데이트 유형</p>
+                            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">안건</span>
+                                <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700">예산</span>
+                                <span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">사양</span>
+                                <span class="px-2 py-1 rounded-full bg-violet-100 text-violet-700">기본정보</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 dark:border-border-dark p-3">
+                            <p class="text-xs font-semibold">문서 타입</p>
+                            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">PDF</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">EXCEL</span>
+                                <span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">프로젝트 데이터</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="rounded-2xl border border-slate-200 dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
+                <div class="grid grid-cols-12 gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/60 text-xs uppercase tracking-wider font-semibold text-slate-500 border-b border-slate-200 dark:border-border-dark">
+                    <div class="col-span-4">프로젝트</div>
+                    <div class="col-span-3">미확인 업데이트 (바로가기)</div>
+                    <div class="col-span-2">고객사 / 위치</div>
+                    <div class="col-span-2">Latest Issue</div>
+                    <div class="col-span-1 text-right">Action</div>
+                </div>
+
+                <div class="divide-y divide-slate-100 dark:divide-border-dark text-sm">
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4">
+                            <p class="font-semibold">반도체 FAB 증설 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-301</span></p>
+                            <p class="text-xs text-slate-500">마감 2026-03-19</p>
+                        </div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs">
+                            <a class="px-2 py-1 rounded-full bg-amber-100 text-amber-800" href="#">안건 2</a>
+                            <a class="px-2 py-1 rounded-full bg-blue-100 text-blue-800" href="#">예산 1</a>
+                            <a class="px-2 py-1 rounded-full bg-violet-100 text-violet-800" href="#">기본정보 1</a>
+                        </div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">삼성전자 / 평택</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">배터리 PACK 자동화 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-302</span></p><p class="text-xs text-slate-500">마감 2026-04-05</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800" href="#">사양 3</a><a class="px-2 py-1 rounded-full bg-blue-100 text-blue-800" href="#">예산 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">현대차 / 울산</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">수소 플랜트 배관 교체 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-303</span></p><p class="text-xs text-slate-500">마감 2026-03-31</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-amber-100 text-amber-800" href="#">안건 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">POSCO / 포항</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">ESS 관제 고도화 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-304</span></p><p class="text-xs text-slate-500">마감 2026-04-11</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-violet-100 text-violet-800" href="#">기본정보 2</a><a class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800" href="#">사양 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">LS Electric / 청주</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">철강 압연 라인 제어 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-305</span></p><p class="text-xs text-slate-500">마감 2026-05-02</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-blue-100 text-blue-800" href="#">예산 2</a><a class="px-2 py-1 rounded-full bg-amber-100 text-amber-800" href="#">안건 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">세아제강 / 군산</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">스마트 물류센터 신설 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-306</span></p><p class="text-xs text-slate-500">마감 2026-05-14</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800" href="#">사양 2</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">쿠팡 / 인천</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">해상풍력 변전실 제작 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-307</span></p><p class="text-xs text-slate-500">마감 2026-06-07</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-violet-100 text-violet-800" href="#">기본정보 1</a><a class="px-2 py-1 rounded-full bg-amber-100 text-amber-800" href="#">안건 2</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">두산에너빌리티 / 창원</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">2차전지 재료 혼합 라인 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-308</span></p><p class="text-xs text-slate-500">마감 2026-03-29</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-blue-100 text-blue-800" href="#">예산 1</a><a class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800" href="#">사양 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">LG화학 / 오창</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">제약 생산동 HVAC 개선 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-309</span></p><p class="text-xs text-slate-500">마감 2026-04-22</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-amber-100 text-amber-800" href="#">안건 3</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">셀트리온 / 송도</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+
+                    <div class="grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <div class="col-span-4"><p class="font-semibold">태양광 인버터 검사 자동화 <span class="text-[10px] ml-1 rounded bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5">PRJ-310</span></p><p class="text-xs text-slate-500">마감 2026-06-18</p></div>
+                        <div class="col-span-3 flex flex-wrap gap-1.5 text-xs"><a class="px-2 py-1 rounded-full bg-violet-100 text-violet-800" href="#">기본정보 1</a><a class="px-2 py-1 rounded-full bg-blue-100 text-blue-800" href="#">예산 1</a></div>
+                        <div class="col-span-2 text-xs text-slate-600 dark:text-slate-300">한화솔루션 / 진천</div>
+                        <div class="col-span-2"><span class="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-500">Empty (이슈 등록 미구현)</span></div>
+                        <div class="col-span-1 text-right"><button class="text-slate-400 hover:text-primary"><span class="material-symbols-outlined">more_vert</span></button></div>
+                    </div>
+                </div>
+
+                <div class="px-4 py-3 border-t border-slate-200 dark:border-border-dark flex items-center justify-between text-xs text-slate-500">
+                    <span>Showing 10 of 10 (기본: 내 프로젝트)</span>
+                    <div class="inline-flex gap-1">
+                        <button class="w-7 h-7 rounded border border-slate-200 dark:border-border-dark">1</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

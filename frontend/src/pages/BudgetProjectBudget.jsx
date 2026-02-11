@@ -188,6 +188,20 @@ function shortProjectName(value, maxLength = 10) {
     return `${text.slice(0, maxLength)}...`;
 }
 
+function includesKeyword(value, keyword) {
+    if (!keyword) return true;
+    return String(value || '').toLowerCase().includes(keyword);
+}
+
+function matchAnyKeyword(keyword, values = []) {
+    if (!keyword) return true;
+    return values.some((value) => includesKeyword(value, keyword));
+}
+
+function escapeRegExp(text) {
+    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function createEquipmentPhaseBucket() {
     return {
         totals: {
@@ -307,6 +321,233 @@ function statusDotClass(percent) {
     return 'bg-emerald-500';
 }
 
+function buildBudgetViewModel({
+    equipmentSummaries = [],
+    selectedPhases = [],
+    selectedCostTypes = [],
+    selectedSources = [],
+    selectedEquipments = [],
+    searchKeyword = '',
+}) {
+    const phaseSet = new Set(selectedPhases);
+    const costTypeSet = new Set(selectedCostTypes);
+    const sourceSet = new Set(selectedSources);
+    const equipmentSet = new Set(selectedEquipments);
+    const keyword = String(searchKeyword || '').trim().toLowerCase();
+    const hasKeyword = keyword.length > 0;
+
+    const items = (equipmentSummaries || [])
+        .filter((equipment) => equipmentSet.has(equipment.name))
+        .map((equipment) => {
+            const equipmentLabelMatch = matchAnyKeyword(keyword, [equipment.name]);
+            const phases = {};
+            const totals = {
+                material: { budget: 0, execution: 0, remaining: 0 },
+                labor: { budget: 0, execution: 0, remaining: 0 },
+                expense: { budget: 0, execution: 0, remaining: 0 },
+                total: { budget: 0, execution: 0, remaining: 0 },
+            };
+
+            PHASES.forEach((phase) => {
+                if (!phaseSet.has(phase)) return;
+                const phaseData = equipment.phases[phase];
+                const phaseLabel = `${PHASE_LABEL[phase]} 단계`;
+                const phaseLabelMatch = matchAnyKeyword(keyword, [phaseLabel]);
+
+                const materialEnabled = costTypeSet.has('material');
+                const laborEnabled = costTypeSet.has('labor');
+                const expenseEnabled = costTypeSet.has('expense');
+
+                const baseMaterialRows = materialEnabled ? phaseData.material.units : [];
+                const matchedMaterialRows = hasKeyword
+                    ? baseMaterialRows.filter((unit) => matchAnyKeyword(keyword, [
+                        unit.unitName,
+                        unit.partCount,
+                        unit.quantityTotal,
+                        formatAmount(unit.budgetAmount),
+                        formatAmount(unit.executionAmount),
+                    ]))
+                    : baseMaterialRows;
+                const materialLabelMatch = hasKeyword && (equipmentLabelMatch || phaseLabelMatch || includesKeyword(COST_TYPE_LABEL.material, keyword));
+                const materialRows = !hasKeyword
+                    ? baseMaterialRows
+                    : (matchedMaterialRows.length > 0 ? matchedMaterialRows : (materialLabelMatch ? baseMaterialRows : []));
+
+                const materialBudget = materialRows.reduce((sum, row) => sum + toNumber(row.budgetAmount), 0);
+                const materialExecution = materialRows.reduce((sum, row) => sum + toNumber(row.executionAmount), 0);
+                const material = {
+                    units: materialRows,
+                    budget: materialBudget,
+                    execution: materialExecution,
+                    remaining: materialBudget - materialExecution,
+                    isVisible: materialEnabled && (!hasKeyword || matchedMaterialRows.length > 0 || materialLabelMatch),
+                };
+
+                const laborBySource = {};
+                let laborBudget = 0;
+                let laborExecution = 0;
+                SOURCE_TYPES.forEach((source) => {
+                    if (!sourceSet.has(source)) return;
+                    const baseRows = phaseData.labor.byStaffing[source] || [];
+                    const matchedRows = hasKeyword
+                        ? baseRows.filter((row) => matchAnyKeyword(keyword, [
+                            row.name,
+                            source,
+                            COST_TYPE_LABEL.labor,
+                            formatAmount(row.budgetAmount),
+                            formatAmount(row.executionAmount),
+                        ]))
+                        : baseRows;
+                    const sourceLabelMatch = hasKeyword && matchAnyKeyword(keyword, [source, `${source} 인건비`, COST_TYPE_LABEL.labor, phaseLabel, equipment.name]);
+                    const rows = !hasKeyword
+                        ? baseRows
+                        : (matchedRows.length > 0 ? matchedRows : (sourceLabelMatch ? baseRows : []));
+                    const sums = sumAmountRows(rows);
+                    laborBySource[source] = {
+                        rows,
+                        budget: sums.budget,
+                        execution: sums.execution,
+                        remaining: sums.budget - sums.execution,
+                        isVisible: !hasKeyword || matchedRows.length > 0 || sourceLabelMatch,
+                    };
+                    if (laborBySource[source].isVisible) {
+                        laborBudget += sums.budget;
+                        laborExecution += sums.execution;
+                    }
+                });
+
+                const laborSources = Object.values(laborBySource).filter((item) => item.isVisible);
+                const labor = {
+                    bySource: laborBySource,
+                    budget: laborBudget,
+                    execution: laborExecution,
+                    remaining: laborBudget - laborExecution,
+                    isVisible: laborEnabled && laborSources.length > 0,
+                };
+
+                const expenseBySource = {};
+                let expenseBudget = 0;
+                let expenseExecution = 0;
+                SOURCE_TYPES.forEach((source) => {
+                    if (!sourceSet.has(source)) return;
+                    const baseRows = phaseData.expense.byType[source] || [];
+                    const matchedRows = hasKeyword
+                        ? baseRows.filter((row) => matchAnyKeyword(keyword, [
+                            row.name,
+                            row.basis,
+                            source,
+                            COST_TYPE_LABEL.expense,
+                            formatAmount(row.budgetAmount),
+                            formatAmount(row.executionAmount),
+                        ]))
+                        : baseRows;
+                    const sourceLabelMatch = hasKeyword && matchAnyKeyword(keyword, [source, `${source} 경비`, COST_TYPE_LABEL.expense, phaseLabel, equipment.name]);
+                    const rows = !hasKeyword
+                        ? baseRows
+                        : (matchedRows.length > 0 ? matchedRows : (sourceLabelMatch ? baseRows : []));
+                    const sums = sumAmountRows(rows);
+                    expenseBySource[source] = {
+                        rows,
+                        budget: sums.budget,
+                        execution: sums.execution,
+                        remaining: sums.budget - sums.execution,
+                        isVisible: !hasKeyword || matchedRows.length > 0 || sourceLabelMatch,
+                    };
+                    if (expenseBySource[source].isVisible) {
+                        expenseBudget += sums.budget;
+                        expenseExecution += sums.execution;
+                    }
+                });
+
+                const expenseSources = Object.values(expenseBySource).filter((item) => item.isVisible);
+                const expense = {
+                    bySource: expenseBySource,
+                    budget: expenseBudget,
+                    execution: expenseExecution,
+                    remaining: expenseBudget - expenseExecution,
+                    isVisible: expenseEnabled && expenseSources.length > 0,
+                };
+
+                const visibleCosts = [material.isVisible, labor.isVisible, expense.isVisible].filter(Boolean).length;
+                if (visibleCosts === 0) return;
+
+                const phaseBudget = material.budget + labor.budget + expense.budget;
+                const phaseExecution = material.execution + labor.execution + expense.execution;
+                const phaseRemaining = phaseBudget - phaseExecution;
+
+                phases[phase] = {
+                    material,
+                    labor,
+                    expense,
+                    total: {
+                        budget: phaseBudget,
+                        execution: phaseExecution,
+                        remaining: phaseRemaining,
+                        percent: usagePercent(phaseBudget, phaseExecution),
+                    },
+                };
+
+                totals.material.budget += material.budget;
+                totals.material.execution += material.execution;
+                totals.material.remaining += material.remaining;
+                totals.labor.budget += labor.budget;
+                totals.labor.execution += labor.execution;
+                totals.labor.remaining += labor.remaining;
+                totals.expense.budget += expense.budget;
+                totals.expense.execution += expense.execution;
+                totals.expense.remaining += expense.remaining;
+                totals.total.budget += phaseBudget;
+                totals.total.execution += phaseExecution;
+                totals.total.remaining += phaseRemaining;
+            });
+
+            totals.total.percent = usagePercent(totals.total.budget, totals.total.execution);
+            if (Object.keys(phases).length === 0) return null;
+            return {
+                name: equipment.name,
+                phases,
+                totals,
+            };
+        })
+        .filter(Boolean);
+
+    const summary = {
+        material: { budget: 0, execution: 0, remaining: 0 },
+        labor: { budget: 0, execution: 0, remaining: 0 },
+        expense: { budget: 0, execution: 0, remaining: 0 },
+        total: { budget: 0, execution: 0, remaining: 0 },
+        phases: {
+            fabrication: { budget: 0, execution: 0, remaining: 0 },
+            installation: { budget: 0, execution: 0, remaining: 0 },
+        },
+    };
+
+    items.forEach((item) => {
+        COST_TYPES.forEach((type) => {
+            summary[type].budget += item.totals[type].budget;
+            summary[type].execution += item.totals[type].execution;
+            summary[type].remaining += item.totals[type].remaining;
+        });
+        summary.total.budget += item.totals.total.budget;
+        summary.total.execution += item.totals.total.execution;
+        summary.total.remaining += item.totals.total.remaining;
+        PHASES.forEach((phase) => {
+            const phaseData = item.phases[phase];
+            if (!phaseData) return;
+            summary.phases[phase].budget += phaseData.total.budget;
+            summary.phases[phase].execution += phaseData.total.execution;
+            summary.phases[phase].remaining += phaseData.total.remaining;
+        });
+    });
+
+    summary.total.percent = usagePercent(summary.total.budget, summary.total.execution);
+    PHASES.forEach((phase) => {
+        summary.phases[phase].percent = usagePercent(summary.phases[phase].budget, summary.phases[phase].execution);
+    });
+
+    return { items, summary };
+}
+
 const BudgetProjectBudget = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
@@ -327,11 +568,13 @@ const BudgetProjectBudget = () => {
     const budgetMenuRef = useRef(null);
     const budgetMenuCloseTimerRef = useRef(null);
 
-    const [equipmentKeyword, setEquipmentKeyword] = useState('');
+    const [detailSearchQuery, setDetailSearchQuery] = useState('');
     const [selectedPhases, setSelectedPhases] = useState([...PHASES]);
     const [selectedCostTypes, setSelectedCostTypes] = useState([...COST_TYPES]);
     const [selectedSources, setSelectedSources] = useState([...SOURCE_TYPES]);
     const [selectedEquipments, setSelectedEquipments] = useState([]);
+    const [isTotalFixed, setIsTotalFixed] = useState(false);
+    const [isTreeExpanded, setIsTreeExpanded] = useState(true);
 
     useEffect(() => {
         setInputQuery(searchParams.get('q') || '');
@@ -613,175 +856,43 @@ const BudgetProjectBudget = () => {
         });
     }, [dashboard.equipmentSummaries]);
 
-    const equipmentFilterOptions = useMemo(() => {
-        const keyword = equipmentKeyword.trim().toLowerCase();
-        if (!keyword) return dashboard.equipmentSummaries.map((item) => item.name);
-        return dashboard.equipmentSummaries
-            .map((item) => item.name)
-            .filter((name) => name.toLowerCase().includes(keyword));
-    }, [dashboard.equipmentSummaries, equipmentKeyword]);
-
     const viewModel = useMemo(() => {
-        const phaseSet = new Set(selectedPhases);
-        const costTypeSet = new Set(selectedCostTypes);
-        const sourceSet = new Set(selectedSources);
-        const equipmentSet = new Set(selectedEquipments);
-
-        const items = dashboard.equipmentSummaries
-            .filter((equipment) => equipmentSet.has(equipment.name))
-            .map((equipment) => {
-                const phases = {};
-                const totals = {
-                    material: { budget: 0, execution: 0, remaining: 0 },
-                    labor: { budget: 0, execution: 0, remaining: 0 },
-                    expense: { budget: 0, execution: 0, remaining: 0 },
-                    total: { budget: 0, execution: 0, remaining: 0 },
-                };
-
-                PHASES.forEach((phase) => {
-                    if (!phaseSet.has(phase)) return;
-                    const phaseData = equipment.phases[phase];
-                    const materialEnabled = costTypeSet.has('material');
-                    const laborEnabled = costTypeSet.has('labor');
-                    const expenseEnabled = costTypeSet.has('expense');
-
-                    const material = {
-                        units: materialEnabled ? phaseData.material.units : [],
-                        budget: materialEnabled ? toNumber(phaseData.material.budget) : 0,
-                        execution: materialEnabled ? toNumber(phaseData.material.execution) : 0,
-                    };
-                    material.remaining = material.budget - material.execution;
-
-                    const laborBySource = {};
-                    let laborBudget = 0;
-                    let laborExecution = 0;
-                    SOURCE_TYPES.forEach((source) => {
-                        const rows = phaseData.labor.byStaffing[source] || [];
-                        const sums = sumAmountRows(rows);
-                        laborBySource[source] = {
-                            rows,
-                            budget: sums.budget,
-                            execution: sums.execution,
-                            remaining: sums.budget - sums.execution,
-                        };
-                        if (laborEnabled && sourceSet.has(source)) {
-                            laborBudget += sums.budget;
-                            laborExecution += sums.execution;
-                        }
-                    });
-                    const labor = {
-                        bySource: laborBySource,
-                        budget: laborBudget,
-                        execution: laborExecution,
-                        remaining: laborBudget - laborExecution,
-                    };
-
-                    const expenseBySource = {};
-                    let expenseBudget = 0;
-                    let expenseExecution = 0;
-                    SOURCE_TYPES.forEach((source) => {
-                        const rows = phaseData.expense.byType[source] || [];
-                        const sums = sumAmountRows(rows);
-                        expenseBySource[source] = {
-                            rows,
-                            budget: sums.budget,
-                            execution: sums.execution,
-                            remaining: sums.budget - sums.execution,
-                        };
-                        if (expenseEnabled && sourceSet.has(source)) {
-                            expenseBudget += sums.budget;
-                            expenseExecution += sums.execution;
-                        }
-                    });
-                    const expense = {
-                        bySource: expenseBySource,
-                        budget: expenseBudget,
-                        execution: expenseExecution,
-                        remaining: expenseBudget - expenseExecution,
-                    };
-
-                    const phaseBudget = material.budget + labor.budget + expense.budget;
-                    const phaseExecution = material.execution + labor.execution + expense.execution;
-                    const phaseRemaining = phaseBudget - phaseExecution;
-
-                    phases[phase] = {
-                        material,
-                        labor,
-                        expense,
-                        total: {
-                            budget: phaseBudget,
-                            execution: phaseExecution,
-                            remaining: phaseRemaining,
-                            percent: usagePercent(phaseBudget, phaseExecution),
-                        },
-                    };
-
-                    totals.material.budget += material.budget;
-                    totals.material.execution += material.execution;
-                    totals.material.remaining += material.remaining;
-                    totals.labor.budget += labor.budget;
-                    totals.labor.execution += labor.execution;
-                    totals.labor.remaining += labor.remaining;
-                    totals.expense.budget += expense.budget;
-                    totals.expense.execution += expense.execution;
-                    totals.expense.remaining += expense.remaining;
-                    totals.total.budget += phaseBudget;
-                    totals.total.execution += phaseExecution;
-                    totals.total.remaining += phaseRemaining;
-                });
-
-                totals.total.percent = usagePercent(totals.total.budget, totals.total.execution);
-                return {
-                    name: equipment.name,
-                    phases,
-                    totals,
-                };
-            })
-            .filter((item) => Object.keys(item.phases).length > 0);
-
-        const summary = {
-            material: { budget: 0, execution: 0, remaining: 0 },
-            labor: { budget: 0, execution: 0, remaining: 0 },
-            expense: { budget: 0, execution: 0, remaining: 0 },
-            total: { budget: 0, execution: 0, remaining: 0 },
-            phases: {
-                fabrication: { budget: 0, execution: 0, remaining: 0 },
-                installation: { budget: 0, execution: 0, remaining: 0 },
-            },
-        };
-
-        items.forEach((item) => {
-            COST_TYPES.forEach((type) => {
-                summary[type].budget += item.totals[type].budget;
-                summary[type].execution += item.totals[type].execution;
-                summary[type].remaining += item.totals[type].remaining;
-            });
-            summary.total.budget += item.totals.total.budget;
-            summary.total.execution += item.totals.total.execution;
-            summary.total.remaining += item.totals.total.remaining;
-            PHASES.forEach((phase) => {
-                const phaseData = item.phases[phase];
-                if (!phaseData) return;
-                summary.phases[phase].budget += phaseData.total.budget;
-                summary.phases[phase].execution += phaseData.total.execution;
-                summary.phases[phase].remaining += phaseData.total.remaining;
-            });
+        return buildBudgetViewModel({
+            equipmentSummaries: dashboard.equipmentSummaries,
+            selectedPhases,
+            selectedCostTypes,
+            selectedSources,
+            selectedEquipments,
+            searchKeyword: detailSearchQuery,
         });
+    }, [
+        dashboard.equipmentSummaries,
+        selectedPhases,
+        selectedCostTypes,
+        selectedSources,
+        selectedEquipments,
+        detailSearchQuery,
+    ]);
 
-        summary.total.percent = usagePercent(summary.total.budget, summary.total.execution);
-        PHASES.forEach((phase) => {
-            summary.phases[phase].percent = usagePercent(summary.phases[phase].budget, summary.phases[phase].execution);
+    const fixedSummaryViewModel = useMemo(() => {
+        return buildBudgetViewModel({
+            equipmentSummaries: dashboard.equipmentSummaries,
+            selectedPhases: [...PHASES],
+            selectedCostTypes: [...COST_TYPES],
+            selectedSources: [...SOURCE_TYPES],
+            selectedEquipments: dashboard.equipmentSummaries.map((item) => item.name),
+            searchKeyword: '',
         });
+    }, [dashboard.equipmentSummaries]);
 
-        return {
-            items,
-            summary,
-        };
-    }, [dashboard.equipmentSummaries, selectedPhases, selectedCostTypes, selectedEquipments, selectedSources]);
+    const summaryView = isTotalFixed ? fixedSummaryViewModel.summary : viewModel.summary;
 
     const allPhaseSelected = selectedPhases.length === PHASES.length;
     const allCostTypeSelected = selectedCostTypes.length === COST_TYPES.length;
     const allSourceSelected = selectedSources.length === SOURCE_TYPES.length;
+    const allEquipmentSelected = selectedEquipments.length > 0
+        && selectedEquipments.length === dashboard.equipmentSummaries.length;
+    const shouldForceExpandBySearch = detailSearchQuery.trim().length > 0;
 
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
@@ -818,6 +929,35 @@ const BudgetProjectBudget = () => {
 
     const toggleMulti = (setter, value) => {
         setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
+    };
+
+    const handleSelectAllFilters = () => {
+        setSelectedPhases([...PHASES]);
+        setSelectedCostTypes([...COST_TYPES]);
+        setSelectedSources([...SOURCE_TYPES]);
+        setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name));
+    };
+
+    const handleClearAllFilters = () => {
+        setSelectedPhases([]);
+        setSelectedCostTypes([]);
+        setSelectedSources([]);
+        setSelectedEquipments([]);
+    };
+
+    const renderHighlightedText = (text) => {
+        const source = String(text ?? '');
+        const keyword = detailSearchQuery.trim();
+        if (!keyword) return source;
+        const escaped = escapeRegExp(keyword);
+        const regex = new RegExp(`(${escaped})`, 'ig');
+        const tokens = source.split(regex);
+        const keywordLower = keyword.toLowerCase();
+        return tokens.map((token, index) => (
+            token.toLowerCase() === keywordLower
+                ? <mark key={`${source}-${index}`} className="rounded bg-yellow-200 px-0.5 text-inherit">{token}</mark>
+                : <React.Fragment key={`${source}-${index}`}>{token}</React.Fragment>
+        ));
     };
 
     if (isLoading) {
@@ -1076,52 +1216,82 @@ const BudgetProjectBudget = () => {
 
                 <div className="flex flex-col gap-5 xl:flex-row">
                     <aside className="xl:w-80 shrink-0 rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between">
+                        <div className="mb-3">
                             <h2 className="text-sm font-bold text-slate-800">필터</h2>
+                        </div>
+
+                        <div className="mb-4 grid grid-cols-2 gap-2">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setEquipmentKeyword('');
-                                    setSelectedPhases([...PHASES]);
-                                    setSelectedCostTypes([...COST_TYPES]);
-                                    setSelectedSources([...SOURCE_TYPES]);
-                                    setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name));
-                                }}
-                                className="text-xs font-semibold text-primary hover:text-primary/80"
+                                onClick={handleSelectAllFilters}
+                                className="h-8 rounded-md border border-primary/30 bg-primary/10 text-xs font-semibold text-primary hover:bg-primary/15"
                             >
-                                전체 초기화
+                                전체 선택
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearAllFilters}
+                                className="h-8 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-slate-300"
+                            >
+                                전체 해제
                             </button>
                         </div>
 
                         <div className="space-y-5 text-sm">
                             <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">설비 검색</p>
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">예산 내역 검색</p>
                                 <div className="relative">
                                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
-                                        value={equipmentKeyword}
-                                        onChange={(event) => setEquipmentKeyword(event.target.value)}
-                                        placeholder="설비 이름 검색"
+                                        value={detailSearchQuery}
+                                        onChange={(event) => setDetailSearchQuery(event.target.value)}
+                                        placeholder="예산 내역 전체 검색"
                                         className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                                     />
                                 </div>
+                                <p className="mt-1 text-[11px] text-slate-500">선택된 필터 항목 내에서만 검색됩니다.</p>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={isTotalFixed}
+                                        onChange={(event) => setIsTotalFixed(event.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                    />
+                                    합계 금액 고정
+                                </label>
+                                <p className="mt-1 text-[11px] text-slate-500">활성화하면 필터링 후에도 합계는 전체 선택 기준으로 유지됩니다.</p>
                             </div>
 
                             <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">프로젝트 단계</p>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">프로젝트 단계</p>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPhases([...PHASES])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 선택
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPhases([])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 해제
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="space-y-2">
                                     <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                                         <input
                                             type="checkbox"
                                             checked={allPhaseSelected}
-                                            onChange={(event) => {
-                                                if (event.target.checked) {
-                                                    setSelectedPhases([...PHASES]);
-                                                } else {
-                                                    setSelectedPhases([]);
-                                                }
-                                            }}
+                                            onChange={(event) => setSelectedPhases(event.target.checked ? [...PHASES] : [])}
                                             className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                                         />
                                         전체 단계
@@ -1141,19 +1311,31 @@ const BudgetProjectBudget = () => {
                             </div>
 
                             <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">비용 유형</p>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">비용 유형</p>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedCostTypes([...COST_TYPES])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 선택
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedCostTypes([])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 해제
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="space-y-2">
                                     <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                                         <input
                                             type="checkbox"
                                             checked={allCostTypeSelected}
-                                            onChange={(event) => {
-                                                if (event.target.checked) {
-                                                    setSelectedCostTypes([...COST_TYPES]);
-                                                } else {
-                                                    setSelectedCostTypes([]);
-                                                }
-                                            }}
+                                            onChange={(event) => setSelectedCostTypes(event.target.checked ? [...COST_TYPES] : [])}
                                             className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                                         />
                                         전체 비용
@@ -1173,7 +1355,25 @@ const BudgetProjectBudget = () => {
                             </div>
 
                             <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">출처</p>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">출처</p>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedSources([...SOURCE_TYPES])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 선택
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedSources([])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 해제
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {SOURCE_TYPES.map((source) => (
                                         <button
@@ -1199,30 +1399,42 @@ const BudgetProjectBudget = () => {
                             <div>
                                 <div className="mb-2 flex items-center justify-between">
                                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">설비</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name))}
-                                        className="text-[11px] font-semibold text-primary hover:text-primary/80"
-                                    >
-                                        전체 선택
-                                    </button>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name))}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 선택
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedEquipments([])}
+                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                                        >
+                                            전체 해제
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                                    {equipmentFilterOptions.map((name) => (
-                                        <label key={name} className="flex items-center gap-2 text-xs text-slate-700">
+                                    {dashboard.equipmentSummaries.map((item) => (
+                                        <label key={item.name} className="flex items-center gap-2 text-xs text-slate-700">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedEquipments.includes(name)}
-                                                onChange={() => toggleMulti(setSelectedEquipments, name)}
+                                                checked={selectedEquipments.includes(item.name)}
+                                                onChange={() => toggleMulti(setSelectedEquipments, item.name)}
                                                 className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                                             />
-                                            <span className="truncate">{name}</span>
+                                            <span className="truncate">{renderHighlightedText(item.name)}</span>
                                         </label>
                                     ))}
-                                    {equipmentFilterOptions.length === 0 && (
-                                        <p className="text-[11px] text-slate-500">일치하는 설비가 없습니다.</p>
+                                    {!dashboard.equipmentSummaries.length && (
+                                        <p className="text-[11px] text-slate-500">등록된 설비가 없습니다.</p>
                                     )}
                                 </div>
+                                {!allEquipmentSelected && dashboard.equipmentSummaries.length > 0 && (
+                                    <p className="mt-1 text-[11px] text-slate-500">선택된 설비만 결과에 반영됩니다.</p>
+                                )}
                             </div>
                         </div>
                     </aside>
@@ -1232,20 +1444,20 @@ const BudgetProjectBudget = () => {
                             <SummaryCard
                                 icon={Calculator}
                                 title="총 예산"
-                                value={formatAmount(viewModel.summary.total.budget)}
-                                subText="할당 100%"
+                                value={formatAmount(summaryView.total.budget)}
+                                subText={isTotalFixed ? '전체 선택 기준 고정' : '필터 조건 반영'}
                             />
                             <SummaryCard
                                 icon={Wallet}
                                 title="총 집행"
-                                value={formatAmount(viewModel.summary.total.execution)}
-                                subText={`집행률 ${formatPercent(viewModel.summary.total.percent)}`}
+                                value={formatAmount(summaryView.total.execution)}
+                                subText={`집행률 ${formatPercent(summaryView.total.percent)}`}
                                 tone="warning"
                             />
                             <SummaryCard
                                 icon={BarChart3}
                                 title="총 잔액"
-                                value={formatAmount(viewModel.summary.total.remaining)}
+                                value={formatAmount(summaryView.total.remaining)}
                                 subText={showExecution ? '집행 반영 모드' : '예산 중심 모드'}
                                 tone="primary"
                             />
@@ -1253,16 +1465,16 @@ const BudgetProjectBudget = () => {
 
                         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {PHASES.filter((phase) => selectedPhases.includes(phase)).map((phase) => {
-                                const phaseSummary = viewModel.summary.phases[phase];
+                                const phaseSummary = summaryView.phases[phase];
                                 const theme = PHASE_THEME[phase];
                                 const materialShare = phaseSummary.execution > 0
-                                    ? Math.round((viewModel.summary.material.execution / Math.max(phaseSummary.execution, 1)) * 100)
+                                    ? Math.round((summaryView.material.execution / Math.max(phaseSummary.execution, 1)) * 100)
                                     : 0;
                                 const laborShare = phaseSummary.execution > 0
-                                    ? Math.round((viewModel.summary.labor.execution / Math.max(phaseSummary.execution, 1)) * 100)
+                                    ? Math.round((summaryView.labor.execution / Math.max(phaseSummary.execution, 1)) * 100)
                                     : 0;
                                 const expenseShare = phaseSummary.execution > 0
-                                    ? Math.round((viewModel.summary.expense.execution / Math.max(phaseSummary.execution, 1)) * 100)
+                                    ? Math.round((summaryView.expense.execution / Math.max(phaseSummary.execution, 1)) * 100)
                                     : 0;
 
                                 return (
@@ -1301,8 +1513,17 @@ const BudgetProjectBudget = () => {
                         </section>
 
                         <section className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-slate-800">예산 상세 브레이크다운</h3>
+                            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-sm font-bold text-slate-800">예산 상세</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsTreeExpanded((prev) => !prev)}
+                                        className="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-slate-300"
+                                    >
+                                        {(isTreeExpanded || shouldForceExpandBySearch) ? '모두 접기' : '모두 펼치기'}
+                                    </button>
+                                </div>
                                 <div className="text-xs text-slate-500 flex items-center gap-3">
                                     <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary" />안전</span>
                                     <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" />경고</span>
@@ -1311,7 +1532,7 @@ const BudgetProjectBudget = () => {
                             </div>
 
                             <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                                <div className="col-span-5">설비 / 카테고리</div>
+                                <div className="col-span-5">항목</div>
                                 <div className="col-span-2 text-right">예산</div>
                                 <div className="col-span-2 text-right">집행</div>
                                 <div className="col-span-2 text-right">잔액</div>
@@ -1321,21 +1542,21 @@ const BudgetProjectBudget = () => {
                             <div className="divide-y divide-slate-200">
                                 {viewModel.items.length === 0 && (
                                     <div className="px-5 py-10 text-center text-sm text-slate-500">
-                                        선택된 필터 조건에 맞는 예산 데이터가 없습니다.
+                                        선택된 필터 조건과 검색어에 맞는 예산 데이터가 없습니다.
                                     </div>
                                 )}
 
                                 {viewModel.items.map((equipment) => {
                                     const totalPercent = equipment.totals.total.percent;
                                     return (
-                                        <details key={equipment.name} className="group" open>
-                                            <summary className="grid grid-cols-12 gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors items-center select-none border-l-4 border-transparent hover:border-primary">
-                                                <div className="col-span-5 flex items-center gap-2 min-w-0">
-                                                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-                                                    <div className="truncate text-sm font-semibold text-slate-800">{equipment.name}</div>
+                                        <details key={equipment.name} className="group" open={isTreeExpanded || shouldForceExpandBySearch}>
+                                            <summary className="grid grid-cols-12 gap-3 px-5 py-3 cursor-pointer transition-colors items-center select-none bg-slate-50 hover:bg-slate-100">
+                                                <div className="col-span-5 flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800">
+                                                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+                                                    <div className="truncate">{renderHighlightedText(equipment.name)}</div>
                                                 </div>
-                                                <div className="col-span-2 text-right text-sm font-medium text-slate-700">{formatAmount(equipment.totals.total.budget)}</div>
-                                                <div className="col-span-2 text-right text-sm font-medium text-slate-700">{formatAmount(equipment.totals.total.execution)}</div>
+                                                <div className="col-span-2 text-right text-sm font-semibold text-slate-700">{formatAmount(equipment.totals.total.budget)}</div>
+                                                <div className="col-span-2 text-right text-sm font-semibold text-slate-700">{formatAmount(equipment.totals.total.execution)}</div>
                                                 <div className={cn('col-span-2 text-right text-sm font-bold', equipment.totals.total.remaining < 0 ? 'text-rose-600' : 'text-primary')}>
                                                     {formatAmount(equipment.totals.total.remaining)}
                                                 </div>
@@ -1346,24 +1567,18 @@ const BudgetProjectBudget = () => {
                                                 </div>
                                             </summary>
 
-                                            <div className="pl-4 pr-2 pb-3">
+                                            <div className="space-y-1 py-1">
                                                 {PHASES.filter((phase) => selectedPhases.includes(phase)).map((phase) => {
                                                     const phaseView = equipment.phases[phase];
                                                     if (!phaseView) return null;
                                                     const theme = PHASE_THEME[phase];
 
                                                     return (
-                                                        <details key={`${equipment.name}-${phase}`} className="group/phase mb-2" open>
-                                                            <summary
-                                                                className={cn(
-                                                                    'grid grid-cols-12 gap-3 px-5 py-3 cursor-pointer transition-colors items-center rounded-l-lg border-l-4',
-                                                                    theme.panel,
-                                                                    theme.border
-                                                                )}
-                                                            >
-                                                                <div className="col-span-5 flex items-center gap-2">
-                                                                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open/phase:rotate-180" />
-                                                                    <span className={cn('text-xs font-bold', theme.text)}>{PHASE_LABEL[phase]} 단계</span>
+                                                        <details key={`${equipment.name}-${phase}`} className="group/phase" open={isTreeExpanded || shouldForceExpandBySearch}>
+                                                            <summary className={cn('grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer transition-colors items-center hover:brightness-[0.98]', theme.panel)}>
+                                                                <div className={cn('col-span-5 flex items-center gap-2 text-xs font-bold', theme.text)}>
+                                                                    <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/phase:rotate-180" />
+                                                                    {renderHighlightedText(`${PHASE_LABEL[phase]} 단계`)}
                                                                 </div>
                                                                 <div className="col-span-2 text-right text-xs font-semibold text-slate-700">{formatAmount(phaseView.total.budget)}</div>
                                                                 <div className="col-span-2 text-right text-xs font-semibold text-slate-700">{formatAmount(phaseView.total.execution)}</div>
@@ -1377,140 +1592,129 @@ const BudgetProjectBudget = () => {
                                                                 </div>
                                                             </summary>
 
-                                                            <div className="ml-6 border-l border-slate-200 pl-4 pr-2 py-2 space-y-2">
-                                                                {selectedCostTypes.includes('material') && (
-                                                                    <details className="group/type" open>
-                                                                        <summary className="grid grid-cols-12 gap-3 px-4 py-2 cursor-pointer hover:bg-slate-50 rounded">
-                                                                            <div className="col-span-5 flex items-center gap-2">
-                                                                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open/type:rotate-180" />
-                                                                                <span className="text-xs font-semibold text-slate-700">재료비</span>
-                                                                            </div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.material.budget)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.material.execution)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.material.remaining)}</div>
-                                                                            <div className="col-span-1 flex justify-center">
-                                                                                <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.material.budget, phaseView.material.execution)))} />
-                                                                            </div>
-                                                                        </summary>
-                                                                        <div className="px-5 py-2">
-                                                                            {!phaseView.material.units.length ? (
-                                                                                <p className="text-[11px] text-slate-500">등록된 유닛 데이터가 없습니다.</p>
-                                                                            ) : (
-                                                                                <table className="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
-                                                                                    <thead className="bg-slate-50 text-slate-500">
-                                                                                        <tr>
-                                                                                            <th className="px-3 py-2 text-left">유닛</th>
-                                                                                            <th className="px-3 py-2 text-right">예산</th>
-                                                                                            <th className="px-3 py-2 text-right">집행</th>
-                                                                                            <th className="px-3 py-2 text-right">상태</th>
-                                                                                        </tr>
-                                                                                    </thead>
-                                                                                    <tbody className="divide-y divide-slate-100">
-                                                                                        {phaseView.material.units.map((unit) => {
-                                                                                            const percent = usagePercent(unit.budgetAmount, unit.executionAmount);
-                                                                                            return (
-                                                                                                <tr key={`${equipment.name}-${phase}-${unit.unitName}`}>
-                                                                                                    <td className="px-3 py-2 text-slate-700">{unit.unitName}</td>
-                                                                                                    <td className="px-3 py-2 text-right text-slate-700">{formatAmount(unit.budgetAmount)}</td>
-                                                                                                    <td className="px-3 py-2 text-right text-slate-500">{formatAmount(unit.executionAmount)}</td>
-                                                                                                    <td className="px-3 py-2 text-right"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(percent))} /></td>
-                                                                                                </tr>
-                                                                                            );
-                                                                                        })}
-                                                                                    </tbody>
-                                                                                </table>
-                                                                            )}
+                                                            {phaseView.material.isVisible && (
+                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
+                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-blue-50/40 hover:bg-blue-50/60">
+                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
+                                                                            {renderHighlightedText('재료비')}
                                                                         </div>
-                                                                    </details>
-                                                                )}
-
-                                                                {selectedCostTypes.includes('labor') && (
-                                                                    <details className="group/type" open>
-                                                                        <summary className="grid grid-cols-12 gap-3 px-4 py-2 cursor-pointer hover:bg-slate-50 rounded">
-                                                                            <div className="col-span-5 flex items-center gap-2">
-                                                                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open/type:rotate-180" />
-                                                                                <span className="text-xs font-semibold text-slate-700">인건비</span>
-                                                                            </div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.labor.budget)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.labor.execution)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.labor.remaining)}</div>
-                                                                            <div className="col-span-1 flex justify-center">
-                                                                                <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.labor.budget, phaseView.labor.execution)))} />
-                                                                            </div>
-                                                                        </summary>
-                                                                        <div className="px-5 py-2 space-y-2">
-                                                                            {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
-                                                                                const sourceBlock = phaseView.labor.bySource[source];
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.budget)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.execution)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.remaining)}</div>
+                                                                        <div className="col-span-1 flex justify-center">
+                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.material.budget, phaseView.material.execution)))} />
+                                                                        </div>
+                                                                    </summary>
+                                                                    <div className="divide-y divide-slate-100">
+                                                                        {!phaseView.material.units.length ? (
+                                                                            <div className="px-5 py-2 text-[11px] text-slate-500">등록된 유닛 데이터가 없습니다.</div>
+                                                                        ) : (
+                                                                            phaseView.material.units.map((unit) => {
+                                                                                const percent = usagePercent(unit.budgetAmount, unit.executionAmount);
                                                                                 return (
-                                                                                    <div key={`${equipment.name}-${phase}-labor-${source}`} className="rounded-lg border border-slate-200 bg-slate-50/50 p-2">
-                                                                                        <div className="mb-1 flex items-center justify-between">
-                                                                                            <p className="text-[11px] font-semibold text-slate-700">{source} 인건비</p>
-                                                                                            <p className="text-[11px] text-slate-600">{formatAmount(sourceBlock.budget)} / {formatAmount(sourceBlock.execution)}</p>
-                                                                                        </div>
-                                                                                        {!sourceBlock.rows.length ? (
-                                                                                            <p className="text-[11px] text-slate-500">항목 없음</p>
-                                                                                        ) : (
-                                                                                            <div className="space-y-1">
-                                                                                                {sourceBlock.rows.map((row) => (
-                                                                                                    <div key={`${equipment.name}-${phase}-labor-${source}-${row.name}`} className="flex items-center justify-between gap-2 rounded border border-slate-100 bg-white px-2 py-1 text-[11px]">
-                                                                                                        <span className="truncate text-slate-700">{row.name}</span>
-                                                                                                        <span className="shrink-0 text-slate-600">{formatAmount(row.budgetAmount)} / {formatAmount(row.executionAmount)}</span>
-                                                                                                    </div>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        )}
+                                                                                    <div key={`${equipment.name}-${phase}-${unit.unitName}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white">
+                                                                                        <div className="col-span-5 text-[11px] text-slate-700">{renderHighlightedText(unit.unitName)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(unit.budgetAmount)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(unit.executionAmount)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(unit.budgetAmount - unit.executionAmount)}</div>
+                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(percent))} /></div>
                                                                                     </div>
                                                                                 );
-                                                                            })}
-                                                                        </div>
-                                                                    </details>
-                                                                )}
+                                                                            })
+                                                                        )}
+                                                                    </div>
+                                                                </details>
+                                                            )}
 
-                                                                {selectedCostTypes.includes('expense') && (
-                                                                    <details className="group/type" open>
-                                                                        <summary className="grid grid-cols-12 gap-3 px-4 py-2 cursor-pointer hover:bg-slate-50 rounded">
-                                                                            <div className="col-span-5 flex items-center gap-2">
-                                                                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open/type:rotate-180" />
-                                                                                <span className="text-xs font-semibold text-slate-700">경비</span>
-                                                                            </div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.expense.budget)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.expense.execution)}</div>
-                                                                            <div className="col-span-2 text-right text-xs text-slate-600">{formatAmount(phaseView.expense.remaining)}</div>
-                                                                            <div className="col-span-1 flex justify-center">
-                                                                                <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.expense.budget, phaseView.expense.execution)))} />
-                                                                            </div>
-                                                                        </summary>
-                                                                        <div className="px-5 py-2 space-y-2">
-                                                                            {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
-                                                                                const sourceBlock = phaseView.expense.bySource[source];
-                                                                                return (
-                                                                                    <div key={`${equipment.name}-${phase}-expense-${source}`} className="rounded-lg border border-slate-200 bg-slate-50/50 p-2">
-                                                                                        <div className="mb-1 flex items-center justify-between">
-                                                                                            <p className="text-[11px] font-semibold text-slate-700">{source} 경비</p>
-                                                                                            <p className="text-[11px] text-slate-600">{formatAmount(sourceBlock.budget)} / {formatAmount(sourceBlock.execution)}</p>
-                                                                                        </div>
-                                                                                        {!sourceBlock.rows.length ? (
-                                                                                            <p className="text-[11px] text-slate-500">항목 없음</p>
-                                                                                        ) : (
-                                                                                            <div className="space-y-1">
-                                                                                                {sourceBlock.rows.map((row) => (
-                                                                                                    <div key={`${equipment.name}-${phase}-expense-${source}-${row.name}`} className="rounded border border-slate-100 bg-white px-2 py-1 text-[11px]">
-                                                                                                        <div className="flex items-center justify-between gap-2">
-                                                                                                            <span className="truncate text-slate-700">{row.name}</span>
-                                                                                                            <span className="shrink-0 text-slate-600">{formatAmount(row.budgetAmount)} / {formatAmount(row.executionAmount)}</span>
-                                                                                                        </div>
-                                                                                                        {row.basis && <p className="mt-0.5 truncate text-[10px] text-slate-500">기준: {row.basis}</p>}
-                                                                                                    </div>
-                                                                                                ))}
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                );
-                                                                            })}
+                                                            {phaseView.labor.isVisible && (
+                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
+                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-violet-50/40 hover:bg-violet-50/60">
+                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
+                                                                            {renderHighlightedText('인건비')}
                                                                         </div>
-                                                                    </details>
-                                                                )}
-                                                            </div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.budget)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.execution)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.remaining)}</div>
+                                                                        <div className="col-span-1 flex justify-center">
+                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.labor.budget, phaseView.labor.execution)))} />
+                                                                        </div>
+                                                                    </summary>
+                                                                    <div className="divide-y divide-slate-100">
+                                                                        {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
+                                                                            const sourceBlock = phaseView.labor.bySource[source];
+                                                                            if (!sourceBlock?.isVisible) return null;
+                                                                            return (
+                                                                                <div key={`${equipment.name}-${phase}-labor-${source}`}>
+                                                                                    <div className="grid grid-cols-12 gap-3 px-5 py-2 bg-white/90">
+                                                                                        <div className="col-span-5 text-[11px] font-semibold text-slate-700">{renderHighlightedText(`${source} 인건비`)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(sourceBlock.budget)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.execution)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.remaining)}</div>
+                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(sourceBlock.budget, sourceBlock.execution)))} /></div>
+                                                                                    </div>
+                                                                                    {sourceBlock.rows.map((row) => (
+                                                                                        <div key={`${equipment.name}-${phase}-labor-${source}-${row.name}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white border-t border-slate-100">
+                                                                                            <div className="col-span-5 text-[11px] text-slate-700">{renderHighlightedText(row.name)}</div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(row.budgetAmount)}</div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(row.executionAmount)}</div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(toNumber(row.budgetAmount) - toNumber(row.executionAmount))}</div>
+                                                                                            <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(row.budgetAmount, row.executionAmount)))} /></div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </details>
+                                                            )}
+
+                                                            {phaseView.expense.isVisible && (
+                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
+                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-emerald-50/40 hover:bg-emerald-50/60">
+                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
+                                                                            {renderHighlightedText('경비')}
+                                                                        </div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.budget)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.execution)}</div>
+                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.remaining)}</div>
+                                                                        <div className="col-span-1 flex justify-center">
+                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.expense.budget, phaseView.expense.execution)))} />
+                                                                        </div>
+                                                                    </summary>
+                                                                    <div className="divide-y divide-slate-100">
+                                                                        {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
+                                                                            const sourceBlock = phaseView.expense.bySource[source];
+                                                                            if (!sourceBlock?.isVisible) return null;
+                                                                            return (
+                                                                                <div key={`${equipment.name}-${phase}-expense-${source}`}>
+                                                                                    <div className="grid grid-cols-12 gap-3 px-5 py-2 bg-white/90">
+                                                                                        <div className="col-span-5 text-[11px] font-semibold text-slate-700">{renderHighlightedText(`${source} 경비`)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(sourceBlock.budget)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.execution)}</div>
+                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.remaining)}</div>
+                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(sourceBlock.budget, sourceBlock.execution)))} /></div>
+                                                                                    </div>
+                                                                                    {sourceBlock.rows.map((row) => (
+                                                                                        <div key={`${equipment.name}-${phase}-expense-${source}-${row.name}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white border-t border-slate-100">
+                                                                                            <div className="col-span-5 text-[11px] text-slate-700">
+                                                                                                <span>{renderHighlightedText(row.name)}</span>
+                                                                                                {row.basis ? <span className="ml-1 text-[10px] text-slate-500">({renderHighlightedText(row.basis)})</span> : null}
+                                                                                            </div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(row.budgetAmount)}</div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(row.executionAmount)}</div>
+                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(toNumber(row.budgetAmount) - toNumber(row.executionAmount))}</div>
+                                                                                            <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(row.budgetAmount, row.executionAmount)))} /></div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </details>
+                                                            )}
                                                         </details>
                                                     );
                                                 })}

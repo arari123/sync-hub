@@ -601,17 +601,27 @@ const SearchResults = () => {
                     {hasProjectPanel ? (
                         <section className="rounded-2xl border border-border bg-card overflow-hidden">
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[1120px]">
+                                <table className="w-full min-w-[1320px] table-fixed">
+                                    <colgroup>
+                                        <col style={{ width: '31%' }} />
+                                        <col style={{ width: '19%' }} />
+                                        <col style={{ width: '11%' }} />
+                                        <col style={{ width: '8%' }} />
+                                        <col style={{ width: '8%' }} />
+                                        <col style={{ width: '8%' }} />
+                                        <col style={{ width: '11%' }} />
+                                        <col style={{ width: '4%' }} />
+                                    </colgroup>
                                     <thead className="bg-secondary/70 text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
                                             <th className="px-4 py-3 text-left font-semibold">프로젝트</th>
                                             <th className="px-4 py-3 text-left font-semibold">미확인 업데이트 (바로가기)</th>
-                                            <th className="px-4 py-3 text-left font-semibold">고객사/위치</th>
-                                            <th className="px-4 py-3 text-left font-semibold">담당자</th>
-                                            <th className="px-4 py-3 text-left font-semibold">프로젝트 상태</th>
-                                            <th className="px-4 py-3 text-left font-semibold">프로젝트 종류</th>
+                                            <th className="px-4 py-3 text-center font-semibold">고객사/위치</th>
+                                            <th className="px-4 py-3 text-center font-semibold">담당자</th>
+                                            <th className="px-4 py-3 text-center font-semibold">프로젝트 상태</th>
+                                            <th className="px-4 py-3 text-center font-semibold">프로젝트 종류</th>
                                             <th className="px-4 py-3 text-left font-semibold">마지막 안건</th>
-                                            <th className="px-4 py-3 text-right font-semibold">Action</th>
+                                            <th className="px-4 py-3 text-center font-semibold">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -678,25 +688,29 @@ const SearchResults = () => {
                                                             )}
                                                         </td>
 
-                                                        <td className="px-4 py-3 align-top text-xs text-slate-600">
+                                                        <td className="px-4 py-3 align-top text-center text-xs text-slate-600">
                                                             <p className="font-medium text-slate-700">{project.customer_name || '-'}</p>
                                                             <p className="mt-1">{project.installation_site || '-'}</p>
                                                         </td>
 
-                                                        <td className="px-4 py-3 align-top text-xs text-slate-600">
+                                                        <td className="px-4 py-3 align-top text-center text-xs text-slate-600">
                                                             {project.manager_name || '담당자 미지정'}
                                                         </td>
 
-                                                        <td className="px-4 py-3 align-top">
-                                                            <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                                                {resolveProjectStatusLabel(project)}
-                                                            </span>
+                                                        <td className="px-4 py-3 align-top text-center">
+                                                            <div className="flex justify-center">
+                                                                <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                                                    {resolveProjectStatusLabel(project)}
+                                                                </span>
+                                                            </div>
                                                         </td>
 
-                                                        <td className="px-4 py-3 align-top">
-                                                            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
-                                                                {resolveProjectTypeLabel(project)}
-                                                            </span>
+                                                        <td className="px-4 py-3 align-top text-center">
+                                                            <div className="flex justify-center">
+                                                                <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                                                                    {resolveProjectTypeLabel(project)}
+                                                                </span>
+                                                            </div>
                                                         </td>
 
                                                         <td className="px-4 py-3 align-top">
@@ -705,7 +719,7 @@ const SearchResults = () => {
                                                             </span>
                                                         </td>
 
-                                                        <td className="px-4 py-3 align-top text-right">
+                                                        <td className="px-4 py-3 align-top text-center">
                                                             <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-primary">
                                                                 <MoreVertical className="h-4 w-4" />
                                                             </button>

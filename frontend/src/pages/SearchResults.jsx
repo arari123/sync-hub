@@ -6,6 +6,7 @@ import {
     Database,
     Filter,
     FolderKanban,
+    House,
     Loader2,
     MoreVertical,
     Plus,
@@ -15,6 +16,8 @@ import {
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
+import ResultList from '../components/ResultList';
+import DocumentDetail from '../components/DocumentDetail';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const STAGE_OPTIONS = [
@@ -218,6 +221,8 @@ const SearchResults = () => {
     const [inputQuery, setInputQuery] = useState(query);
     const [projectPool, setProjectPool] = useState([]);
     const [projectRows, setProjectRows] = useState([]);
+    const [documentResults, setDocumentResults] = useState([]);
+    const [selectedResult, setSelectedResult] = useState(null);
     const [showAllProjects, setShowAllProjects] = useState(false);
     const [projectFilters, setProjectFilters] = useState({
         projectName: '',
@@ -243,12 +248,20 @@ const SearchResults = () => {
         const fetchResults = async () => {
             setIsLoading(true);
             setError('');
+            setSelectedResult(null);
 
             try {
                 const projectListPromise = api.get('/budget/projects', {
                     params: { page: 1, page_size: 200, sort_by: 'updated_desc' },
                     signal: controller.signal,
                 });
+
+                const documentSearchPromise = hasSearchQuery
+                    ? api.get('/documents/search', {
+                        params: { q: searchQuery, page: 1, page_size: 10 },
+                        signal: controller.signal,
+                    })
+                    : Promise.resolve({ data: { items: [] } });
 
                 const projectSearchPromise = hasSearchQuery
                     ? api.get('/budget/projects/search', {
@@ -257,8 +270,9 @@ const SearchResults = () => {
                     })
                     : Promise.resolve({ data: [] });
 
-                const [projectListResult, projectSearchResult] = await Promise.allSettled([
+                const [projectListResult, documentSearchResult, projectSearchResult] = await Promise.allSettled([
                     projectListPromise,
+                    documentSearchPromise,
                     projectSearchPromise,
                 ]);
 
@@ -266,7 +280,14 @@ const SearchResults = () => {
                     throw projectListResult.reason;
                 }
 
+                if (hasSearchQuery && documentSearchResult.status !== 'fulfilled') {
+                    throw documentSearchResult.reason;
+                }
+
                 const projectList = extractItems(projectListResult.value?.data);
+                const docs = documentSearchResult.status === 'fulfilled'
+                    ? extractItems(documentSearchResult.value?.data)
+                    : [];
 
                 let nextProjectRows = projectList;
                 if (hasSearchQuery) {
@@ -280,12 +301,14 @@ const SearchResults = () => {
                 if (!active) return;
                 setProjectPool(projectList);
                 setProjectRows(nextProjectRows);
+                setDocumentResults(docs);
             } catch (err) {
                 if (!active || err?.code === 'ERR_CANCELED') {
                     return;
                 }
                 setProjectPool([]);
                 setProjectRows([]);
+                setDocumentResults([]);
                 setError(getErrorMessage(err, '검색 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
             } finally {
                 if (!active) return;
@@ -398,8 +421,8 @@ const SearchResults = () => {
                 <aside className="hidden xl:flex w-60 shrink-0 border-r border-slate-200 bg-white p-3">
                     <nav className="w-full space-y-1.5 text-sm">
                         <Link to="/" className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 font-semibold text-slate-900">
-                            <Search className="h-4 w-4" />
-                            글로벌 검색
+                            <House className="h-4 w-4" />
+                            메인
                         </Link>
                         <Link to="/project-management" className="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">
                             <FolderKanban className="h-4 w-4" />
@@ -626,8 +649,40 @@ const SearchResults = () => {
                                 Showing {Math.min(TABLE_PAGE_SIZE, totalVisibleCount)} of {totalVisibleCount}
                                 {projectScope ? ` (프로젝트코드:${projectScope} 범위)` : ''}
                             </span>
+                            {hasSearchQuery && (
+                                <span>문서 검색 결과 {documentResults.length}건</span>
+                            )}
                         </div>
                     </section>
+
+                    {hasSearchQuery && (
+                        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-slate-800">문서 검색 결과</h2>
+                                <span className="text-xs text-slate-500">검색어: {searchQuery}</span>
+                            </div>
+
+                            {documentResults.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                                    <div className="lg:col-span-7">
+                                        <ResultList
+                                            results={documentResults}
+                                            query={searchQuery}
+                                            selectedResult={selectedResult}
+                                            onSelect={setSelectedResult}
+                                        />
+                                    </div>
+                                    <div className="lg:col-span-5">
+                                        <DocumentDetail result={selectedResult} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                                    문서 검색 결과가 없습니다.
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </main>
             </div>
         </div>

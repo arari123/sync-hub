@@ -12,7 +12,7 @@
 - [x] 필터 전체 선택/해제(전역 + 단계/비용/설비) 추가
 - [x] 사이드바 통합 검색(하이라이트, 필터 범위 검색, 자동 펼침) 반영
 - [x] Docker 검증 (`npm run build`, `verify:fast`)
-- [ ] 커밋 및 `git push`
+- [x] 커밋 및 `git push`
 
 ## 검증 계획
 - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'`
@@ -21,3 +21,4 @@
 ## 검증 결과
 - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
 - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (80 tests, OK)
+- 반영 커밋: `ea13b5c`

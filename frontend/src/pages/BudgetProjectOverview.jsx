@@ -349,29 +349,29 @@ const BudgetProjectOverview = () => {
 
                                 {isBudgetMenuOpen && (
                                     <div
-                                        className="absolute right-0 top-[calc(100%+6px)] z-30 rounded-lg border border-border bg-card p-1.5 shadow-lg"
+                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-[360px] rounded-lg border border-border bg-card p-1.5 shadow-lg"
                                         onMouseEnter={keepBudgetMenuOpen}
                                         onMouseLeave={scheduleBudgetMenuClose}
                                     >
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 whitespace-nowrap">
                                             <Link
                                                 to={budgetMaterialPath}
                                                 onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
                                             >
                                                 재료비 관리
                                             </Link>
                                             <Link
                                                 to={budgetLaborPath}
                                                 onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
                                             >
                                                 인건비 관리
                                             </Link>
                                             <Link
                                                 to={budgetExpensePath}
                                                 onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
                                             >
                                                 경비 관리
                                             </Link>

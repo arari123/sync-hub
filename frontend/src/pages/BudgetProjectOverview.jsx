@@ -225,6 +225,7 @@ const BudgetProjectOverview = () => {
 
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
+    const budgetManagementPath = `${baseProjectPath}/budget`;
     const budgetMaterialPath = `${baseProjectPath}/edit/material`;
     const budgetLaborPath = `${baseProjectPath}/edit/labor`;
     const budgetExpensePath = `${baseProjectPath}/edit/expense`;
@@ -237,8 +238,8 @@ const BudgetProjectOverview = () => {
     const timelineItems = useMemo(() => MOCK_TIMELINE_ITEMS, []);
     const pathname = location.pathname;
     const isProjectMainActive = pathname === projectMainPath || pathname === `${projectMainPath}/`;
-    const isBudgetActive = pathname === `${baseProjectPath}/budget`
-        || pathname === `${baseProjectPath}/budget/`
+    const isBudgetActive = pathname === budgetManagementPath
+        || pathname === `${budgetManagementPath}/`
         || pathname.startsWith(`${baseProjectPath}/edit/`);
     const isIssueActive = pathname === issueManagementPath || pathname === `${issueManagementPath}/`;
     const isScheduleActive = pathname === scheduleManagementPath || pathname === `${scheduleManagementPath}/`;
@@ -360,7 +361,7 @@ const BudgetProjectOverview = () => {
                                 onMouseLeave={scheduleBudgetMenuClose}
                             >
                                 <Link
-                                    to={`${baseProjectPath}/budget`}
+                                    to={budgetManagementPath}
                                     onMouseEnter={keepBudgetMenuOpen}
                                     className={cn(
                                         'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors',
@@ -597,6 +598,9 @@ const BudgetProjectOverview = () => {
                                         <p className="text-xs text-muted-foreground">프로젝트 예산/집행 현황</p>
                                     </div>
                                     <div className="text-right">
+                                        <Link className="mb-1 inline-flex text-xs font-medium text-primary hover:text-primary/80" to={budgetManagementPath}>
+                                            전체 보기
+                                        </Link>
                                         <div className="text-3xl font-bold text-slate-900 font-mono tracking-tight">
                                             {formatAmount(balanceTotal)}
                                         </div>

@@ -22,6 +22,11 @@ const STAGE_OPTIONS = [
     { value: 'warranty', label: '워런티' },
     { value: 'closure', label: '종료' },
 ];
+const PROJECT_TYPE_OPTIONS = [
+    { value: 'equipment', label: '설비' },
+    { value: 'parts', label: '파츠' },
+    { value: 'as', label: 'AS' },
+];
 const TABLE_PAGE_SIZE = 10;
 const STAGE_LABEL_MAP = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
@@ -122,6 +127,15 @@ function normalizeStage(value) {
     const stage = String(value || '').trim().toLowerCase();
     if (stage === 'progress') return 'fabrication';
     return stage;
+}
+
+function normalizeProjectType(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw === 'equipment' || raw === '설비') return 'equipment';
+    if (raw === 'parts' || raw === '파츠') return 'parts';
+    if (raw === 'as' || raw === 'a/s' || raw === '유지보수' || raw === 'as project') return 'as';
+    return raw;
 }
 
 function resolveProjectStatusLabel(project) {
@@ -272,6 +286,7 @@ const SearchResults = () => {
     const [showAllProjects, setShowAllProjects] = useState(false);
     const [projectFilters, setProjectFilters] = useState({
         stages: [],
+        types: [],
     });
     const [projectFilterQuery, setProjectFilterQuery] = useState('');
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
@@ -387,6 +402,9 @@ const SearchResults = () => {
         const selectedStages = new Set(
             Array.isArray(projectFilters.stages) ? projectFilters.stages : []
         );
+        const selectedTypes = new Set(
+            Array.isArray(projectFilters.types) ? projectFilters.types : []
+        );
 
         return source.filter((project) => {
             if (!showAllProjects && project?.is_mine === false) {
@@ -399,6 +417,11 @@ const SearchResults = () => {
             const installationSite = String(project?.installation_site || '').toLowerCase();
 
             if (selectedStages.size > 0 && !selectedStages.has(normalizeStage(project?.current_stage))) {
+                return false;
+            }
+
+            const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
+            if (selectedTypes.size > 0 && !selectedTypes.has(projectTypeKey)) {
                 return false;
             }
 
@@ -415,7 +438,7 @@ const SearchResults = () => {
 
             return true;
         });
-    }, [projectRows, projectFilters.stages, projectScope, projectFilterQuery, showAllProjects]);
+    }, [projectRows, projectFilters.stages, projectFilters.types, projectScope, projectFilterQuery, showAllProjects]);
 
     const tableProjects = useMemo(
         () => visibleProjects.slice(0, TABLE_PAGE_SIZE),
@@ -452,6 +475,20 @@ const SearchResults = () => {
 
     const clearStageFilters = () => {
         setProjectFilters((prev) => ({ ...prev, stages: [] }));
+    };
+
+    const toggleTypeFilter = (type) => {
+        setProjectFilters((prev) => {
+            const current = Array.isArray(prev.types) ? prev.types : [];
+            const nextTypes = current.includes(type)
+                ? current.filter((value) => value !== type)
+                : [...current, type];
+            return { ...prev, types: nextTypes };
+        });
+    };
+
+    const clearTypeFilters = () => {
+        setProjectFilters((prev) => ({ ...prev, types: [] }));
     };
 
     return (
@@ -606,6 +643,39 @@ const SearchResults = () => {
                                                     key={item.value}
                                                     type="button"
                                                     onClick={() => toggleStageFilter(item.value)}
+                                                    className={cn(
+                                                        'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                                        isActive
+                                                            ? 'border border-border bg-card text-foreground shadow-sm'
+                                                            : 'text-muted-foreground hover:bg-secondary'
+                                                    )}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="flex items-center gap-1 overflow-x-auto">
+                                        <button
+                                            type="button"
+                                            onClick={clearTypeFilters}
+                                            className={cn(
+                                                'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                projectFilters.types.length === 0
+                                                    ? 'border border-border bg-card shadow-sm'
+                                                    : 'text-muted-foreground hover:bg-secondary'
+                                            )}
+                                        >
+                                            전체 유형
+                                        </button>
+                                        {PROJECT_TYPE_OPTIONS.map((item) => {
+                                            const isActive = projectFilters.types.includes(item.value);
+                                            return (
+                                                <button
+                                                    key={item.value}
+                                                    type="button"
+                                                    onClick={() => toggleTypeFilter(item.value)}
                                                     className={cn(
                                                         'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                                                         isActive

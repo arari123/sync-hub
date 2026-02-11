@@ -349,7 +349,7 @@ const BudgetProjectOverview = () => {
 
                                 {isBudgetMenuOpen && (
                                     <div
-                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max min-w-[360px] rounded-lg border border-border bg-card p-1.5 shadow-lg"
+                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max rounded-lg border border-border bg-card p-1.5 shadow-lg"
                                         onMouseEnter={keepBudgetMenuOpen}
                                         onMouseLeave={scheduleBudgetMenuClose}
                                     >

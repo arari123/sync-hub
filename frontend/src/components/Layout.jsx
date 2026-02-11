@@ -7,6 +7,7 @@ const Layout = ({ children }) => {
     const location = useLocation();
     const authed = isAuthenticated();
     const user = getCurrentUser();
+    const isSearchRoute = location.pathname === '/search';
     const isProjectManagementRoute = location.pathname.startsWith('/project-management');
     const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(location.pathname);
 
@@ -14,6 +15,14 @@ const Layout = ({ children }) => {
         clearSession();
         navigate('/login', { replace: true });
     };
+
+    if (isSearchRoute) {
+        return (
+            <div className="min-h-screen bg-slate-50 font-sans text-foreground antialiased">
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary/10 selection:text-primary">

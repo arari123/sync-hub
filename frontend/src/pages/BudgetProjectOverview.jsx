@@ -79,6 +79,7 @@ function localizeStageLabel(value) {
     const normalized = raw.toLowerCase();
     if (STAGE_LABEL_ALIAS[normalized]) return STAGE_LABEL_ALIAS[normalized];
     if (raw === 'A/S') return '유지보수';
+    if (/[A-Za-z]/.test(raw)) return '';
     return raw;
 }
 

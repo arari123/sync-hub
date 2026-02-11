@@ -7,7 +7,7 @@ const Layout = ({ children }) => {
     const location = useLocation();
     const authed = isAuthenticated();
     const user = getCurrentUser();
-    const isSearchRoute = location.pathname === '/search';
+    const isSearchRoute = location.pathname === '/' || location.pathname === '/search';
     const isProjectManagementRoute = location.pathname.startsWith('/project-management');
     const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(location.pathname);
 

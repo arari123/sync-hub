@@ -21,6 +21,11 @@ function LegacyBudgetManagementRedirect() {
   return <Navigate to={`${redirectedPath}${location.search}${location.hash}`} replace />;
 }
 
+function LegacySearchRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/${location.search}${location.hash}`} replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -29,8 +34,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/" element={<ProtectedRoute><Navigate to="/search" replace /></ProtectedRoute>} />
-          <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
+          <Route path="/search" element={<ProtectedRoute><LegacySearchRedirect /></ProtectedRoute>} />
           <Route path="/project-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
           <Route path="/project-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />

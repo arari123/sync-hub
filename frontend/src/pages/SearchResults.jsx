@@ -25,6 +25,12 @@ const STAGE_OPTIONS = [
     { value: 'closure', label: '종료' },
 ];
 const TABLE_PAGE_SIZE = 10;
+const STAGE_LABEL_MAP = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, item.label]));
+const PROJECT_TYPE_LABEL_MAP = {
+    equipment: '설비',
+    parts: '파츠',
+    as: '유지보수',
+};
 
 function extractItems(payload) {
     if (Array.isArray(payload)) return payload;
@@ -120,6 +126,21 @@ function normalizeStage(value) {
     return stage;
 }
 
+function resolveProjectStatusLabel(project) {
+    const explicitLabel = String(project?.current_stage_label || '').trim();
+    if (explicitLabel) return explicitLabel;
+    const stage = normalizeStage(project?.current_stage);
+    return STAGE_LABEL_MAP[stage] || '-';
+}
+
+function resolveProjectTypeLabel(project) {
+    const explicitLabel = String(project?.project_type_label || '').trim();
+    if (explicitLabel) return explicitLabel;
+    const type = String(project?.project_type || '').trim().toLowerCase();
+    if (!type) return '미분류';
+    return PROJECT_TYPE_LABEL_MAP[type] || type;
+}
+
 function buildUpdateLinks(project) {
     const projectId = project?.id;
     if (!projectId) return [];
@@ -196,6 +217,8 @@ function mergeProjectSearchRows(projectPool, projectHits, query) {
             current_stage_label: hit?.current_stage_label || '',
             score: Number(hit?.score || 0),
             monitoring: {},
+            project_type: hit?.project_type || '',
+            project_type_label: hit?.project_type_label || '',
         });
     }
 
@@ -585,6 +608,8 @@ const SearchResults = () => {
                                             <th className="px-4 py-3 text-left font-semibold">미확인 업데이트 (바로가기)</th>
                                             <th className="px-4 py-3 text-left font-semibold">고객사/위치</th>
                                             <th className="px-4 py-3 text-left font-semibold">담당자</th>
+                                            <th className="px-4 py-3 text-left font-semibold">프로젝트 상태</th>
+                                            <th className="px-4 py-3 text-left font-semibold">프로젝트 종류</th>
                                             <th className="px-4 py-3 text-left font-semibold">마지막 안건</th>
                                             <th className="px-4 py-3 text-right font-semibold">Action</th>
                                         </tr>
@@ -592,7 +617,7 @@ const SearchResults = () => {
                                     <tbody>
                                         {isLoading ? (
                                             <tr>
-                                                <td colSpan={6} className="px-4 py-16 text-center">
+                                                <td colSpan={8} className="px-4 py-16 text-center">
                                                     <div className="inline-flex items-center gap-2 text-muted-foreground">
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                         데이터를 불러오는 중입니다.
@@ -601,7 +626,7 @@ const SearchResults = () => {
                                             </tr>
                                         ) : tableProjects.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                                                <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
                                                     필터 조건에 맞는 프로젝트가 없습니다.
                                                 </td>
                                             </tr>
@@ -660,6 +685,18 @@ const SearchResults = () => {
 
                                                         <td className="px-4 py-3 align-top text-xs text-slate-600">
                                                             {project.manager_name || '담당자 미지정'}
+                                                        </td>
+
+                                                        <td className="px-4 py-3 align-top">
+                                                            <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                                                {resolveProjectStatusLabel(project)}
+                                                            </span>
+                                                        </td>
+
+                                                        <td className="px-4 py-3 align-top">
+                                                            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+                                                                {resolveProjectTypeLabel(project)}
+                                                            </span>
                                                         </td>
 
                                                         <td className="px-4 py-3 align-top">

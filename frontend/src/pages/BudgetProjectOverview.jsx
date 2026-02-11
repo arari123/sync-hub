@@ -397,7 +397,7 @@ const BudgetProjectOverview = () => {
                                             : 'text-muted-foreground hover:bg-card hover:text-foreground'
                                     )}
                                 >
-                                    예산 관리
+                                    예산 메인
                                     <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isBudgetMenuOpen && 'rotate-180')} />
                                 </Link>
 

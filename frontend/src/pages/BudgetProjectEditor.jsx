@@ -2240,7 +2240,7 @@ const BudgetProjectEditor = () => {
                         breadcrumbItems={[
                             { label: '프로젝트 관리', to: '/project-management' },
                             { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
-                            { label: '예산 관리', to: `/project-management/projects/${projectId}/budget` },
+                            { label: '예산 메인', to: `/project-management/projects/${projectId}/budget` },
                             { label: `${SECTION_META[section].label} 입력` },
                         ]}
                     />

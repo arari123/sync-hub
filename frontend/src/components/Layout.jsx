@@ -11,6 +11,8 @@ const Layout = ({ children }) => {
     const isSearchRoute = pathname === '/' || pathname === '/search';
     const isProjectMainRoute = /^\/project-management\/projects\/[^/]+\/?$/.test(pathname)
         && pathname !== '/project-management/projects/new';
+    const isProjectBudgetMainRoute = /^\/project-management\/projects\/[^/]+\/budget\/?$/.test(pathname)
+        && pathname !== '/project-management/projects/new';
     const isProjectManagementRoute = pathname.startsWith('/project-management');
     const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(pathname);
 
@@ -19,7 +21,7 @@ const Layout = ({ children }) => {
         navigate('/login', { replace: true });
     };
 
-    if (isSearchRoute || isProjectMainRoute) {
+    if (isSearchRoute || isProjectMainRoute || isProjectBudgetMainRoute) {
         return (
             <div className="min-h-screen bg-slate-50 font-sans text-foreground antialiased">
                 {children}
@@ -41,7 +43,7 @@ const Layout = ({ children }) => {
                             {isBudgetContextRoute && (
                                 <>
                                     <span className="text-foreground/40">-</span>
-                                    <span>예산 관리</span>
+                                    <span>예산 메인</span>
                                 </>
                             )}
                         </div>

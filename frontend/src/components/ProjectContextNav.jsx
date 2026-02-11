@@ -18,7 +18,7 @@ const MENU_ITEMS = [
     { key: 'overview', label: '프로젝트 메인', subPath: '', icon: FolderKanban },
     {
         key: 'budget',
-        label: '예산 관리',
+        label: '예산 메인',
         subPath: '/budget',
         icon: Receipt,
         children: [

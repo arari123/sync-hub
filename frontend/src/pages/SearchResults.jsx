@@ -507,60 +507,65 @@ const SearchResults = () => {
                             <div className="border-t border-border p-4 space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllProjects(false)}
-                                            className={cn(
-                                                'h-8 rounded-full border px-3 text-xs font-semibold transition',
-                                                !showAllProjects
-                                                    ? 'border-primary bg-primary text-primary-foreground'
-                                                    : 'border-border bg-card text-slate-600 hover:bg-secondary'
-                                            )}
-                                        >
-                                            내 프로젝트
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllProjects(true)}
-                                            className={cn(
-                                                'h-8 rounded-full border px-3 text-xs font-semibold transition',
-                                                showAllProjects
-                                                    ? 'border-primary bg-primary text-primary-foreground'
-                                                    : 'border-border bg-card text-slate-600 hover:bg-secondary'
-                                            )}
-                                        >
-                                            전체 프로젝트
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={clearStageFilters}
-                                            className={cn(
-                                                'h-8 rounded-full border px-3 text-xs font-semibold transition',
-                                                projectFilters.stages.length === 0
-                                                    ? 'border-primary bg-primary text-primary-foreground'
-                                                    : 'border-border bg-card text-slate-600 hover:bg-secondary'
-                                            )}
-                                        >
-                                            전체 단계
-                                        </button>
-                                        {STAGE_OPTIONS.map((item) => {
-                                            const isActive = projectFilters.stages.includes(item.value);
-                                            return (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => toggleStageFilter(item.value)}
-                                                    className={cn(
-                                                        'h-8 rounded-full border px-3 text-xs font-semibold transition',
-                                                        isActive
-                                                            ? 'border-primary bg-primary text-primary-foreground'
-                                                            : 'border-border bg-card text-slate-600 hover:bg-secondary'
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            );
-                                        })}
+                                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllProjects(false)}
+                                                className={cn(
+                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                                    !showAllProjects
+                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                                )}
+                                            >
+                                                내 프로젝트
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllProjects(true)}
+                                                className={cn(
+                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                                    showAllProjects
+                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                                )}
+                                            >
+                                                전체 프로젝트
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={clearStageFilters}
+                                                className={cn(
+                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                                    projectFilters.stages.length === 0
+                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                                )}
+                                            >
+                                                전체 단계
+                                            </button>
+                                            {STAGE_OPTIONS.map((item) => {
+                                                const isActive = projectFilters.stages.includes(item.value);
+                                                return (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        className={cn(
+                                                            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                                            isActive
+                                                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                                        )}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                     <span className="text-sm text-muted-foreground">
                                         프로젝트 {totalVisibleCount}건 표시 / 기준 풀 {totalProjectCount}건

@@ -399,7 +399,7 @@ const SearchResults = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="h-20 border-b border-border bg-card/95 backdrop-blur">
+            <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
                 <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
                     <Link to="/" className="w-44 shrink-0 flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
@@ -410,31 +410,16 @@ const SearchResults = () => {
                     </Link>
 
                     <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0">
-                        <div className="flex flex-col gap-1.5">
-                            <label className="relative block">
-                                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <input
-                                    type="text"
-                                    value={inputQuery}
-                                    onChange={(event) => setInputQuery(event.target.value)}
-                                    placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
-                                    className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
-                                />
-                            </label>
-
-                            <nav
-                                aria-label="현재 경로"
-                                className="flex items-center gap-1.5 text-sm text-muted-foreground"
-                            >
-                                <Link to="/" className="font-medium hover:text-primary">
-                                    메인
-                                </Link>
-                                <span>/</span>
-                                <Link to="/search" className="font-semibold text-foreground/90 hover:text-primary">
-                                    글로벌 검색
-                                </Link>
-                            </nav>
-                        </div>
+                        <label className="relative block">
+                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                type="text"
+                                value={inputQuery}
+                                onChange={(event) => setInputQuery(event.target.value)}
+                                placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
+                                className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
+                            />
+                        </label>
                     </form>
 
                     <div className="w-40 shrink-0 flex items-center justify-end gap-2">
@@ -486,7 +471,26 @@ const SearchResults = () => {
                 </div>
             </header>
 
-            <div className="mx-auto min-h-[calc(100vh-5rem)] max-w-[1600px]">
+            <div className="border-b border-border bg-secondary/80">
+                <div className="mx-auto h-10 max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
+                    <div className="w-44 shrink-0" aria-hidden />
+                    <nav
+                        aria-label="현재 경로"
+                        className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
+                    >
+                        <Link to="/" className="font-medium hover:text-primary">
+                            메인
+                        </Link>
+                        <span>/</span>
+                        <Link to="/search" className="font-semibold text-foreground/90 hover:text-primary">
+                            글로벌 검색
+                        </Link>
+                    </nav>
+                    <div className="w-40 shrink-0" aria-hidden />
+                </div>
+            </div>
+
+            <div className="mx-auto min-h-[calc(100vh-6.5rem)] max-w-[1600px]">
                 <main className="overflow-y-auto p-4 lg:p-6 space-y-4">
                     {error && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

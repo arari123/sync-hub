@@ -32,5 +32,5 @@
 - `git revert <commit>`으로 본 변경을 되돌린다.
 
 ## 7. Evidence
-- `docker-compose exec -T web bash -lc 'cd /app && npm run verify:fast'`
+- `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'`
 - `rg -n "Latest Issue|Empty|프로젝트코드:삼성전자" docs/code.html`

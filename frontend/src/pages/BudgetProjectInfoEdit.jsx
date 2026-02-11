@@ -222,7 +222,7 @@ const BudgetProjectInfoEdit = () => {
                     이 프로젝트는 수정 권한이 없습니다.
                 </div>
                 <Link to={baseProjectPath}>
-                    <Button size="sm" variant="outline">프로젝트 상세로 돌아가기</Button>
+                    <Button size="sm" variant="outline">프로젝트 메인으로 돌아가기</Button>
                 </Link>
             </div>
         );

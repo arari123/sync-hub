@@ -15,7 +15,7 @@ import { Link, matchPath, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
 const MENU_ITEMS = [
-    { key: 'overview', label: '프로젝트 상세', subPath: '', icon: FolderKanban },
+    { key: 'overview', label: '프로젝트 메인', subPath: '', icon: FolderKanban },
     {
         key: 'budget',
         label: '예산 관리',

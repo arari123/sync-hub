@@ -47,7 +47,7 @@ const ProjectResultList = ({ results }) => {
                             단계: {project.current_stage_label || '-'}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full border border-border/80 px-2 py-1 text-foreground">
-                            프로젝트 상세 이동
+                            프로젝트 메인 이동
                             <ArrowRight className="h-3 w-3" />
                         </span>
                     </div>

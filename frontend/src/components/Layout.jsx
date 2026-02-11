@@ -5,18 +5,21 @@ import { clearSession, getCurrentUser, isAuthenticated } from '../lib/session';
 const Layout = ({ children }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const pathname = location.pathname;
     const authed = isAuthenticated();
     const user = getCurrentUser();
-    const isSearchRoute = location.pathname === '/' || location.pathname === '/search';
-    const isProjectManagementRoute = location.pathname.startsWith('/project-management');
-    const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(location.pathname);
+    const isSearchRoute = pathname === '/' || pathname === '/search';
+    const isProjectMainRoute = /^\/project-management\/projects\/[^/]+\/?$/.test(pathname)
+        && pathname !== '/project-management/projects/new';
+    const isProjectManagementRoute = pathname.startsWith('/project-management');
+    const isBudgetContextRoute = /^\/project-management\/projects\/[^/]+\/(budget|edit\/(material|labor|expense))(\/|$)/.test(pathname);
 
     const logout = () => {
         clearSession();
         navigate('/login', { replace: true });
     };
 
-    if (isSearchRoute) {
+    if (isSearchRoute || isProjectMainRoute) {
         return (
             <div className="min-h-screen bg-slate-50 font-sans text-foreground antialiased">
                 {children}

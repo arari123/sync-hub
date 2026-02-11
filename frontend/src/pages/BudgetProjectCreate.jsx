@@ -131,7 +131,7 @@ const BudgetProjectCreate = () => {
                         <p className="text-xs text-muted-foreground">프로젝트 관리</p>
                         <h1 className="text-2xl font-bold">신규 프로젝트 생성</h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            프로젝트를 생성하면 프로젝트 상세 페이지로 이동합니다.
+                            프로젝트를 생성하면 프로젝트 메인 페이지로 이동합니다.
                         </p>
                     </div>
                     <Link
@@ -225,7 +225,7 @@ const BudgetProjectCreate = () => {
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
                     >
                         <Plus className="h-4 w-4" />
-                        {isSubmitting ? '생성 중...' : '생성 후 프로젝트 상세로 이동'}
+                        {isSubmitting ? '생성 중...' : '생성 후 프로젝트 메인으로 이동'}
                     </button>
                 </form>
             </section>

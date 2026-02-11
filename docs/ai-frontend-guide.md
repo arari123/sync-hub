@@ -134,8 +134,23 @@
   - 필터/카드 컴포넌트는 compact 우선 (`h-8~h-10`, `text-xs~text-sm`)
 - 상태 표현
   - 로딩/오류/빈결과는 반드시 별도 블록으로 노출
-- 토큰 사용
-  - 색상/반경/링은 `index.css` 토큰 기반 클래스 우선
+- 메인 페이지 테마 색상 (기준: `docs/code.html`)
+  - `primary`: `#1A73E8` (hover `#1557B0`)
+  - `background-light`: `#F7F9FC`
+  - `surface-light`: `#FFFFFF`
+  - `border-light`: `#DFE5EF`
+  - `surface-dark`: `#1A2234`
+  - `background-dark`: `#0F172A`
+- 메인 페이지 색상 토큰 매핑 (`frontend/src/index.css`)
+  - `--primary`: `#1A73E8`
+  - `--background`: `#F7F9FC`
+  - `--card`: `#FFFFFF`
+  - `--border`, `--input`: `#DFE5EF`
+  - `--ring`: `#1A73E8`
+- 메인 페이지 적용 규칙
+  - 상단 로고 배경, 활성 버튼, 포커스 링은 `primary` 계열만 사용한다.
+  - 화면 바탕은 `bg-background`, 카드/패널은 `bg-card`, 경계선은 `border-border`를 사용한다.
+  - 페이지 단위 임의 HEX 색상 추가를 금지하고, 색상은 토큰으로만 확장한다.
 
 ## 8. 변경 시 주의사항
 - `/project-management` 계열 URL을 직접 하드코딩 변경하지 말고, `App.jsx` 라우트와 함께 동기화한다.

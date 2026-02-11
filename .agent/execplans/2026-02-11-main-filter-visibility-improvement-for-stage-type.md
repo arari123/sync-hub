@@ -8,7 +8,7 @@
 - [x] 활성 상태 스타일을 primary 채움으로 강화
 - [x] 비활성 상태 대비 스타일 조정
 - [x] Docker 검증 (`npm run build`, `verify:fast`)
-- [ ] 커밋 및 `git push`
+- [x] 커밋 및 `git push`
 
 ## 검증 계획
 - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'`
@@ -17,3 +17,4 @@
 ## 검증 결과
 - `docker-compose exec -T frontend sh -lc 'cd /app && npm run build'` 통과
 - `docker-compose exec -T web bash -lc 'cd /app && bash scripts/verify_fast.sh'` 통과 (80 tests, OK)
+- 반영 커밋: `a840055`

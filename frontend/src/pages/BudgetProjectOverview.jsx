@@ -509,32 +509,10 @@ const BudgetProjectOverview = () => {
                                                 <span className="bg-primary/10 text-primary text-xs font-semibold px-2 py-0.5 rounded border border-primary/20">
                                                     {currentStageLabel}
                                                 </span>
-                                                <span className="text-xs font-semibold px-2 py-0.5 rounded border border-border bg-secondary text-slate-700">
-                                                    프로젝트 메인
-                                                </span>
                                             </div>
                                             <p className="text-sm text-muted-foreground max-w-2xl">
                                                 {project.description || '프로젝트 설명이 아직 등록되지 않았습니다.'}
                                             </p>
-                                        </div>
-
-                                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap gap-1">
-                                            {STAGE_SEGMENTS.map((item) => {
-                                                const isActive = item.key === currentStageKey;
-                                                return (
-                                                    <span
-                                                        key={item.key}
-                                                        className={cn(
-                                                            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                                            isActive
-                                                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                : 'text-muted-foreground'
-                                                        )}
-                                                    >
-                                                        {item.label}
-                                                    </span>
-                                                );
-                                            })}
                                         </div>
                                     </div>
 

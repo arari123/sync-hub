@@ -1,7 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import Home from './pages/Home';
 import SearchResults from './pages/SearchResults';
 import BudgetManagement from './pages/BudgetManagement';
 import BudgetProjectCreate from './pages/BudgetProjectCreate';
@@ -30,7 +29,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><Navigate to="/search" replace /></ProtectedRoute>} />
           <Route path="/search" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
           <Route path="/project-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
           <Route path="/project-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />

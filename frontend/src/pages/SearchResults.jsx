@@ -3,10 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
     Database,
-    Filter,
     Grid2x2,
     Loader2,
-    MoreVertical,
     Plus,
     Search,
 } from 'lucide-react';
@@ -141,6 +139,35 @@ function resolveProjectTypeLabel(project) {
     return PROJECT_TYPE_LABEL_MAP[type] || type;
 }
 
+function matchProjectFilterQuery(project, rawQuery) {
+    const query = String(rawQuery || '').trim().toLowerCase();
+    if (!query) return true;
+
+    const tokens = query.split(/\s+/).map((item) => item.trim()).filter(Boolean);
+    if (tokens.length === 0) return true;
+
+    const equipmentNames = Array.isArray(project?.equipment_names)
+        ? project.equipment_names.map((item) => String(item || '')).join(' ')
+        : '';
+
+    const haystack = [
+        project?.name,
+        project?.code,
+        project?.description,
+        project?.customer_name,
+        project?.manager_name,
+        project?.author_name,
+        project?.installation_site,
+        equipmentNames,
+        resolveProjectStatusLabel(project),
+        resolveProjectTypeLabel(project),
+    ]
+        .map((item) => String(item || '').toLowerCase())
+        .join(' ');
+
+    return tokens.every((token) => haystack.includes(token));
+}
+
 function buildUpdateLinks(project) {
     const projectId = project?.id;
     if (!projectId) return [];
@@ -246,6 +273,7 @@ const SearchResults = () => {
     const [projectFilters, setProjectFilters] = useState({
         stages: [],
     });
+    const [projectFilterQuery, setProjectFilterQuery] = useState('');
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -381,9 +409,13 @@ const SearchResults = () => {
                 }
             }
 
+            if (!matchProjectFilterQuery(project, projectFilterQuery)) {
+                return false;
+            }
+
             return true;
         });
-    }, [projectRows, projectFilters.stages, projectScope, showAllProjects]);
+    }, [projectRows, projectFilters.stages, projectScope, projectFilterQuery, showAllProjects]);
 
     const tableProjects = useMemo(
         () => visibleProjects.slice(0, TABLE_PAGE_SIZE),
@@ -391,6 +423,8 @@ const SearchResults = () => {
     );
 
     const totalVisibleCount = visibleProjects.length;
+    const visibleStartIndex = totalVisibleCount > 0 ? 1 : 0;
+    const visibleEndIndex = Math.min(TABLE_PAGE_SIZE, totalVisibleCount);
     const totalProjectCount = showAllProjects
         ? projectPool.length
         : projectPool.filter((project) => project?.is_mine !== false).length;
@@ -520,221 +554,204 @@ const SearchResults = () => {
                     )}
 
                     {hasProjectPanel && (
-                        <details open className="rounded-2xl border border-border bg-card">
-                            <summary className="list-none cursor-pointer px-4 py-3">
-                                <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                                    <Filter className="h-4 w-4" />
-                                    프로젝트 필터
-                                </div>
-                            </summary>
-                            <div className="border-t border-border p-4 space-y-3">
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowAllProjects(false)}
-                                                className={cn(
-                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                                    !showAllProjects
-                                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                                )}
-                                            >
-                                                내 프로젝트
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowAllProjects(true)}
-                                                className={cn(
-                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                                    showAllProjects
-                                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                                )}
-                                            >
-                                                전체 프로젝트
-                                            </button>
-                                        </div>
-
-                                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={clearStageFilters}
-                                                className={cn(
-                                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                                    projectFilters.stages.length === 0
-                                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                                )}
-                                            >
-                                                전체 단계
-                                            </button>
-                                            {STAGE_OPTIONS.map((item) => {
-                                                const isActive = projectFilters.stages.includes(item.value);
-                                                return (
-                                                    <button
-                                                        key={item.value}
-                                                        type="button"
-                                                        onClick={() => toggleStageFilter(item.value)}
-                                                        className={cn(
-                                                            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                                            isActive
-                                                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                                        )}
-                                                    >
-                                                        {item.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
+                        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                                    <div className="flex rounded-lg bg-secondary p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllProjects(false)}
+                                            className={cn(
+                                                'px-4 py-1.5 text-sm rounded font-semibold transition-colors',
+                                                !showAllProjects
+                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            )}
+                                        >
+                                            내 프로젝트
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAllProjects(true)}
+                                            className={cn(
+                                                'px-4 py-1.5 text-sm rounded font-semibold transition-colors',
+                                                showAllProjects
+                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            )}
+                                        >
+                                            전체 프로젝트
+                                        </button>
                                     </div>
-                                    <span className="text-sm text-muted-foreground">
-                                        프로젝트 {totalVisibleCount}건 표시 / 기준 풀 {totalProjectCount}건
-                                    </span>
+
+                                    <div className="hidden h-6 w-px bg-border md:block" />
+
+                                    <div className="flex items-center gap-1 overflow-x-auto">
+                                        <button
+                                            type="button"
+                                            onClick={clearStageFilters}
+                                            className={cn(
+                                                'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                projectFilters.stages.length === 0
+                                                    ? 'border border-border bg-card shadow-sm'
+                                                    : 'text-muted-foreground hover:bg-secondary'
+                                            )}
+                                        >
+                                            전체 단계
+                                        </button>
+                                        {STAGE_OPTIONS.map((item) => {
+                                            const isActive = projectFilters.stages.includes(item.value);
+                                            return (
+                                                <button
+                                                    key={item.value}
+                                                    type="button"
+                                                    onClick={() => toggleStageFilter(item.value)}
+                                                    className={cn(
+                                                        'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                                        isActive
+                                                            ? 'border border-border bg-card text-foreground shadow-sm'
+                                                            : 'text-muted-foreground hover:bg-secondary'
+                                                    )}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="relative w-full lg:w-80">
+                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                        type="text"
+                                        value={projectFilterQuery}
+                                        onChange={(event) => setProjectFilterQuery(event.target.value)}
+                                        placeholder="프로젝트 내 단어 매칭 검색"
+                                        className="h-9 w-full rounded-lg border border-input bg-secondary pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
+                                    />
                                 </div>
                             </div>
-                        </details>
+                        </section>
                     )}
 
                     {hasProjectPanel ? (
-                        <section className="rounded-2xl border border-border bg-card overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full min-w-[1320px] table-fixed">
-                                    <colgroup>
-                                        <col style={{ width: '31%' }} />
-                                        <col style={{ width: '19%' }} />
-                                        <col style={{ width: '11%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '8%' }} />
-                                        <col style={{ width: '11%' }} />
-                                        <col style={{ width: '4%' }} />
-                                    </colgroup>
-                                    <thead className="bg-secondary/70 text-xs uppercase tracking-wide text-muted-foreground">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left font-semibold">프로젝트</th>
-                                            <th className="px-4 py-3 text-left font-semibold">미확인 업데이트 (바로가기)</th>
-                                            <th className="px-4 py-3 text-center font-semibold">고객사/위치</th>
-                                            <th className="px-4 py-3 text-center font-semibold">담당자</th>
-                                            <th className="px-4 py-3 text-center font-semibold">프로젝트 상태</th>
-                                            <th className="px-4 py-3 text-center font-semibold">프로젝트 종류</th>
-                                            <th className="px-4 py-3 text-left font-semibold">마지막 안건</th>
-                                            <th className="px-4 py-3 text-center font-semibold">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {isLoading ? (
-                                            <tr>
-                                                <td colSpan={8} className="px-4 py-16 text-center">
-                                                    <div className="inline-flex items-center gap-2 text-muted-foreground">
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                        데이터를 불러오는 중입니다.
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ) : tableProjects.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
-                                                    필터 조건에 맞는 프로젝트가 없습니다.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            tableProjects.map((project) => {
-                                                const updateLinks = buildUpdateLinks(project);
-                                                return (
-                                                    <tr key={`project-row-${project.id}`} className="border-t border-border/70 hover:bg-secondary/50">
-                                                        <td className="px-4 py-3 align-top">
-                                                            <div className="flex items-start gap-3">
-                                                                <img
-                                                                    src={project.cover_image_display_url || project.cover_image_fallback_url || ''}
-                                                                    alt={`${project.name || '프로젝트'} 대표 이미지`}
-                                                                    className="h-12 w-20 rounded-md border border-border object-cover bg-secondary"
-                                                                />
-                                                                <div className="min-w-0">
-                                                                    <Link
-                                                                        to={`/project-management/projects/${project.id}`}
-                                                                        className="block truncate text-sm font-semibold text-foreground hover:text-primary"
-                                                                    >
-                                                                        {project.name || '이름 없는 프로젝트'}
-                                                                    </Link>
-                                                                    <p className="mt-0.5 text-xs text-muted-foreground font-mono">{project.code || 'NO-CODE'}</p>
-                                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                                        최근 업데이트: {formatDate(project.updated_at)}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </td>
+                        <section className="space-y-3">
+                            {isLoading ? (
+                                <div className="rounded-xl border border-border bg-card px-4 py-16 text-center">
+                                    <div className="inline-flex items-center gap-2 text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        데이터를 불러오는 중입니다.
+                                    </div>
+                                </div>
+                            ) : tableProjects.length === 0 ? (
+                                <div className="rounded-xl border border-border bg-card px-4 py-16 text-center text-sm text-muted-foreground">
+                                    필터 조건에 맞는 프로젝트가 없습니다.
+                                </div>
+                            ) : (
+                                tableProjects.map((project) => {
+                                    const updateLinks = buildUpdateLinks(project);
+                                    return (
+                                        <article
+                                            key={`project-row-${project.id}`}
+                                            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-secondary">
+                                                    <img
+                                                        src={project.cover_image_display_url || project.cover_image_fallback_url || ''}
+                                                        alt={`${project.name || '프로젝트'} 대표 이미지`}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                </div>
 
-                                                        <td className="px-4 py-3 align-top">
-                                                            {updateLinks.length > 0 ? (
-                                                                <div className="flex flex-wrap gap-1.5">
-                                                                    {updateLinks.map((item) => (
-                                                                        <Link
-                                                                            key={`${project.id}-${item.label}`}
-                                                                            to={item.to}
-                                                                            className={cn(
-                                                                                'rounded-full px-2 py-1 text-[11px] font-semibold',
-                                                                                badgeToneClass(item.tone)
-                                                                            )}
-                                                                        >
-                                                                            {item.label}
-                                                                        </Link>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-muted-foreground">미확인 업데이트 없음</span>
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-4 py-3 align-top text-center text-xs text-slate-600">
-                                                            <p className="font-medium text-slate-700">{project.customer_name || '-'}</p>
-                                                            <p className="mt-1">{project.installation_site || '-'}</p>
-                                                        </td>
-
-                                                        <td className="px-4 py-3 align-top text-center text-xs text-slate-600">
-                                                            {project.manager_name || '담당자 미지정'}
-                                                        </td>
-
-                                                        <td className="px-4 py-3 align-top text-center">
-                                                            <div className="flex justify-center">
-                                                                <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                                                    {resolveProjectStatusLabel(project)}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-
-                                                        <td className="px-4 py-3 align-top text-center">
-                                                            <div className="flex justify-center">
-                                                                <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
-                                                                    {resolveProjectTypeLabel(project)}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-
-                                                        <td className="px-4 py-3 align-top">
-                                                            <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                                                                Empty (이슈 등록 미구현)
+                                                <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-12 md:items-center">
+                                                    <div className="min-w-0 md:col-span-3">
+                                                        <div className="mb-1.5 flex items-center gap-2">
+                                                            <Link
+                                                                to={`/project-management/projects/${project.id}`}
+                                                                className="truncate text-sm font-bold text-foreground hover:text-primary"
+                                                            >
+                                                                {project.name || '이름 없는 프로젝트'}
+                                                            </Link>
+                                                            <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+                                                                {project.code || '코드 없음'}
                                                             </span>
-                                                        </td>
+                                                        </div>
 
-                                                        <td className="px-4 py-3 align-top text-center">
-                                                            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-primary">
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                        <div className="mb-2 flex flex-wrap gap-1.5">
+                                                            {updateLinks.length > 0 ? updateLinks.map((item) => (
+                                                                <Link
+                                                                    key={`${project.id}-${item.label}`}
+                                                                    to={item.to}
+                                                                    className={cn(
+                                                                        'rounded px-1.5 py-0.5 text-[10px] font-bold border',
+                                                                        badgeToneClass(item.tone)
+                                                                    )}
+                                                                >
+                                                                    {item.label}
+                                                                </Link>
+                                                            )) : (
+                                                                <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                                                                    업데이트 없음
+                                                                </span>
+                                                            )}
+                                                        </div>
 
-                            <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                                                        <p className="text-[11px] text-muted-foreground">
+                                                            최근 업데이트: {formatDate(project.updated_at)}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4 md:col-span-5 md:grid-cols-4">
+                                                        <div className="min-w-0">
+                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">고객사/위치</p>
+                                                            <p className="truncate text-xs font-semibold text-foreground">
+                                                                {(project.customer_name || '-')}{' | '}{(project.installation_site || '-')}
+                                                            </p>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">담당자</p>
+                                                            <p className="truncate text-xs font-semibold text-foreground">
+                                                                {project.manager_name || '담당자 미지정'}
+                                                            </p>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">프로젝트 상태</p>
+                                                            <span className="inline-flex rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                                                {resolveProjectStatusLabel(project)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">프로젝트 종류</p>
+                                                            <span className="text-xs font-semibold text-foreground">
+                                                                {resolveProjectTypeLabel(project)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="border-l border-border pl-4 md:col-span-4">
+                                                        <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">마지막 안건</p>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                                <p className="text-[11px] leading-tight text-muted-foreground">현재 이슈 등록 미구현 상태입니다.</p>
+                                                            </div>
+                                                            <div className="flex items-start gap-2">
+                                                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+                                                                <p className="text-[11px] leading-tight text-muted-foreground">향후 안건 데이터와 연동될 예정입니다.</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </article>
+                                    );
+                                })
+                            )}
+
+                            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
                                 <span>
-                                    Showing {Math.min(TABLE_PAGE_SIZE, totalVisibleCount)} of {totalVisibleCount}
+                                    프로젝트 {visibleStartIndex}-{visibleEndIndex} / 총 {totalVisibleCount}건
                                     {projectScope ? ` (프로젝트코드:${projectScope} 범위)` : ''}
                                 </span>
                                 {hasSearchQuery && (

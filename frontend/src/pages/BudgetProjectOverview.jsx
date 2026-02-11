@@ -666,10 +666,10 @@ const BudgetProjectOverview = () => {
 
 const InfoField = ({ label, value, mono = false }) => (
     <div className="space-y-1">
-        <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</label>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</label>
         <div className={cn(
-            'text-sm font-medium text-slate-700',
-            mono && 'font-mono bg-secondary px-2 py-0.5 rounded inline-block'
+            'block text-sm font-bold text-slate-800',
+            mono && 'mt-0.5 w-fit break-all rounded bg-secondary px-2 py-0.5 font-mono'
         )}>
             {value}
         </div>

@@ -34,6 +34,11 @@ const PROJECT_TYPE_LABEL_MAP = {
     parts: '파츠',
     as: '유지보수',
 };
+const FILTER_CHIP_BASE_CLASS =
+    'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
+const FILTER_CHIP_ACTIVE_CLASS = 'border border-primary bg-primary text-primary-foreground shadow-md shadow-primary/25';
+const FILTER_CHIP_INACTIVE_CLASS =
+    'border border-border bg-muted/80 text-muted-foreground hover:border-foreground/25 hover:bg-muted hover:text-foreground';
 
 function extractItems(payload) {
     if (Array.isArray(payload)) return payload;
@@ -627,11 +632,12 @@ const SearchResults = () => {
                                         <button
                                             type="button"
                                             onClick={clearStageFilters}
+                                            aria-pressed={projectFilters.stages.length === 0}
                                             className={cn(
-                                                'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                FILTER_CHIP_BASE_CLASS,
                                                 projectFilters.stages.length === 0
-                                                    ? 'border border-border bg-card shadow-sm'
-                                                    : 'text-muted-foreground hover:bg-secondary'
+                                                    ? FILTER_CHIP_ACTIVE_CLASS
+                                                    : FILTER_CHIP_INACTIVE_CLASS
                                             )}
                                         >
                                             전체 단계
@@ -643,11 +649,12 @@ const SearchResults = () => {
                                                     key={item.value}
                                                     type="button"
                                                     onClick={() => toggleStageFilter(item.value)}
+                                                    aria-pressed={isActive}
                                                     className={cn(
-                                                        'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                                        FILTER_CHIP_BASE_CLASS,
                                                         isActive
-                                                            ? 'border border-border bg-card text-foreground shadow-sm'
-                                                            : 'text-muted-foreground hover:bg-secondary'
+                                                            ? FILTER_CHIP_ACTIVE_CLASS
+                                                            : FILTER_CHIP_INACTIVE_CLASS
                                                     )}
                                                 >
                                                     {item.label}
@@ -662,11 +669,12 @@ const SearchResults = () => {
                                         <button
                                             type="button"
                                             onClick={clearTypeFilters}
+                                            aria-pressed={projectFilters.types.length === 0}
                                             className={cn(
-                                                'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                FILTER_CHIP_BASE_CLASS,
                                                 projectFilters.types.length === 0
-                                                    ? 'border border-border bg-card shadow-sm'
-                                                    : 'text-muted-foreground hover:bg-secondary'
+                                                    ? FILTER_CHIP_ACTIVE_CLASS
+                                                    : FILTER_CHIP_INACTIVE_CLASS
                                             )}
                                         >
                                             전체 유형
@@ -678,11 +686,12 @@ const SearchResults = () => {
                                                     key={item.value}
                                                     type="button"
                                                     onClick={() => toggleTypeFilter(item.value)}
+                                                    aria-pressed={isActive}
                                                     className={cn(
-                                                        'whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                                        FILTER_CHIP_BASE_CLASS,
                                                         isActive
-                                                            ? 'border border-border bg-card text-foreground shadow-sm'
-                                                            : 'text-muted-foreground hover:bg-secondary'
+                                                            ? FILTER_CHIP_ACTIVE_CLASS
+                                                            : FILTER_CHIP_INACTIVE_CLASS
                                                     )}
                                                 >
                                                     {item.label}

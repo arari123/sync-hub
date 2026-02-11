@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
+    Database,
     Filter,
+    Grid2x2,
     Loader2,
     MoreVertical,
     Plus,
@@ -221,15 +223,29 @@ const SearchResults = () => {
     const [projectFilters, setProjectFilters] = useState({
         stages: [],
     });
+    const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
     const user = getCurrentUser();
     const userBadge = (user?.full_name || user?.email || 'U').slice(0, 1).toUpperCase();
+    const quickMenuRef = useRef(null);
 
     useEffect(() => {
         setInputQuery(query);
     }, [query]);
+
+    useEffect(() => {
+        const handlePointerDown = (event) => {
+            if (!quickMenuRef.current) return;
+            if (quickMenuRef.current.contains(event.target)) return;
+            setIsQuickMenuOpen(false);
+        };
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+        };
+    }, []);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -406,10 +422,48 @@ const SearchResults = () => {
                         </label>
                     </form>
 
-                    <div className="w-28 shrink-0 flex items-center justify-end gap-2">
+                    <div className="w-40 shrink-0 flex items-center justify-end gap-2">
                         <button type="button" className="h-9 w-9 rounded-full grid place-items-center text-slate-500 hover:bg-slate-100">
                             <Bell className="h-4 w-4" />
                         </button>
+                        <div className="relative" ref={quickMenuRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsQuickMenuOpen((prev) => !prev)}
+                                className="h-9 w-9 rounded-full grid place-items-center text-slate-500 hover:bg-slate-100"
+                                aria-label="빠른 메뉴"
+                                aria-expanded={isQuickMenuOpen}
+                            >
+                                <Grid2x2 className="h-4 w-4" />
+                            </button>
+
+                            {isQuickMenuOpen && (
+                                <div className="absolute right-0 top-11 z-20 w-56 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Link
+                                            to="/project-management/projects/new"
+                                            onClick={() => setIsQuickMenuOpen(false)}
+                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-slate-700 hover:bg-slate-100"
+                                        >
+                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-white">
+                                                <Plus className="h-4 w-4" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-center">새 프로젝트 생성</span>
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-slate-400 cursor-not-allowed"
+                                            title="데이터 허브는 아직 구현되지 않았습니다."
+                                        >
+                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-200 text-slate-500">
+                                                <Database className="h-4 w-4" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-center">데이터 허브(미구현)</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <button type="button" className="h-9 w-9 rounded-full bg-slate-900 text-white text-xs font-bold grid place-items-center">
                             <span>{userBadge}</span>
                         </button>
@@ -434,16 +488,16 @@ const SearchResults = () => {
                                 </div>
                             </summary>
                             <div className="border-t border-slate-200 p-4 space-y-3">
-                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                    <div className="inline-flex w-fit rounded-lg border border-slate-200 p-1">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setShowAllProjects(false)}
                                             className={cn(
-                                                'px-3 py-1.5 text-sm rounded-md transition',
+                                                'h-8 rounded-full border px-3 text-xs font-semibold transition',
                                                 !showAllProjects
-                                                    ? 'bg-slate-900 text-white font-semibold'
-                                                    : 'text-slate-600 hover:bg-slate-100'
+                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                                             )}
                                         >
                                             내 프로젝트
@@ -452,31 +506,14 @@ const SearchResults = () => {
                                             type="button"
                                             onClick={() => setShowAllProjects(true)}
                                             className={cn(
-                                                'px-3 py-1.5 text-sm rounded-md transition',
+                                                'h-8 rounded-full border px-3 text-xs font-semibold transition',
                                                 showAllProjects
-                                                    ? 'bg-slate-900 text-white font-semibold'
-                                                    : 'text-slate-600 hover:bg-slate-100'
+                                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                                             )}
                                         >
                                             전체 프로젝트
                                         </button>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-slate-500">
-                                            프로젝트 {totalVisibleCount}건 표시 / 기준 풀 {totalProjectCount}건
-                                        </span>
-                                        <Link
-                                            to="/project-management/projects/new"
-                                            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                            프로젝트 생성
-                                        </Link>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2">
                                     <button
                                         type="button"
                                         onClick={clearStageFilters}
@@ -484,7 +521,7 @@ const SearchResults = () => {
                                             'h-8 rounded-full border px-3 text-xs font-semibold transition',
                                             projectFilters.stages.length === 0
                                                 ? 'border-slate-900 bg-slate-900 text-white'
-                                                : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                                                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                                         )}
                                     >
                                         전체 단계
@@ -500,13 +537,17 @@ const SearchResults = () => {
                                                     'h-8 rounded-full border px-3 text-xs font-semibold transition',
                                                     isActive
                                                         ? 'border-slate-900 bg-slate-900 text-white'
-                                                        : 'border-slate-300 text-slate-600 hover:bg-slate-100'
+                                                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                                                 )}
                                             >
                                                 {item.label}
                                             </button>
                                         );
                                     })}
+                                </div>
+                                    <span className="text-sm text-slate-500">
+                                        프로젝트 {totalVisibleCount}건 표시 / 기준 풀 {totalProjectCount}건
+                                    </span>
                                 </div>
                             </div>
                         </details>
@@ -628,41 +669,35 @@ const SearchResults = () => {
                                 )}
                             </div>
                         </section>
-                    ) : (
-                        !isLoading && (
-                            <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-500">
-                                검색 조건과 일치하는 프로젝트가 없습니다.
-                            </div>
-                        )
-                    )}
+                    ) : null}
 
-                    {hasSearchQuery && (
+                    {hasSearchQuery && documentResults.length > 0 && (
                         <section className="rounded-2xl border border-slate-200 bg-white p-4">
                             <div className="mb-3 flex items-center justify-between">
                                 <h2 className="text-sm font-semibold text-slate-800">문서 검색 결과</h2>
                                 <span className="text-xs text-slate-500">검색어: {searchQuery}</span>
                             </div>
 
-                            {documentResults.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-                                    <div className="lg:col-span-7">
-                                        <ResultList
-                                            results={documentResults}
-                                            query={searchQuery}
-                                            selectedResult={selectedResult}
-                                            onSelect={setSelectedResult}
-                                        />
-                                    </div>
-                                    <div className="lg:col-span-5">
-                                        <DocumentDetail result={selectedResult} />
-                                    </div>
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                                <div className="lg:col-span-7">
+                                    <ResultList
+                                        results={documentResults}
+                                        query={searchQuery}
+                                        selectedResult={selectedResult}
+                                        onSelect={setSelectedResult}
+                                    />
                                 </div>
-                            ) : (
-                                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                                    문서 검색 결과가 없습니다.
+                                <div className="lg:col-span-5">
+                                    <DocumentDetail result={selectedResult} />
                                 </div>
-                            )}
+                            </div>
                         </section>
+                    )}
+
+                    {hasSearchQuery && !isLoading && !error && totalVisibleCount === 0 && documentResults.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+                            검색 결과가 없습니다.
+                        </div>
                     )}
                 </main>
             </div>

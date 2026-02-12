@@ -2,14 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
-    Building2,
     Database,
     Grid2x2,
     Loader2,
-    MapPin,
     Plus,
     Search,
-    User,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
@@ -37,6 +34,7 @@ const PROJECT_TYPE_LABEL_MAP = {
     parts: '파츠',
     as: '유지보수',
 };
+const PROJECT_SIGNAL_LABELS = ['안건', '예산', '사양'];
 const FILTER_CHIP_BASE_CLASS =
     'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
 const FILTER_CHIP_ACTIVE_CLASS = 'border border-sky-300 bg-sky-500 text-white shadow-sm shadow-sky-500/25';
@@ -286,20 +284,6 @@ function badgeToneClass(tone) {
     return 'border-slate-200 bg-slate-100 text-slate-700';
 }
 
-function formatDate(value) {
-    const text = String(value || '').trim();
-    if (!text) return '-';
-    return text.slice(0, 10);
-}
-
-function formatShortDate(value) {
-    const dateText = formatDate(value);
-    if (dateText === '-') return '-';
-    const [year, month, day] = dateText.split('-');
-    if (!year || !month || !day) return dateText;
-    return `${month}.${day}`;
-}
-
 function toNumber(value) {
     const number = Number(value);
     return Number.isFinite(number) ? number : 0;
@@ -388,12 +372,17 @@ function resolveProgressMeta(project, balance, progressPercent) {
     };
 }
 
-function toneDotColor(tone) {
-    if (tone === 'amber') return '#f59e0b';
-    if (tone === 'blue') return '#0ea5e9';
-    if (tone === 'emerald') return '#10b981';
-    if (tone === 'violet') return '#8b5cf6';
-    return '#94a3b8';
+function buildMockAgendaTitles(project) {
+    const stageLabel = resolveProjectStatusLabel(project) || '진행';
+    const equipmentName = Array.isArray(project?.equipment_names) && project.equipment_names.length > 0
+        ? String(project.equipment_names[0] || '').trim()
+        : '핵심 설비';
+
+    return [
+        `${stageLabel} 단계 주간 이슈 점검`,
+        `${equipmentName} 사양 확정 협의`,
+        '납기 대응 일정 및 협력사 조율',
+    ];
 }
 
 function mergeProjectSearchRows(projectPool, projectHits, query) {
@@ -918,6 +907,12 @@ const SearchResults = () => {
                             ) : (
                                 tableProjects.map((project) => {
                                     const updateLinks = buildUpdateLinks(project);
+                                    const updateLinkMap = new Map(updateLinks.map((item) => [item.label, item]));
+                                    const signalUpdates = PROJECT_SIGNAL_LABELS.map((label) => ({
+                                        label,
+                                        ...updateLinkMap.get(label),
+                                    }));
+                                    const mockAgendaTitles = buildMockAgendaTitles(project);
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const progressPercent = computeProgressPercent(project);
@@ -927,11 +922,11 @@ const SearchResults = () => {
                                     return (
                                         <article
                                             key={`project-row-${project.id}`}
-                                            className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
+                                            className="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
                                         >
-                                            <div className="flex flex-col gap-4 xl:flex-row">
-                                                <div className="flex gap-4 xl:w-[40%]">
-                                                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                            <div className="flex flex-col gap-3 xl:flex-row">
+                                                <div className="flex gap-3 xl:w-[42%]">
+                                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                                                         {coverImage ? (
                                                             <img
                                                                 src={coverImage}
@@ -946,7 +941,7 @@ const SearchResults = () => {
                                                     </div>
 
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                                                        <div className="mb-1 flex items-center justify-between gap-2">
                                                             <span className="truncate text-[10px] font-mono tracking-wider text-slate-400">
                                                                 {project.code || '코드 없음'}
                                                             </span>
@@ -961,40 +956,43 @@ const SearchResults = () => {
 
                                                         <Link
                                                             to={`/project-management/projects/${project.id}`}
-                                                            className="mb-2 block truncate text-lg font-bold tracking-tight text-slate-900 hover:text-sky-700"
+                                                            className="mb-1.5 block truncate text-base font-bold tracking-tight text-slate-900 hover:text-sky-700"
                                                         >
                                                             {project.name || '이름 없는 프로젝트'}
                                                         </Link>
 
-                                                        <p className="mb-3 text-[11px] text-slate-500 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
-                                                            {project.description || '프로젝트 설명이 아직 등록되지 않았습니다.'}
+                                                        <p className="truncate text-[11px] text-slate-600">
+                                                            고객사 {project.customer_name || '-'} · 설치장소 {project.installation_site || '-'} · 담당자 {project.manager_name || '미지정'}
                                                         </p>
 
-                                                        <div className="grid gap-y-1 text-[11px] text-slate-600">
-                                                            <p className="flex items-center gap-1.5">
-                                                                <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                                                                <span className="truncate">
-                                                                    {project.customer_name || '고객사 미지정'}
-                                                                </span>
-                                                            </p>
-                                                            <p className="flex items-center gap-1.5">
-                                                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                                                                <span className="truncate">
-                                                                    {project.installation_site || '설치 위치 미지정'}
-                                                                </span>
-                                                            </p>
-                                                            <p className="flex items-center gap-1.5">
-                                                                <User className="h-3.5 w-3.5 text-slate-400" />
-                                                                <span className="truncate">
-                                                                    담당자: {project.manager_name || '담당자 미지정'}
-                                                                </span>
-                                                            </p>
+                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                            {signalUpdates.map((item) => (
+                                                                item.to ? (
+                                                                    <Link
+                                                                        key={`${project.id}-${item.label}`}
+                                                                        to={item.to}
+                                                                        className={cn(
+                                                                            'rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                                                            badgeToneClass(item.tone)
+                                                                        )}
+                                                                    >
+                                                                        {item.label}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span
+                                                                        key={`${project.id}-${item.label}`}
+                                                                        className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500"
+                                                                    >
+                                                                        {item.label}
+                                                                    </span>
+                                                                )
+                                                            ))}
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-4 xl:w-[35%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
-                                                    <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                                <div className="border-t border-slate-200 pt-3 xl:w-[38%] xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                    <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                                                         <div className="flex flex-col">
                                                             <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">예산</span>
                                                             <span className="text-xs font-bold text-slate-700">
@@ -1026,7 +1024,7 @@ const SearchResults = () => {
                                                         <span>종료</span>
                                                     </div>
 
-                                                    <div className="relative mb-1.5 py-2">
+                                                    <div className="relative mb-1 py-2">
                                                         <div className="h-1.5 rounded-full bg-slate-200" />
                                                         <div
                                                             className="absolute left-0 top-2 h-1.5 rounded-full transition-all duration-500"
@@ -1052,9 +1050,9 @@ const SearchResults = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-4 xl:w-[25%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 업데이트</p>
+                                                <div className="border-t border-slate-200 pt-3 xl:w-[20%] xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                    <div className="mb-1.5 flex items-center justify-between">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
                                                         <Link
                                                             to={`/project-management/projects/${project.id}`}
                                                             className="text-[10px] font-semibold text-sky-600 hover:underline"
@@ -1063,31 +1061,17 @@ const SearchResults = () => {
                                                         </Link>
                                                     </div>
 
-                                                    <div className="space-y-2">
-                                                        {updateLinks.length > 0 ? updateLinks.map((item) => (
-                                                            <div key={`${project.id}-${item.label}`} className="flex items-start gap-2">
-                                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toneDotColor(item.tone) }} />
-                                                                <div className="min-w-0">
-                                                                    <Link
-                                                                        to={item.to}
-                                                                        className={cn(
-                                                                            'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
-                                                                            badgeToneClass(item.tone)
-                                                                        )}
-                                                                    >
-                                                                        {item.label}
-                                                                    </Link>
-                                                                    <p className="mt-0.5 text-[10px] text-slate-500">
-                                                                        마지막 업데이트 {formatShortDate(project.updated_at)}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        )) : (
-                                                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">
-                                                                등록된 업데이트가 없습니다.
-                                                            </div>
-                                                        )}
+                                                    <div className="space-y-1.5">
+                                                        {mockAgendaTitles.map((title, index) => (
+                                                            <p
+                                                                key={`${project.id}-agenda-${index}`}
+                                                                className="truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-600"
+                                                            >
+                                                                {title}
+                                                            </p>
+                                                        ))}
                                                     </div>
+                                                    <p className="mt-1.5 text-[9px] text-slate-400">안건 연동 전 임시 제목</p>
                                                 </div>
                                             </div>
                                         </article>

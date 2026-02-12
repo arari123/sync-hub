@@ -689,7 +689,7 @@ const BudgetProjectBudget = () => {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const [project, setProject] = useState(null);
-    const [version, setVersion] = useState(null);
+    const [, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
     const [details, setDetails] = useState(EMPTY_DETAILS);
     const [isLoading, setIsLoading] = useState(true);
@@ -1317,56 +1317,36 @@ const BudgetProjectBudget = () => {
                     </div>
                 )}
 
-                <section className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            프로젝트 예산 통합 모니터
-                        </h1>
-                        <p className="mt-1 text-sm text-slate-500">
-                            {projectName} / {version?.name || '현재 버전'} / 단위: 원
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
-                    >
-                        <Calculator className="h-4 w-4" />
-                        보고서 내보내기
-                    </button>
-                </section>
-
-                <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-primary" />
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-sm font-semibold text-slate-600">총 예산</p>
-                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalBudget)}</h3>
-                                <p className="mt-1 text-xs text-slate-500">재료비 + 인건비 + 경비</p>
+                                <p className="text-xs font-semibold text-slate-600">총 예산</p>
+                                <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalBudget)}</h3>
                             </div>
-                            <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
-                                <Wallet className="h-5 w-5" />
+                            <div className="rounded-md bg-blue-50 p-2 text-blue-600">
+                                <Wallet className="h-4 w-4" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center text-sm text-slate-500">
-                            <span className="mr-2 font-medium text-slate-600">초기 기준: {formatWon(initialCap)}</span>
+                        <div className="mt-2 flex items-center text-[11px] text-slate-500">
+                            <span className="mr-1.5 font-medium text-slate-600">초기 {formatWon(initialCap)}</span>
                             <span>(조정 {formatPercent(initialCapDeltaPercent)})</span>
                         </div>
                     </article>
 
-                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-rose-500" />
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-sm font-semibold text-slate-600">총 집행</p>
-                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalExecution)}</h3>
-                                <p className="mt-1 text-xs text-slate-500">실집행 누적 금액</p>
+                                <p className="text-xs font-semibold text-slate-600">총 집행</p>
+                                <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalExecution)}</h3>
                             </div>
-                            <div className="rounded-lg bg-rose-50 p-3 text-rose-600">
-                                <BarChart3 className="h-5 w-5" />
+                            <div className="rounded-md bg-rose-50 p-2 text-rose-600">
+                                <BarChart3 className="h-4 w-4" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center text-sm text-slate-500">
+                        <div className="mt-2 flex items-center text-[11px] text-slate-500">
                             <div className="mr-2 h-2 w-full rounded-full bg-slate-200">
                                 <div className="h-2 rounded-full bg-rose-500" style={{ width: `${Math.min(totalExecutionPercent, 100)}%` }} />
                             </div>
@@ -1374,19 +1354,18 @@ const BudgetProjectBudget = () => {
                         </div>
                     </article>
 
-                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-emerald-500" />
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center justify-between gap-2">
                             <div>
-                                <p className="text-sm font-semibold text-slate-600">총 잔액</p>
-                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalRemaining)}</h3>
-                                <p className="mt-1 text-xs text-slate-500">예산 대비 잔여 금액</p>
+                                <p className="text-xs font-semibold text-slate-600">총 잔액</p>
+                                <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalRemaining)}</h3>
                             </div>
-                            <div className="rounded-lg bg-emerald-50 p-3 text-emerald-600">
-                                <Scale className="h-5 w-5" />
+                            <div className="rounded-md bg-emerald-50 p-2 text-emerald-600">
+                                <Scale className="h-4 w-4" />
                             </div>
                         </div>
-                        <div className="mt-4 flex items-center text-sm text-slate-500">
+                        <div className="mt-2 flex items-center text-[11px] text-slate-500">
                             <span
                                 className={cn(
                                     'rounded px-2 py-0.5 text-xs font-semibold',
@@ -1401,27 +1380,36 @@ const BudgetProjectBudget = () => {
                 </section>
 
                 <nav className="mb-6 rounded-xl border border-gray-200 bg-white px-6 shadow-sm">
-                    <div className="scrollbar-hide flex gap-10 overflow-x-auto">
-                        {BUDGET_TAB_ITEMS.map((tab) => {
-                            const isActive = activeBudgetTab === tab.key;
-                            const Icon = tab.icon;
-                            return (
-                                <button
-                                    key={tab.key}
-                                    type="button"
-                                    onClick={() => setActiveBudgetTab(tab.key)}
-                                    className={cn(
-                                        'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all focus-visible:outline-none',
-                                        isActive
-                                            ? 'border-primary font-bold text-primary'
-                                            : 'border-transparent font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                                    )}
-                                >
-                                    <Icon className="h-[19px] w-[19px]" />
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="scrollbar-hide flex flex-1 gap-10 overflow-x-auto">
+                            {BUDGET_TAB_ITEMS.map((tab) => {
+                                const isActive = activeBudgetTab === tab.key;
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => setActiveBudgetTab(tab.key)}
+                                        className={cn(
+                                            'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all focus-visible:outline-none',
+                                            isActive
+                                                ? 'border-primary font-bold text-primary'
+                                                : 'border-transparent font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                                        )}
+                                    >
+                                        <Icon className="h-[19px] w-[19px]" />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <button
+                            type="button"
+                            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                        >
+                            <Calculator className="h-3.5 w-3.5" />
+                            보고서 내보내기
+                        </button>
                     </div>
                 </nav>
 

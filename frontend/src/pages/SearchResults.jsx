@@ -920,8 +920,8 @@ const SearchResults = () => {
                                             key={`project-row-${project.id}`}
                                             className="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
                                         >
-                                            <div className="flex flex-col gap-3 xl:flex-row">
-                                                <div className="flex gap-3 xl:w-[42%]">
+                                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                                                <div className="flex min-w-0 gap-3">
                                                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                                                         {coverImage ? (
                                                             <img
@@ -952,7 +952,7 @@ const SearchResults = () => {
 
                                                         <Link
                                                             to={`/project-management/projects/${project.id}`}
-                                                            className="mb-1.5 block truncate text-base font-bold tracking-tight text-slate-900 hover:text-sky-700"
+                                                            className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-slate-900 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-700"
                                                         >
                                                             {project.name || '이름 없는 프로젝트'}
                                                         </Link>
@@ -987,7 +987,7 @@ const SearchResults = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-3 xl:w-[38%] xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
                                                     <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                                                         <div className="flex flex-col">
                                                             <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">예산</span>
@@ -1046,7 +1046,7 @@ const SearchResults = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-3 xl:w-[20%] xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
                                                     <div className="mb-1.5 flex items-center justify-between">
                                                         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
                                                         <Link

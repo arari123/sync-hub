@@ -36,10 +36,10 @@ const PROJECT_TYPE_LABEL_MAP = {
 };
 const PROJECT_SIGNAL_LABELS = ['안건', '예산', '사양'];
 const FILTER_CHIP_BASE_CLASS =
-    'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
-const FILTER_CHIP_ACTIVE_CLASS = 'border border-sky-300 bg-sky-500 text-white shadow-sm shadow-sky-500/25';
+    'whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none transition-all duration-150 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
+const FILTER_CHIP_ACTIVE_CLASS = 'border-sky-500 bg-sky-500 text-white shadow-sm shadow-sky-500/20';
 const FILTER_CHIP_INACTIVE_CLASS =
-    'border border-slate-200 bg-white/90 text-slate-500 hover:border-slate-300 hover:text-slate-700';
+    'border-slate-200 bg-white/95 text-slate-500 hover:border-sky-400 hover:text-sky-600';
 const STAGE_PROGRESS_FALLBACK = {
     review: 18,
     fabrication: 46,
@@ -770,122 +770,118 @@ const SearchResults = () => {
                     )}
 
                     {hasProjectPanel && (
-                        <section className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur-sm">
-                            <div className="flex flex-col gap-3">
-                                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                        <section className="rounded-xl border border-slate-200 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+                                    <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-1">
+                                        <button
+                                            type="button"
+                                            onClick={clearStageFilters}
+                                            aria-pressed={projectFilters.stages.length === 0}
+                                            className={cn(
+                                                FILTER_CHIP_BASE_CLASS,
+                                                projectFilters.stages.length === 0
+                                                    ? FILTER_CHIP_ACTIVE_CLASS
+                                                    : FILTER_CHIP_INACTIVE_CLASS
+                                            )}
+                                        >
+                                            전체 ({filteredProjects.length})
+                                        </button>
+                                        {STAGE_OPTIONS.map((item) => {
+                                            const isActive = projectFilters.stages.includes(item.value);
+                                            return (
+                                                <button
+                                                    key={item.value}
+                                                    type="button"
+                                                    onClick={() => toggleStageFilter(item.value)}
+                                                    aria-pressed={isActive}
+                                                    className={cn(
+                                                        FILTER_CHIP_BASE_CLASS,
+                                                        isActive
+                                                            ? FILTER_CHIP_ACTIVE_CLASS
+                                                            : FILTER_CHIP_INACTIVE_CLASS
+                                                    )}
+                                                >
+                                                    {item.label} ({stageCounts[item.value] || 0})
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                                        <div className="flex rounded-md bg-slate-100 p-0.5">
                                             <button
                                                 type="button"
                                                 onClick={() => setShowAllProjects(false)}
                                                 className={cn(
-                                                    'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    'rounded px-2.5 py-1 text-[11px] font-semibold transition-colors',
                                                     !showAllProjects
                                                         ? 'bg-white text-slate-900 shadow-sm'
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 )}
                                             >
-                                                내 프로젝트 ({myProjectCount})
+                                                내프로젝트
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setShowAllProjects(true)}
                                                 className={cn(
-                                                    'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    'rounded px-2.5 py-1 text-[11px] font-medium transition-colors',
                                                     showAllProjects
                                                         ? 'bg-white text-slate-900 shadow-sm'
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 )}
                                             >
-                                                전체 프로젝트 ({allProjectCount})
+                                                전체프로젝트
                                             </button>
                                         </div>
 
-                                        <div className="hidden h-5 w-px bg-slate-200 xl:block" />
+                                        <div className="relative w-full sm:w-52 xl:w-56">
+                                            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                value={projectFilterQuery}
+                                                onChange={(event) => setProjectFilterQuery(event.target.value)}
+                                                placeholder="프로젝트 검색"
+                                                className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 pr-2 pl-7 text-xs text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-1 focus:ring-sky-300"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                                <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-1">
+                                    <button
+                                        type="button"
+                                        onClick={clearTypeFilters}
+                                        aria-pressed={projectFilters.types.length === 0}
+                                        className={cn(
+                                            FILTER_CHIP_BASE_CLASS,
+                                            projectFilters.types.length === 0
+                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                : FILTER_CHIP_INACTIVE_CLASS
+                                        )}
+                                    >
+                                        전체 유형 ({filteredProjects.length})
+                                    </button>
+                                    {PROJECT_TYPE_OPTIONS.map((item) => {
+                                        const isActive = projectFilters.types.includes(item.value);
+                                        return (
                                             <button
+                                                key={item.value}
                                                 type="button"
-                                                onClick={clearStageFilters}
-                                                aria-pressed={projectFilters.stages.length === 0}
+                                                onClick={() => toggleTypeFilter(item.value)}
+                                                aria-pressed={isActive}
                                                 className={cn(
                                                     FILTER_CHIP_BASE_CLASS,
-                                                    projectFilters.stages.length === 0
+                                                    isActive
                                                         ? FILTER_CHIP_ACTIVE_CLASS
                                                         : FILTER_CHIP_INACTIVE_CLASS
                                                 )}
                                             >
-                                                전체 단계 ({filteredProjects.length})
+                                                {item.label} ({typeCounts[item.value] || 0})
                                             </button>
-                                            {STAGE_OPTIONS.map((item) => {
-                                                const isActive = projectFilters.stages.includes(item.value);
-                                                return (
-                                                    <button
-                                                        key={item.value}
-                                                        type="button"
-                                                        onClick={() => toggleStageFilter(item.value)}
-                                                        aria-pressed={isActive}
-                                                        className={cn(
-                                                            FILTER_CHIP_BASE_CLASS,
-                                                            isActive
-                                                                ? FILTER_CHIP_ACTIVE_CLASS
-                                                                : FILTER_CHIP_INACTIVE_CLASS
-                                                        )}
-                                                    >
-                                                        {item.label} ({stageCounts[item.value] || 0})
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        <div className="hidden h-5 w-px bg-slate-200 xl:block" />
-
-                                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                                            <button
-                                                type="button"
-                                                onClick={clearTypeFilters}
-                                                aria-pressed={projectFilters.types.length === 0}
-                                                className={cn(
-                                                    FILTER_CHIP_BASE_CLASS,
-                                                    projectFilters.types.length === 0
-                                                        ? FILTER_CHIP_ACTIVE_CLASS
-                                                        : FILTER_CHIP_INACTIVE_CLASS
-                                                )}
-                                            >
-                                                전체 유형 ({filteredProjects.length})
-                                            </button>
-                                            {PROJECT_TYPE_OPTIONS.map((item) => {
-                                                const isActive = projectFilters.types.includes(item.value);
-                                                return (
-                                                    <button
-                                                        key={item.value}
-                                                        type="button"
-                                                        onClick={() => toggleTypeFilter(item.value)}
-                                                        aria-pressed={isActive}
-                                                        className={cn(
-                                                            FILTER_CHIP_BASE_CLASS,
-                                                            isActive
-                                                                ? FILTER_CHIP_ACTIVE_CLASS
-                                                                : FILTER_CHIP_INACTIVE_CLASS
-                                                        )}
-                                                    >
-                                                        {item.label} ({typeCounts[item.value] || 0})
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div className="relative w-full xl:w-80">
-                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            value={projectFilterQuery}
-                                            onChange={(event) => setProjectFilterQuery(event.target.value)}
-                                            placeholder="프로젝트 내 단어 매칭 검색"
-                                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
-                                        />
-                                    </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </section>

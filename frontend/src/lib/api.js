@@ -1,7 +1,16 @@
 import axios from 'axios';
 import { clearSession, getAccessToken } from './session';
 
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8001').replace(/\/$/, '');
+const configuredApiBaseUrl = (import.meta.env.VITE_API_URL ?? '').trim();
+
+function resolveDefaultApiBaseUrl() {
+    if (typeof window === 'undefined') {
+        return 'http://localhost:8001';
+    }
+    return window.location.origin;
+}
+
+export const API_BASE_URL = (configuredApiBaseUrl || resolveDefaultApiBaseUrl()).replace(/\/$/, '');
 export const POLLING_INTERVAL_MS = 2500;
 export const HEALTH_POLLING_INTERVAL_MS = 7000;
 

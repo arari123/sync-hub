@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
     Bell,
+    ChevronDown,
     Database,
     Grid2x2,
     Loader2,
@@ -11,8 +12,6 @@ import {
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
-import BudgetBreadcrumb from '../components/BudgetBreadcrumb';
-import ProjectContextNav from '../components/ProjectContextNav';
 
 const STAGE_SEGMENTS = [
     { key: 'review', label: '검토' },
@@ -57,6 +56,12 @@ function toNumber(value) {
 function formatAmount(value) {
     const number = Math.round(toNumber(value));
     return `${number.toLocaleString('ko-KR')}원`;
+}
+
+function truncateProjectName(value, max = 10) {
+    const chars = Array.from(String(value || '').trim());
+    if (chars.length <= max) return chars.join('');
+    return chars.slice(0, max).join('');
 }
 
 function resolveStageKey(value) {
@@ -115,6 +120,7 @@ function localizeProjectTypeLabel(labelValue, typeValue) {
 const BudgetProjectOverview = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [project, setProject] = useState(null);
     const [version, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
@@ -128,7 +134,10 @@ const BudgetProjectOverview = () => {
 
     const [inputQuery, setInputQuery] = useState('');
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
+    const [isBudgetMenuOpen, setIsBudgetMenuOpen] = useState(false);
     const quickMenuRef = useRef(null);
+    const budgetMenuRef = useRef(null);
+    const budgetMenuCloseTimerRef = useRef(null);
 
     const user = getCurrentUser();
     const userBadge = (user?.full_name || user?.email || 'U').slice(0, 1).toUpperCase();
@@ -137,14 +146,40 @@ const BudgetProjectOverview = () => {
         const handlePointerDown = (event) => {
             const target = event.target;
             const isQuickMenuTarget = quickMenuRef.current?.contains(target);
+            const isBudgetMenuTarget = budgetMenuRef.current?.contains(target);
 
             if (!isQuickMenuTarget) setIsQuickMenuOpen(false);
+            if (!isBudgetMenuTarget) setIsBudgetMenuOpen(false);
         };
         document.addEventListener('mousedown', handlePointerDown);
         return () => {
             document.removeEventListener('mousedown', handlePointerDown);
         };
     }, []);
+
+    useEffect(() => () => {
+        if (!budgetMenuCloseTimerRef.current) return;
+        clearTimeout(budgetMenuCloseTimerRef.current);
+        budgetMenuCloseTimerRef.current = null;
+    }, []);
+
+    const keepBudgetMenuOpen = () => {
+        if (budgetMenuCloseTimerRef.current) {
+            clearTimeout(budgetMenuCloseTimerRef.current);
+            budgetMenuCloseTimerRef.current = null;
+        }
+        setIsBudgetMenuOpen(true);
+    };
+
+    const scheduleBudgetMenuClose = () => {
+        if (budgetMenuCloseTimerRef.current) {
+            clearTimeout(budgetMenuCloseTimerRef.current);
+        }
+        budgetMenuCloseTimerRef.current = setTimeout(() => {
+            setIsBudgetMenuOpen(false);
+            budgetMenuCloseTimerRef.current = null;
+        }, 1000);
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -225,6 +260,7 @@ const BudgetProjectOverview = () => {
     const balanceTotal = confirmedTotal - spentTotal;
 
     const projectName = String(project?.name || '프로젝트').trim() || '프로젝트';
+    const trimmedProjectName = truncateProjectName(projectName, 10);
     const currentStageKey = resolveStageKey(project?.current_stage);
     const currentStageLabel = localizeStageLabel(project?.current_stage_label)
         || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label
@@ -251,10 +287,28 @@ const BudgetProjectOverview = () => {
     const resourcesCount = Math.max(documentCount + equipments.length, 0);
 
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
+    const projectMainPath = baseProjectPath;
     const budgetManagementPath = `${baseProjectPath}/budget`;
+    const budgetMaterialPath = `${baseProjectPath}/edit/material`;
+    const budgetLaborPath = `${baseProjectPath}/edit/labor`;
+    const budgetExpensePath = `${baseProjectPath}/edit/expense`;
     const issueManagementPath = `${baseProjectPath}/agenda`;
+    const scheduleManagementPath = `${baseProjectPath}/schedule`;
+    const specManagementPath = `${baseProjectPath}/spec`;
+    const dataManagementPath = `${baseProjectPath}/data`;
+    const projectSettingPath = `${baseProjectPath}/info/edit`;
 
     const timelineItems = useMemo(() => MOCK_TIMELINE_ITEMS, []);
+    const pathname = location.pathname;
+    const isProjectMainActive = pathname === projectMainPath || pathname === `${projectMainPath}/`;
+    const isBudgetActive = pathname === budgetManagementPath
+        || pathname === `${budgetManagementPath}/`
+        || pathname.startsWith(`${baseProjectPath}/edit/`);
+    const isIssueActive = pathname === issueManagementPath || pathname === `${issueManagementPath}/`;
+    const isScheduleActive = pathname === scheduleManagementPath || pathname === `${scheduleManagementPath}/`;
+    const isSpecActive = pathname === specManagementPath || pathname === `${specManagementPath}/`;
+    const isDataActive = pathname === dataManagementPath || pathname === `${dataManagementPath}/`;
+    const isSettingActive = pathname.startsWith(projectSettingPath);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -331,15 +385,148 @@ const BudgetProjectOverview = () => {
             </header>
 
             <div className="border-b border-border bg-secondary/80">
-                <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2 space-y-2">
-                    <BudgetBreadcrumb
-                        items={[
-                            { label: '프로젝트 관리', to: '/project-management' },
-                            { label: projectName, to: baseProjectPath },
-                            { label: '프로젝트 메인' },
-                        ]}
-                    />
-                    <ProjectContextNav projectId={project?.id || projectId} />
+                <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <nav
+                            aria-label="현재 경로"
+                            className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
+                        >
+                            <Link to="/home" className="font-medium hover:text-primary">
+                                메인
+                            </Link>
+                            <span>/</span>
+                            <Link to="/home" className="font-medium hover:text-primary">
+                                글로벌 검색
+                            </Link>
+                            <span>&gt;</span>
+                            <span className="font-semibold text-foreground/90" title={projectName}>
+                                {trimmedProjectName || '프로젝트'}
+                            </span>
+                        </nav>
+
+                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap items-center justify-end gap-1">
+                            <Link
+                                to={projectMainPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isProjectMainActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                프로젝트 메인
+                            </Link>
+
+                            <div
+                                className="relative"
+                                ref={budgetMenuRef}
+                                onMouseEnter={keepBudgetMenuOpen}
+                                onMouseLeave={scheduleBudgetMenuClose}
+                            >
+                                <Link
+                                    to={budgetManagementPath}
+                                    onMouseEnter={keepBudgetMenuOpen}
+                                    className={cn(
+                                        'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                        isBudgetActive
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                    )}
+                                >
+                                    예산 메인
+                                    <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isBudgetMenuOpen && 'rotate-180')} />
+                                </Link>
+
+                                {isBudgetMenuOpen && (
+                                    <div
+                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max rounded-lg border border-border bg-card p-1.5 shadow-lg"
+                                        onMouseEnter={keepBudgetMenuOpen}
+                                        onMouseLeave={scheduleBudgetMenuClose}
+                                    >
+                                        <div className="flex items-center gap-1 whitespace-nowrap">
+                                            <Link
+                                                to={budgetMaterialPath}
+                                                onClick={() => setIsBudgetMenuOpen(false)}
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                            >
+                                                재료비 관리
+                                            </Link>
+                                            <Link
+                                                to={budgetLaborPath}
+                                                onClick={() => setIsBudgetMenuOpen(false)}
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                            >
+                                                인건비 관리
+                                            </Link>
+                                            <Link
+                                                to={budgetExpensePath}
+                                                onClick={() => setIsBudgetMenuOpen(false)}
+                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
+                                            >
+                                                경비 관리
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <Link
+                                to={issueManagementPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isIssueActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                이슈 관리
+                            </Link>
+                            <Link
+                                to={scheduleManagementPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isScheduleActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                일정 관리
+                            </Link>
+                            <Link
+                                to={specManagementPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isSpecActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                사양 관리
+                            </Link>
+                            <Link
+                                to={dataManagementPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isDataActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                데이터 관리
+                            </Link>
+                            <Link
+                                to={projectSettingPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isSettingActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
+                                )}
+                            >
+                                프로젝트 설정
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </div>
 

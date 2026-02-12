@@ -51,7 +51,7 @@
   - `ui/`: 공용 UI primitives (`Button`, `Input`, `Logo`)
 - `pages/`
   - `SearchResults.jsx`: 홈(`/home`) 통합 검색 화면
-  - `BudgetManagement.jsx`: 프로젝트 목록 메인
+  - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 라우트 미연결)
   - `BudgetProjectOverview.jsx`: 프로젝트 메인(상세 요약)
   - `BudgetProjectBudget.jsx`: 예산 메인
   - `BudgetProjectEditor.jsx`: 재료비/인건비/경비 입력 탭
@@ -66,7 +66,7 @@
 
 ## 주요 프론트 라우트
 - `/home`: 메인 검색 페이지
-- `/project-management`: 프로젝트 목록
+- `/project-management`: 레거시 경로(현재 `/home` 리다이렉트)
 - `/project-management/projects/new`: 프로젝트 생성
 - `/project-management/projects/:projectId`: 프로젝트 메인
 - `/project-management/projects/:projectId/budget`: 예산 메인

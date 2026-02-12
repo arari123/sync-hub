@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     Search,
-    Briefcase,
     Database,
     Settings,
     LogOut,
@@ -41,7 +40,6 @@ const Sidebar = () => {
 
     const navItems = [
         { icon: Search, label: '지식 검색', to: '/' },
-        { icon: Briefcase, label: '프로젝트 관리', to: '/project-management' },
         { icon: Database, label: '지식 베이스', to: '/knowledge' },
         { icon: Settings, label: '설정', to: '/settings' },
     ];

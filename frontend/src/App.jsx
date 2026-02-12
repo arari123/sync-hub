@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchResults from './pages/SearchResults';
-import BudgetManagement from './pages/BudgetManagement';
 import BudgetProjectCreate from './pages/BudgetProjectCreate';
 import BudgetProjectOverview from './pages/BudgetProjectOverview';
 import BudgetProjectInfoEdit from './pages/BudgetProjectInfoEdit';
@@ -39,7 +38,7 @@ function App() {
           <Route path="/" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />
           <Route path="/home" element={<ProtectedRoute><SearchResults /></ProtectedRoute>} />
           <Route path="/search" element={<ProtectedRoute><LegacySearchRedirect /></ProtectedRoute>} />
-          <Route path="/project-management" element={<ProtectedRoute><BudgetManagement /></ProtectedRoute>} />
+          <Route path="/project-management" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />
           <Route path="/project-management/projects/new" element={<ProtectedRoute><BudgetProjectCreate /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId" element={<ProtectedRoute><BudgetProjectOverview /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/info/edit" element={<ProtectedRoute><BudgetProjectInfoEdit /></ProtectedRoute>} />

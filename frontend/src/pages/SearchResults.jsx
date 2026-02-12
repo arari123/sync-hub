@@ -1047,8 +1047,8 @@ const SearchResults = () => {
                                                 </div>
 
                                                 <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                    <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-2">
-                                                        <div className="mb-2 flex items-center justify-between">
+                                                    <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-1.5">
+                                                        <div className="mb-1.5 flex items-center justify-between">
                                                             <div className="flex items-center gap-1.5">
                                                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
                                                                 <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-600">
@@ -1063,12 +1063,12 @@ const SearchResults = () => {
                                                             </Link>
                                                         </div>
 
-                                                        <div className="space-y-1.5">
+                                                        <div className="space-y-1">
                                                             {mockAgendaTitles.map((title, index) => (
                                                                 <div
                                                                     key={`${project.id}-agenda-${index}`}
                                                                     className={cn(
-                                                                        'group relative overflow-hidden rounded-lg border px-2 py-1.5 transition-all',
+                                                                        'group relative overflow-hidden rounded-lg border px-2 py-1 transition-all',
                                                                         index === 0
                                                                             ? 'border-sky-300 bg-white shadow-sm'
                                                                             : 'border-slate-200 bg-white/80 hover:border-slate-300'
@@ -1091,14 +1091,9 @@ const SearchResults = () => {
                                                                         >
                                                                             {index + 1}
                                                                         </span>
-                                                                        <div className="min-w-0">
-                                                                            <p className="truncate text-[10px] font-semibold text-slate-700">
-                                                                                {title}
-                                                                            </p>
-                                                                            <p className="text-[9px] text-slate-400">
-                                                                                안건 연동 전 임시 제목
-                                                                            </p>
-                                                                        </div>
+                                                                        <p className="min-w-0 truncate text-[10px] font-semibold text-slate-700">
+                                                                            {title}
+                                                                        </p>
                                                                     </div>
                                                                 </div>
                                                             ))}

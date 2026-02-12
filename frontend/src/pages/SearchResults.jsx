@@ -292,14 +292,6 @@ function formatDate(value) {
     return text.slice(0, 10);
 }
 
-function formatShortDate(value) {
-    const dateText = formatDate(value);
-    if (dateText === '-') return '-';
-    const [year, month, day] = dateText.split('-');
-    if (!year || !month || !day) return dateText;
-    return `${month}.${day}`;
-}
-
 function toNumber(value) {
     const number = Number(value);
     return Number.isFinite(number) ? number : 0;
@@ -930,7 +922,7 @@ const SearchResults = () => {
                                             className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
                                         >
                                             <div className="flex flex-col gap-4 xl:flex-row">
-                                                <div className="flex gap-4 xl:w-[40%]">
+                                                <div className="flex gap-4 xl:w-[48%]">
                                                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                                                         {coverImage ? (
                                                             <img
@@ -990,10 +982,49 @@ const SearchResults = () => {
                                                                 </span>
                                                             </p>
                                                         </div>
+
+                                                        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
+                                                            <span>생성일 {formatDate(project.created_at)}</span>
+                                                            <span className="inline-block h-3 w-px bg-slate-300" />
+                                                            <span>전체 마지막 업데이트 {formatDate(project.updated_at)}</span>
+                                                        </div>
+
+                                                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5">
+                                                            <div className="mb-2 flex items-center justify-between">
+                                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 업데이트</p>
+                                                                <Link
+                                                                    to={`/project-management/projects/${project.id}`}
+                                                                    className="text-[10px] font-semibold text-sky-600 hover:underline"
+                                                                >
+                                                                    보기
+                                                                </Link>
+                                                            </div>
+
+                                                            <div className="space-y-1.5">
+                                                                {updateLinks.length > 0 ? updateLinks.map((item) => (
+                                                                    <div key={`${project.id}-${item.label}`} className="flex items-start gap-2">
+                                                                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toneDotColor(item.tone) }} />
+                                                                        <Link
+                                                                            to={item.to}
+                                                                            className={cn(
+                                                                                'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                                                                badgeToneClass(item.tone)
+                                                                            )}
+                                                                        >
+                                                                            {item.label}
+                                                                        </Link>
+                                                                    </div>
+                                                                )) : (
+                                                                    <div className="rounded-lg border border-dashed border-slate-200 bg-white px-2.5 py-2 text-[11px] text-slate-500">
+                                                                        등록된 업데이트가 없습니다.
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-4 xl:w-[35%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                                                <div className="border-t border-slate-200 pt-4 xl:flex-1 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
                                                     <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                                                         <div className="flex flex-col">
                                                             <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">예산</span>
@@ -1049,44 +1080,6 @@ const SearchResults = () => {
                                                             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: progressMeta.dotColor }} />
                                                             {progressMeta.label}
                                                         </span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="border-t border-slate-200 pt-4 xl:w-[25%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
-                                                    <div className="mb-2 flex items-center justify-between">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 업데이트</p>
-                                                        <Link
-                                                            to={`/project-management/projects/${project.id}`}
-                                                            className="text-[10px] font-semibold text-sky-600 hover:underline"
-                                                        >
-                                                            보기
-                                                        </Link>
-                                                    </div>
-
-                                                    <div className="space-y-2">
-                                                        {updateLinks.length > 0 ? updateLinks.map((item) => (
-                                                            <div key={`${project.id}-${item.label}`} className="flex items-start gap-2">
-                                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toneDotColor(item.tone) }} />
-                                                                <div className="min-w-0">
-                                                                    <Link
-                                                                        to={item.to}
-                                                                        className={cn(
-                                                                            'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
-                                                                            badgeToneClass(item.tone)
-                                                                        )}
-                                                                    >
-                                                                        {item.label}
-                                                                    </Link>
-                                                                    <p className="mt-0.5 text-[10px] text-slate-500">
-                                                                        마지막 업데이트 {formatShortDate(project.updated_at)}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        )) : (
-                                                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">
-                                                                등록된 업데이트가 없습니다.
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

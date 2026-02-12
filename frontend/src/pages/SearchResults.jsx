@@ -1047,27 +1047,63 @@ const SearchResults = () => {
                                                 </div>
 
                                                 <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                    <div className="mb-1.5 flex items-center justify-between">
-                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
-                                                        <Link
-                                                            to={`/project-management/projects/${project.id}`}
-                                                            className="text-[10px] font-semibold text-sky-600 hover:underline"
-                                                        >
-                                                            보기
-                                                        </Link>
-                                                    </div>
-
-                                                    <div className="space-y-1.5">
-                                                        {mockAgendaTitles.map((title, index) => (
-                                                            <p
-                                                                key={`${project.id}-agenda-${index}`}
-                                                                className="truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-600"
+                                                    <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-2">
+                                                        <div className="mb-2 flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
+                                                                <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-600">
+                                                                    3건
+                                                                </span>
+                                                            </div>
+                                                            <Link
+                                                                to={`/project-management/projects/${project.id}`}
+                                                                className="text-[10px] font-semibold text-sky-600 hover:underline"
                                                             >
-                                                                {title}
-                                                            </p>
-                                                        ))}
+                                                                보기
+                                                            </Link>
+                                                        </div>
+
+                                                        <div className="space-y-1.5">
+                                                            {mockAgendaTitles.map((title, index) => (
+                                                                <div
+                                                                    key={`${project.id}-agenda-${index}`}
+                                                                    className={cn(
+                                                                        'group relative overflow-hidden rounded-lg border px-2 py-1.5 transition-all',
+                                                                        index === 0
+                                                                            ? 'border-sky-300 bg-white shadow-sm'
+                                                                            : 'border-slate-200 bg-white/80 hover:border-slate-300'
+                                                                    )}
+                                                                >
+                                                                    <span
+                                                                        className={cn(
+                                                                            'absolute left-0 top-0 h-full w-0.5',
+                                                                            index === 0 ? 'bg-sky-400' : 'bg-slate-300'
+                                                                        )}
+                                                                    />
+                                                                    <div className="flex items-start gap-2">
+                                                                        <span
+                                                                            className={cn(
+                                                                                'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                                                                                index === 0
+                                                                                    ? 'bg-sky-100 text-sky-700'
+                                                                                    : 'bg-slate-100 text-slate-500'
+                                                                            )}
+                                                                        >
+                                                                            {index + 1}
+                                                                        </span>
+                                                                        <div className="min-w-0">
+                                                                            <p className="truncate text-[10px] font-semibold text-slate-700">
+                                                                                {title}
+                                                                            </p>
+                                                                            <p className="text-[9px] text-slate-400">
+                                                                                안건 연동 전 임시 제목
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    <p className="mt-1.5 text-[9px] text-slate-400">안건 연동 전 임시 제목</p>
                                                 </div>
                                             </div>
                                         </article>

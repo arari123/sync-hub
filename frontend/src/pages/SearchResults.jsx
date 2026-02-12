@@ -2,11 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
+    Building2,
     Database,
     Grid2x2,
     Loader2,
+    MapPin,
     Plus,
     Search,
+    User,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
@@ -35,10 +38,67 @@ const PROJECT_TYPE_LABEL_MAP = {
     as: '유지보수',
 };
 const FILTER_CHIP_BASE_CLASS =
-    'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
-const FILTER_CHIP_ACTIVE_CLASS = 'border border-primary bg-primary text-primary-foreground shadow-md shadow-primary/25';
+    'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
+const FILTER_CHIP_ACTIVE_CLASS = 'border border-sky-300 bg-sky-500 text-white shadow-sm shadow-sky-500/25';
 const FILTER_CHIP_INACTIVE_CLASS =
-    'border border-border bg-muted/80 text-muted-foreground hover:border-foreground/25 hover:bg-muted hover:text-foreground';
+    'border border-slate-200 bg-white/90 text-slate-500 hover:border-slate-300 hover:text-slate-700';
+const STAGE_PROGRESS_FALLBACK = {
+    review: 18,
+    fabrication: 46,
+    installation: 72,
+    warranty: 88,
+    closure: 100,
+};
+const STAGE_STYLE_MAP = {
+    review: {
+        badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
+        statusTextClass: 'text-sky-600',
+        progressFrom: '#38bdf8',
+        progressTo: '#10b981',
+        dotColor: '#0ea5e9',
+        statusLabel: '검토 진행',
+    },
+    fabrication: {
+        badgeClass: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+        statusTextClass: 'text-indigo-600',
+        progressFrom: '#6366f1',
+        progressTo: '#14b8a6',
+        dotColor: '#6366f1',
+        statusLabel: '제작 진행',
+    },
+    installation: {
+        badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        statusTextClass: 'text-emerald-600',
+        progressFrom: '#34d399',
+        progressTo: '#06b6d4',
+        dotColor: '#10b981',
+        statusLabel: '설치 진행',
+    },
+    warranty: {
+        badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
+        statusTextClass: 'text-amber-600',
+        progressFrom: '#f59e0b',
+        progressTo: '#f97316',
+        dotColor: '#f59e0b',
+        statusLabel: '워런티 대응',
+    },
+    closure: {
+        badgeClass: 'border-slate-200 bg-slate-100 text-slate-700',
+        statusTextClass: 'text-slate-600',
+        progressFrom: '#94a3b8',
+        progressTo: '#64748b',
+        dotColor: '#64748b',
+        statusLabel: '종료',
+    },
+    default: {
+        badgeClass: 'border-slate-200 bg-slate-100 text-slate-700',
+        statusTextClass: 'text-slate-600',
+        progressFrom: '#94a3b8',
+        progressTo: '#64748b',
+        dotColor: '#64748b',
+        statusLabel: '진행',
+    },
+};
 
 function extractItems(payload) {
     if (Array.isArray(payload)) return payload;
@@ -219,17 +279,121 @@ function buildUpdateLinks(project) {
 }
 
 function badgeToneClass(tone) {
-    if (tone === 'amber') return 'bg-amber-100 text-amber-800';
-    if (tone === 'blue') return 'bg-blue-100 text-blue-800';
-    if (tone === 'emerald') return 'bg-emerald-100 text-emerald-800';
-    if (tone === 'violet') return 'bg-violet-100 text-violet-800';
-    return 'bg-slate-100 text-slate-700';
+    if (tone === 'amber') return 'border-amber-200 bg-amber-50 text-amber-700';
+    if (tone === 'blue') return 'border-sky-200 bg-sky-50 text-sky-700';
+    if (tone === 'emerald') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (tone === 'violet') return 'border-violet-200 bg-violet-50 text-violet-700';
+    return 'border-slate-200 bg-slate-100 text-slate-700';
 }
 
 function formatDate(value) {
     const text = String(value || '').trim();
     if (!text) return '-';
     return text.slice(0, 10);
+}
+
+function formatShortDate(value) {
+    const dateText = formatDate(value);
+    if (dateText === '-') return '-';
+    const [year, month, day] = dateText.split('-');
+    if (!year || !month || !day) return dateText;
+    return `${month}.${day}`;
+}
+
+function toNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function formatCompactKrw(value) {
+    const amount = toNumber(value);
+    const abs = Math.abs(amount);
+    const sign = amount < 0 ? '-' : '';
+    const normalized = sign ? abs : amount;
+
+    if (abs >= 100000000) {
+        const unit = (normalized / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+        return `${sign}${unit}억 원`;
+    }
+    if (abs >= 10000) {
+        const unit = (normalized / 10000).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+        return `${sign}${unit}만 원`;
+    }
+    return `${amount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원`;
+}
+
+function resolveStageStyle(project) {
+    const stage = normalizeStage(project?.current_stage);
+    return STAGE_STYLE_MAP[stage] || STAGE_STYLE_MAP.default;
+}
+
+function resolveBudgetSnapshot(project) {
+    const monitoring = project?.monitoring || {};
+    const totals = project?.totals || {};
+    const confirmedBudget = Math.max(
+        toNumber(monitoring.confirmed_budget_total),
+        toNumber(totals.grand_total),
+    );
+    const spentByParts = (
+        toNumber(monitoring.actual_spent_material)
+        + toNumber(monitoring.actual_spent_labor)
+        + toNumber(monitoring.actual_spent_expense)
+    );
+    const spent = Math.max(toNumber(monitoring.actual_spent_total), spentByParts, 0);
+    const balance = confirmedBudget - spent;
+    return {
+        confirmedBudget,
+        spent,
+        balance,
+    };
+}
+
+function computeProgressPercent(project) {
+    const milestones = Array.isArray(project?.summary_milestones) ? project.summary_milestones : [];
+    if (milestones.length > 0) {
+        let progressScore = 0;
+        for (const milestone of milestones) {
+            const status = String(milestone?.status || '').trim().toLowerCase();
+            if (status === 'done') {
+                progressScore += 1;
+            } else if (status === 'active') {
+                progressScore += 0.55;
+            }
+        }
+        const ratio = progressScore / milestones.length;
+        return Math.max(8, Math.min(100, Math.round(ratio * 100)));
+    }
+
+    const stage = normalizeStage(project?.current_stage);
+    return STAGE_PROGRESS_FALLBACK[stage] || 15;
+}
+
+function resolveProgressMeta(project, balance, progressPercent) {
+    const stage = normalizeStage(project?.current_stage);
+    const stageStyle = resolveStageStyle(project);
+
+    if (balance < 0) {
+        return { label: '예산 주의', dotColor: '#f59e0b', textClass: 'text-amber-600' };
+    }
+    if (stage === 'closure') {
+        return { label: '종료', dotColor: '#64748b', textClass: 'text-slate-600' };
+    }
+    if (progressPercent >= 90) {
+        return { label: '완료 임박', dotColor: '#10b981', textClass: 'text-emerald-600' };
+    }
+    return {
+        label: stageStyle.statusLabel,
+        dotColor: stageStyle.dotColor,
+        textClass: stageStyle.statusTextClass,
+    };
+}
+
+function toneDotColor(tone) {
+    if (tone === 'amber') return '#f59e0b';
+    if (tone === 'blue') return '#0ea5e9';
+    if (tone === 'emerald') return '#10b981';
+    if (tone === 'violet') return '#8b5cf6';
+    return '#94a3b8';
 }
 
 function mergeProjectSearchRows(projectPool, projectHits, query) {
@@ -401,15 +565,9 @@ const SearchResults = () => {
         };
     }, [hasSearchQuery, searchQuery]);
 
-    const visibleProjects = useMemo(() => {
+    const filteredProjects = useMemo(() => {
         const source = Array.isArray(projectRows) ? projectRows : [];
         const scopeFilter = String(projectScope || '').trim().toLowerCase();
-        const selectedStages = new Set(
-            Array.isArray(projectFilters.stages) ? projectFilters.stages : []
-        );
-        const selectedTypes = new Set(
-            Array.isArray(projectFilters.types) ? projectFilters.types : []
-        );
 
         return source.filter((project) => {
             if (!showAllProjects && project?.is_mine === false) {
@@ -420,15 +578,6 @@ const SearchResults = () => {
             const code = String(project?.code || '').toLowerCase();
             const customerName = String(project?.customer_name || '').toLowerCase();
             const installationSite = String(project?.installation_site || '').toLowerCase();
-
-            if (selectedStages.size > 0 && !selectedStages.has(normalizeStage(project?.current_stage))) {
-                return false;
-            }
-
-            const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
-            if (selectedTypes.size > 0 && !selectedTypes.has(projectTypeKey)) {
-                return false;
-            }
 
             if (scopeFilter) {
                 const scopeHaystack = `${name} ${code} ${customerName} ${installationSite}`.trim();
@@ -443,7 +592,43 @@ const SearchResults = () => {
 
             return true;
         });
-    }, [projectRows, projectFilters.stages, projectFilters.types, projectScope, projectFilterQuery, showAllProjects]);
+    }, [projectRows, projectScope, projectFilterQuery, showAllProjects]);
+
+    const stageCounts = useMemo(() => {
+        const counts = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, 0]));
+        for (const project of filteredProjects) {
+            const stage = normalizeStage(project?.current_stage);
+            if (!(stage in counts)) continue;
+            counts[stage] += 1;
+        }
+        return counts;
+    }, [filteredProjects]);
+
+    const typeCounts = useMemo(() => {
+        const counts = Object.fromEntries(PROJECT_TYPE_OPTIONS.map((item) => [item.value, 0]));
+        for (const project of filteredProjects) {
+            const type = normalizeProjectType(project?.project_type || project?.project_type_label);
+            if (!(type in counts)) continue;
+            counts[type] += 1;
+        }
+        return counts;
+    }, [filteredProjects]);
+
+    const visibleProjects = useMemo(() => {
+        const selectedStages = new Set(Array.isArray(projectFilters.stages) ? projectFilters.stages : []);
+        const selectedTypes = new Set(Array.isArray(projectFilters.types) ? projectFilters.types : []);
+
+        return filteredProjects.filter((project) => {
+            if (selectedStages.size > 0 && !selectedStages.has(normalizeStage(project?.current_stage))) {
+                return false;
+            }
+            const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
+            if (selectedTypes.size > 0 && !selectedTypes.has(projectTypeKey)) {
+                return false;
+            }
+            return true;
+        });
+    }, [filteredProjects, projectFilters.stages, projectFilters.types]);
 
     const tableProjects = useMemo(
         () => visibleProjects.slice(0, TABLE_PAGE_SIZE),
@@ -453,10 +638,10 @@ const SearchResults = () => {
     const totalVisibleCount = visibleProjects.length;
     const visibleStartIndex = totalVisibleCount > 0 ? 1 : 0;
     const visibleEndIndex = Math.min(TABLE_PAGE_SIZE, totalVisibleCount);
-    const totalProjectCount = showAllProjects
-        ? projectPool.length
-        : projectPool.filter((project) => project?.is_mine !== false).length;
-    const hasProjectPanel = projectRows.length > 0;
+    const myProjectCount = projectPool.filter((project) => project?.is_mine !== false).length;
+    const allProjectCount = projectPool.length;
+    const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
+    const hasProjectPanel = isLoading || projectRows.length > 0 || !hasSearchQuery;
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
@@ -596,120 +781,122 @@ const SearchResults = () => {
                     )}
 
                     {hasProjectPanel && (
-                        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                                    <div className="flex rounded-lg bg-secondary p-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllProjects(false)}
-                                            className={cn(
-                                                'px-4 py-1.5 text-sm rounded font-semibold transition-colors',
-                                                !showAllProjects
-                                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                                    : 'text-muted-foreground hover:text-foreground'
-                                            )}
-                                        >
-                                            내 프로젝트
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllProjects(true)}
-                                            className={cn(
-                                                'px-4 py-1.5 text-sm rounded font-semibold transition-colors',
-                                                showAllProjects
-                                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                                    : 'text-muted-foreground hover:text-foreground'
-                                            )}
-                                        >
-                                            전체 프로젝트
-                                        </button>
+                        <section className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur-sm">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllProjects(false)}
+                                                className={cn(
+                                                    'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    !showAllProjects
+                                                        ? 'bg-white text-slate-900 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                )}
+                                            >
+                                                내 프로젝트 ({myProjectCount})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllProjects(true)}
+                                                className={cn(
+                                                    'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                    showAllProjects
+                                                        ? 'bg-white text-slate-900 shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                )}
+                                            >
+                                                전체 프로젝트 ({allProjectCount})
+                                            </button>
+                                        </div>
+
+                                        <div className="hidden h-5 w-px bg-slate-200 xl:block" />
+
+                                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                                            <button
+                                                type="button"
+                                                onClick={clearStageFilters}
+                                                aria-pressed={projectFilters.stages.length === 0}
+                                                className={cn(
+                                                    FILTER_CHIP_BASE_CLASS,
+                                                    projectFilters.stages.length === 0
+                                                        ? FILTER_CHIP_ACTIVE_CLASS
+                                                        : FILTER_CHIP_INACTIVE_CLASS
+                                                )}
+                                            >
+                                                전체 단계 ({filteredProjects.length})
+                                            </button>
+                                            {STAGE_OPTIONS.map((item) => {
+                                                const isActive = projectFilters.stages.includes(item.value);
+                                                return (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive
+                                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                                : FILTER_CHIP_INACTIVE_CLASS
+                                                        )}
+                                                    >
+                                                        {item.label} ({stageCounts[item.value] || 0})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="hidden h-5 w-px bg-slate-200 xl:block" />
+
+                                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                                            <button
+                                                type="button"
+                                                onClick={clearTypeFilters}
+                                                aria-pressed={projectFilters.types.length === 0}
+                                                className={cn(
+                                                    FILTER_CHIP_BASE_CLASS,
+                                                    projectFilters.types.length === 0
+                                                        ? FILTER_CHIP_ACTIVE_CLASS
+                                                        : FILTER_CHIP_INACTIVE_CLASS
+                                                )}
+                                            >
+                                                전체 유형 ({filteredProjects.length})
+                                            </button>
+                                            {PROJECT_TYPE_OPTIONS.map((item) => {
+                                                const isActive = projectFilters.types.includes(item.value);
+                                                return (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => toggleTypeFilter(item.value)}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive
+                                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                                : FILTER_CHIP_INACTIVE_CLASS
+                                                        )}
+                                                    >
+                                                        {item.label} ({typeCounts[item.value] || 0})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
-                                    <div className="hidden h-6 w-px bg-border md:block" />
-
-                                    <div className="flex items-center gap-1 overflow-x-auto">
-                                        <button
-                                            type="button"
-                                            onClick={clearStageFilters}
-                                            aria-pressed={projectFilters.stages.length === 0}
-                                            className={cn(
-                                                FILTER_CHIP_BASE_CLASS,
-                                                projectFilters.stages.length === 0
-                                                    ? FILTER_CHIP_ACTIVE_CLASS
-                                                    : FILTER_CHIP_INACTIVE_CLASS
-                                            )}
-                                        >
-                                            전체 단계
-                                        </button>
-                                        {STAGE_OPTIONS.map((item) => {
-                                            const isActive = projectFilters.stages.includes(item.value);
-                                            return (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => toggleStageFilter(item.value)}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive
-                                                            ? FILTER_CHIP_ACTIVE_CLASS
-                                                            : FILTER_CHIP_INACTIVE_CLASS
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            );
-                                        })}
+                                    <div className="relative w-full xl:w-80">
+                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={projectFilterQuery}
+                                            onChange={(event) => setProjectFilterQuery(event.target.value)}
+                                            placeholder="프로젝트 내 단어 매칭 검색"
+                                            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                                        />
                                     </div>
-
-                                    <div className="hidden h-6 w-px bg-border md:block" />
-
-                                    <div className="flex items-center gap-1 overflow-x-auto">
-                                        <button
-                                            type="button"
-                                            onClick={clearTypeFilters}
-                                            aria-pressed={projectFilters.types.length === 0}
-                                            className={cn(
-                                                FILTER_CHIP_BASE_CLASS,
-                                                projectFilters.types.length === 0
-                                                    ? FILTER_CHIP_ACTIVE_CLASS
-                                                    : FILTER_CHIP_INACTIVE_CLASS
-                                            )}
-                                        >
-                                            전체 유형
-                                        </button>
-                                        {PROJECT_TYPE_OPTIONS.map((item) => {
-                                            const isActive = projectFilters.types.includes(item.value);
-                                            return (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => toggleTypeFilter(item.value)}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive
-                                                            ? FILTER_CHIP_ACTIVE_CLASS
-                                                            : FILTER_CHIP_INACTIVE_CLASS
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="relative w-full lg:w-80">
-                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        type="text"
-                                        value={projectFilterQuery}
-                                        onChange={(event) => setProjectFilterQuery(event.target.value)}
-                                        placeholder="프로젝트 내 단어 매칭 검색"
-                                        className="h-9 w-full rounded-lg border border-input bg-secondary pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
-                                    />
                                 </div>
                             </div>
                         </section>
@@ -718,110 +905,188 @@ const SearchResults = () => {
                     {hasProjectPanel ? (
                         <section className="space-y-3">
                             {isLoading ? (
-                                <div className="rounded-xl border border-border bg-card px-4 py-16 text-center">
-                                    <div className="inline-flex items-center gap-2 text-muted-foreground">
+                                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-16 text-center shadow-sm">
+                                    <div className="inline-flex items-center gap-2 text-slate-500">
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         데이터를 불러오는 중입니다.
                                     </div>
                                 </div>
                             ) : tableProjects.length === 0 ? (
-                                <div className="rounded-xl border border-border bg-card px-4 py-16 text-center text-sm text-muted-foreground">
+                                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-16 text-center text-sm text-slate-500 shadow-sm">
                                     필터 조건에 맞는 프로젝트가 없습니다.
                                 </div>
                             ) : (
                                 tableProjects.map((project) => {
                                     const updateLinks = buildUpdateLinks(project);
+                                    const stageStyle = resolveStageStyle(project);
+                                    const budget = resolveBudgetSnapshot(project);
+                                    const progressPercent = computeProgressPercent(project);
+                                    const progressWidth = `${Math.max(6, Math.min(100, progressPercent))}%`;
+                                    const progressMeta = resolveProgressMeta(project, budget.balance, progressPercent);
+                                    const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
                                     return (
                                         <article
                                             key={`project-row-${project.id}`}
-                                            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50"
+                                            className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-secondary">
-                                                    <img
-                                                        src={project.cover_image_display_url || project.cover_image_fallback_url || ''}
-                                                        alt={`${project.name || '프로젝트'} 대표 이미지`}
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                </div>
-
-                                                <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-12 md:items-center">
-                                                    <div className="min-w-0 md:col-span-3">
-                                                        <div className="mb-1.5 flex items-center gap-2">
-                                                            <Link
-                                                                to={`/project-management/projects/${project.id}`}
-                                                                className="truncate text-sm font-bold text-foreground hover:text-primary"
-                                                            >
-                                                                {project.name || '이름 없는 프로젝트'}
-                                                            </Link>
-                                                            <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
-                                                                {project.code || '코드 없음'}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="mb-2 flex flex-wrap gap-1.5">
-                                                            {updateLinks.length > 0 ? updateLinks.map((item) => (
-                                                                <Link
-                                                                    key={`${project.id}-${item.label}`}
-                                                                    to={item.to}
-                                                                    className={cn(
-                                                                        'rounded px-1.5 py-0.5 text-[10px] font-bold border',
-                                                                        badgeToneClass(item.tone)
-                                                                    )}
-                                                                >
-                                                                    {item.label}
-                                                                </Link>
-                                                            )) : (
-                                                                <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-                                                                    업데이트 없음
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        <p className="text-[11px] text-muted-foreground">
-                                                            최근 업데이트: {formatDate(project.updated_at)}
-                                                        </p>
+                                            <div className="flex flex-col gap-4 xl:flex-row">
+                                                <div className="flex gap-4 xl:w-[40%]">
+                                                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                                        {coverImage ? (
+                                                            <img
+                                                                src={coverImage}
+                                                                alt={`${project.name || '프로젝트'} 대표 이미지`}
+                                                                className="h-full w-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="grid h-full w-full place-items-center text-xs font-semibold text-slate-400">
+                                                                이미지 없음
+                                                            </div>
+                                                        )}
                                                     </div>
 
-                                                    <div className="grid grid-cols-2 gap-4 md:col-span-5 md:grid-cols-4">
-                                                        <div className="min-w-0">
-                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">고객사/위치</p>
-                                                            <p className="truncate text-xs font-semibold text-foreground">
-                                                                {(project.customer_name || '-')}{' | '}{(project.installation_site || '-')}
-                                                            </p>
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">담당자</p>
-                                                            <p className="truncate text-xs font-semibold text-foreground">
-                                                                {project.manager_name || '담당자 미지정'}
-                                                            </p>
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">프로젝트 상태</p>
-                                                            <span className="inline-flex rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                                                            <span className="truncate text-[10px] font-mono tracking-wider text-slate-400">
+                                                                {project.code || '코드 없음'}
+                                                            </span>
+                                                            <span className={cn(
+                                                                'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                                                stageStyle.badgeClass
+                                                            )}
+                                                            >
                                                                 {resolveProjectStatusLabel(project)}
                                                             </span>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">프로젝트 종류</p>
-                                                            <span className="text-xs font-semibold text-foreground">
-                                                                {resolveProjectTypeLabel(project)}
+
+                                                        <Link
+                                                            to={`/project-management/projects/${project.id}`}
+                                                            className="mb-2 block truncate text-lg font-bold tracking-tight text-slate-900 hover:text-sky-700"
+                                                        >
+                                                            {project.name || '이름 없는 프로젝트'}
+                                                        </Link>
+
+                                                        <p className="mb-3 text-[11px] text-slate-500 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">
+                                                            {project.description || '프로젝트 설명이 아직 등록되지 않았습니다.'}
+                                                        </p>
+
+                                                        <div className="grid gap-y-1 text-[11px] text-slate-600">
+                                                            <p className="flex items-center gap-1.5">
+                                                                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                                                                <span className="truncate">
+                                                                    {project.customer_name || '고객사 미지정'}
+                                                                </span>
+                                                            </p>
+                                                            <p className="flex items-center gap-1.5">
+                                                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                                                <span className="truncate">
+                                                                    {project.installation_site || '설치 위치 미지정'}
+                                                                </span>
+                                                            </p>
+                                                            <p className="flex items-center gap-1.5">
+                                                                <User className="h-3.5 w-3.5 text-slate-400" />
+                                                                <span className="truncate">
+                                                                    담당자: {project.manager_name || '담당자 미지정'}
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="border-t border-slate-200 pt-4 xl:w-[35%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                                                    <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">예산</span>
+                                                            <span className="text-xs font-bold text-slate-700">
+                                                                {formatCompactKrw(budget.confirmedBudget)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-col border-l border-slate-200 pl-2">
+                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">사용</span>
+                                                            <span className="text-xs font-bold text-slate-700">
+                                                                {formatCompactKrw(budget.spent)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-col border-l border-slate-200 pl-2">
+                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">잔액</span>
+                                                            <span className={cn(
+                                                                'text-xs font-bold',
+                                                                budget.balance >= 0 ? 'text-emerald-600' : 'text-amber-600'
+                                                            )}
+                                                            >
+                                                                {budget.balance >= 0 ? '+' : ''}
+                                                                {formatCompactKrw(budget.balance)}
                                                             </span>
                                                         </div>
                                                     </div>
 
-                                                    <div className="border-l border-border pl-4 md:col-span-4">
-                                                        <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">마지막 안건</p>
-                                                        <div className="space-y-1.5">
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                                                                <p className="text-[11px] leading-tight text-muted-foreground">현재 이슈 등록 미구현 상태입니다.</p>
+                                                    <div className="mb-2 flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                                                        <span>시작</span>
+                                                        <span className={stageStyle.statusTextClass}>{resolveProjectStatusLabel(project)}</span>
+                                                        <span>종료</span>
+                                                    </div>
+
+                                                    <div className="relative mb-1.5 py-2">
+                                                        <div className="h-1.5 rounded-full bg-slate-200" />
+                                                        <div
+                                                            className="absolute left-0 top-2 h-1.5 rounded-full transition-all duration-500"
+                                                            style={{
+                                                                width: progressWidth,
+                                                                background: `linear-gradient(90deg, ${stageStyle.progressFrom} 0%, ${stageStyle.progressTo} 100%)`,
+                                                            }}
+                                                        />
+                                                        <div className="absolute left-0 top-2 h-2 w-2 -translate-x-1/2 -translate-y-1/4 rounded-full border border-white bg-slate-300" />
+                                                        <div className="absolute right-0 top-2 h-2 w-2 translate-x-1/2 -translate-y-1/4 rounded-full border border-white bg-slate-300" />
+                                                        <div
+                                                            className="absolute top-2 h-3 w-3 -translate-x-1/2 -translate-y-1/3 rounded-full border-2 border-white shadow-sm"
+                                                            style={{ left: progressWidth, backgroundColor: stageStyle.dotColor }}
+                                                        />
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-semibold text-slate-500">진행률 {progressPercent}%</span>
+                                                        <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold', progressMeta.textClass)}>
+                                                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: progressMeta.dotColor }} />
+                                                            {progressMeta.label}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="border-t border-slate-200 pt-4 xl:w-[25%] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 업데이트</p>
+                                                        <Link
+                                                            to={`/project-management/projects/${project.id}`}
+                                                            className="text-[10px] font-semibold text-sky-600 hover:underline"
+                                                        >
+                                                            보기
+                                                        </Link>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        {updateLinks.length > 0 ? updateLinks.map((item) => (
+                                                            <div key={`${project.id}-${item.label}`} className="flex items-start gap-2">
+                                                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toneDotColor(item.tone) }} />
+                                                                <div className="min-w-0">
+                                                                    <Link
+                                                                        to={item.to}
+                                                                        className={cn(
+                                                                            'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                                                            badgeToneClass(item.tone)
+                                                                        )}
+                                                                    >
+                                                                        {item.label}
+                                                                    </Link>
+                                                                    <p className="mt-0.5 text-[10px] text-slate-500">
+                                                                        마지막 업데이트 {formatShortDate(project.updated_at)}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex items-start gap-2">
-                                                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-                                                                <p className="text-[11px] leading-tight text-muted-foreground">향후 안건 데이터와 연동될 예정입니다.</p>
+                                                        )) : (
+                                                            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">
+                                                                등록된 업데이트가 없습니다.
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -830,9 +1095,10 @@ const SearchResults = () => {
                                 })
                             )}
 
-                            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
                                 <span>
                                     프로젝트 {visibleStartIndex}-{visibleEndIndex} / 총 {totalVisibleCount}건
+                                    {` · 기준 모드 ${showAllProjects ? '전체' : '내 프로젝트'} (${totalProjectCount}건)`}
                                     {projectScope ? ` (프로젝트코드:${projectScope} 범위)` : ''}
                                 </span>
                                 {hasSearchQuery && (

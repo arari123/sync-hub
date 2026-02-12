@@ -10,6 +10,7 @@ import {
     Loader2,
     Plus,
     Receipt,
+    Scale,
     Search,
     Users,
     Wallet,
@@ -18,6 +19,12 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
+import {
+    BUDGET_CLONE_EXPENSE_CONTENT,
+    BUDGET_CLONE_LABOR_CONTENT,
+    BUDGET_CLONE_MATERIAL_CONTENT,
+    BUDGET_CLONE_SUMMARY_CONTENT,
+} from './budgetCloneTemplates';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
 const PHASES = ['fabrication', 'installation'];
@@ -55,6 +62,63 @@ const DEFAULT_LABOR_SETTINGS = {
     labor_days_per_month_domestic: 22,
     labor_days_per_month_overseas: 30,
 };
+
+const BUDGET_TAB_ITEMS = [
+    { key: 'summary', label: 'Summary Overview', icon: BarChart3 },
+    { key: 'material', label: 'Material Budget', icon: Boxes },
+    { key: 'labor', label: 'Labor Cost', icon: Users },
+    { key: 'expense', label: 'Expenses', icon: Receipt },
+];
+
+const BUDGET_TAB_CONTENT = {
+    summary: BUDGET_CLONE_SUMMARY_CONTENT,
+    material: BUDGET_CLONE_MATERIAL_CONTENT,
+    labor: BUDGET_CLONE_LABOR_CONTENT,
+    expense: BUDGET_CLONE_EXPENSE_CONTENT,
+};
+
+const BUDGET_CLONE_CUSTOM_CSS = `
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.budget-clone-content .bg-surface-light {
+    background-color: #ffffff;
+}
+.budget-clone-content .bg-background-light {
+    background-color: #f3f4f6;
+}
+.budget-clone-content .bg-subtotal-light {
+    background-color: #e0f2fe;
+}
+.budget-clone-content .bg-total-light {
+    background-color: #1e3a8a;
+}
+.budget-clone-content .bg-navy-header {
+    background-color: #1e3a8a;
+}
+.budget-clone-content .bg-emerald-header {
+    background-color: #047857;
+}
+.budget-clone-content .bg-deep-navy {
+    background-color: #0f172a;
+}
+.budget-clone-content .text-gold-accent {
+    color: #fbbf24;
+}
+.budget-clone-content .shadow-soft-blue {
+    box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1), 0 2px 4px -1px rgba(14, 165, 233, 0.06);
+}
+.budget-clone-content .shadow-card {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.budget-clone-content table {
+    width: 100%;
+}
+`;
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 const EMPTY_DETAILS = {
@@ -175,6 +239,11 @@ function formatAmount(value) {
     const number = toNumber(value);
     const roundedManwon = number >= 0 ? Math.floor(number / 10000) : Math.ceil(number / 10000);
     return `${roundedManwon.toLocaleString('ko-KR')}만원`;
+}
+
+function formatWon(value) {
+    const amount = Math.round(toNumber(value));
+    return `₩ ${amount.toLocaleString('ko-KR')}`;
 }
 
 function formatPercent(value) {
@@ -575,6 +644,7 @@ const BudgetProjectBudget = () => {
     const [selectedEquipments, setSelectedEquipments] = useState([]);
     const [isTotalFixed, setIsTotalFixed] = useState(false);
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
+    const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
 
     useEffect(() => {
         setInputQuery(searchParams.get('q') || '');
@@ -886,6 +956,15 @@ const BudgetProjectBudget = () => {
     }, [dashboard.equipmentSummaries]);
 
     const summaryView = isTotalFixed ? fixedSummaryViewModel.summary : viewModel.summary;
+    const activeTabContentHtml = BUDGET_TAB_CONTENT[activeBudgetTab] || BUDGET_CLONE_SUMMARY_CONTENT;
+    const totalBudget = toNumber(summaryView.total.budget);
+    const totalExecution = toNumber(summaryView.total.execution);
+    const totalRemaining = toNumber(summaryView.total.remaining);
+    const totalExecutionPercent = usagePercent(totalBudget, totalExecution);
+    const initialCap = Math.round(totalBudget * 0.94);
+    const initialCapDeltaPercent = initialCap > 0 ? ((totalBudget - initialCap) / initialCap) * 100 : 0;
+    const remainingPercent = totalBudget > 0 ? Math.max(0, (totalRemaining / totalBudget) * 100) : 0;
+    const isOverBudget = totalRemaining < 0;
 
     const allPhaseSelected = selectedPhases.length === PHASES.length;
     const allCostTypeSelected = selectedCostTypes.length === COST_TYPES.length;
@@ -1213,519 +1292,120 @@ const BudgetProjectBudget = () => {
                         {error}
                     </div>
                 )}
+                <style>{BUDGET_CLONE_CUSTOM_CSS}</style>
 
-                <div className="flex flex-col gap-5 xl:flex-row">
-                    <aside className="xl:w-80 shrink-0 rounded-xl border border-border bg-card p-4 shadow-sm">
-                        <div className="mb-3">
-                            <h2 className="text-sm font-bold text-slate-800">필터</h2>
-                        </div>
-
-                        <div className="mb-4 grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={handleSelectAllFilters}
-                                className="h-8 rounded-md border border-primary/30 bg-primary/10 text-xs font-semibold text-primary hover:bg-primary/15"
-                            >
-                                전체 선택
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleClearAllFilters}
-                                className="h-8 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-slate-300"
-                            >
-                                전체 해제
-                            </button>
-                        </div>
-
-                        <div className="space-y-5 text-sm">
-                            <div>
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">예산 내역 검색</p>
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        value={detailSearchQuery}
-                                        onChange={(event) => setDetailSearchQuery(event.target.value)}
-                                        placeholder="예산 내역 전체 검색"
-                                        className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                    />
-                                </div>
-                                <p className="mt-1 text-[11px] text-slate-500">선택된 필터 항목 내에서만 검색됩니다.</p>
-                            </div>
-
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                                    <input
-                                        type="checkbox"
-                                        checked={isTotalFixed}
-                                        onChange={(event) => setIsTotalFixed(event.target.checked)}
-                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                    />
-                                    합계 금액 고정
-                                </label>
-                                <p className="mt-1 text-[11px] text-slate-500">활성화하면 필터링 후에도 합계는 전체 선택 기준으로 유지됩니다.</p>
-                            </div>
-
-                            <div>
-                                <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">프로젝트 단계</p>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedPhases([...PHASES])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 선택
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedPhases([])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 해제
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                                        <input
-                                            type="checkbox"
-                                            checked={allPhaseSelected}
-                                            onChange={(event) => setSelectedPhases(event.target.checked ? [...PHASES] : [])}
-                                            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                        />
-                                        전체 단계
-                                    </label>
-                                    {PHASES.map((phase) => (
-                                        <label key={phase} className="flex items-center gap-2 text-xs text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedPhases.includes(phase)}
-                                                onChange={() => toggleMulti(setSelectedPhases, phase)}
-                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            {PHASE_LABEL[phase]}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">비용 유형</p>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedCostTypes([...COST_TYPES])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 선택
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedCostTypes([])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 해제
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                                        <input
-                                            type="checkbox"
-                                            checked={allCostTypeSelected}
-                                            onChange={(event) => setSelectedCostTypes(event.target.checked ? [...COST_TYPES] : [])}
-                                            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                        />
-                                        전체 비용
-                                    </label>
-                                    {COST_TYPES.map((type) => (
-                                        <label key={type} className="flex items-center gap-2 text-xs text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedCostTypes.includes(type)}
-                                                onChange={() => toggleMulti(setSelectedCostTypes, type)}
-                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            {COST_TYPE_LABEL[type]}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">출처</p>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedSources([...SOURCE_TYPES])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 선택
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedSources([])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 해제
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {SOURCE_TYPES.map((source) => (
-                                        <button
-                                            key={source}
-                                            type="button"
-                                            onClick={() => toggleMulti(setSelectedSources, source)}
-                                            className={cn(
-                                                'h-8 rounded-md border text-xs font-semibold transition-colors',
-                                                selectedSources.includes(source)
-                                                    ? 'border-primary bg-primary/10 text-primary'
-                                                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
-                                            )}
-                                        >
-                                            {source}
-                                        </button>
-                                    ))}
-                                </div>
-                                {!allSourceSelected && (
-                                    <p className="mt-1 text-[11px] text-slate-500">선택된 출처만 합산됩니다.</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <div className="mb-2 flex items-center justify-between">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">설비</p>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name))}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 선택
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedEquipments([])}
-                                            className="h-6 rounded border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
-                                        >
-                                            전체 해제
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                                    {dashboard.equipmentSummaries.map((item) => (
-                                        <label key={item.name} className="flex items-center gap-2 text-xs text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedEquipments.includes(item.name)}
-                                                onChange={() => toggleMulti(setSelectedEquipments, item.name)}
-                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            <span className="truncate">{renderHighlightedText(item.name)}</span>
-                                        </label>
-                                    ))}
-                                    {!dashboard.equipmentSummaries.length && (
-                                        <p className="text-[11px] text-slate-500">등록된 설비가 없습니다.</p>
-                                    )}
-                                </div>
-                                {!allEquipmentSelected && dashboard.equipmentSummaries.length > 0 && (
-                                    <p className="mt-1 text-[11px] text-slate-500">선택된 설비만 결과에 반영됩니다.</p>
-                                )}
-                            </div>
-                        </div>
-                    </aside>
-
-                    <div className="flex-1 space-y-5">
-                        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <SummaryCard
-                                icon={Calculator}
-                                title="총 예산"
-                                value={formatAmount(summaryView.total.budget)}
-                                subText={isTotalFixed ? '전체 선택 기준 고정' : '필터 조건 반영'}
-                            />
-                            <SummaryCard
-                                icon={Wallet}
-                                title="총 집행"
-                                value={formatAmount(summaryView.total.execution)}
-                                subText={`집행률 ${formatPercent(summaryView.total.percent)}`}
-                                tone="warning"
-                            />
-                            <SummaryCard
-                                icon={BarChart3}
-                                title="총 잔액"
-                                value={formatAmount(summaryView.total.remaining)}
-                                subText={showExecution ? '집행 반영 모드' : '예산 중심 모드'}
-                                tone="primary"
-                            />
-                        </section>
-
-                        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {PHASES.filter((phase) => selectedPhases.includes(phase)).map((phase) => {
-                                const phaseSummary = summaryView.phases[phase];
-                                const theme = PHASE_THEME[phase];
-                                const materialShare = phaseSummary.execution > 0
-                                    ? Math.round((summaryView.material.execution / Math.max(phaseSummary.execution, 1)) * 100)
-                                    : 0;
-                                const laborShare = phaseSummary.execution > 0
-                                    ? Math.round((summaryView.labor.execution / Math.max(phaseSummary.execution, 1)) * 100)
-                                    : 0;
-                                const expenseShare = phaseSummary.execution > 0
-                                    ? Math.round((summaryView.expense.execution / Math.max(phaseSummary.execution, 1)) * 100)
-                                    : 0;
-
-                                return (
-                                    <article
-                                        key={`phase-summary-${phase}`}
-                                        className={cn('rounded-xl border border-slate-200 bg-white p-4 shadow-sm', theme.border, 'border-l-4')}
-                                    >
-                                        <div className="mb-3 flex items-center justify-between">
-                                            <div>
-                                                <h3 className={cn('text-sm font-bold', theme.text)}>{PHASE_LABEL[phase]} 단계</h3>
-                                                <p className="text-xs text-slate-500">예산 {formatAmount(phaseSummary.budget)}</p>
-                                            </div>
-                                            <span className={cn('rounded px-2 py-1 text-[11px] font-bold', theme.badge)}>
-                                                집행률 {formatPercent(phaseSummary.percent)}
-                                            </span>
-                                        </div>
-                                        <div className="mb-3 text-xs text-slate-600">
-                                            <span>집행 {formatAmount(phaseSummary.execution)}</span>
-                                            <span className="mx-2">/</span>
-                                            <span>잔액 {formatAmount(phaseSummary.remaining)}</span>
-                                        </div>
-                                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                                            <div
-                                                className={cn('h-full', theme.progress)}
-                                                style={{ width: `${phaseSummary.percent}%` }}
-                                            />
-                                        </div>
-                                        <div className={cn('mt-3 grid grid-cols-3 gap-2 rounded-lg p-2', theme.panel)}>
-                                            <MiniMetric label="재료비" value={`${materialShare}%`} icon={Boxes} />
-                                            <MiniMetric label="인건비" value={`${laborShare}%`} icon={Users} />
-                                            <MiniMetric label="경비" value={`${expenseShare}%`} icon={Receipt} />
-                                        </div>
-                                    </article>
-                                );
-                            })}
-                        </section>
-
-                        <section className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-sm font-bold text-slate-800">예산 상세</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsTreeExpanded((prev) => !prev)}
-                                        className="h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-slate-300"
-                                    >
-                                        {(isTreeExpanded || shouldForceExpandBySearch) ? '모두 접기' : '모두 펼치기'}
-                                    </button>
-                                </div>
-                                <div className="text-xs text-slate-500 flex items-center gap-3">
-                                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary" />안전</span>
-                                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" />경고</span>
-                                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" />초과</span>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                                <div className="col-span-5">항목</div>
-                                <div className="col-span-2 text-right">예산</div>
-                                <div className="col-span-2 text-right">집행</div>
-                                <div className="col-span-2 text-right">잔액</div>
-                                <div className="col-span-1 text-center">상태</div>
-                            </div>
-
-                            <div className="divide-y divide-slate-200">
-                                {viewModel.items.length === 0 && (
-                                    <div className="px-5 py-10 text-center text-sm text-slate-500">
-                                        선택된 필터 조건과 검색어에 맞는 예산 데이터가 없습니다.
-                                    </div>
-                                )}
-
-                                {viewModel.items.map((equipment) => {
-                                    const totalPercent = equipment.totals.total.percent;
-                                    return (
-                                        <details key={equipment.name} className="group" open={isTreeExpanded || shouldForceExpandBySearch}>
-                                            <summary className="grid grid-cols-12 gap-3 px-5 py-3 cursor-pointer transition-colors items-center select-none bg-slate-50 hover:bg-slate-100">
-                                                <div className="col-span-5 flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800">
-                                                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
-                                                    <div className="truncate">{renderHighlightedText(equipment.name)}</div>
-                                                </div>
-                                                <div className="col-span-2 text-right text-sm font-semibold text-slate-700">{formatAmount(equipment.totals.total.budget)}</div>
-                                                <div className="col-span-2 text-right text-sm font-semibold text-slate-700">{formatAmount(equipment.totals.total.execution)}</div>
-                                                <div className={cn('col-span-2 text-right text-sm font-bold', equipment.totals.total.remaining < 0 ? 'text-rose-600' : 'text-primary')}>
-                                                    {formatAmount(equipment.totals.total.remaining)}
-                                                </div>
-                                                <div className="col-span-1 flex justify-center">
-                                                    <div className="h-1.5 w-14 overflow-hidden rounded-full bg-slate-200">
-                                                        <div className={cn('h-full', usageBarClass(totalPercent))} style={{ width: `${Math.min(totalPercent, 100)}%` }} />
-                                                    </div>
-                                                </div>
-                                            </summary>
-
-                                            <div className="space-y-1 py-1">
-                                                {PHASES.filter((phase) => selectedPhases.includes(phase)).map((phase) => {
-                                                    const phaseView = equipment.phases[phase];
-                                                    if (!phaseView) return null;
-                                                    const theme = PHASE_THEME[phase];
-
-                                                    return (
-                                                        <details key={`${equipment.name}-${phase}`} className="group/phase" open={isTreeExpanded || shouldForceExpandBySearch}>
-                                                            <summary className={cn('grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer transition-colors items-center hover:brightness-[0.98]', theme.panel)}>
-                                                                <div className={cn('col-span-5 flex items-center gap-2 text-xs font-bold', theme.text)}>
-                                                                    <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/phase:rotate-180" />
-                                                                    {renderHighlightedText(`${PHASE_LABEL[phase]} 단계`)}
-                                                                </div>
-                                                                <div className="col-span-2 text-right text-xs font-semibold text-slate-700">{formatAmount(phaseView.total.budget)}</div>
-                                                                <div className="col-span-2 text-right text-xs font-semibold text-slate-700">{formatAmount(phaseView.total.execution)}</div>
-                                                                <div className={cn('col-span-2 text-right text-xs font-semibold', phaseView.total.remaining < 0 ? 'text-rose-600' : theme.text)}>
-                                                                    {formatAmount(phaseView.total.remaining)}
-                                                                </div>
-                                                                <div className="col-span-1 flex justify-center">
-                                                                    <span className={cn('rounded px-2 py-0.5 text-[10px] font-bold', theme.badge)}>
-                                                                        {formatPercent(phaseView.total.percent)}
-                                                                    </span>
-                                                                </div>
-                                                            </summary>
-
-                                                            {phaseView.material.isVisible && (
-                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
-                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-blue-50/40 hover:bg-blue-50/60">
-                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
-                                                                            {renderHighlightedText('재료비')}
-                                                                        </div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.budget)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.execution)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.material.remaining)}</div>
-                                                                        <div className="col-span-1 flex justify-center">
-                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.material.budget, phaseView.material.execution)))} />
-                                                                        </div>
-                                                                    </summary>
-                                                                    <div className="divide-y divide-slate-100">
-                                                                        {!phaseView.material.units.length ? (
-                                                                            <div className="px-5 py-2 text-[11px] text-slate-500">등록된 유닛 데이터가 없습니다.</div>
-                                                                        ) : (
-                                                                            phaseView.material.units.map((unit) => {
-                                                                                const percent = usagePercent(unit.budgetAmount, unit.executionAmount);
-                                                                                return (
-                                                                                    <div key={`${equipment.name}-${phase}-${unit.unitName}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white">
-                                                                                        <div className="col-span-5 text-[11px] text-slate-700">{renderHighlightedText(unit.unitName)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(unit.budgetAmount)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(unit.executionAmount)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(unit.budgetAmount - unit.executionAmount)}</div>
-                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(percent))} /></div>
-                                                                                    </div>
-                                                                                );
-                                                                            })
-                                                                        )}
-                                                                    </div>
-                                                                </details>
-                                                            )}
-
-                                                            {phaseView.labor.isVisible && (
-                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
-                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-violet-50/40 hover:bg-violet-50/60">
-                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
-                                                                            {renderHighlightedText('인건비')}
-                                                                        </div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.budget)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.execution)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.labor.remaining)}</div>
-                                                                        <div className="col-span-1 flex justify-center">
-                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.labor.budget, phaseView.labor.execution)))} />
-                                                                        </div>
-                                                                    </summary>
-                                                                    <div className="divide-y divide-slate-100">
-                                                                        {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
-                                                                            const sourceBlock = phaseView.labor.bySource[source];
-                                                                            if (!sourceBlock?.isVisible) return null;
-                                                                            return (
-                                                                                <div key={`${equipment.name}-${phase}-labor-${source}`}>
-                                                                                    <div className="grid grid-cols-12 gap-3 px-5 py-2 bg-white/90">
-                                                                                        <div className="col-span-5 text-[11px] font-semibold text-slate-700">{renderHighlightedText(`${source} 인건비`)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(sourceBlock.budget)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.execution)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.remaining)}</div>
-                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(sourceBlock.budget, sourceBlock.execution)))} /></div>
-                                                                                    </div>
-                                                                                    {sourceBlock.rows.map((row) => (
-                                                                                        <div key={`${equipment.name}-${phase}-labor-${source}-${row.name}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white border-t border-slate-100">
-                                                                                            <div className="col-span-5 text-[11px] text-slate-700">{renderHighlightedText(row.name)}</div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(row.budgetAmount)}</div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(row.executionAmount)}</div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(toNumber(row.budgetAmount) - toNumber(row.executionAmount))}</div>
-                                                                                            <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(row.budgetAmount, row.executionAmount)))} /></div>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </details>
-                                                            )}
-
-                                                            {phaseView.expense.isVisible && (
-                                                                <details className="group/type" open={isTreeExpanded || shouldForceExpandBySearch}>
-                                                                    <summary className="grid grid-cols-12 gap-3 px-5 py-2 cursor-pointer items-center bg-emerald-50/40 hover:bg-emerald-50/60">
-                                                                        <div className="col-span-5 flex items-center gap-2 text-[11px] font-semibold text-slate-700">
-                                                                            <ChevronDown className="h-3.5 w-3.5 text-slate-500 transition-transform group-open/type:rotate-180" />
-                                                                            {renderHighlightedText('경비')}
-                                                                        </div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.budget)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.execution)}</div>
-                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(phaseView.expense.remaining)}</div>
-                                                                        <div className="col-span-1 flex justify-center">
-                                                                            <span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(phaseView.expense.budget, phaseView.expense.execution)))} />
-                                                                        </div>
-                                                                    </summary>
-                                                                    <div className="divide-y divide-slate-100">
-                                                                        {SOURCE_TYPES.filter((source) => selectedSources.includes(source)).map((source) => {
-                                                                            const sourceBlock = phaseView.expense.bySource[source];
-                                                                            if (!sourceBlock?.isVisible) return null;
-                                                                            return (
-                                                                                <div key={`${equipment.name}-${phase}-expense-${source}`}>
-                                                                                    <div className="grid grid-cols-12 gap-3 px-5 py-2 bg-white/90">
-                                                                                        <div className="col-span-5 text-[11px] font-semibold text-slate-700">{renderHighlightedText(`${source} 경비`)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(sourceBlock.budget)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.execution)}</div>
-                                                                                        <div className="col-span-2 text-right text-[11px] text-slate-600">{formatAmount(sourceBlock.remaining)}</div>
-                                                                                        <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(sourceBlock.budget, sourceBlock.execution)))} /></div>
-                                                                                    </div>
-                                                                                    {sourceBlock.rows.map((row) => (
-                                                                                        <div key={`${equipment.name}-${phase}-expense-${source}-${row.name}`} className="grid grid-cols-12 gap-3 px-5 py-2 bg-white border-t border-slate-100">
-                                                                                            <div className="col-span-5 text-[11px] text-slate-700">
-                                                                                                <span>{renderHighlightedText(row.name)}</span>
-                                                                                                {row.basis ? <span className="ml-1 text-[10px] text-slate-500">({renderHighlightedText(row.basis)})</span> : null}
-                                                                                            </div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-700">{formatAmount(row.budgetAmount)}</div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(row.executionAmount)}</div>
-                                                                                            <div className="col-span-2 text-right text-[11px] text-slate-500">{formatAmount(toNumber(row.budgetAmount) - toNumber(row.executionAmount))}</div>
-                                                                                            <div className="col-span-1 flex justify-center"><span className={cn('inline-block h-2 w-2 rounded-full', statusDotClass(usagePercent(row.budgetAmount, row.executionAmount)))} /></div>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </details>
-                                                            )}
-                                                        </details>
-                                                    );
-                                                })}
-                                            </div>
-                                        </details>
-                                    );
-                                })}
-                            </div>
-                        </section>
+                <section className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                            Phased Integrated Cost Breakdown Dashboard
+                        </h1>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Consolidated Financial Review (Unit: KRW)
+                        </p>
                     </div>
-                </div>
+                    <button
+                        type="button"
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+                    >
+                        <Calculator className="h-4 w-4" />
+                        Export PDF
+                    </button>
+                </section>
+
+                <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                        <div className="absolute right-0 top-0 h-full w-1 bg-primary" />
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Project Budget</p>
+                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalBudget)}</h3>
+                                <p className="mt-1 text-xs text-slate-400">Material + Labor + Expenses</p>
+                            </div>
+                            <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
+                                <Wallet className="h-5 w-5" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center text-sm text-slate-500">
+                            <span className="mr-2 font-medium text-slate-600">Initial Cap: {formatWon(initialCap)}</span>
+                            <span>({formatPercent(initialCapDeltaPercent)} Adjust)</span>
+                        </div>
+                    </article>
+
+                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                        <div className="absolute right-0 top-0 h-full w-1 bg-rose-500" />
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Expenditure</p>
+                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalExecution)}</h3>
+                                <p className="mt-1 text-xs text-slate-400">Actual Spent to Date</p>
+                            </div>
+                            <div className="rounded-lg bg-rose-50 p-3 text-rose-600">
+                                <BarChart3 className="h-5 w-5" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center text-sm text-slate-500">
+                            <div className="mr-2 h-2 w-full rounded-full bg-slate-200">
+                                <div className="h-2 rounded-full bg-rose-500" style={{ width: `${Math.min(totalExecutionPercent, 100)}%` }} />
+                            </div>
+                            <span className="whitespace-nowrap font-semibold">{totalExecutionPercent.toFixed(1)}%</span>
+                        </div>
+                    </article>
+
+                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                        <div className="absolute right-0 top-0 h-full w-1 bg-emerald-500" />
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Variance (Remaining)</p>
+                                <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalRemaining)}</h3>
+                                <p className="mt-1 text-xs text-slate-400">Available Funds</p>
+                            </div>
+                            <div className="rounded-lg bg-emerald-50 p-3 text-emerald-600">
+                                <Scale className="h-5 w-5" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center text-sm text-slate-500">
+                            <span
+                                className={cn(
+                                    'rounded px-2 py-0.5 text-xs font-semibold',
+                                    isOverBudget ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                                )}
+                            >
+                                {isOverBudget ? 'Over Budget' : 'On Budget'}
+                            </span>
+                            <span className="ml-2">{remainingPercent.toFixed(1)}% Remaining</span>
+                        </div>
+                    </article>
+                </section>
+
+                <nav className="mb-6 rounded-xl border border-gray-200 bg-white px-6 shadow-sm">
+                    <div className="scrollbar-hide flex gap-10 overflow-x-auto">
+                        {BUDGET_TAB_ITEMS.map((tab) => {
+                            const isActive = activeBudgetTab === tab.key;
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveBudgetTab(tab.key)}
+                                    className={cn(
+                                        'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all',
+                                        isActive
+                                            ? 'border-primary font-bold text-primary'
+                                            : 'border-transparent font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                    )}
+                                >
+                                    <Icon className="h-[19px] w-[19px]" />
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </nav>
+
+                <section
+                    className="budget-clone-content"
+                    dangerouslySetInnerHTML={{ __html: activeTabContentHtml }}
+                />
             </main>
         </div>
     );

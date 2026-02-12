@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Integrated Project Cost Summary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3B82F6", 
+                        "background-light": "#F3F4F6", 
+                        "background-dark": "#0F172A", 
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E293B", 
+                        "subtotal-light": "#E0F2FE", 
+                        "subtotal-dark": "#0C4A6E", 
+                        "total-light": "#1E3A8A", 
+                        "total-dark": "#172554", 
+                        "gold-light": "#FEF3C7",
+                        "gold-dark": "#78350F",
+                        "emerald-light": "#D1FAE5",
+                        "emerald-dark": "#064E3B",
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                        sans: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }.tree-line {
+            position: relative;
+        }
+        .tree-line::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 2rem;
+            width: 1px;
+            height: 100%;
+            background-color: #E5E7EB;}
+        .dark .tree-line::before {
+            background-color: #374151;}
+        .tree-branch {
+            position: relative;
+        }
+        .tree-branch::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -1rem;
+            width: 1rem;
+            height: 1px;
+            background-color: #E5E7EB;}
+        .dark .tree-branch::before {
+            background-color: #374151;}
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans antialiased text-gray-800 dark:text-gray-200 min-h-screen p-4 md:p-8 transition-colors duration-300">
+<header class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white">Phased Integrated Cost Breakdown Dashboard</h1>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Consolidated Financial Review (Unit: 1,000 KRW)</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 rounded-full bg-white dark:bg-surface-dark shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition" onclick="document.documentElement.classList.toggle('dark')">
+<i class="fa-solid fa-moon dark:hidden text-gray-600"></i>
+<i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+</button>
+<button class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
+<i class="fa-solid fa-download"></i> Export PDF
+        </button>
+</div>
+</header>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-surface-light dark:bg-surface-dark p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+<div class="absolute right-0 top-0 h-full w-1 bg-primary"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Project Budget</p>
+<h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">₩ 850,000</h3>
+<p class="text-xs text-gray-400 mt-1">Material + Labor + Expenses</p>
+</div>
+<div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+<i class="fa-solid fa-sack-dollar text-xl"></i>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
+<span class="text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1 mr-2">
+                 Initial Cap: ₩ 800k
+            </span>
+<span>(+6.25% Adjust)</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+<div class="absolute right-0 top-0 h-full w-1 bg-rose-500"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Expenditure</p>
+<h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">₩ 412,500</h3>
+<p class="text-xs text-gray-400 mt-1">Actual Spent to Date</p>
+</div>
+<div class="p-3 bg-rose-50 dark:bg-rose-900/30 rounded-lg text-rose-600 dark:text-rose-400">
+<i class="fa-solid fa-chart-line text-xl"></i>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
+<div class="bg-rose-500 h-2 rounded-full" style="width: 48.5%"></div>
+</div>
+<span class="whitespace-nowrap font-semibold">48.5%</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+<div class="absolute right-0 top-0 h-full w-1 bg-emerald-500"></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Variance (Remaining)</p>
+<h3 class="text-3xl font-bold text-gray-900 dark:text-white mt-2">₩ 437,500</h3>
+<p class="text-xs text-gray-400 mt-1">Available Funds</p>
+</div>
+<div class="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+<i class="fa-solid fa-scale-balanced text-xl"></i>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
+<span class="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded text-xs font-semibold">On Budget</span>
+<span class="ml-2">51.5% Remaining</span>
+</div>
+</div>
+</div>
+<nav class="mb-6 bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 px-6">
+<div class="flex gap-10 overflow-x-auto scrollbar-hide">
+<a class="py-4 text-sm font-bold text-primary border-b-2 border-primary transition-all flex items-center gap-2 whitespace-nowrap" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+            Summary Overview
+        </a>
+<a class="py-4 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all flex items-center gap-2 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 whitespace-nowrap" href="#">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+            Material Budget
+        </a>
+<a class="py-4 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all flex items-center gap-2 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 whitespace-nowrap" href="#">
+<span class="material-symbols-outlined text-[20px]">engineering</span>
+            Labor Cost
+        </a>
+<a class="py-4 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all flex items-center gap-2 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 whitespace-nowrap" href="#">
+<span class="material-symbols-outlined text-[20px]">receipt_long</span>
+            Expenses
+        </a>
+</div>
+</nav>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-surface-light dark:bg-surface-dark p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h4 class="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-blue-500"></span> Material
+            </h4>
+<span class="text-xs text-gray-400">Allocated: 450,000</span>
+</div>
+<div class="flex justify-between items-end mb-2">
+<div>
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Actual</span>
+<span class="text-xl font-bold text-gray-900 dark:text-white">231,000</span>
+</div>
+<div class="text-right">
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Balance</span>
+<span class="text-sm font-semibold text-emerald-600">219,000</span>
+</div>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mb-1">
+<div class="bg-blue-500 h-1.5 rounded-full" style="width: 51%"></div>
+</div>
+<div class="text-right text-[10px] text-gray-400">51% Utilized</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h4 class="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-purple-500"></span> Labor
+            </h4>
+<span class="text-xs text-gray-400">Allocated: 300,000</span>
+</div>
+<div class="flex justify-between items-end mb-2">
+<div>
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Actual</span>
+<span class="text-xl font-bold text-gray-900 dark:text-white">145,000</span>
+</div>
+<div class="text-right">
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Balance</span>
+<span class="text-sm font-semibold text-emerald-600">155,000</span>
+</div>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mb-1">
+<div class="bg-purple-500 h-1.5 rounded-full" style="width: 48%"></div>
+</div>
+<div class="text-right text-[10px] text-gray-400">48% Utilized</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h4 class="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-orange-500"></span> Expenses
+            </h4>
+<span class="text-xs text-gray-400">Allocated: 100,000</span>
+</div>
+<div class="flex justify-between items-end mb-2">
+<div>
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Actual</span>
+<span class="text-xl font-bold text-gray-900 dark:text-white">36,500</span>
+</div>
+<div class="text-right">
+<span class="text-xs text-gray-500 dark:text-gray-400 block">Balance</span>
+<span class="text-sm font-semibold text-emerald-600">63,500</span>
+</div>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 mb-1">
+<div class="bg-orange-500 h-1.5 rounded-full" style="width: 36%"></div>
+</div>
+<div class="text-right text-[10px] text-gray-400">36% Utilized</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+<div class="bg-gray-50 dark:bg-gray-800/50 p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+<h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">Integrated Cost Breakdown</h2>
+<div class="flex items-center gap-2">
+<span class="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">View Mode: Phased Detail</span>
+<button class="text-gray-400 hover:text-primary transition"><i class="fa-solid fa-filter"></i></button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-sm text-left border-collapse">
+<thead class="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+<tr>
+<th class="px-6 py-4 font-semibold w-1/4" scope="col">Cost Category / Phase</th>
+<th class="px-6 py-4 font-semibold text-right" scope="col">Allocated Budget</th>
+<th class="px-6 py-4 font-semibold text-right" scope="col">Actual Cost</th>
+<th class="px-6 py-4 font-semibold text-right" scope="col">Variance (Balance)</th>
+<th class="px-6 py-4 font-semibold text-center w-36" scope="col">Performance</th>
+<th class="px-6 py-4 font-semibold text-center w-24" scope="col">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-200 dark:divide-gray-700 text-gray-700 dark:text-gray-300">
+<tr class="bg-gray-50 dark:bg-surface-dark/50 font-medium">
+<td class="px-6 py-3">
+<div class="flex items-center">
+<button class="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+<i class="fa-solid fa-chevron-down text-xs"></i>
+</button>
+<div class="p-1.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 mr-2">
+<span class="material-symbols-outlined text-[18px]">inventory_2</span>
+</div>
+<span class="text-gray-900 dark:text-white font-bold">Material Cost (Total)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">450,000</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">231,000</td>
+<td class="px-6 py-3 text-right text-emerald-600">219,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+<div class="bg-blue-500 h-1.5 rounded-full" style="width: 51%"></div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 uppercase tracking-wide">Summary</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-blue-500/20 dark:border-l-blue-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Manufacturing (MFG)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">350,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">174,000</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">176,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">49%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-blue-400 h-1 rounded-full" style="width: 49%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-100 dark:border-green-800/50">Normal</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-blue-500/20 dark:border-l-blue-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Installation (INST)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">100,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">57,000</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">43,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">57%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-blue-400 h-1 rounded-full" style="width: 57%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800/50">Warning</span>
+</td>
+</tr>
+<tr class="bg-gray-50 dark:bg-surface-dark/50 font-medium border-t border-gray-200 dark:border-gray-700">
+<td class="px-6 py-3">
+<div class="flex items-center">
+<button class="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+<i class="fa-solid fa-chevron-down text-xs"></i>
+</button>
+<div class="p-1.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 mr-2">
+<span class="material-symbols-outlined text-[18px]">engineering</span>
+</div>
+<span class="text-gray-900 dark:text-white font-bold">Labor Cost (Total)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">300,000</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">145,000</td>
+<td class="px-6 py-3 text-right text-emerald-600">155,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+<div class="bg-purple-500 h-1.5 rounded-full" style="width: 48%"></div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 uppercase tracking-wide">Summary</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-purple-500/20 dark:border-l-purple-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Manufacturing (MFG)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">200,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">95,000</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">105,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">47%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-purple-400 h-1 rounded-full" style="width: 47%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-100 dark:border-green-800/50">Normal</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-purple-500/20 dark:border-l-purple-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Installation (INST)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">100,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">50,000</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">50,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">50%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-purple-400 h-1 rounded-full" style="width: 50%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-100 dark:border-green-800/50">Normal</span>
+</td>
+</tr>
+<tr class="bg-gray-50 dark:bg-surface-dark/50 font-medium border-t border-gray-200 dark:border-gray-700">
+<td class="px-6 py-3">
+<div class="flex items-center">
+<button class="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+<i class="fa-solid fa-chevron-down text-xs"></i>
+</button>
+<div class="p-1.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 mr-2">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</div>
+<span class="text-gray-900 dark:text-white font-bold">Expenses (Total)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">100,000</td>
+<td class="px-6 py-3 text-right text-gray-900 dark:text-white">36,500</td>
+<td class="px-6 py-3 text-right text-emerald-600">63,500</td>
+<td class="px-6 py-3 align-middle">
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+<div class="bg-orange-500 h-1.5 rounded-full" style="width: 36%"></div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 uppercase tracking-wide">Summary</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-orange-500/20 dark:border-l-orange-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Manufacturing (MFG)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">40,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">12,000</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">28,000</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">30%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-orange-400 h-1 rounded-full" style="width: 30%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800/50">Under</span>
+</td>
+</tr>
+<tr class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800/30 transition border-l-4 border-l-orange-500/20 dark:border-l-orange-500/10">
+<td class="px-6 py-3 pl-12 relative">
+<div class="flex items-center tree-branch ml-4">
+<span class="text-gray-600 dark:text-gray-400 text-sm">Installation (INST)</span>
+</div>
+</td>
+<td class="px-6 py-3 text-right text-gray-600 dark:text-gray-400">60,000</td>
+<td class="px-6 py-3 text-right text-gray-800 dark:text-gray-200">24,500</td>
+<td class="px-6 py-3 text-right font-medium text-emerald-600">35,500</td>
+<td class="px-6 py-3 align-middle">
+<div class="flex items-center gap-2">
+<span class="text-[10px] w-8 text-right text-gray-500">41%</span>
+<div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-1">
+<div class="bg-orange-400 h-1 rounded-full" style="width: 41%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-center">
+<span class="px-2 py-1 text-xs font-medium rounded bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-100 dark:border-green-800/50">Normal</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="bg-total-light dark:bg-total-dark text-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row justify-between items-center border border-total-dark dark:border-blue-900">
+<div class="mb-4 md:mb-0">
+<h3 class="text-xl font-bold tracking-wide">TOTAL INTEGRATED PROJECT COST REVIEW</h3>
+<p class="text-blue-200 text-sm mt-1">Consolidated Grand Total (Material + Labor + Expenses)</p>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right hidden md:block">
+<div class="text-xs text-blue-200 uppercase tracking-wider mb-1">Total Variance</div>
+<div class="text-2xl font-bold text-emerald-400">+ 437,500</div>
+</div>
+<div class="h-10 w-px bg-blue-700 hidden md:block"></div>
+<div class="text-right">
+<div class="text-xs text-blue-200 uppercase tracking-wider mb-1">Total Expenditure</div>
+<div class="text-3xl font-bold text-gold-light">₩ 412,500</div>
+</div>
+</div>
+</div>
+<div class="mt-6 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+<p>Last updated: October 24, 2023 15:45 PM</p>
+<p>System Ver 2.4.2 | Project ID: PRJ-2023-ALPHA</p>
+</div>
+</body></html>

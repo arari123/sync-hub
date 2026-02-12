@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Agenda Detail View - Project Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00acc1",
+                        "primary-dark": "#00838f",
+                        "navy-header": "#1a237e",
+                        "text-main": "#212529",
+                        "text-secondary": "#6c757d",
+                        "background-page": "#F8F9FA",
+                        "surface-card": "#ffffff",
+                        "border-light": "#e9ecef",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                    boxShadow: {
+                        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)',
+                        'hover': '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.025)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8F9FA; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #adb5bd; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00acc1; 
+        }.comments-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #adb5bd #F8F9FA;
+        }
+    </style>
+</head>
+<body class="bg-background-page text-text-main min-h-screen flex flex-col">
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border-light px-6 py-4 shadow-sm">
+<div class="flex items-center justify-between max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<a class="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-cyan-600 flex items-center justify-center text-white font-bold text-lg shadow-sm" href="#">
+                    P
+                </a>
+<div class="flex flex-col">
+<h1 class="text-xl font-bold font-display tracking-tight text-navy-header leading-none">Project Dashboard</h1>
+<span class="text-xs text-text-secondary mt-0.5">Agenda Detail View</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-gray-100 transition-colors">
+<span class="material-icons-round text-text-secondary">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-gray-200 overflow-hidden ring-2 ring-white shadow-sm">
+<img alt="User Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+</div>
+</div>
+</nav>
+<main class="flex-grow container max-w-7xl mx-auto px-4 md:px-6 py-8">
+<header class="bg-surface-card p-6 rounded-xl shadow-soft border border-border-light mb-6">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+<div class="space-y-2 flex-grow">
+<div class="flex items-center gap-3">
+<span class="bg-cyan-50 text-primary border border-cyan-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Agenda</span>
+<span class="text-sm text-text-secondary font-medium">#AG-2023-442</span>
+</div>
+<h2 class="text-2xl md:text-3xl font-bold text-navy-header font-display leading-tight">Q3 Marketing Budget Reallocation Request</h2>
+</div>
+<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
+<div class="relative inline-flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+<button class="px-4 py-2 rounded-md bg-white text-green-700 shadow-sm text-sm font-bold transition-all border border-green-100 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            In Progress
+                        </button>
+<button class="px-4 py-2 rounded-md text-text-secondary hover:text-text-main hover:bg-gray-200/50 text-sm font-medium transition-all">
+                            Completed
+                        </button>
+</div>
+<div class="flex items-center gap-3 w-full sm:w-auto">
+<button class="flex-1 sm:flex-none px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-text-main hover:bg-gray-50 font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2">
+<span class="material-icons-round text-base">content_copy</span>
+                            Re-register
+                        </button>
+<button class="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2">
+<span class="material-icons-round text-base">reply</span>
+                            Reply to Agenda
+                        </button>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-col gap-6 h-full items-start w-full">
+<div class="w-full space-y-4">
+<article class="bg-surface-card rounded-xl border border-primary/30 shadow-md overflow-hidden relative">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                    DJ
+                                </div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-text-main text-lg">RE: Adjusted Proposal for Q3</h3>
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded uppercase">Latest</span>
+</div>
+<p class="text-xs text-text-secondary">
+<span class="font-semibold text-text-main">David Jenkins</span> <span class="text-gray-400">[Marketing Lead]</span> • Oct 26, 2023 14:30
+                                    </p>
+</div>
+</div>
+</div>
+<div class="prose prose-sm max-w-none text-text-main mb-6">
+<p>Hi Team,</p>
+<p>Based on the feedback from the finance department regarding the initial reallocation request, we have adjusted the ad spend distribution. We are shifting 15% from the 'Brand Awareness' bucket to 'Conversion Campaigns' to maximize immediate ROI before the quarter ends.</p>
+<p>Please review the attached revised spreadsheet. The total budget remains unchanged.</p>
+<div class="my-4 p-4 bg-gray-50 rounded-lg border border-gray-100 flex gap-4">
+<div class="shrink-0 w-32 h-24 rounded overflow-hidden border border-gray-200">
+<img alt="Revised Chart" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3CxDjpeEeOGZSGGPC8n-3FHYaLjPGC1vSfQ4brhwoKDMk-yCLWyfZVFo5BjQzYfaq9L9YPsuUAl_Y1vHzrtlFLOrxuVUHqjv-zw41YFlQvp8o42Oe4LWWj61L9IXd7HevSvvoLmKpLbIplN1e2R5Eqrut0cfaLcHq2gys47ZTu2KGxpQGI--wK9hn3p8UnG6j5szWwMtZA9Lmxjs9xPjr3lr5-IhhMCKJ4dp19G12XhY4SZfC-hmyysNOfaFEqisg1rCQ3Sbg6ZA"/>
+</div>
+<div class="flex flex-col justify-center">
+<span class="text-xs font-bold text-gray-500 uppercase">Visual Reference</span>
+<p class="text-sm font-medium">Q3_Revised_Allocation_Chart.png</p>
+</div>
+</div>
+</div>
+<div class="border-t border-gray-100 pt-4">
+<h4 class="text-xs font-bold text-text-secondary uppercase mb-3 flex items-center gap-2">
+<span class="material-icons-round text-sm">attach_file</span> Attachments (2)
+                            </h4>
+<div class="flex flex-wrap gap-3">
+<a class="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-lg hover:border-primary hover:text-primary transition-colors group" href="#">
+<div class="w-8 h-8 rounded bg-green-50 text-green-600 flex items-center justify-center">
+<span class="material-icons-round text-lg">table_view</span>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-medium group-hover:text-primary text-text-main">Q3_Budget_v2.xlsx</span>
+<span class="text-[10px] text-gray-400">1.2 MB</span>
+</div>
+</a>
+<a class="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-lg hover:border-primary hover:text-primary transition-colors group" href="#">
+<div class="w-8 h-8 rounded bg-red-50 text-red-600 flex items-center justify-center">
+<span class="material-icons-round text-lg">picture_as_pdf</span>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-medium group-hover:text-primary text-text-main">Memo_Adjustment.pdf</span>
+<span class="text-[10px] text-gray-400">450 KB</span>
+</div>
+</a>
+</div>
+</div>
+</div>
+<div class="bg-gray-50/50 border-t border-gray-100 p-6">
+<div class="mb-4 flex items-center justify-between">
+<h4 class="text-sm font-bold text-navy-header flex items-center gap-2">
+<span class="material-icons-round text-primary text-base">chat_bubble_outline</span>
+                                Comments (3)
+                            </h4>
+</div>
+<div class="space-y-4 mb-4">
+<div class="flex gap-3">
+<div class="h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-1">
+                                    MP
+                                </div>
+<div class="flex-grow">
+<div class="bg-white p-3 rounded-lg rounded-tl-none border border-gray-200 shadow-sm">
+<div class="flex justify-between items-baseline mb-1">
+<span class="text-xs font-bold text-text-main">Michael Park</span>
+<span class="text-[10px] text-gray-400">10 min ago</span>
+</div>
+<p class="text-sm text-text-main">Looks good. I'll approve the PO once the system updates.</p>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<div class="h-8 w-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold shrink-0 mt-1">
+                                    SK
+                                </div>
+<div class="flex-grow">
+<div class="bg-white p-3 rounded-lg rounded-tl-none border border-gray-200 shadow-sm">
+<div class="flex justify-between items-baseline mb-1">
+<span class="text-xs font-bold text-text-main">Sarah Kim</span>
+<span class="text-[10px] text-gray-400">1 hour ago</span>
+</div>
+<p class="text-sm text-text-main">@David Please ensure the 'Brand Awareness' cut doesn't affect the ongoing YouTube campaign.</p>
+</div>
+<div class="flex gap-3 mt-2 ml-2">
+<div class="h-6 w-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold shrink-0 mt-1">
+                                            DJ
+                                        </div>
+<div class="flex-grow">
+<div class="bg-indigo-50/50 p-2.5 rounded-lg rounded-tl-none border border-indigo-100 shadow-sm">
+<div class="flex justify-between items-baseline mb-1">
+<span class="text-xs font-bold text-navy-header">David Jenkins</span>
+<span class="text-[10px] text-gray-400">45 min ago</span>
+</div>
+<p class="text-sm text-text-main">Understood. The YouTube campaign is funded from a separate line item.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex gap-3 items-start">
+<div class="h-8 w-8 rounded-full bg-gray-200 overflow-hidden shrink-0">
+<img alt="User Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+<div class="flex-grow relative">
+<input class="w-full bg-white border border-gray-300 rounded-full py-2 px-4 pr-12 text-sm focus:ring-primary focus:border-primary shadow-sm" placeholder="Add a comment to this thread..." type="text"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-primary hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-icons-round text-lg">send</span>
+</button>
+</div>
+</div>
+</div>
+</article>
+<div class="relative">
+<div class="flex items-center justify-between mb-2 px-2">
+<span class="text-xs font-bold text-text-secondary uppercase tracking-wider">History (3 Replies)</span>
+<button class="text-xs font-semibold text-primary hover:text-primary-dark flex items-center gap-1 transition-colors">
+                            Expand All <span class="material-icons-round text-sm">unfold_more</span>
+</button>
+</div>
+<div class="space-y-2">
+<div class="bg-white rounded-lg border border-border-light p-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer transition-colors group">
+<div class="flex items-center gap-3 overflow-hidden">
+<div class="h-8 w-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-bold shrink-0">
+                                    SK
+                                </div>
+<div class="flex flex-col min-w-0">
+<span class="text-sm font-semibold text-text-main truncate group-hover:text-primary">RE: Clarification on Ad Spend</span>
+<span class="text-xs text-text-secondary truncate">Sarah Kim [Finance] • Oct 25, 2023</span>
+</div>
+</div>
+<span class="material-icons-round text-gray-400 group-hover:text-primary">expand_more</span>
+</div>
+<div class="bg-white rounded-lg border border-border-light p-3 flex items-center justify-between hover:bg-gray-50 cursor-pointer transition-colors group">
+<div class="flex items-center gap-3 overflow-hidden">
+<div class="h-8 w-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-bold shrink-0">
+                                    DJ
+                                </div>
+<div class="flex flex-col min-w-0">
+<span class="text-sm font-semibold text-text-main truncate group-hover:text-primary">RE: Budget reallocation needed</span>
+<span class="text-xs text-text-secondary truncate">David Jenkins [Marketing] • Oct 24, 2023</span>
+</div>
+</div>
+<span class="material-icons-round text-gray-400 group-hover:text-primary">expand_more</span>
+</div>
+</div>
+<div class="absolute top-8 bottom-2 left-[27px] w-px bg-gray-200 -z-10"></div>
+</div>
+<article class="bg-surface-card rounded-xl border border-border-light shadow-soft overflow-hidden mt-2 opacity-95">
+<div class="bg-gray-50 px-6 py-3 border-b border-border-light flex items-center gap-2">
+<span class="material-icons-round text-gray-400 text-sm">history_edu</span>
+<span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Original Agenda Registration</span>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
+                                    SJ
+                                </div>
+<div>
+<h3 class="font-bold text-text-main text-lg">Q3 Marketing Budget Reallocation Request</h3>
+<p class="text-xs text-text-secondary">
+<span class="font-semibold text-text-main">Sarah Jenkins</span> <span class="text-gray-400">[MKT Dept]</span> • Oct 24, 2023 09:15
+                                    </p>
+</div>
+</div>
+</div>
+<div class="prose prose-sm max-w-none text-text-secondary mb-6">
+<p>We need to discuss the reallocation of the remaining Q3 marketing budget. Currently, we are underspending in the social media category but overspending in PPC.</p>
+<p>Attached is the preliminary proposal to shift funds to balance the accounts and push for higher conversion in the final month of the quarter.</p>
+</div>
+<div class="border-t border-gray-100 pt-4">
+<div class="flex flex-wrap gap-3">
+<a class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-medium text-text-main hover:bg-gray-100 transition-colors" href="#">
+<span class="material-icons-round text-base text-gray-400">attach_file</span>
+                                    Initial_Proposal_v1.pdf
+                                </a>
+</div>
+</div>
+</div>
+<div class="bg-gray-50/50 border-t border-gray-100 p-6">
+<div class="mb-4 flex items-center justify-between">
+<h4 class="text-sm font-bold text-navy-header flex items-center gap-2">
+<span class="material-icons-round text-primary text-base">chat_bubble_outline</span>
+                                Comments (2)
+                            </h4>
+</div>
+<div class="space-y-4 mb-4">
+<div class="flex gap-3">
+<div class="h-8 w-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold shrink-0 mt-1">
+                                    AL
+                                </div>
+<div class="flex-grow">
+<div class="bg-white p-3 rounded-lg rounded-tl-none border border-gray-200 shadow-sm">
+<div class="flex justify-between items-baseline mb-1">
+<span class="text-xs font-bold text-text-main">Alex Lee</span>
+<span class="text-[10px] text-gray-400">Yesterday</span>
+</div>
+<p class="text-sm text-text-main">Has the updated spreadsheet been uploaded yet?</p>
+</div>
+</div>
+</div>
+<div class="flex gap-3">
+<div class="h-8 w-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold shrink-0 mt-1">
+                                    MP
+                                </div>
+<div class="flex-grow">
+<div class="bg-white p-3 rounded-lg rounded-tl-none border border-gray-200 shadow-sm">
+<div class="flex justify-between items-baseline mb-1">
+<span class="text-xs font-bold text-text-main">Michael Park</span>
+<span class="text-[10px] text-gray-400">Yesterday</span>
+</div>
+<p class="text-sm text-text-main">Checking in on this. We need to finalize by Friday.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="flex gap-3 items-start">
+<div class="h-8 w-8 rounded-full bg-gray-200 overflow-hidden shrink-0">
+<img alt="User Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+<div class="flex-grow relative">
+<input class="w-full bg-white border border-gray-300 rounded-full py-2 px-4 pr-12 text-sm focus:ring-primary focus:border-primary shadow-sm" placeholder="Add a comment to this thread..." type="text"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-primary hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-icons-round text-lg">send</span>
+</button>
+</div>
+</div>
+</div>
+</article>
+</div>
+</div>
+</main>
+
+</body></html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Create New Agenda - Project Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00acc1",
+                        "primary-dark": "#00838f",
+                        "navy-header": "#1a237e",
+                        "text-main": "#212529",
+                        "text-secondary": "#6c757d",
+                        "background-page": "#F8F9FA",
+                        "surface-card": "#ffffff",
+                        "border-light": "#e9ecef",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                    boxShadow: {
+                        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)',
+                        'hover': '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.025)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8F9FA; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #adb5bd; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00acc1; 
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }.rte-btn {
+            @apply p-1.5 rounded text-gray-500 hover:bg-gray-100 hover:text-navy-header transition-colors;
+        }
+    </style>
+</head>
+<body class="bg-background-page text-text-main min-h-screen flex flex-col">
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border-light px-6 py-4 shadow-sm">
+<div class="flex items-center justify-between max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<a class="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-cyan-600 flex items-center justify-center text-white font-bold text-lg shadow-sm" href="#">
+                    P
+                </a>
+<div class="flex flex-col">
+<h1 class="text-xl font-bold font-display tracking-tight text-navy-header leading-none">Project Dashboard</h1>
+<span class="text-xs text-text-secondary mt-0.5">Create New Agenda</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-gray-100 transition-colors">
+<span class="material-icons-round text-text-secondary">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-gray-200 overflow-hidden ring-2 ring-white shadow-sm">
+<img alt="User Profile" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+</div>
+</div>
+</nav>
+<main class="flex-grow container max-w-7xl mx-auto px-4 md:px-6 py-8">
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+<div>
+<h2 class="text-2xl font-bold text-navy-header font-display">Create New Agenda</h2>
+<p class="text-sm text-text-secondary mt-1">Fill in the details below to register a new agenda or work report.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-text-main hover:bg-gray-50 font-semibold text-sm transition-colors shadow-sm flex items-center gap-2">
+<span class="material-icons-round text-base">save</span>
+                    Save Draft
+                </button>
+<button class="px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-dark text-white font-semibold text-sm transition-colors shadow-sm flex items-center gap-2">
+<span class="material-icons-round text-base">send</span>
+                    Register
+                </button>
+</div>
+</header>
+<div class="mb-6">
+<div class="border-b border-gray-200">
+<nav aria-label="Tabs" class="-mb-px flex space-x-8">
+<button class="border-primary text-primary whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2" id="tab-agenda" onclick="switchTab('agenda')">
+<span class="material-icons-round text-lg">assignment</span>
+                        General Agenda
+                    </button>
+<button class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2" id="tab-report" onclick="switchTab('report')">
+<span class="material-icons-round text-lg">engineering</span>
+                        Work Report
+                    </button>
+</nav>
+</div>
+</div>
+<div class="tab-content active space-y-6" id="content-agenda">
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div>
+<label class="block text-xs font-semibold text-text-secondary uppercase mb-1">Agenda ID</label>
+<div class="flex items-center gap-2 p-2.5 bg-gray-50 rounded border border-gray-200 text-gray-500 text-sm font-mono">
+<span class="material-icons-round text-sm">tag</span>
+                            Auto-generated
+                        </div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-text-secondary uppercase mb-1">Author</label>
+<div class="flex items-center gap-2 p-2.5 bg-gray-50 rounded border border-gray-200 text-text-main text-sm">
+<div class="h-5 w-5 rounded-full bg-gray-300 overflow-hidden">
+<img alt="User" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+                            David Jenkins [Marketing Lead]
+                        </div>
+</div>
+<div class="lg:col-span-2 flex items-end justify-end">
+<div class="flex items-center gap-3">
+<span class="text-sm font-medium text-text-secondary">Status:</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+<span class="ml-3 text-sm font-medium text-text-main peer-checked:text-green-600">In Progress</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<h3 class="text-sm font-bold text-navy-header uppercase mb-4 flex items-center gap-2">
+<span class="material-icons-round text-base">groups</span> Personnel Information
+                </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Requester</label>
+<input class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" placeholder="Search for user..." type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Department/Affiliation</label>
+<input class="w-full rounded-lg border-gray-300 bg-gray-50 text-gray-500 text-sm shadow-sm" placeholder="Auto-filled" readonly="" type="text"/>
+</div>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Responder</label>
+<input class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" placeholder="Search for user..." type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Department/Affiliation</label>
+<input class="w-full rounded-lg border-gray-300 bg-gray-50 text-gray-500 text-sm shadow-sm" placeholder="Auto-filled" readonly="" type="text"/>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<div class="mb-6">
+<label class="block text-sm font-medium text-text-main mb-2">Subject</label>
+<input class="w-full text-lg font-semibold rounded-lg border-gray-300 focus:border-primary focus:ring-primary shadow-sm py-3 px-4" placeholder="Enter agenda title here..." type="text"/>
+</div>
+<label class="block text-sm font-medium text-text-main mb-2">Content</label>
+<div class="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm">
+<div class="bg-gray-50 border-b border-gray-200 p-2 flex flex-wrap gap-2 items-center">
+<div class="flex items-center bg-white rounded border border-gray-200 shadow-sm">
+<button class="rte-btn"><span class="material-icons-round text-lg">format_bold</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">format_italic</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">format_underlined</span></button>
+</div>
+<div class="w-px h-6 bg-gray-300 mx-1"></div>
+<div class="flex items-center bg-white rounded border border-gray-200 shadow-sm">
+<button class="rte-btn"><span class="material-icons-round text-lg">format_list_bulleted</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">format_list_numbered</span></button>
+</div>
+<div class="w-px h-6 bg-gray-300 mx-1"></div>
+<div class="flex items-center bg-white rounded border border-gray-200 shadow-sm">
+<button class="rte-btn"><span class="material-icons-round text-lg">format_align_left</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">format_align_center</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">format_align_right</span></button>
+</div>
+<div class="w-px h-6 bg-gray-300 mx-1"></div>
+<div class="flex items-center bg-white rounded border border-gray-200 shadow-sm">
+<button class="rte-btn"><span class="material-icons-round text-lg">link</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">image</span></button>
+<button class="rte-btn"><span class="material-icons-round text-lg">table_chart</span></button>
+</div>
+<div class="ml-auto text-xs text-gray-400 font-medium">Rich Text Editor Mode</div>
+</div>
+<div class="p-4 min-h-[300px] text-sm text-text-main outline-none">
+<p class="text-gray-400">Start typing your agenda content here...</p>
+</div>
+</div>
+<div class="mt-4 border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-gray-50 transition-colors cursor-pointer">
+<div class="h-10 w-10 bg-blue-50 text-primary rounded-full flex items-center justify-center mb-2">
+<span class="material-icons-round">cloud_upload</span>
+</div>
+<span class="text-sm font-medium text-text-main">Click to upload or drag and drop files</span>
+<span class="text-xs text-text-secondary mt-1">SVG, PNG, JPG or PDF (max. 10MB)</span>
+</div>
+</div>
+</div>
+<div class="tab-content space-y-6" id="content-report">
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<h3 class="text-sm font-bold text-navy-header uppercase mb-4 flex items-center gap-2">
+<span class="material-icons-round text-base">info</span> Report Information
+                </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Author</label>
+<input class="w-full rounded-lg border-gray-300 bg-gray-50 text-gray-500 text-sm shadow-sm" readonly="" type="text" value="David Jenkins"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Requester (Client)</label>
+<input class="w-full rounded-lg border-gray-300 bg-gray-50 text-gray-500 text-sm shadow-sm" readonly="" type="text" value="Acme Corp (Auto-filled)"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Work Location</label>
+<input class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" placeholder="e.g. Server Room B" type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Start Date &amp; Time</label>
+<input class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" type="datetime-local"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">End Date &amp; Time</label>
+<input class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" type="datetime-local"/>
+</div>
+</div>
+<div class="mb-4">
+<label class="block text-sm font-medium text-text-main mb-1">Target Equipment</label>
+<select class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm" multiple="">
+<option>Server Rack A1</option>
+<option>Cooling Unit 4</option>
+<option>Switch Network B2</option>
+</select>
+<p class="text-xs text-text-secondary mt-1">Hold Ctrl/Cmd to select multiple items.</p>
+</div>
+<label class="block text-sm font-medium text-text-main mb-2">Workers</label>
+<div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+<table class="w-full text-sm text-left">
+<thead class="bg-gray-50 text-text-secondary font-semibold border-b border-gray-200">
+<tr>
+<th class="px-4 py-3">Worker Name</th>
+<th class="px-4 py-3">Role</th>
+<th class="px-4 py-3 w-32">Hours</th>
+<th class="px-4 py-3 w-16"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 bg-white">
+<tr>
+<td class="px-4 py-2"><input class="w-full border-0 p-1 bg-transparent focus:ring-0" placeholder="Name" type="text"/></td>
+<td class="px-4 py-2"><input class="w-full border-0 p-1 bg-transparent focus:ring-0" placeholder="Role" type="text"/></td>
+<td class="px-4 py-2"><input class="w-full border rounded border-gray-200 p-1 text-center" placeholder="0" type="number"/></td>
+<td class="px-4 py-2 text-center"><button class="text-gray-400 hover:text-red-500"><span class="material-icons-round text-lg">close</span></button></td>
+</tr>
+</tbody>
+</table>
+<div class="bg-gray-50 px-4 py-2 border-t border-gray-200">
+<button class="text-xs font-bold text-primary hover:text-primary-dark uppercase flex items-center gap-1">
+<span class="material-icons-round text-sm">add</span> Add Worker
+                         </button>
+</div>
+</div>
+</div>
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<h3 class="text-sm font-bold text-navy-header uppercase mb-4 flex items-center gap-2">
+<span class="material-icons-round text-base">description</span> Report Details
+                </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Symptom / Issue</label>
+<textarea class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm h-32" placeholder="Describe the initial symptom..."></textarea>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Cause</label>
+<textarea class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm h-32" placeholder="Identify the root cause..."></textarea>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Interim Action</label>
+<textarea class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm h-32" placeholder="Temporary fixes applied..."></textarea>
+</div>
+<div>
+<label class="block text-sm font-medium text-text-main mb-1">Final Action</label>
+<textarea class="w-full rounded-lg border-gray-300 focus:border-primary focus:ring-primary text-sm shadow-sm h-32" placeholder="Final resolution..."></textarea>
+</div>
+</div>
+</div>
+<div class="bg-surface-card rounded-xl shadow-soft border border-border-light p-6">
+<h3 class="text-sm font-bold text-navy-header uppercase mb-4 flex items-center gap-2">
+<span class="material-icons-round text-base">settings_input_component</span> Parts Used
+                </h3>
+<div class="border border-gray-200 rounded-lg overflow-hidden">
+<table class="w-full text-sm text-left">
+<thead class="bg-gray-50 text-text-secondary font-semibold border-b border-gray-200">
+<tr>
+<th class="px-4 py-3">Part Name</th>
+<th class="px-4 py-3">Manufacturer</th>
+<th class="px-4 py-3">Model No.</th>
+<th class="px-4 py-3 w-24 text-center">Qty</th>
+<th class="px-4 py-3 w-16"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 bg-white">
+<tr>
+<td class="px-4 py-2"><input class="w-full border-0 p-1 bg-transparent focus:ring-0" placeholder="e.g. Capacitor" type="text"/></td>
+<td class="px-4 py-2"><input class="w-full border-0 p-1 bg-transparent focus:ring-0" placeholder="e.g. Samsung" type="text"/></td>
+<td class="px-4 py-2"><input class="w-full border-0 p-1 bg-transparent focus:ring-0" placeholder="e.g. XJ-200" type="text"/></td>
+<td class="px-4 py-2"><input class="w-full border rounded border-gray-200 p-1 text-center" placeholder="1" type="number"/></td>
+<td class="px-4 py-2 text-center"><button class="text-gray-400 hover:text-red-500"><span class="material-icons-round text-lg">close</span></button></td>
+</tr>
+</tbody>
+</table>
+<div class="bg-gray-50 px-4 py-2 border-t border-gray-200">
+<button class="text-xs font-bold text-primary hover:text-primary-dark uppercase flex items-center gap-1">
+<span class="material-icons-round text-sm">add</span> Add Part
+                         </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        function switchTab(tabName) {
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Show selected content
+            document.getElementById('content-' + tabName).classList.add('active');
+            // Reset tab styles
+            document.getElementById('tab-agenda').className = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 cursor-pointer";
+            document.getElementById('tab-report').className = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 cursor-pointer";
+            // Set active tab style
+            const activeClass = "border-primary text-primary whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 cursor-pointer";
+            document.getElementById('tab-' + tabName).className = activeClass;
+        }
+    </script>
+
+</body></html>

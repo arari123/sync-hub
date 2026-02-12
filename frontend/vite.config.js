@@ -19,6 +19,10 @@ export default defineConfig({
         target: 'http://web:8000',
         changeOrigin: true,
       },
+      '/agenda': {
+        target: 'http://web:8000',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://web:8000',
         changeOrigin: true,

@@ -1105,6 +1105,9 @@ const SearchResults = () => {
                                                         </p>
 
                                                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                            <span className="inline-flex shrink-0 items-center rounded-full border border-rose-200 bg-gradient-to-r from-rose-50 to-orange-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-rose-600">
+                                                                NEW UPDATE
+                                                            </span>
                                                             {signalUpdates.map((item) => (
                                                                 item.to ? (
                                                                     <Link

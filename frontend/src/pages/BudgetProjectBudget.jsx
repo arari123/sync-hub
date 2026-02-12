@@ -19,13 +19,6 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
-import {
-    BUDGET_TABLE_CLONE_CSS,
-    BUDGET_TABLE_CLONE_EXPENSE,
-    BUDGET_TABLE_CLONE_LABOR,
-    BUDGET_TABLE_CLONE_MATERIAL,
-    BUDGET_TABLE_CLONE_SUMMARY,
-} from './budgetTableCloneTemplates';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
 const PHASES = ['fabrication', 'installation'];
@@ -70,13 +63,6 @@ const BUDGET_TAB_ITEMS = [
     { key: 'labor', label: '인건비', icon: Users },
     { key: 'expense', label: '경비', icon: Receipt },
 ];
-
-const BUDGET_TABLE_TEMPLATE_BY_TAB = {
-    summary: BUDGET_TABLE_CLONE_SUMMARY,
-    material: BUDGET_TABLE_CLONE_MATERIAL,
-    labor: BUDGET_TABLE_CLONE_LABOR,
-    expense: BUDGET_TABLE_CLONE_EXPENSE,
-};
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 const EMPTY_DETAILS = {
@@ -1039,7 +1025,10 @@ const BudgetProjectBudget = () => {
     const initialCapDeltaPercent = initialCap > 0 ? ((totalBudget - initialCap) / initialCap) * 100 : 0;
     const remainingPercent = totalBudget > 0 ? Math.max(0, (totalRemaining / totalBudget) * 100) : 0;
     const isOverBudget = totalRemaining < 0;
-    const activeTableTemplate = BUDGET_TABLE_TEMPLATE_BY_TAB[activeBudgetTab] || BUDGET_TABLE_CLONE_SUMMARY;
+    const summaryRows = useMemo(() => buildSummaryRows(viewModel.items), [viewModel.items]);
+    const materialRows = useMemo(() => buildMaterialRows(viewModel.items), [viewModel.items]);
+    const laborRows = useMemo(() => buildLaborRows(viewModel.items), [viewModel.items]);
+    const expenseRows = useMemo(() => buildExpenseRows(viewModel.items), [viewModel.items]);
 
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
@@ -1327,7 +1316,6 @@ const BudgetProjectBudget = () => {
                         {error}
                     </div>
                 )}
-                <style>{BUDGET_TABLE_CLONE_CSS}</style>
 
                 <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
                     <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1425,10 +1413,24 @@ const BudgetProjectBudget = () => {
                     </div>
                 </nav>
 
-                <section
-                    className="budget-table-clone"
-                    dangerouslySetInnerHTML={{ __html: activeTableTemplate }}
-                />
+                {activeBudgetTab === 'summary' && (
+                    <SummaryTabContent
+                        summaryView={summaryView}
+                        summaryRows={summaryRows}
+                    />
+                )}
+
+                {activeBudgetTab === 'material' && (
+                    <MaterialTabContent rows={materialRows} />
+                )}
+
+                {activeBudgetTab === 'labor' && (
+                    <LaborTabContent rows={laborRows} />
+                )}
+
+                {activeBudgetTab === 'expense' && (
+                    <ExpenseTabContent rows={expenseRows} />
+                )}
             </main>
         </div>
     );

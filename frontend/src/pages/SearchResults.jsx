@@ -385,6 +385,15 @@ function buildMockAgendaTitles(project) {
     ];
 }
 
+function formatAgendaUpdatedDate(value) {
+    const text = String(value || '').trim();
+    if (!text || text.length < 10) return '--.--';
+    const month = text.slice(5, 7);
+    const day = text.slice(8, 10);
+    if (!month || !day) return '--.--';
+    return `${month}.${day}`;
+}
+
 function mergeProjectSearchRows(projectPool, projectHits, query) {
     const pool = Array.isArray(projectPool) ? projectPool : [];
     const map = new Map(pool.map((project) => [Number(project.id), project]));
@@ -909,6 +918,7 @@ const SearchResults = () => {
                                         ...updateLinkMap.get(label),
                                     }));
                                     const mockAgendaTitles = buildMockAgendaTitles(project);
+                                    const agendaUpdatedDate = formatAgendaUpdatedDate(project.updated_at);
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const progressPercent = computeProgressPercent(project);
@@ -1080,20 +1090,13 @@ const SearchResults = () => {
                                                                             index === 0 ? 'bg-sky-400' : 'bg-slate-300'
                                                                         )}
                                                                     />
-                                                                    <div className="flex items-start gap-2">
-                                                                        <span
-                                                                            className={cn(
-                                                                                'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
-                                                                                index === 0
-                                                                                    ? 'bg-sky-100 text-sky-700'
-                                                                                    : 'bg-slate-100 text-slate-500'
-                                                                            )}
-                                                                        >
-                                                                            {index + 1}
-                                                                        </span>
+                                                                    <div className="flex items-center justify-between gap-2">
                                                                         <p className="min-w-0 truncate text-[10px] font-semibold text-slate-700">
                                                                             {title}
                                                                         </p>
+                                                                        <span className="shrink-0 text-[9px] font-mono text-slate-400">
+                                                                            {agendaUpdatedDate}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                             ))}

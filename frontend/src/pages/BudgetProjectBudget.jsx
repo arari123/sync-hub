@@ -19,12 +19,6 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
-import {
-    BUDGET_CLONE_EXPENSE_CONTENT,
-    BUDGET_CLONE_LABOR_CONTENT,
-    BUDGET_CLONE_MATERIAL_CONTENT,
-    BUDGET_CLONE_SUMMARY_CONTENT,
-} from './budgetCloneTemplates';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
 const PHASES = ['fabrication', 'installation'];
@@ -64,61 +58,11 @@ const DEFAULT_LABOR_SETTINGS = {
 };
 
 const BUDGET_TAB_ITEMS = [
-    { key: 'summary', label: 'Summary Overview', icon: BarChart3 },
-    { key: 'material', label: 'Material Budget', icon: Boxes },
-    { key: 'labor', label: 'Labor Cost', icon: Users },
-    { key: 'expense', label: 'Expenses', icon: Receipt },
+    { key: 'summary', label: '통합 요약', icon: BarChart3 },
+    { key: 'material', label: '재료비', icon: Boxes },
+    { key: 'labor', label: '인건비', icon: Users },
+    { key: 'expense', label: '경비', icon: Receipt },
 ];
-
-const BUDGET_TAB_CONTENT = {
-    summary: BUDGET_CLONE_SUMMARY_CONTENT,
-    material: BUDGET_CLONE_MATERIAL_CONTENT,
-    labor: BUDGET_CLONE_LABOR_CONTENT,
-    expense: BUDGET_CLONE_EXPENSE_CONTENT,
-};
-
-const BUDGET_CLONE_CUSTOM_CSS = `
-.scrollbar-hide::-webkit-scrollbar {
-    display: none;
-}
-.scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-.budget-clone-content .bg-surface-light {
-    background-color: #ffffff;
-}
-.budget-clone-content .bg-background-light {
-    background-color: #f3f4f6;
-}
-.budget-clone-content .bg-subtotal-light {
-    background-color: #e0f2fe;
-}
-.budget-clone-content .bg-total-light {
-    background-color: #1e3a8a;
-}
-.budget-clone-content .bg-navy-header {
-    background-color: #1e3a8a;
-}
-.budget-clone-content .bg-emerald-header {
-    background-color: #047857;
-}
-.budget-clone-content .bg-deep-navy {
-    background-color: #0f172a;
-}
-.budget-clone-content .text-gold-accent {
-    color: #fbbf24;
-}
-.budget-clone-content .shadow-soft-blue {
-    box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1), 0 2px 4px -1px rgba(14, 165, 233, 0.06);
-}
-.budget-clone-content .shadow-card {
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08);
-}
-.budget-clone-content table {
-    width: 100%;
-}
-`;
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 const EMPTY_DETAILS = {
@@ -265,10 +209,6 @@ function includesKeyword(value, keyword) {
 function matchAnyKeyword(keyword, values = []) {
     if (!keyword) return true;
     return values.some((value) => includesKeyword(value, keyword));
-}
-
-function escapeRegExp(text) {
-    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function createEquipmentPhaseBucket() {
@@ -617,6 +557,132 @@ function buildBudgetViewModel({
     return { items, summary };
 }
 
+function getBudgetStatusMeta(budget, execution) {
+    const safeBudget = toNumber(budget);
+    const safeExecution = toNumber(execution);
+    const remaining = safeBudget - safeExecution;
+    const percent = usagePercent(safeBudget, safeExecution);
+    if (remaining < 0 || percent >= 100) {
+        return { label: '초과', className: 'bg-rose-100 text-rose-700 border-rose-200' };
+    }
+    if (percent >= 80) {
+        return { label: '주의', className: 'bg-amber-100 text-amber-700 border-amber-200' };
+    }
+    return { label: '정상', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+}
+
+function buildSummaryRows(items) {
+    const rows = [];
+    (items || []).forEach((equipment) => {
+        rows.push({
+            key: `${equipment.name}-total`,
+            kind: 'equipment',
+            label: equipment.name,
+            budget: toNumber(equipment.totals?.total?.budget),
+            execution: toNumber(equipment.totals?.total?.execution),
+        });
+        PHASES.forEach((phase) => {
+            const phaseData = equipment.phases?.[phase];
+            if (!phaseData) return;
+            rows.push({
+                key: `${equipment.name}-${phase}`,
+                kind: 'phase',
+                label: `${PHASE_LABEL[phase]} 단계`,
+                budget: toNumber(phaseData.total?.budget),
+                execution: toNumber(phaseData.total?.execution),
+            });
+        });
+    });
+    return rows;
+}
+
+function buildMaterialRows(items) {
+    const rows = [];
+    (items || []).forEach((equipment) => {
+        PHASES.forEach((phase) => {
+            const phaseView = equipment.phases?.[phase];
+            if (!phaseView?.material?.isVisible) return;
+            (phaseView.material.units || []).forEach((unit) => {
+                const quantity = toNumber(unit.quantityTotal);
+                const budget = toNumber(unit.budgetAmount);
+                const execution = toNumber(unit.executionAmount);
+                rows.push({
+                    key: `${equipment.name}-${phase}-material-${unit.unitName}`,
+                    phase,
+                    equipmentName: equipment.name,
+                    unitName: unit.unitName,
+                    partCount: toNumber(unit.partCount),
+                    quantity,
+                    unitCost: quantity > 0 ? budget / quantity : 0,
+                    budget,
+                    execution,
+                    remaining: budget - execution,
+                });
+            });
+        });
+    });
+    return rows;
+}
+
+function buildLaborRows(items) {
+    const rows = [];
+    (items || []).forEach((equipment) => {
+        PHASES.forEach((phase) => {
+            const phaseView = equipment.phases?.[phase];
+            if (!phaseView?.labor?.isVisible) return;
+            SOURCE_TYPES.forEach((source) => {
+                const sourceBlock = phaseView.labor.bySource?.[source];
+                if (!sourceBlock?.isVisible) return;
+                (sourceBlock.rows || []).forEach((row) => {
+                    const budget = toNumber(row.budgetAmount);
+                    const execution = toNumber(row.executionAmount);
+                    rows.push({
+                        key: `${equipment.name}-${phase}-labor-${source}-${row.name}`,
+                        phase,
+                        equipmentName: equipment.name,
+                        source,
+                        taskName: row.name,
+                        budget,
+                        execution,
+                        remaining: budget - execution,
+                    });
+                });
+            });
+        });
+    });
+    return rows;
+}
+
+function buildExpenseRows(items) {
+    const rows = [];
+    (items || []).forEach((equipment) => {
+        PHASES.forEach((phase) => {
+            const phaseView = equipment.phases?.[phase];
+            if (!phaseView?.expense?.isVisible) return;
+            SOURCE_TYPES.forEach((source) => {
+                const sourceBlock = phaseView.expense.bySource?.[source];
+                if (!sourceBlock?.isVisible) return;
+                (sourceBlock.rows || []).forEach((row) => {
+                    const budget = toNumber(row.budgetAmount);
+                    const execution = toNumber(row.executionAmount);
+                    rows.push({
+                        key: `${equipment.name}-${phase}-expense-${source}-${row.name}`,
+                        phase,
+                        equipmentName: equipment.name,
+                        source,
+                        expenseName: row.name,
+                        basis: row.basis || '',
+                        budget,
+                        execution,
+                        remaining: budget - execution,
+                    });
+                });
+            });
+        });
+    });
+    return rows;
+}
+
 const BudgetProjectBudget = () => {
     const { projectId } = useParams();
     const navigate = useNavigate();
@@ -637,7 +703,7 @@ const BudgetProjectBudget = () => {
     const budgetMenuRef = useRef(null);
     const budgetMenuCloseTimerRef = useRef(null);
 
-    const [detailSearchQuery, setDetailSearchQuery] = useState('');
+    const detailSearchQuery = '';
     const [selectedPhases, setSelectedPhases] = useState([...PHASES]);
     const [selectedCostTypes, setSelectedCostTypes] = useState([...COST_TYPES]);
     const [selectedSources, setSelectedSources] = useState([...SOURCE_TYPES]);
@@ -727,11 +793,6 @@ const BudgetProjectBudget = () => {
 
         load();
     }, [projectId]);
-
-    const showExecution = useMemo(
-        () => EXECUTION_STAGES.has(String(project?.current_stage || '').trim()),
-        [project?.current_stage],
-    );
 
     const dashboard = useMemo(() => {
         const settings = { ...DEFAULT_LABOR_SETTINGS, ...(details?.budget_settings || {}) };
@@ -956,7 +1017,6 @@ const BudgetProjectBudget = () => {
     }, [dashboard.equipmentSummaries]);
 
     const summaryView = isTotalFixed ? fixedSummaryViewModel.summary : viewModel.summary;
-    const activeTabContentHtml = BUDGET_TAB_CONTENT[activeBudgetTab] || BUDGET_CLONE_SUMMARY_CONTENT;
     const totalBudget = toNumber(summaryView.total.budget);
     const totalExecution = toNumber(summaryView.total.execution);
     const totalRemaining = toNumber(summaryView.total.remaining);
@@ -965,13 +1025,10 @@ const BudgetProjectBudget = () => {
     const initialCapDeltaPercent = initialCap > 0 ? ((totalBudget - initialCap) / initialCap) * 100 : 0;
     const remainingPercent = totalBudget > 0 ? Math.max(0, (totalRemaining / totalBudget) * 100) : 0;
     const isOverBudget = totalRemaining < 0;
-
-    const allPhaseSelected = selectedPhases.length === PHASES.length;
-    const allCostTypeSelected = selectedCostTypes.length === COST_TYPES.length;
-    const allSourceSelected = selectedSources.length === SOURCE_TYPES.length;
-    const allEquipmentSelected = selectedEquipments.length > 0
-        && selectedEquipments.length === dashboard.equipmentSummaries.length;
-    const shouldForceExpandBySearch = detailSearchQuery.trim().length > 0;
+    const summaryRows = useMemo(() => buildSummaryRows(viewModel.items), [viewModel.items]);
+    const materialRows = useMemo(() => buildMaterialRows(viewModel.items), [viewModel.items]);
+    const laborRows = useMemo(() => buildLaborRows(viewModel.items), [viewModel.items]);
+    const expenseRows = useMemo(() => buildExpenseRows(viewModel.items), [viewModel.items]);
 
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
@@ -1004,39 +1061,6 @@ const BudgetProjectBudget = () => {
         const params = new URLSearchParams();
         if (query) params.set('q', query);
         navigate({ pathname: '/', search: params.toString() ? `?${params.toString()}` : '' });
-    };
-
-    const toggleMulti = (setter, value) => {
-        setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
-    };
-
-    const handleSelectAllFilters = () => {
-        setSelectedPhases([...PHASES]);
-        setSelectedCostTypes([...COST_TYPES]);
-        setSelectedSources([...SOURCE_TYPES]);
-        setSelectedEquipments(dashboard.equipmentSummaries.map((item) => item.name));
-    };
-
-    const handleClearAllFilters = () => {
-        setSelectedPhases([]);
-        setSelectedCostTypes([]);
-        setSelectedSources([]);
-        setSelectedEquipments([]);
-    };
-
-    const renderHighlightedText = (text) => {
-        const source = String(text ?? '');
-        const keyword = detailSearchQuery.trim();
-        if (!keyword) return source;
-        const escaped = escapeRegExp(keyword);
-        const regex = new RegExp(`(${escaped})`, 'ig');
-        const tokens = source.split(regex);
-        const keywordLower = keyword.toLowerCase();
-        return tokens.map((token, index) => (
-            token.toLowerCase() === keywordLower
-                ? <mark key={`${source}-${index}`} className="rounded bg-yellow-200 px-0.5 text-inherit">{token}</mark>
-                : <React.Fragment key={`${source}-${index}`}>{token}</React.Fragment>
-        ));
     };
 
     if (isLoading) {
@@ -1292,15 +1316,14 @@ const BudgetProjectBudget = () => {
                         {error}
                     </div>
                 )}
-                <style>{BUDGET_CLONE_CUSTOM_CSS}</style>
 
                 <section className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Phased Integrated Cost Breakdown Dashboard
+                            프로젝트 예산 통합 모니터
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            Consolidated Financial Review (Unit: KRW)
+                            {projectName} / {version?.name || '현재 버전'} / 단위: 원
                         </p>
                     </div>
                     <button
@@ -1308,36 +1331,36 @@ const BudgetProjectBudget = () => {
                         className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
                     >
                         <Calculator className="h-4 w-4" />
-                        Export PDF
+                        보고서 내보내기
                     </button>
                 </section>
 
                 <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-primary" />
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Project Budget</p>
+                                <p className="text-sm font-semibold text-slate-600">총 예산</p>
                                 <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalBudget)}</h3>
-                                <p className="mt-1 text-xs text-slate-400">Material + Labor + Expenses</p>
+                                <p className="mt-1 text-xs text-slate-500">재료비 + 인건비 + 경비</p>
                             </div>
                             <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
                                 <Wallet className="h-5 w-5" />
                             </div>
                         </div>
                         <div className="mt-4 flex items-center text-sm text-slate-500">
-                            <span className="mr-2 font-medium text-slate-600">Initial Cap: {formatWon(initialCap)}</span>
-                            <span>({formatPercent(initialCapDeltaPercent)} Adjust)</span>
+                            <span className="mr-2 font-medium text-slate-600">초기 기준: {formatWon(initialCap)}</span>
+                            <span>(조정 {formatPercent(initialCapDeltaPercent)})</span>
                         </div>
                     </article>
 
-                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-rose-500" />
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Expenditure</p>
+                                <p className="text-sm font-semibold text-slate-600">총 집행</p>
                                 <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalExecution)}</h3>
-                                <p className="mt-1 text-xs text-slate-400">Actual Spent to Date</p>
+                                <p className="mt-1 text-xs text-slate-500">실집행 누적 금액</p>
                             </div>
                             <div className="rounded-lg bg-rose-50 p-3 text-rose-600">
                                 <BarChart3 className="h-5 w-5" />
@@ -1351,13 +1374,13 @@ const BudgetProjectBudget = () => {
                         </div>
                     </article>
 
-                    <article className="relative overflow-hidden rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
+                    <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="absolute right-0 top-0 h-full w-1 bg-emerald-500" />
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="text-sm font-medium uppercase tracking-wider text-slate-500">Total Variance (Remaining)</p>
+                                <p className="text-sm font-semibold text-slate-600">총 잔액</p>
                                 <h3 className="mt-2 text-3xl font-bold text-slate-900">{formatWon(totalRemaining)}</h3>
-                                <p className="mt-1 text-xs text-slate-400">Available Funds</p>
+                                <p className="mt-1 text-xs text-slate-500">예산 대비 잔여 금액</p>
                             </div>
                             <div className="rounded-lg bg-emerald-50 p-3 text-emerald-600">
                                 <Scale className="h-5 w-5" />
@@ -1370,9 +1393,9 @@ const BudgetProjectBudget = () => {
                                     isOverBudget ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                                 )}
                             >
-                                {isOverBudget ? 'Over Budget' : 'On Budget'}
+                                {isOverBudget ? '예산 초과' : '예산 정상'}
                             </span>
-                            <span className="ml-2">{remainingPercent.toFixed(1)}% Remaining</span>
+                            <span className="ml-2">잔여율 {remainingPercent.toFixed(1)}%</span>
                         </div>
                     </article>
                 </section>
@@ -1388,10 +1411,10 @@ const BudgetProjectBudget = () => {
                                     type="button"
                                     onClick={() => setActiveBudgetTab(tab.key)}
                                     className={cn(
-                                        'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all',
+                                        'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all focus-visible:outline-none',
                                         isActive
                                             ? 'border-primary font-bold text-primary'
-                                            : 'border-transparent font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                            : 'border-transparent font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700'
                                     )}
                                 >
                                     <Icon className="h-[19px] w-[19px]" />
@@ -1402,44 +1425,286 @@ const BudgetProjectBudget = () => {
                     </div>
                 </nav>
 
-                <section
-                    className="budget-clone-content"
-                    dangerouslySetInnerHTML={{ __html: activeTabContentHtml }}
-                />
+                {activeBudgetTab === 'summary' && (
+                    <SummaryTabContent
+                        summaryView={summaryView}
+                        summaryRows={summaryRows}
+                    />
+                )}
+
+                {activeBudgetTab === 'material' && (
+                    <MaterialTabContent rows={materialRows} />
+                )}
+
+                {activeBudgetTab === 'labor' && (
+                    <LaborTabContent rows={laborRows} />
+                )}
+
+                {activeBudgetTab === 'expense' && (
+                    <ExpenseTabContent rows={expenseRows} />
+                )}
             </main>
         </div>
     );
 };
 
-const SummaryCard = ({ icon: Icon, title, value, subText, tone = 'default' }) => {
-    const toneClass = tone === 'primary'
-        ? 'bg-primary text-white border-primary'
-        : tone === 'warning'
-            ? 'bg-orange-50 border-orange-200 text-slate-900'
-            : 'bg-white border-slate-200 text-slate-900';
-
-    const subToneClass = tone === 'primary' ? 'text-white/85' : 'text-slate-500';
-
+const BudgetStatusBadge = ({ budget, execution }) => {
+    const meta = getBudgetStatusMeta(budget, execution);
     return (
-        <article className={cn('rounded-xl border p-4 shadow-sm', toneClass)}>
-            <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">{title}</p>
-                <Icon className="h-4 w-4" />
-            </div>
-            <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
-            <p className={cn('mt-2 text-xs font-medium', subToneClass)}>{subText}</p>
-        </article>
+        <span className={cn('inline-flex items-center rounded border px-2 py-0.5 text-xs font-bold', meta.className)}>
+            {meta.label}
+        </span>
     );
 };
 
-const MiniMetric = ({ label, value, icon: Icon }) => (
-    <div className="rounded-md bg-white/70 px-2 py-1.5 border border-white/50">
-        <p className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-            <Icon className="h-3 w-3" />
-            {label}
-        </p>
-        <p className="mt-0.5 text-xs font-bold text-slate-700">{value}</p>
-    </div>
+const SummaryTabContent = ({ summaryView, summaryRows }) => {
+    const metricCards = [
+        { key: 'material', label: '재료비', accent: 'bg-blue-500' },
+        { key: 'labor', label: '인건비', accent: 'bg-violet-500' },
+        { key: 'expense', label: '경비', accent: 'bg-amber-500' },
+    ];
+
+    return (
+        <div className="space-y-5">
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {metricCards.map((card) => {
+                    const data = summaryView[card.key];
+                    const percent = usagePercent(data.budget, data.execution);
+                    return (
+                        <article key={card.key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-slate-900">{card.label}</h3>
+                                <span className={cn('h-2.5 w-2.5 rounded-full', card.accent)} />
+                            </div>
+                            <div className="space-y-1 text-sm">
+                                <p className="font-semibold text-slate-800">예산 {formatWon(data.budget)}</p>
+                                <p className="text-slate-700">집행 {formatWon(data.execution)}</p>
+                                <p className={cn('font-semibold', toNumber(data.remaining) < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                                    잔액 {formatWon(data.remaining)}
+                                </p>
+                            </div>
+                            <div className="mt-3">
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                    <div
+                                        className={cn('h-full', usageBarClass(percent))}
+                                        style={{ width: `${Math.min(percent, 100)}%` }}
+                                    />
+                                </div>
+                                <p className="mt-1 text-right text-xs font-semibold text-slate-600">{percent.toFixed(1)}%</p>
+                            </div>
+                        </article>
+                    );
+                })}
+            </section>
+
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-3">
+                    <h3 className="text-sm font-bold text-white">통합 예산 상세</h3>
+                    <span className="text-xs font-semibold text-slate-200">설비/단계별 실제 집계</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-sm">
+                        <thead className="bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-700">
+                            <tr>
+                                <th className="px-4 py-3 text-left">구분</th>
+                                <th className="px-4 py-3 text-right">예산</th>
+                                <th className="px-4 py-3 text-right">집행</th>
+                                <th className="px-4 py-3 text-right">잔액</th>
+                                <th className="px-4 py-3 text-center">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {summaryRows.map((row) => {
+                                const remaining = toNumber(row.budget) - toNumber(row.execution);
+                                return (
+                                    <tr key={row.key} className={cn(row.kind === 'equipment' ? 'bg-slate-50 font-semibold text-slate-900' : 'bg-white text-slate-800')}>
+                                        <td className="px-4 py-3">
+                                            <span className={cn(row.kind === 'phase' && 'pl-4 text-slate-700')}>{row.label}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                                        <td className="px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                                        <td className={cn('px-4 py-3 text-right font-semibold', remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                                            {formatWon(remaining)}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-slate-900 text-white">
+                                <td className="px-4 py-3 text-left text-sm font-bold">전체 합계</td>
+                                <td className="px-4 py-3 text-right font-bold">{formatWon(summaryView.total.budget)}</td>
+                                <td className="px-4 py-3 text-right font-bold">{formatWon(summaryView.total.execution)}</td>
+                                <td className="px-4 py-3 text-right font-bold">{formatWon(summaryView.total.remaining)}</td>
+                                <td className="px-4 py-3 text-center">
+                                    <BudgetStatusBadge budget={summaryView.total.budget} execution={summaryView.total.execution} />
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+        </div>
+    );
+};
+
+const MaterialTabContent = ({ rows }) => (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-3">
+            <h3 className="text-sm font-bold text-white">재료비 상세</h3>
+            <span className="text-xs font-semibold text-slate-200">실제 프로젝트 데이터</span>
+        </div>
+        <div className="overflow-x-auto">
+            <table className="w-full min-w-[1080px] text-sm">
+                <thead className="bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-700">
+                    <tr>
+                        <th className="px-4 py-3 text-left">단계</th>
+                        <th className="px-4 py-3 text-left">설비</th>
+                        <th className="px-4 py-3 text-left">유닛</th>
+                        <th className="px-4 py-3 text-right">파트수</th>
+                        <th className="px-4 py-3 text-right">수량</th>
+                        <th className="px-4 py-3 text-right">단가</th>
+                        <th className="px-4 py-3 text-right">예산</th>
+                        <th className="px-4 py-3 text-right">집행</th>
+                        <th className="px-4 py-3 text-right">잔액</th>
+                        <th className="px-4 py-3 text-center">상태</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800">
+                    {rows.length === 0 && (
+                        <tr>
+                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={10}>
+                                표시할 재료비 데이터가 없습니다.
+                            </td>
+                        </tr>
+                    )}
+                    {rows.map((row, index) => (
+                        <tr key={row.key} className={cn(index % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{PHASE_LABEL[row.phase]}</td>
+                            <td className="px-4 py-3 font-semibold">{row.equipmentName}</td>
+                            <td className="px-4 py-3">{row.unitName}</td>
+                            <td className="px-4 py-3 text-right">{row.partCount.toLocaleString('ko-KR')}</td>
+                            <td className="px-4 py-3 text-right">{row.quantity.toLocaleString('ko-KR')}</td>
+                            <td className="px-4 py-3 text-right">{formatWon(row.unitCost)}</td>
+                            <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                            <td className="px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                            <td className={cn('px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                                {formatWon(row.remaining)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                                <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </section>
+);
+
+const LaborTabContent = ({ rows }) => (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-3">
+            <h3 className="text-sm font-bold text-white">인건비 상세</h3>
+            <span className="text-xs font-semibold text-slate-200">실제 프로젝트 데이터</span>
+        </div>
+        <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-sm">
+                <thead className="bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-700">
+                    <tr>
+                        <th className="px-4 py-3 text-left">단계</th>
+                        <th className="px-4 py-3 text-left">설비</th>
+                        <th className="px-4 py-3 text-left">구분</th>
+                        <th className="px-4 py-3 text-left">업무/부서</th>
+                        <th className="px-4 py-3 text-right">예산</th>
+                        <th className="px-4 py-3 text-right">집행</th>
+                        <th className="px-4 py-3 text-right">잔액</th>
+                        <th className="px-4 py-3 text-center">상태</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800">
+                    {rows.length === 0 && (
+                        <tr>
+                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={8}>
+                                표시할 인건비 데이터가 없습니다.
+                            </td>
+                        </tr>
+                    )}
+                    {rows.map((row, index) => (
+                        <tr key={row.key} className={cn(index % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{PHASE_LABEL[row.phase]}</td>
+                            <td className="px-4 py-3 font-semibold">{row.equipmentName}</td>
+                            <td className="px-4 py-3">{row.source}</td>
+                            <td className="px-4 py-3">{row.taskName}</td>
+                            <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                            <td className="px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                            <td className={cn('px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                                {formatWon(row.remaining)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                                <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </section>
+);
+
+const ExpenseTabContent = ({ rows }) => (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-5 py-3">
+            <h3 className="text-sm font-bold text-white">경비 상세</h3>
+            <span className="text-xs font-semibold text-slate-200">실제 프로젝트 데이터</span>
+        </div>
+        <div className="overflow-x-auto">
+            <table className="w-full min-w-[1120px] text-sm">
+                <thead className="bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-700">
+                    <tr>
+                        <th className="px-4 py-3 text-left">단계</th>
+                        <th className="px-4 py-3 text-left">설비</th>
+                        <th className="px-4 py-3 text-left">구분</th>
+                        <th className="px-4 py-3 text-left">경비 항목</th>
+                        <th className="px-4 py-3 text-left">산정 기준</th>
+                        <th className="px-4 py-3 text-right">예산</th>
+                        <th className="px-4 py-3 text-right">집행</th>
+                        <th className="px-4 py-3 text-right">잔액</th>
+                        <th className="px-4 py-3 text-center">상태</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800">
+                    {rows.length === 0 && (
+                        <tr>
+                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={9}>
+                                표시할 경비 데이터가 없습니다.
+                            </td>
+                        </tr>
+                    )}
+                    {rows.map((row, index) => (
+                        <tr key={row.key} className={cn(index % 2 === 0 ? 'bg-white' : 'bg-slate-50')}>
+                            <td className="px-4 py-3 font-semibold text-slate-700">{PHASE_LABEL[row.phase]}</td>
+                            <td className="px-4 py-3 font-semibold">{row.equipmentName}</td>
+                            <td className="px-4 py-3">{row.source}</td>
+                            <td className="px-4 py-3">{row.expenseName}</td>
+                            <td className="px-4 py-3 text-slate-600">{row.basis || '-'}</td>
+                            <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                            <td className="px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                            <td className={cn('px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}>
+                                {formatWon(row.remaining)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                                <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </section>
 );
 
 export default BudgetProjectBudget;

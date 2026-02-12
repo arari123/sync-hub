@@ -12,10 +12,10 @@ const Login = () => {
     const [error, setError] = useState('');
 
     if (isAuthenticated()) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/home" replace />;
     }
 
-    const fromPath = location.state?.from || '/';
+    const fromPath = location.state?.from || '/home';
 
     const onSubmit = async (event) => {
         event.preventDefault();

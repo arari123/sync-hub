@@ -79,6 +79,14 @@ function ratio(actual, total) {
     return Math.max(0, Math.min(100, (actual / total) * 100));
 }
 
+function formatAgendaDate(value) {
+    const text = String(value || '').trim();
+    if (text.length < 10) return '-';
+    const month = text.slice(5, 7);
+    const day = text.slice(8, 10);
+    return `${month}.${day}`;
+}
+
 function localizeStageLabel(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
@@ -117,6 +125,10 @@ const BudgetProjectOverview = () => {
     const [version, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
     const [totals, setTotals] = useState(null);
+    const [agendaItems, setAgendaItems] = useState([]);
+    const [agendaTotal, setAgendaTotal] = useState(0);
+    const [isAgendaLoading, setIsAgendaLoading] = useState(false);
+    const [agendaError, setAgendaError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -173,7 +185,9 @@ const BudgetProjectOverview = () => {
         const load = async () => {
             if (!projectId) return;
             setIsLoading(true);
+            setIsAgendaLoading(true);
             setError('');
+            setAgendaError('');
 
             try {
                 const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
@@ -183,6 +197,20 @@ const BudgetProjectOverview = () => {
 
                 const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
                 setVersion(currentVersion);
+
+                try {
+                    const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
+                        params: { page: 1, per_page: 5, include_drafts: false },
+                    });
+                    const agendaPayload = agendaResp?.data || {};
+                    setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
+                    setAgendaTotal(Number(agendaPayload?.total || 0));
+                    setAgendaError('');
+                } catch (agendaErr) {
+                    setAgendaItems([]);
+                    setAgendaTotal(0);
+                    setAgendaError(getErrorMessage(agendaErr, '안건 정보를 불러오지 못했습니다.'));
+                }
 
                 if (!currentVersion?.id) {
                     setEquipments([]);
@@ -197,6 +225,7 @@ const BudgetProjectOverview = () => {
             } catch (err) {
                 setError(getErrorMessage(err, '프로젝트 메인 정보를 불러오지 못했습니다.'));
             } finally {
+                setIsAgendaLoading(false);
                 setIsLoading(false);
             }
         };
@@ -208,10 +237,10 @@ const BudgetProjectOverview = () => {
         event.preventDefault();
         const nextQuery = inputQuery.trim();
         if (!nextQuery) {
-            navigate('/');
+            navigate('/home');
             return;
         }
-        navigate(`/?q=${encodeURIComponent(nextQuery)}`);
+        navigate(`/home?q=${encodeURIComponent(nextQuery)}`);
     };
 
     const monitoring = project?.monitoring || {};
@@ -246,7 +275,14 @@ const BudgetProjectOverview = () => {
     const laborRate = ratio(spentLabor, Math.max(confirmedLabor, 1));
     const expenseRate = ratio(spentExpense, Math.max(confirmedExpense, 1));
 
-    const issueCount = 0;
+    const issueCount = Math.max(agendaTotal, agendaItems.length);
+    const latestAgenda = agendaItems[0] || null;
+    const latestAgendaTitle = latestAgenda
+        ? (latestAgenda.latest_title || latestAgenda.root_title || latestAgenda.title || '')
+        : '';
+    const latestAgendaSubText = latestAgendaTitle
+        ? `${formatAgendaDate(latestAgenda.last_updated_at || latestAgenda.updated_at)} · ${latestAgendaTitle}`
+        : (agendaError || '등록된 안건이 없습니다.');
     const documentCount = Math.max(toNumber(project?.document_count), toNumber(project?.documents_count));
     const resourcesCount = Math.max(documentCount + equipments.length, 0);
 
@@ -256,7 +292,7 @@ const BudgetProjectOverview = () => {
     const budgetMaterialPath = `${baseProjectPath}/edit/material`;
     const budgetLaborPath = `${baseProjectPath}/edit/labor`;
     const budgetExpensePath = `${baseProjectPath}/edit/expense`;
-    const issueManagementPath = `${baseProjectPath}/joblist`;
+    const issueManagementPath = `${baseProjectPath}/agenda`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
     const specManagementPath = `${baseProjectPath}/spec`;
     const dataManagementPath = `${baseProjectPath}/data`;
@@ -278,7 +314,7 @@ const BudgetProjectOverview = () => {
         <div className="min-h-screen bg-background text-foreground">
             <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
                 <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
-                    <Link to="/" className="w-44 shrink-0 flex items-center gap-2">
+                    <Link to="/home" className="w-44 shrink-0 flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
                         <div className="leading-tight">
                             <p className="font-extrabold tracking-tight text-sm">sync-hub</p>
@@ -355,11 +391,11 @@ const BudgetProjectOverview = () => {
                             aria-label="현재 경로"
                             className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                         >
-                            <Link to="/" className="font-medium hover:text-primary">
+                            <Link to="/home" className="font-medium hover:text-primary">
                                 메인
                             </Link>
                             <span>/</span>
-                            <Link to="/search" className="font-medium hover:text-primary">
+                            <Link to="/home" className="font-medium hover:text-primary">
                                 글로벌 검색
                             </Link>
                             <span>&gt;</span>
@@ -567,9 +603,54 @@ const BudgetProjectOverview = () => {
                                     </Link>
                                 </div>
                                 <div className="p-3 overflow-y-auto flex-1 h-[280px]">
-                                    <div className="h-full rounded-lg border border-dashed border-border bg-secondary/40 flex items-center justify-center text-sm text-muted-foreground">
-                                        비어 있음 (이슈 등록 미구현)
-                                    </div>
+                                    {isAgendaLoading ? (
+                                        <div className="h-full rounded-lg border border-border bg-secondary/30 flex items-center justify-center text-sm text-muted-foreground">
+                                            <span className="inline-flex items-center gap-2">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                안건 정보를 불러오는 중...
+                                            </span>
+                                        </div>
+                                    ) : agendaItems.length <= 0 ? (
+                                        <div className="h-full rounded-lg border border-dashed border-border bg-secondary/40 flex items-center justify-center text-sm text-muted-foreground">
+                                            {agendaError || '등록된 안건이 없습니다.'}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {agendaItems.map((agendaItem) => {
+                                                const agendaTitle = agendaItem.root_title || agendaItem.title || '제목 없음';
+                                                const latestTitle = agendaItem.latest_title || agendaTitle;
+                                                const statusLabel = agendaItem.progress_status === 'completed' ? '완료' : '진행 중';
+                                                const subDate = formatAgendaDate(agendaItem.last_updated_at || agendaItem.updated_at);
+                                                return (
+                                                    <Link
+                                                        key={`overview-agenda-${agendaItem.id}`}
+                                                        to={`${issueManagementPath}/${agendaItem.id}`}
+                                                        className="block rounded-lg border border-border bg-background px-3 py-2 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="truncate text-sm font-semibold text-slate-800">{agendaTitle}</p>
+                                                            <span className={cn(
+                                                                'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                                                                agendaItem.progress_status === 'completed'
+                                                                    ? 'border-slate-300 bg-slate-100 text-slate-600'
+                                                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                            )}
+                                                            >
+                                                                {statusLabel}
+                                                            </span>
+                                                        </div>
+                                                        {latestTitle !== agendaTitle && (
+                                                            <p className="mt-1 truncate text-[11px] text-slate-600">최근 답변: {latestTitle}</p>
+                                                        )}
+                                                        <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                                                            <span>답변 {agendaItem.reply_count || 0} · 코멘트 {agendaItem.comment_count || 0}</span>
+                                                            <span>{subDate}</span>
+                                                        </div>
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             </section>
 
@@ -674,7 +755,7 @@ const BudgetProjectOverview = () => {
                                 <StatCard
                                     label="등록 안건 수"
                                     value={`${issueCount}`}
-                                    subText="마지막 안건 비어 있음"
+                                    subText={latestAgendaSubText}
                                     accentClass="text-orange-500"
                                     boxClass="bg-orange-50 text-orange-500"
                                 />

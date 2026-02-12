@@ -99,6 +99,12 @@ const STAGE_STYLE_MAP = {
     },
 };
 
+function normalizeProjectId(value) {
+    const projectId = Number(value || 0);
+    if (!Number.isFinite(projectId) || projectId <= 0) return 0;
+    return Math.floor(projectId);
+}
+
 function extractItems(payload) {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.items)) return payload.items;
@@ -255,7 +261,7 @@ function buildUpdateLinks(project) {
     const equipmentCount = Array.isArray(project?.equipment_names) ? project.equipment_names.length : 0;
 
     if ((project?.current_stage || '') === 'review') {
-        updates.push({ label: '안건', to: `/project-management/projects/${projectId}/joblist`, tone: 'amber' });
+        updates.push({ label: '안건', to: `/project-management/projects/${projectId}/agenda`, tone: 'amber' });
     }
     if (Math.abs(varianceTotal) >= 1) {
         updates.push({ label: '예산', to: `/project-management/projects/${projectId}/budget`, tone: 'blue' });
@@ -373,19 +379,6 @@ function resolveProgressMeta(project, balance, progressPercent) {
     };
 }
 
-function buildMockAgendaTitles(project) {
-    const stageLabel = resolveProjectStatusLabel(project) || '진행';
-    const equipmentName = Array.isArray(project?.equipment_names) && project.equipment_names.length > 0
-        ? String(project.equipment_names[0] || '').trim()
-        : '핵심 설비';
-
-    return [
-        `${stageLabel} 단계 주간 이슈 점검`,
-        `${equipmentName} 사양 확정 협의`,
-        '납기 대응 일정 및 협력사 조율',
-    ];
-}
-
 function formatAgendaUpdatedDate(value) {
     const text = String(value || '').trim();
     if (!text || text.length < 10) return '--.--';
@@ -461,6 +454,7 @@ const SearchResults = () => {
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [projectAgendaMap, setProjectAgendaMap] = useState({});
 
     const user = getCurrentUser();
     const userBadge = (user?.full_name || user?.email || 'U').slice(0, 1).toUpperCase();
@@ -634,6 +628,10 @@ const SearchResults = () => {
         () => visibleProjects.slice(0, TABLE_PAGE_SIZE),
         [visibleProjects]
     );
+    const visibleProjectIds = useMemo(
+        () => tableProjects.map((project) => normalizeProjectId(project?.id)).filter(Boolean),
+        [tableProjects]
+    );
 
     const totalVisibleCount = visibleProjects.length;
     const visibleStartIndex = totalVisibleCount > 0 ? 1 : 0;
@@ -643,14 +641,85 @@ const SearchResults = () => {
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
     const hasProjectPanel = isLoading || projectRows.length > 0 || !hasSearchQuery;
 
+    useEffect(() => {
+        if (visibleProjectIds.length <= 0) return undefined;
+
+        const pendingProjectIds = visibleProjectIds.filter((projectId) => !(projectId in projectAgendaMap));
+        if (pendingProjectIds.length <= 0) return undefined;
+
+        let active = true;
+        const controller = new AbortController();
+
+        const fetchProjectAgendas = async () => {
+            const responses = await Promise.all(
+                pendingProjectIds.map(async (projectId) => {
+                    try {
+                        const response = await api.get(`/agenda/projects/${projectId}/threads`, {
+                            params: { page: 1, per_page: 3, include_drafts: false },
+                            signal: controller.signal,
+                        });
+                        const payload = response?.data || {};
+                        return {
+                            projectId,
+                            value: {
+                                items: Array.isArray(payload.items) ? payload.items : [],
+                                total: Number(payload.total || 0),
+                                fetchedAt: Date.now(),
+                                hasError: false,
+                            },
+                        };
+                    } catch (err) {
+                        if (err?.code === 'ERR_CANCELED') {
+                            return {
+                                projectId,
+                                value: {
+                                    items: [],
+                                    total: 0,
+                                    fetchedAt: Date.now(),
+                                    hasError: true,
+                                },
+                            };
+                        }
+                        return {
+                            projectId,
+                            value: {
+                                items: [],
+                                total: 0,
+                                fetchedAt: Date.now(),
+                                hasError: true,
+                            },
+                        };
+                    }
+                })
+            );
+
+            if (!active) return;
+
+            setProjectAgendaMap((prev) => {
+                const next = { ...prev };
+                for (const item of responses) {
+                    next[item.projectId] = item.value;
+                }
+                return next;
+            });
+        };
+
+        fetchProjectAgendas();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [projectAgendaMap, visibleProjectIds]);
+
     const handleSearchSubmit = (event) => {
         event.preventDefault();
         const nextQuery = inputQuery.trim();
         if (!nextQuery) {
-            navigate('/');
+            navigate('/home');
             return;
         }
-        navigate(`/?q=${encodeURIComponent(nextQuery)}`);
+        navigate(`/home?q=${encodeURIComponent(nextQuery)}`);
     };
 
     const toggleStageFilter = (stage) => {
@@ -685,11 +754,11 @@ const SearchResults = () => {
         <div className="min-h-screen bg-background text-foreground">
             <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
                 <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
-                    <Link to="/" className="w-44 shrink-0 flex items-center gap-2">
+                    <Link to="/home" className="w-44 shrink-0 flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
                         <div className="leading-tight">
                             <p className="font-extrabold tracking-tight text-sm">sync-hub</p>
-                            <p className="text-[10px] text-muted-foreground">Search Workspace</p>
+                            <p className="text-[10px] text-muted-foreground">검색 워크스페이스</p>
                         </div>
                     </Link>
 
@@ -761,13 +830,11 @@ const SearchResults = () => {
                         aria-label="현재 경로"
                         className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                     >
-                        <Link to="/" className="font-medium hover:text-primary">
+                        <Link to="/home" className="font-medium hover:text-primary">
                             메인
                         </Link>
                         <span>/</span>
-                        <Link to="/search" className="font-semibold text-foreground/90 hover:text-primary">
-                            글로벌 검색
-                        </Link>
+                        <span className="font-semibold text-foreground/90">글로벌 검색</span>
                     </nav>
                 </div>
             </div>
@@ -1050,8 +1117,12 @@ const SearchResults = () => {
                                         label,
                                         ...updateLinkMap.get(label),
                                     }));
-                                    const mockAgendaTitles = buildMockAgendaTitles(project);
-                                    const agendaUpdatedDate = formatAgendaUpdatedDate(project.updated_at);
+                                    const agendaSummary = projectAgendaMap[normalizeProjectId(project?.id)];
+                                    const agendaItems = Array.isArray(agendaSummary?.items)
+                                        ? agendaSummary.items.slice(0, 3)
+                                        : [];
+                                    const agendaCount = Number(agendaSummary?.total || agendaItems.length || 0);
+                                    const isAgendaLoading = !agendaSummary;
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const progressPercent = computeProgressPercent(project);
@@ -1193,16 +1264,16 @@ const SearchResults = () => {
                                                 </div>
 
                                                 <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                    <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-1.5">
-                                                        <div className="mb-1.5 flex items-center justify-between">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
-                                                                <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-600">
-                                                                    3건
-                                                                </span>
-                                                            </div>
+                                                        <div className="rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-1.5">
+                                                            <div className="mb-1.5 flex items-center justify-between">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">최신 안건</p>
+                                                                    <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-600">
+                                                                        {isAgendaLoading ? '...' : `${agendaCount}건`}
+                                                                    </span>
+                                                                </div>
                                                             <Link
-                                                                to={`/project-management/projects/${project.id}`}
+                                                                to={`/project-management/projects/${project.id}/agenda`}
                                                                 className="text-[10px] font-semibold text-sky-600 hover:underline"
                                                             >
                                                                 보기
@@ -1210,32 +1281,55 @@ const SearchResults = () => {
                                                         </div>
 
                                                         <div className="space-y-1">
-                                                            {mockAgendaTitles.map((title, index) => (
-                                                                <div
-                                                                    key={`${project.id}-agenda-${index}`}
-                                                                    className={cn(
-                                                                        'group relative overflow-hidden rounded-lg border px-2 py-1 transition-all',
-                                                                        index === 0
-                                                                            ? 'border-sky-300 bg-white shadow-sm'
-                                                                            : 'border-slate-200 bg-white/80 hover:border-slate-300'
-                                                                    )}
-                                                                >
-                                                                    <span
-                                                                        className={cn(
-                                                                            'absolute left-0 top-0 h-full w-0.5',
-                                                                            index === 0 ? 'bg-sky-400' : 'bg-slate-300'
-                                                                        )}
-                                                                    />
-                                                                    <div className="flex items-center justify-between gap-2">
-                                                                        <p className="min-w-0 truncate text-[10px] font-semibold text-slate-700">
-                                                                            {title}
-                                                                        </p>
-                                                                        <span className="shrink-0 text-[9px] font-mono text-slate-400">
-                                                                            {agendaUpdatedDate}
-                                                                        </span>
-                                                                    </div>
+                                                            {isAgendaLoading && (
+                                                                <div className="rounded-lg border border-slate-200 bg-white/80 px-2 py-2 text-[10px] font-medium text-slate-500">
+                                                                    최신 안건을 불러오는 중입니다.
                                                                 </div>
-                                                            ))}
+                                                            )}
+                                                            {!isAgendaLoading && agendaItems.length === 0 && (
+                                                                <div className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-2 py-2 text-[10px] font-medium text-slate-500">
+                                                                    등록된 안건이 없습니다.
+                                                                </div>
+                                                            )}
+                                                            {!isAgendaLoading && agendaItems.map((agendaItem, index) => {
+                                                                const agendaTitle = agendaItem.latest_title
+                                                                    || agendaItem.root_title
+                                                                    || agendaItem.title
+                                                                    || '제목 없음';
+                                                                const agendaUpdatedDate = formatAgendaUpdatedDate(
+                                                                    agendaItem.last_updated_at || agendaItem.updated_at || project.updated_at
+                                                                );
+                                                                const agendaDetailPath = agendaItem?.id
+                                                                    ? `/project-management/projects/${project.id}/agenda/${agendaItem.id}`
+                                                                    : `/project-management/projects/${project.id}/agenda`;
+                                                                return (
+                                                                    <Link
+                                                                        key={`${project.id}-agenda-${agendaItem.id || index}`}
+                                                                        to={agendaDetailPath}
+                                                                        className={cn(
+                                                                            'group relative block overflow-hidden rounded-lg border px-2 py-1 transition-all',
+                                                                            index === 0
+                                                                                ? 'border-sky-300 bg-white shadow-sm'
+                                                                                : 'border-slate-200 bg-white/80 hover:border-slate-300'
+                                                                        )}
+                                                                    >
+                                                                        <span
+                                                                            className={cn(
+                                                                                'absolute left-0 top-0 h-full w-0.5',
+                                                                                index === 0 ? 'bg-sky-400' : 'bg-slate-300'
+                                                                            )}
+                                                                        />
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <p className="min-w-0 truncate text-[10px] font-semibold text-slate-700">
+                                                                                {agendaTitle}
+                                                                            </p>
+                                                                            <span className="shrink-0 text-[9px] font-mono text-slate-400">
+                                                                                {agendaUpdatedDate}
+                                                                            </span>
+                                                                        </div>
+                                                                    </Link>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 </div>

@@ -27,7 +27,7 @@ const Logo = ({ className, size = 'default', asLink = true }) => {
     );
 
     if (asLink) {
-        return <Link to="/" className="hover:opacity-90 transition-opacity">{content}</Link>;
+        return <Link to="/home" className="hover:opacity-90 transition-opacity">{content}</Link>;
     }
 
     return content;

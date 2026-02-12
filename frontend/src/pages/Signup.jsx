@@ -13,7 +13,7 @@ const Signup = () => {
     const [result, setResult] = useState(null);
 
     if (isAuthenticated()) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/home" replace />;
     }
 
     const onSubmit = async (event) => {

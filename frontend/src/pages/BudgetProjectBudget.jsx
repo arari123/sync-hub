@@ -1,24 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     BarChart3,
-    Bell,
     Boxes,
     Calculator,
     ChevronDown,
-    Database,
-    Grid2x2,
     Loader2,
-    Plus,
     Receipt,
     Scale,
-    Search,
     Users,
     Wallet,
 } from 'lucide-react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
-import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
+import GlobalTopBar from '../components/GlobalTopBar';
 
 const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
 const PHASES = ['fabrication', 'installation'];
@@ -785,19 +780,13 @@ function formatSignedCompact(value) {
 
 const BudgetProjectBudget = () => {
     const { projectId } = useParams();
-    const navigate = useNavigate();
     const location = useLocation();
-    const [searchParams] = useSearchParams();
     const [project, setProject] = useState(null);
     const [, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
     const [details, setDetails] = useState(EMPTY_DETAILS);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-
-    const [inputQuery, setInputQuery] = useState(() => searchParams.get('q') || '');
-    const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
-    const quickMenuRef = useRef(null);
 
     const [isBudgetMenuOpen, setIsBudgetMenuOpen] = useState(false);
     const budgetMenuRef = useRef(null);
@@ -813,15 +802,9 @@ const BudgetProjectBudget = () => {
     const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
 
     useEffect(() => {
-        setInputQuery(searchParams.get('q') || '');
-    }, [searchParams]);
-
-    useEffect(() => {
         const handleGlobalClick = (event) => {
             const target = event.target;
-            const isQuickMenuTarget = quickMenuRef.current?.contains(target);
             const isBudgetMenuTarget = budgetMenuRef.current?.contains(target);
-            if (!isQuickMenuTarget) setIsQuickMenuOpen(false);
             if (!isBudgetMenuTarget) setIsBudgetMenuOpen(false);
         };
 
@@ -1154,17 +1137,7 @@ const BudgetProjectBudget = () => {
     const isDataActive = pathname === dataManagementPath || pathname === `${dataManagementPath}/`;
     const isSettingActive = pathname.startsWith(projectSettingPath);
 
-    const user = getCurrentUser();
-    const userBadge = String(user?.name || user?.email || 'U').trim().slice(0, 1).toUpperCase() || 'U';
     const projectName = project?.name || '프로젝트';
-
-    const handleSearchSubmit = (event) => {
-        event.preventDefault();
-        const query = inputQuery.trim();
-        const params = new URLSearchParams();
-        if (query) params.set('q', query);
-        navigate({ pathname: '/home', search: params.toString() ? `?${params.toString()}` : '' });
-    };
 
     if (isLoading) {
         return (
@@ -1195,77 +1168,7 @@ const BudgetProjectBudget = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
-                <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
-                    <Link to="/home" className="w-44 shrink-0 flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
-                        <div className="leading-tight">
-                            <p className="font-extrabold tracking-tight text-sm">sync-hub</p>
-                            <p className="text-[10px] text-muted-foreground">검색 워크스페이스</p>
-                        </div>
-                    </Link>
-
-                    <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0">
-                        <label className="relative block">
-                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <input
-                                type="text"
-                                value={inputQuery}
-                                onChange={(event) => setInputQuery(event.target.value)}
-                                placeholder="프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색"
-                                className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
-                            />
-                        </label>
-                    </form>
-
-                    <div className="w-40 shrink-0 flex items-center justify-end gap-2">
-                        <button type="button" className="h-9 w-9 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary hover:text-primary">
-                            <Bell className="h-4 w-4" />
-                        </button>
-                        <div className="relative" ref={quickMenuRef}>
-                            <button
-                                type="button"
-                                onClick={() => setIsQuickMenuOpen((prev) => !prev)}
-                                className="h-9 w-9 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary hover:text-primary"
-                                aria-label="빠른 메뉴"
-                                aria-expanded={isQuickMenuOpen}
-                            >
-                                <Grid2x2 className="h-4 w-4" />
-                            </button>
-
-                            {isQuickMenuOpen && (
-                                <div className="absolute right-0 top-11 z-20 w-56 rounded-2xl border border-border bg-card p-3 shadow-xl">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Link
-                                            to="/project-management/projects/new"
-                                            onClick={() => setIsQuickMenuOpen(false)}
-                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-foreground hover:bg-secondary"
-                                        >
-                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground">
-                                                <Plus className="h-4 w-4" />
-                                            </span>
-                                            <span className="text-xs font-semibold text-center">새 프로젝트 생성</span>
-                                        </Link>
-                                        <button
-                                            type="button"
-                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-muted-foreground/70 cursor-not-allowed"
-                                            title="데이터 허브는 아직 구현되지 않았습니다."
-                                        >
-                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-muted-foreground">
-                                                <Database className="h-4 w-4" />
-                                            </span>
-                                            <span className="text-xs font-semibold text-center">데이터 허브(미구현)</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <button type="button" className="h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-bold grid place-items-center">
-                            <span>{userBadge}</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <GlobalTopBar />
 
             <div className="border-b border-border bg-secondary/80">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2">

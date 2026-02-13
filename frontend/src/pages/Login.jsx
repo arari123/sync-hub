@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
 import { isAuthenticated, setSession } from '../lib/session';
+import Logo from '../components/ui/Logo';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -42,57 +45,75 @@ const Login = () => {
     };
 
     return (
-        <div className="mx-auto flex min-h-[70vh] w-full max-w-md items-center">
-            <div className="w-full rounded-xl border bg-card p-6 shadow-sm">
-                <h1 className="mb-2 text-2xl font-bold">Sync-Hub 로그인</h1>
-                <p className="mb-6 text-sm text-muted-foreground">
-                    승인된 회사 이메일로 로그인하세요.
-                </p>
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full items-center justify-center px-4 py-8">
+            <div className="auth-shell app-enter lg:grid-cols-[0.95fr_1.05fr]">
+                <aside className="auth-aside hidden lg:flex lg:flex-col lg:justify-between">
+                    <div className="space-y-4">
+                        <span className="chip-pill">Access Portal</span>
+                        <h1 className="text-3xl font-extrabold leading-tight text-slate-900">
+                            실시간 프로젝트 데이터와
+                            <br />
+                            지식 검색을 한 번에.
+                        </h1>
+                        <p className="max-w-sm text-sm leading-relaxed text-slate-600">
+                            Sync-Hub는 예산, 안건, 사양 데이터를 통합해 빠른 의사결정을 지원합니다.
+                        </p>
+                    </div>
+                    <div className="space-y-2 text-xs text-slate-600">
+                        <p>보안 이메일 인증 기반 계정 정책 적용</p>
+                        <p>프로젝트별 권한/버전 이력 기반 작업 추적</p>
+                    </div>
+                </aside>
 
-                <form className="space-y-4" onSubmit={onSubmit}>
-                    <div className="space-y-1">
-                        <label className="text-sm font-medium" htmlFor="email">이메일</label>
-                        <input
-                            id="email"
-                            type="email"
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                            placeholder="name@company.com"
-                            autoComplete="email"
-                        />
+                <div className="p-6 sm:p-8 lg:p-10">
+                    <div className="mb-6 flex items-center justify-between">
+                        <Logo asLink={false} />
+                        <span className="chip-pill">LOGIN</span>
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="text-sm font-medium" htmlFor="password">비밀번호</label>
-                        <input
-                            id="password"
-                            type="password"
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="비밀번호 입력"
-                            autoComplete="current-password"
-                        />
-                    </div>
+                    <p className="mb-6 text-sm text-muted-foreground">
+                        승인된 회사 이메일로 로그인하세요.
+                    </p>
 
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    <form className="space-y-4" onSubmit={onSubmit}>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-slate-700" htmlFor="email">이메일</label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(event) => setEmail(event.target.value)}
+                                placeholder="name@company.com"
+                                autoComplete="email"
+                            />
+                        </div>
 
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {isLoading ? '로그인 중...' : '로그인'}
-                    </button>
-                </form>
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-slate-700" htmlFor="password">비밀번호</label>
+                            <Input
+                                id="password"
+                                type="password"
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                                placeholder="비밀번호 입력"
+                                autoComplete="current-password"
+                            />
+                        </div>
 
-                <p className="mt-4 text-sm text-muted-foreground">
-                    계정이 없다면{' '}
-                    <Link className="font-medium text-primary hover:underline" to="/signup">
-                        메일 인증 가입
-                    </Link>
-                </p>
+                        {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+
+                        <Button type="submit" disabled={isLoading} className="w-full">
+                            {isLoading ? '로그인 중...' : '로그인'}
+                        </Button>
+                    </form>
+
+                    <p className="mt-5 text-sm text-muted-foreground">
+                        계정이 없다면{' '}
+                        <Link className="font-semibold text-primary hover:underline" to="/signup">
+                            메일 인증 가입
+                        </Link>
+                    </p>
+                </div>
             </div>
         </div>
     );

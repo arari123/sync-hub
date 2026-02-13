@@ -52,7 +52,7 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
     const basePath = `/project-management/projects/${resolvedProjectId}`;
 
     return (
-        <nav className={cn('bg-secondary p-1 rounded-lg inline-flex flex-wrap items-center justify-end gap-1', className)}>
+        <nav className={cn('app-surface-soft inline-flex flex-wrap items-center justify-end gap-1 p-1.5', className)}>
             {MENU_ITEMS.map((item) => {
                 const to = `${basePath}${item.subPath}`;
                 const isActive = isMenuItemActive(item.key, location.pathname, basePath);
@@ -60,12 +60,8 @@ const ProjectContextNav = ({ projectId = '', className = '' }) => {
                     <Link
                         key={item.key}
                         to={to}
-                        className={cn(
-                            'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                            isActive
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:bg-card hover:text-foreground',
-                        )}
+                        data-active={isActive}
+                        className="nav-pill"
                     >
                         {item.label}
                     </Link>

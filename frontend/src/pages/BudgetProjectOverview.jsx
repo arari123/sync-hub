@@ -242,10 +242,10 @@ const BudgetProjectOverview = () => {
     const isSettingActive = pathname.startsWith(projectSettingPath);
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="app-shell min-h-screen bg-background text-foreground">
             <GlobalTopBar />
 
-            <div className="border-b border-border bg-secondary/80">
+            <div className="border-b border-border/80 bg-card/65 backdrop-blur">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2">
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <nav
@@ -265,83 +265,55 @@ const BudgetProjectOverview = () => {
                             </span>
                         </nav>
 
-                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap items-center justify-end gap-1">
+                        <div className="app-surface-soft inline-flex flex-wrap items-center justify-end gap-1 p-1.5">
                             <Link
                                 to={projectMainPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isProjectMainActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isProjectMainActive}
+                                className="nav-pill"
                             >
                                 프로젝트 메인
                             </Link>
 
                             <Link
                                 to={budgetManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isBudgetActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isBudgetActive}
+                                className="nav-pill"
                             >
                                 예산 메인
                             </Link>
 
                             <Link
                                 to={issueManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isIssueActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isIssueActive}
+                                className="nav-pill"
                             >
                                 이슈 관리
                             </Link>
                             <Link
                                 to={scheduleManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isScheduleActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isScheduleActive}
+                                className="nav-pill"
                             >
                                 일정 관리
                             </Link>
                             <Link
                                 to={specManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isSpecActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isSpecActive}
+                                className="nav-pill"
                             >
                                 사양 관리
                             </Link>
                             <Link
                                 to={dataManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isDataActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isDataActive}
+                                className="nav-pill"
                             >
                                 데이터 관리
                             </Link>
                             <Link
                                 to={projectSettingPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isSettingActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isSettingActive}
+                                className="nav-pill"
                             >
                                 프로젝트 설정
                             </Link>
@@ -350,7 +322,7 @@ const BudgetProjectOverview = () => {
                 </div>
             </div>
 
-            <main className="mx-auto max-w-[1600px] px-4 lg:px-6 py-5">
+            <main className="app-enter mx-auto max-w-[1640px] px-4 py-5 lg:px-6">
                 {error && (
                     <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {error}

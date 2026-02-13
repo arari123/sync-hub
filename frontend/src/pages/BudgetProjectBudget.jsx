@@ -1540,6 +1540,61 @@ const CostSummaryPanel = ({ panelBadge, items }) => (
     </section>
 );
 
+const TabCostMetricPanel = ({ panelBadge, costKey, budgetLabel, executionLabel, remainingLabel, budget, execution, remaining }) => {
+    const theme = SUMMARY_THEME[costKey] || SUMMARY_THEME.material;
+    const metricCards = [
+        {
+            key: 'budget',
+            label: budgetLabel,
+            value: budget,
+            valueClass: 'text-slate-900',
+            toneClass: 'border-blue-100 bg-blue-50/60',
+        },
+        {
+            key: 'execution',
+            label: executionLabel,
+            value: execution,
+            valueClass: 'text-slate-900',
+            toneClass: 'border-amber-100 bg-amber-50/60',
+        },
+        {
+            key: 'remaining',
+            label: remainingLabel,
+            value: remaining,
+            valueClass: remaining < 0 ? 'text-rose-600' : 'text-emerald-600',
+            toneClass: remaining < 0 ? 'border-rose-100 bg-rose-50/60' : 'border-emerald-100 bg-emerald-50/60',
+        },
+    ];
+
+    return (
+        <section className="rounded-2xl border border-slate-300/80 bg-gradient-to-br from-slate-100 to-slate-50 p-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between px-1">
+                <h3 className="text-xs font-bold tracking-[0.14em] text-slate-600">비용군 요약 패널</h3>
+                <span className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                    {panelBadge}
+                </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+                {metricCards.map((metric) => (
+                    <article key={metric.key} className={cn('rounded-xl border px-3 py-2.5 shadow-sm', metric.toneClass)}>
+                        <div className="flex items-center gap-2">
+                            <span className={cn('inline-flex rounded-md p-1.5', theme.categoryIcon)}>
+                                {costKey === 'material' && <Boxes className="h-3.5 w-3.5" />}
+                                {costKey === 'labor' && <Users className="h-3.5 w-3.5" />}
+                                {costKey === 'expense' && <Receipt className="h-3.5 w-3.5" />}
+                            </span>
+                            <p className="text-[11px] font-semibold tracking-wide text-slate-600">{metric.label}</p>
+                        </div>
+                        <p className={cn('mt-2 text-lg font-bold leading-none', metric.valueClass)}>
+                            {formatCompactNumber(metric.value)}
+                        </p>
+                    </article>
+                ))}
+            </div>
+        </section>
+    );
+};
+
 const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => (
     <div className="space-y-8">
         <CostSummaryPanel
@@ -1665,26 +1720,19 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => (
 const MaterialTabContent = ({ rows }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
-    const totalPercent = usagePercent(total.budget, total.execution);
     const phaseGroups = buildRowsByPhase(rows);
 
     return (
         <div className="space-y-8">
-            <CostSummaryPanel
+            <TabCostMetricPanel
                 panelBadge="재료비"
-                items={[
-                    {
-                        key: 'material',
-                        label: '재료비',
-                        budgetLabel: '재료비 총 예산',
-                        executionLabel: '재료비 집행금액',
-                        remainingLabel: '재료비 잔액',
-                        budget: total.budget,
-                        execution: total.execution,
-                        remaining,
-                        percent: totalPercent,
-                    },
-                ]}
+                costKey="material"
+                budgetLabel="재료비 총 예산"
+                executionLabel="재료비 집행금액"
+                remainingLabel="재료비 잔액"
+                budget={total.budget}
+                execution={total.execution}
+                remaining={remaining}
             />
 
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
@@ -1786,21 +1834,15 @@ const LaborTabContent = ({ rows }) => {
 
     return (
         <div className="space-y-8">
-            <CostSummaryPanel
+            <TabCostMetricPanel
                 panelBadge="인건비"
-                items={[
-                    {
-                        key: 'labor',
-                        label: '인건비',
-                        budgetLabel: '인건비 총 예산',
-                        executionLabel: '인건비 집행금액',
-                        remainingLabel: '인건비 잔액',
-                        budget: total.budget,
-                        execution: total.execution,
-                        remaining,
-                        percent: totalPercent,
-                    },
-                ]}
+                costKey="labor"
+                budgetLabel="인건비 총 예산"
+                executionLabel="인건비 집행금액"
+                remainingLabel="인건비 잔액"
+                budget={total.budget}
+                execution={total.execution}
+                remaining={remaining}
             />
 
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -1923,26 +1965,19 @@ const ExpenseTabContent = ({ rows }) => {
     const visibleRows = rows.filter((row) => !(toNumber(row.budget) === 0 && toNumber(row.execution) === 0));
     const total = summarizeBudgetExecution(visibleRows);
     const remaining = total.budget - total.execution;
-    const totalPercent = usagePercent(total.budget, total.execution);
     const phaseGroups = buildRowsByPhaseAndSource(visibleRows);
 
     return (
         <div className="space-y-8">
-            <CostSummaryPanel
+            <TabCostMetricPanel
                 panelBadge="경비"
-                items={[
-                    {
-                        key: 'expense',
-                        label: '경비',
-                        budgetLabel: '경비 총 예산',
-                        executionLabel: '경비 집행금액',
-                        remainingLabel: '경비 잔액',
-                        budget: total.budget,
-                        execution: total.execution,
-                        remaining,
-                        percent: totalPercent,
-                    },
-                ]}
+                costKey="expense"
+                budgetLabel="경비 총 예산"
+                executionLabel="경비 집행금액"
+                remainingLabel="경비 잔액"
+                budget={total.budget}
+                execution={total.execution}
+                remaining={remaining}
             />
 
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

@@ -3,6 +3,7 @@
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
 - 저장소 운영 규칙: `AGENTS.md`
+- localhost 시작/복구 가이드: `docs/localhost-startup.md`
 - PRD 템플릿/실행 계획: `docs/prd/`, `.agent/execplans/`, `PLANS.md`
 - 세션 재개 기준: `docs/session-handover-2026-02-08.md`
 - 프로젝트 입력 스펙: `docs/project-input-spec.md`
@@ -96,6 +97,7 @@
   - dedup: `/api/admin/dedup/clusters`, `/api/admin/dedup/clusters/{cluster_id}`, `/api/admin/dedup/audit`
 
 ## 검증/운영 스크립트
+- localhost 시작/복구: `scripts/start_localhost.sh`
 - 빠른 검증: `scripts/verify_fast.sh`
 - 전체 검증: `scripts/verify.sh`
 - 디자인 토큰 린트: `scripts/lint_frontend_design_tokens.py`

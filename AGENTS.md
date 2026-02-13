@@ -19,6 +19,8 @@
 - **프로젝트 입력 문서 동기화 규칙**: 프로젝트 생성/수정/버전/설비/예산상세(`budget_settings` 포함) 입력 항목이 추가·변경되면 같은 작업에서 `docs/project-input-spec.md`를 반드시 갱신한다.
 
 ## 명령어 가이드
+- `bash scripts/start_localhost.sh`: localhost 웹 기본 기동(자동 복구 포함).
+- `bash scripts/start_localhost.sh gpu`: GPU 포함 localhost 기동(자동 복구 포함).
 - `npm run verify`: 전체 테스트 및 린트 실행(추후 구현).
 - `npm run verify:fast`: 빠른 단위 테스트 실행(추후 구현).
 - `sudo docker-compose up -d`: 서비스 기동.
@@ -34,6 +36,7 @@
 
 ## 저장소 맵 (빠른 링크)
 - 자세한 구조는 [docs/repo-map.md](docs/repo-map.md)를 참고한다.
+- localhost 시작/복구 가이드는 [docs/localhost-startup.md](docs/localhost-startup.md)를 참고한다.
 
 ## 세션 재개 규칙
 - 새 세션에서 사용자가 **`다음 작업 진행해줘`** 또는 동일 의미의 재개 지시(예: `다음 작업 진행해주고 ...`)를 입력하면 재개 명령으로 처리한다.

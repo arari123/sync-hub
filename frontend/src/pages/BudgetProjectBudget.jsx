@@ -796,6 +796,7 @@ const BudgetProjectBudget = () => {
     const [isTotalFixed, setIsTotalFixed] = useState(false);
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
     const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
+    const [isInputMode, setIsInputMode] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -1328,13 +1329,28 @@ const BudgetProjectBudget = () => {
                                 );
                             })}
                         </div>
-                        <button
-                            type="button"
-                            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-                        >
-                            <Calculator className="h-3.5 w-3.5" />
-                            보고서 내보내기
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsInputMode((prev) => !prev)}
+                                aria-pressed={isInputMode}
+                                className={cn(
+                                    'inline-flex h-8 items-center rounded-md border px-3 text-xs font-semibold transition-colors',
+                                    isInputMode
+                                        ? 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+                                )}
+                            >
+                                입력 모드
+                            </button>
+                            <button
+                                type="button"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                            >
+                                <Calculator className="h-3.5 w-3.5" />
+                                보고서 내보내기
+                            </button>
+                        </div>
                     </div>
                 </nav>
 
@@ -1346,15 +1362,15 @@ const BudgetProjectBudget = () => {
                 )}
 
                 {activeBudgetTab === 'material' && (
-                    <MaterialTabContent rows={materialRows} />
+                    <MaterialTabContent rows={materialRows} isInputMode={isInputMode} />
                 )}
 
                 {activeBudgetTab === 'labor' && (
-                    <LaborTabContent rows={laborRows} />
+                    <LaborTabContent rows={laborRows} isInputMode={isInputMode} />
                 )}
 
                 {activeBudgetTab === 'expense' && (
-                    <ExpenseTabContent rows={expenseRows} />
+                    <ExpenseTabContent rows={expenseRows} isInputMode={isInputMode} />
                 )}
             </main>
         </div>
@@ -1632,8 +1648,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => (
     </div>
 );
 
-const MaterialTabContent = ({ rows }) => {
-    const [isInputMode, setIsInputMode] = useState(false);
+const MaterialTabContent = ({ rows, isInputMode }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const phaseGroups = buildRowsByPhase(rows);
@@ -1654,21 +1669,7 @@ const MaterialTabContent = ({ rows }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
                 <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-4">
                     <h3 className="text-lg font-bold text-slate-800">재료비 상세 내역</h3>
-                    <div className="flex items-center gap-2">
-                        {!isInputMode && <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">단위: 원</span>}
-                        <button
-                            type="button"
-                            onClick={() => setIsInputMode((prev) => !prev)}
-                            className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-bold transition-colors',
-                                isInputMode
-                                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-                            )}
-                        >
-                            {isInputMode ? '조회로 전환' : '입력으로 전환'}
-                        </button>
-                    </div>
+                    {!isInputMode && <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">단위: 원</span>}
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
@@ -1762,8 +1763,7 @@ const MaterialTabContent = ({ rows }) => {
     );
 };
 
-const LaborTabContent = ({ rows }) => {
-    const [isInputMode, setIsInputMode] = useState(false);
+const LaborTabContent = ({ rows, isInputMode }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const totalPercent = usagePercent(total.budget, total.execution);
@@ -1785,21 +1785,7 @@ const LaborTabContent = ({ rows }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                     <h3 className="text-sm font-bold tracking-wide text-slate-800">인건비 상세 내역</h3>
-                    <div className="flex items-center gap-2">
-                        {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
-                        <button
-                            type="button"
-                            onClick={() => setIsInputMode((prev) => !prev)}
-                            className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-bold transition-colors',
-                                isInputMode
-                                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-                            )}
-                        >
-                            {isInputMode ? '조회로 전환' : '입력으로 전환'}
-                        </button>
-                    </div>
+                    {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
@@ -1918,8 +1904,7 @@ const LaborTabContent = ({ rows }) => {
     );
 };
 
-const ExpenseTabContent = ({ rows }) => {
-    const [isInputMode, setIsInputMode] = useState(false);
+const ExpenseTabContent = ({ rows, isInputMode }) => {
     const visibleRows = rows.filter((row) => !(toNumber(row.budget) === 0 && toNumber(row.execution) === 0));
     const total = summarizeBudgetExecution(visibleRows);
     const remaining = total.budget - total.execution;
@@ -1941,21 +1926,7 @@ const ExpenseTabContent = ({ rows }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                     <h3 className="text-sm font-bold tracking-wide text-slate-800">경비 상세 내역</h3>
-                    <div className="flex items-center gap-2">
-                        {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
-                        <button
-                            type="button"
-                            onClick={() => setIsInputMode((prev) => !prev)}
-                            className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-bold transition-colors',
-                                isInputMode
-                                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-                            )}
-                        >
-                            {isInputMode ? '조회로 전환' : '입력으로 전환'}
-                        </button>
-                    </div>
+                    {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
                 </div>
                 {isInputMode ? (
                     <div className="p-4">

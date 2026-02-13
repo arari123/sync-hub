@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     BarChart3,
     Boxes,
@@ -797,6 +797,29 @@ const BudgetProjectBudget = () => {
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
     const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
     const [isInputMode, setIsInputMode] = useState(false);
+    const pendingScrollTopRef = useRef(null);
+
+    const handleBudgetTabChange = (nextTab) => {
+        if (nextTab === activeBudgetTab) return;
+        pendingScrollTopRef.current = window.scrollY;
+        setActiveBudgetTab(nextTab);
+    };
+
+    useLayoutEffect(() => {
+        if (!Number.isFinite(pendingScrollTopRef.current)) return;
+        const targetTop = pendingScrollTopRef.current;
+        pendingScrollTopRef.current = null;
+
+        const rafId = window.requestAnimationFrame(() => {
+            const maxTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
+            window.scrollTo(0, clampedTop);
+        });
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+        };
+    }, [activeBudgetTab]);
 
     useEffect(() => {
         const load = async () => {
@@ -1315,7 +1338,7 @@ const BudgetProjectBudget = () => {
                                     <button
                                         key={tab.key}
                                         type="button"
-                                        onClick={() => setActiveBudgetTab(tab.key)}
+                                        onClick={() => handleBudgetTabChange(tab.key)}
                                         className={cn(
                                             'inline-flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm transition-all focus-visible:outline-none',
                                             isActive

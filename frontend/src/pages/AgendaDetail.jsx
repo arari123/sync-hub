@@ -13,6 +13,7 @@ import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
+import { INPUT_COMMON_CLASS } from '../components/ui/Input';
 
 function numberValue(value, fallback = 0) {
     const parsed = Number(value);
@@ -412,7 +413,7 @@ export default function AgendaDetail() {
         return <p className="text-sm text-slate-500">안건 정보를 찾을 수 없습니다.</p>;
     }
 
-    const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20';
+    const inputClass = cn(INPUT_COMMON_CLASS, 'rounded-lg');
 
     return (
         <div className="space-y-5">
@@ -750,7 +751,10 @@ export default function AgendaDetail() {
                             value={commentText}
                             onChange={(event) => setCommentText(event.target.value)}
                             placeholder="코멘트를 입력하세요."
-                            className="min-h-[90px] w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                            className={cn(
+                                INPUT_COMMON_CLASS,
+                                'min-h-[90px] rounded-lg px-2 text-xs'
+                            )}
                         />
                         <button
                             type="button"

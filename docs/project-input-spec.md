@@ -208,6 +208,50 @@
 | `overseas_airfare_daily` | number | 350000 | 해외 항공료 일단가 |
 | `overseas_transport_daily_count` | number | 1 | 해외 교통 횟수 계수 |
 
+## 7.1 `schedule_wbs_json`(프로젝트 공통 일정) 입력 키
+
+`budget_projects.schedule_wbs_json`은 프로젝트 공통 WBS 일정 JSON이며, 버전 상세(`budget_detail_json`)와 별도로 저장된다.
+
+| key | type | 필수 | 기본값 | 설명 |
+|---|---|---|---|---|
+| `schema_version` | string | Y | `wbs.v1` | 스키마 버전 |
+| `weekend_mode` | string | Y | `exclude` | `exclude`(주말 제외) / `include`(주말 포함) |
+| `anchor_date` | string(YYYY-MM-DD) | Y | 생성일 기준 오늘 | 첫 일정 자동 산정 기준일 |
+| `groups` | object[] | Y | 기본 3개 루트 그룹 | 그룹 트리 |
+| `rows` | object[] | Y | `[]` | 일정/이벤트 행 |
+| `updated_at` | string | N | `""` | 마지막 저장 시각(ISO) |
+
+`groups[]` 필드:
+
+| key | type | 필수 | 설명 |
+|---|---|---|---|
+| `id` | string | Y | 그룹 식별자 |
+| `name` | string | Y | 그룹명 |
+| `stage` | string | Y | `design`/`fabrication`/`installation` |
+| `parent_group_id` | string\|null | Y | 상위 그룹 ID, 루트는 `null` |
+| `sort_order` | number | Y | 같은 부모 내 정렬순서 |
+| `is_system` | boolean | Y | 기본 루트 그룹 여부 |
+
+`rows[]` 필드:
+
+| key | type | 필수 | 설명 |
+|---|---|---|---|
+| `id` | string | Y | 행 식별자 |
+| `kind` | string | Y | `task`/`event` |
+| `name` | string | Y | 일정 명칭 |
+| `stage` | string | Y | 그룹과 동일 stage로 정규화 |
+| `parent_group_id` | string | Y | 소속 그룹 ID(단일 소속) |
+| `sort_order` | number | Y | 같은 그룹 내 정렬순서 |
+| `duration_days` | number | Y | 작업일(`event`는 0 고정) |
+| `start_date` | string(YYYY-MM-DD) | Y | 시작일 |
+| `end_date` | string(YYYY-MM-DD) | Y | 종료일 |
+| `note` | string | N | 비고 |
+
+운영 규칙:
+- 기본 루트 그룹: `stage-design`, `stage-fabrication`, `stage-installation`는 항상 존재하며 삭제/명칭 변경 불가.
+- 커스텀 그룹은 동일 루트 stage 내부에서만 생성 가능.
+- `event`는 항상 `duration_days=0`, `start_date=end_date`로 정규화.
+
 ## 8. 자동 계산 규칙(데이터 생성 시 반영 권장)
 
 - 재료비: `quantity * unit_price * material_unit_counts(scope)`

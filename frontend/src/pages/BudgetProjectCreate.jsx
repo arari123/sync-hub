@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
+import { Input } from '../components/ui/Input';
 
 function parseEquipmentNames(value) {
     const raw = String(value || '');
@@ -284,7 +285,7 @@ const BudgetProjectCreate = () => {
                     <form
                         id="project-create-form"
                         onSubmit={createProject}
-                        className="mx-auto max-w-5xl space-y-10 pb-12 [&_input]:border-slate-300 [&_input]:text-slate-900 [&_input]:placeholder:text-slate-500 [&_input]:caret-slate-900 [&_input:focus]:border-primary [&_input:focus]:ring-primary/20 [&_select]:border-slate-300 [&_select]:text-slate-900 [&_select:focus]:border-primary [&_select:focus]:ring-primary/20 [&_textarea]:border-slate-300 [&_textarea]:text-slate-900 [&_textarea]:placeholder:text-slate-500 [&_textarea:focus]:border-primary [&_textarea:focus]:ring-primary/20"
+                        className="mx-auto max-w-5xl space-y-10 pb-12 [&_input]:border-input [&_input]:bg-card [&_input]:text-foreground [&_input]:placeholder:text-muted-foreground/90 [&_input]:caret-foreground [&_input:focus-visible]:border-primary [&_input:focus-visible]:ring-ring/30 [&_select]:border-input [&_select]:bg-card [&_select]:text-foreground [&_select:focus-visible]:border-primary [&_select:focus-visible]:ring-ring/30 [&_textarea]:border-input [&_textarea]:bg-card [&_textarea]:text-foreground [&_textarea]:placeholder:text-muted-foreground/90 [&_textarea:focus-visible]:border-primary [&_textarea:focus-visible]:ring-ring/30"
                     >
                         <section>
                             <h2 className="mb-6 border-b border-slate-100 pb-2 text-lg font-bold text-slate-900">
@@ -319,8 +320,8 @@ const BudgetProjectCreate = () => {
                                         <label className="mb-2 block text-sm font-medium text-slate-700">
                                             프로젝트명 <span className="text-rose-500">*</span>
                                         </label>
-                                        <input
-                                            className="w-full rounded-md border-slate-300 bg-white text-sm shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
+                                        <Input
+                                            className="w-full text-sm"
                                             placeholder="예: 2차전지 조립 자동화 라인 A1"
                                             value={name}
                                             onChange={(event) => setName(event.target.value)}
@@ -332,8 +333,8 @@ const BudgetProjectCreate = () => {
                                         </label>
                                         <div className="relative">
                                             <QrCode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                            <input
-                                                className="w-full rounded-md border-slate-300 bg-white pl-10 font-mono text-sm uppercase shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
+                                            <Input
+                                                className="w-full pl-10 font-mono text-sm uppercase"
                                                 placeholder="PRJ-2026-XXXX"
                                                 value={code}
                                                 onChange={(event) => setCode(event.target.value)}
@@ -363,8 +364,8 @@ const BudgetProjectCreate = () => {
                                     <label className="mb-2 block text-sm font-medium text-slate-700">고객사</label>
                                     <div className="relative">
                                         <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            className="w-full rounded-md border-slate-300 bg-white pl-10 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
+                                        <Input
+                                            className="w-full pl-10 text-sm"
                                             placeholder="고객사 검색 또는 입력"
                                             value={customerName}
                                             onChange={(event) => setCustomerName(event.target.value)}
@@ -376,8 +377,8 @@ const BudgetProjectCreate = () => {
                                     <label className="mb-2 block text-sm font-medium text-slate-700">설치 장소</label>
                                     <div className="relative">
                                         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            className="w-full rounded-md border-slate-300 bg-white pl-10 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
+                                        <Input
+                                            className="w-full pl-10 text-sm"
                                             placeholder="도시 또는 국가 입력"
                                             value={installationSite}
                                             onChange={(event) => setInstallationSite(event.target.value)}
@@ -407,8 +408,8 @@ const BudgetProjectCreate = () => {
                                     <label className="mb-2 block text-sm font-medium text-slate-700">출장 거리(편도, km)</label>
                                     <div className="relative">
                                         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            className="w-full rounded-md border-slate-300 bg-white pl-10 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
+                                        <Input
+                                            className="w-full pl-10 text-sm"
                                             placeholder="예: 15"
                                             value={businessTripDistanceKm}
                                             onChange={(event) => setBusinessTripDistanceKm(event.target.value.replace(/[^0-9.]/g, ''))}
@@ -433,25 +434,25 @@ const BudgetProjectCreate = () => {
                                     {clientContacts.map((contact, index) => (
                                         <div key={`contact-${index}`} className="grid grid-cols-1 items-start gap-3 sm:grid-cols-12">
                                             <div className="sm:col-span-3">
-                                                <input
-                                                    className="w-full rounded-md border-slate-300 bg-white text-sm shadow-sm focus:border-primary focus:ring-primary/20"
+                                                <Input
+                                                    className="w-full text-sm"
                                                     placeholder="이름"
                                                     value={contact.name}
                                                     onChange={(event) => updateContactField(index, 'name', event.target.value)}
                                                 />
                                             </div>
                                             <div className="sm:col-span-3">
-                                                <input
-                                                    className="w-full rounded-md border-slate-300 bg-white text-sm shadow-sm focus:border-primary focus:ring-primary/20"
+                                                <Input
+                                                    className="w-full text-sm"
                                                     placeholder="부서"
                                                     value={contact.department}
                                                     onChange={(event) => updateContactField(index, 'department', event.target.value)}
                                                 />
                                             </div>
                                             <div className="sm:col-span-3">
-                                                <input
+                                                <Input
                                                     type="email"
-                                                    className="w-full rounded-md border-slate-300 bg-white text-sm shadow-sm focus:border-primary focus:ring-primary/20"
+                                                    className="w-full text-sm"
                                                     placeholder="이메일"
                                                     value={contact.email}
                                                     onChange={(event) => updateContactField(index, 'email', event.target.value)}
@@ -459,8 +460,8 @@ const BudgetProjectCreate = () => {
                                             </div>
                                             <div className="sm:col-span-3">
                                                 <div className="flex items-center gap-2">
-                                                    <input
-                                                        className="w-full rounded-md border-slate-300 bg-white text-sm shadow-sm focus:border-primary focus:ring-primary/20"
+                                                    <Input
+                                                        className="w-full text-sm"
                                                         placeholder="전화번호"
                                                         value={contact.phone}
                                                         onChange={(event) => updateContactField(index, 'phone', event.target.value)}

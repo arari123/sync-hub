@@ -3,6 +3,8 @@ import {
     BarChart3,
     Boxes,
     Calculator,
+    ChevronDown,
+    ChevronRight,
     Loader2,
     Receipt,
     Scale,
@@ -252,9 +254,24 @@ function ensureMaterialUnitBucket(map, unitName) {
             quantityTotal: 0,
             budgetAmount: 0,
             executionAmount: 0,
+            parts: new Map(),
         });
     }
     return map.get(unitName);
+}
+
+function ensureMaterialPartBucket(map, partName) {
+    const normalizedPartName = String(partName || '').trim() || '미지정 파츠';
+    if (!map.has(normalizedPartName)) {
+        map.set(normalizedPartName, {
+            partName: normalizedPartName,
+            modelName: '',
+            quantityTotal: 0,
+            budgetAmount: 0,
+            executionAmount: 0,
+        });
+    }
+    return map.get(normalizedPartName);
 }
 
 function ensureNamedAmountBucket(map, key, fallbackLabel = '미지정 항목') {
@@ -296,7 +313,7 @@ function sortByAmountDesc(items, key = 'budgetAmount') {
     return [...(items || [])].sort((a, b) => {
         const diff = toNumber(b?.[key]) - toNumber(a?.[key]);
         if (diff !== 0) return diff;
-        return String(a?.name || a?.unitName || '').localeCompare(String(b?.name || b?.unitName || ''), 'ko-KR');
+        return String(a?.name || a?.unitName || a?.partName || '').localeCompare(String(b?.name || b?.unitName || b?.partName || ''), 'ko-KR');
     });
 }
 
@@ -371,6 +388,7 @@ function buildBudgetViewModel({
                         unit.quantityTotal,
                         formatAmount(unit.budgetAmount),
                         formatAmount(unit.executionAmount),
+                        ...((unit.parts || []).map((part) => part.partName)),
                     ]))
                     : baseMaterialRows;
                 const materialLabelMatch = hasKeyword && (equipmentLabelMatch || phaseLabelMatch || includesKeyword(COST_TYPE_LABEL.material, keyword));
@@ -569,25 +587,49 @@ function getBudgetStatusMeta(budget, execution) {
 
 function buildMaterialRows(items) {
     const rows = [];
+    const formatPartDisplayName = (part) => {
+        const partName = String(part?.partName || '').trim() || '미지정 파츠';
+        const modelName = String(part?.modelName || '').trim();
+        return modelName ? `${partName}(${modelName})` : partName;
+    };
     (items || []).forEach((equipment) => {
         PHASES.forEach((phase) => {
             const phaseView = equipment.phases?.[phase];
             if (!phaseView?.material?.isVisible) return;
             (phaseView.material.units || []).forEach((unit) => {
-                const quantity = toNumber(unit.quantityTotal);
+                const unitCount = Math.max(1, toNumber(unit.unitCount) || 1);
+                const quantity = unitCount;
                 const budget = toNumber(unit.budgetAmount);
                 const execution = toNumber(unit.executionAmount);
+                const partRows = (unit.parts || []).map((part) => {
+                    const partQuantityPerUnit = toNumber(part.quantityTotal);
+                    const partBudget = toNumber(part.budgetAmount);
+                    const partExecution = toNumber(part.executionAmount);
+                    const partTotalQuantity = partQuantityPerUnit * unitCount;
+                    return {
+                        key: `${equipment.name}-${phase}-material-${unit.unitName}-part-${part.partName}`,
+                        partName: part.partName,
+                        modelName: part.modelName || '',
+                        displayName: formatPartDisplayName(part),
+                        quantity: partTotalQuantity,
+                        unitCost: partTotalQuantity > 0 ? partBudget / partTotalQuantity : 0,
+                        budget: partBudget,
+                        execution: partExecution,
+                    };
+                });
                 rows.push({
                     key: `${equipment.name}-${phase}-material-${unit.unitName}`,
                     phase,
                     equipmentName: equipment.name,
                     unitName: unit.unitName,
                     partCount: toNumber(unit.partCount),
+                    unitCount,
                     quantity,
-                    unitCost: quantity > 0 ? budget / quantity : 0,
+                    unitCost: unitCount > 0 ? budget / unitCount : 0,
                     budget,
                     execution,
                     remaining: budget - execution,
+                    parts: partRows,
                 });
             });
         });
@@ -728,17 +770,64 @@ function buildSummaryCategoryRows(items, summaryView) {
             },
         },
     };
+    const materialUnitsByPhase = {
+        fabrication: [],
+        installation: [],
+    };
+    const materialEquipmentSet = new Set();
 
     (items || []).forEach((equipment) => {
         PHASES.forEach((phase) => {
             const phaseData = equipment?.phases?.[phase];
             if (!phaseData) return;
+            (phaseData.material?.units || []).forEach((unit) => {
+                materialEquipmentSet.add(equipment.name);
+                const unitBudget = toNumber(unit?.budgetAmount);
+                const unitExecution = toNumber(unit?.executionAmount);
+                const unitCount = Math.max(1, toNumber(unit?.unitCount) || 1);
+                const unitKey = `material::${phase}::${equipment.name}::${unit.unitName}`;
+                const sortedParts = sortByAmountDesc(unit?.parts || [], 'budgetAmount');
+                materialUnitsByPhase[phase].push({
+                    key: unitKey,
+                    equipmentName: equipment.name,
+                    unitName: unit.unitName,
+                    partCount: toNumber(unit?.partCount),
+                    quantity: unitCount,
+                    budget: unitBudget,
+                    execution: unitExecution,
+                    remaining: unitBudget - unitExecution,
+                    percent: usagePercent(unitBudget, unitExecution),
+                    parts: sortedParts.map((part) => {
+                        const partBudget = toNumber(part?.budgetAmount);
+                        const partExecution = toNumber(part?.executionAmount);
+                        const partQuantityPerUnit = toNumber(part?.quantityTotal);
+                        return {
+                            key: `${unitKey}::${part.partName}`,
+                            partName: String(part?.partName || '미지정 파츠'),
+                            quantity: partQuantityPerUnit * unitCount,
+                            budget: partBudget,
+                            execution: partExecution,
+                            remaining: partBudget - partExecution,
+                            percent: usagePercent(partBudget, partExecution),
+                        };
+                    }),
+                });
+            });
             COST_TYPES.forEach((type) => {
                 const bucket = phaseData[type];
                 if (!bucket?.isVisible) return;
                 categoryMap[type].phaseValues[phase].budget += toNumber(bucket.budget);
                 categoryMap[type].phaseValues[phase].execution += toNumber(bucket.execution);
             });
+        });
+    });
+    PHASES.forEach((phase) => {
+        materialUnitsByPhase[phase] = [...materialUnitsByPhase[phase]].sort((a, b) => {
+            const diff = toNumber(b?.budget) - toNumber(a?.budget);
+            if (diff !== 0) return diff;
+            const aName = `${a?.equipmentName || ''}::${a?.unitName || ''}`;
+            const bName = `${b?.equipmentName || ''}::${b?.unitName || ''}`;
+            return aName.localeCompare(bName, 'ko-KR');
         });
     });
 
@@ -752,6 +841,7 @@ function buildSummaryCategoryRows(items, summaryView) {
             execution,
             remaining,
             percent: usagePercent(budget, execution),
+            equipmentCount: type === 'material' ? materialEquipmentSet.size : 0,
             children: PHASES.map((phase) => {
                 const phaseBudget = toNumber(categoryMap[type].phaseValues[phase].budget);
                 const phaseExecution = toNumber(categoryMap[type].phaseValues[phase].execution);
@@ -762,6 +852,7 @@ function buildSummaryCategoryRows(items, summaryView) {
                     execution: phaseExecution,
                     remaining: phaseBudget - phaseExecution,
                     percent: usagePercent(phaseBudget, phaseExecution),
+                    units: type === 'material' ? materialUnitsByPhase[phase] : [],
                 };
             }),
         };
@@ -907,6 +998,8 @@ const BudgetProjectBudget = () => {
             if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
+            const partName = String(row?.part_name || row?.spec || '미지정 파츠').trim() || '미지정 파츠';
+            const modelName = String(row?.spec || '').trim();
             const unitScopeKey = materialUnitScopeKeyFromRow(row);
             const unitCount = Math.max(1, Number(materialUnitCountMap[unitScopeKey] || 1));
             const amount = toNumber(row?.quantity) * toNumber(row?.unit_price) * unitCount;
@@ -914,12 +1007,18 @@ const BudgetProjectBudget = () => {
             const equipment = ensureEquipmentBucket(equipmentMap, equipmentName);
             const phaseBucket = equipment.phases[phase];
             const unitBucket = ensureMaterialUnitBucket(phaseBucket.materialUnits, unitName);
+            const partBucket = ensureMaterialPartBucket(unitBucket.parts, partName);
 
             phaseBucket.totals.material.budget += amount;
             unitBucket.unitCount = Math.max(1, toNumber(unitCount));
-            unitBucket.partCount += 1;
             unitBucket.quantityTotal += toNumber(row?.quantity);
             unitBucket.budgetAmount += amount;
+            partBucket.quantityTotal += toNumber(row?.quantity);
+            partBucket.budgetAmount += amount;
+            if (modelName) {
+                partBucket.modelName = modelName;
+            }
+            unitBucket.partCount = unitBucket.parts.size;
         });
 
         (details?.execution_material_items || []).forEach((row) => {
@@ -927,6 +1026,8 @@ const BudgetProjectBudget = () => {
             if (!equipmentName) return;
             const phase = normalizePhase(row?.phase);
             const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
+            const partName = String(row?.part_name || row?.spec || '미지정 파츠').trim() || '미지정 파츠';
+            const modelName = String(row?.spec || '').trim();
             const unitScopeKey = materialUnitScopeKeyFromRow(row);
             const unitCount = Math.max(1, Number(materialUnitCountMap[unitScopeKey] || 1));
             const amount = toNumber(row?.executed_amount);
@@ -934,10 +1035,16 @@ const BudgetProjectBudget = () => {
             const equipment = ensureEquipmentBucket(equipmentMap, equipmentName);
             const phaseBucket = equipment.phases[phase];
             const unitBucket = ensureMaterialUnitBucket(phaseBucket.materialUnits, unitName);
+            const partBucket = ensureMaterialPartBucket(unitBucket.parts, partName);
 
             phaseBucket.totals.material.execution += amount;
             unitBucket.unitCount = Math.max(1, toNumber(unitCount));
             unitBucket.executionAmount += amount;
+            partBucket.executionAmount += amount;
+            if (!partBucket.modelName && modelName) {
+                partBucket.modelName = modelName;
+            }
+            unitBucket.partCount = unitBucket.parts.size;
         });
 
         (details?.labor_items || []).forEach((row) => {
@@ -1025,7 +1132,13 @@ const BudgetProjectBudget = () => {
                         budget: materialBudget,
                         execution: materialExecution,
                         remaining: materialBudget - materialExecution,
-                        units: sortByAmountDesc(Array.from(phaseBucket.materialUnits.values()), 'budgetAmount'),
+                        units: sortByAmountDesc(
+                            Array.from(phaseBucket.materialUnits.values()).map((unit) => ({
+                                ...unit,
+                                parts: sortByAmountDesc(Array.from(unit.parts.values()), 'budgetAmount'),
+                            })),
+                            'budgetAmount',
+                        ),
                     },
                     labor: {
                         budget: laborBudget,
@@ -1554,132 +1667,336 @@ const TabCostMetricPanel = ({ panelBadge, costKey, budgetLabel, executionLabel, 
     );
 };
 
-const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => (
-    <div className="space-y-8">
-        <CostSummaryPanel
-            panelBadge="재료비/인건비/경비"
-            items={summaryCategoryRows.map((category) => ({
-                key: category.key,
-                label: COST_TYPE_LABEL[category.key],
-                budgetLabel: '예산',
-                executionLabel: '집행금액',
-                remainingLabel: '잔여 예산',
-                budget: category.budget,
-                execution: category.execution,
-                remaining: category.remaining,
-                percent: category.percent,
-            }))}
-        />
+const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
+    const materialCategory = useMemo(
+        () => summaryCategoryRows.find((category) => category.key === 'material') || null,
+        [summaryCategoryRows],
+    );
+    const materialPhaseKeys = useMemo(
+        () => (materialCategory?.children || []).map((child) => child.key),
+        [materialCategory],
+    );
+    const materialUnitKeysByPhase = useMemo(() => {
+        const mapped = {};
+        (materialCategory?.children || []).forEach((child) => {
+            mapped[child.key] = (child.units || []).map((unit) => unit.key);
+        });
+        return mapped;
+    }, [materialCategory]);
+    const materialUnitKeys = useMemo(
+        () => Object.values(materialUnitKeysByPhase).flat(),
+        [materialUnitKeysByPhase],
+    );
+    const [expandedMaterialPhaseKeys, setExpandedMaterialPhaseKeys] = useState([]);
+    const [expandedMaterialUnitKeys, setExpandedMaterialUnitKeys] = useState([]);
 
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-4">
-                <h3 className="text-lg font-bold text-slate-800">통합 원가 상세</h3>
-                <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">보기: 단계별 상세</span>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm text-left">
-                    <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
-                        <tr>
-                            <th className="w-1/4 px-6 py-4 font-semibold">비용 구분 / 단계</th>
-                            <th className="px-6 py-4 text-right font-semibold">배정 예산</th>
-                            <th className="px-6 py-4 text-right font-semibold">집행 금액</th>
-                            <th className="px-6 py-4 text-right font-semibold">편차(잔액)</th>
-                            <th className="w-36 px-6 py-4 text-center font-semibold">진행률</th>
-                            <th className="w-24 px-6 py-4 text-center font-semibold">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-slate-700">
-                        {summaryCategoryRows.map((category) => {
-                            const theme = SUMMARY_THEME[category.key];
-                            return (
-                                <React.Fragment key={category.key}>
-                                    <tr className="bg-slate-50 font-medium">
-                                        <td className="px-6 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn('rounded p-1.5', theme.categoryIcon)}>
-                                                    {category.key === 'material' && <Boxes className="h-4 w-4" />}
-                                                    {category.key === 'labor' && <Users className="h-4 w-4" />}
-                                                    {category.key === 'expense' && <Receipt className="h-4 w-4" />}
-                                                </div>
-                                                <span className="font-bold text-slate-900">{category.label}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-3 text-right text-slate-900">{formatCompactNumber(category.budget)}</td>
-                                        <td className="px-6 py-3 text-right text-slate-900">{formatCompactNumber(category.execution)}</td>
-                                        <td className={cn('px-6 py-3 text-right', category.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                            {formatCompactNumber(category.remaining)}
-                                        </td>
-                                        <td className="px-6 py-3">
-                                            <div className="h-1.5 w-full rounded-full bg-slate-200">
-                                                <div className={cn('h-1.5 rounded-full', theme.categoryProgress)} style={{ width: `${Math.min(category.percent, 100)}%` }} />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-3 text-center">
-                                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-slate-700">합계</span>
-                                        </td>
-                                    </tr>
-                                    {category.children.map((child) => {
-                                        const childStatus = getBudgetStatusMeta(child.budget, child.execution);
-                                        return (
-                                            <tr key={child.key} className={cn('bg-white transition hover:bg-slate-50 border-l-4', theme.childBorder)}>
-                                                <td className="px-6 py-3 pl-12 text-sm text-slate-600">{child.label}</td>
-                                                <td className="px-6 py-3 text-right text-slate-600">{formatCompactNumber(child.budget)}</td>
-                                                <td className="px-6 py-3 text-right text-slate-800">{formatCompactNumber(child.execution)}</td>
-                                                <td className={cn('px-6 py-3 text-right font-medium', child.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                    {formatCompactNumber(child.remaining)}
-                                                </td>
-                                                <td className="px-6 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-8 text-right text-[10px] text-slate-500">{child.percent.toFixed(0)}%</span>
-                                                        <div className="h-1 w-full rounded-full bg-slate-100">
-                                                            <div className={cn('h-1 rounded-full', theme.childProgress)} style={{ width: `${Math.min(child.percent, 100)}%` }} />
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-3 text-center">
-                                                    <span className={cn('rounded border px-2 py-1 text-xs font-medium', childStatus.className)}>
-                                                        {childStatus.label}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </React.Fragment>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+    useEffect(() => {
+        setExpandedMaterialPhaseKeys((prev) => prev.filter((key) => materialPhaseKeys.includes(key)));
+        setExpandedMaterialUnitKeys((prev) => prev.filter((key) => materialUnitKeys.includes(key)));
+    }, [materialPhaseKeys, materialUnitKeys]);
 
-        <section className="rounded-xl border border-blue-800 bg-blue-900 p-6 text-white shadow-lg">
-            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
-                <div>
-                    <h3 className="text-xl font-bold tracking-wide">프로젝트 통합 원가 검토</h3>
-                    <p className="mt-1 text-sm text-blue-200">재료비 + 인건비 + 경비 통합 집계</p>
+    const collapseAllMaterial = useCallback(() => {
+        setExpandedMaterialPhaseKeys([]);
+        setExpandedMaterialUnitKeys([]);
+    }, []);
+    const expandAllMaterial = useCallback(() => {
+        setExpandedMaterialPhaseKeys(materialPhaseKeys);
+        setExpandedMaterialUnitKeys(materialUnitKeys);
+    }, [materialPhaseKeys, materialUnitKeys]);
+    const toggleMaterialPhase = useCallback((phaseKey) => {
+        const phaseUnitKeys = materialUnitKeysByPhase[phaseKey] || [];
+        setExpandedMaterialPhaseKeys((prev) => {
+            const isExpanded = prev.includes(phaseKey);
+            if (isExpanded) {
+                setExpandedMaterialUnitKeys((unitPrev) => unitPrev.filter((unitKey) => !phaseUnitKeys.includes(unitKey)));
+                return prev.filter((key) => key !== phaseKey);
+            }
+            return [...prev, phaseKey];
+        });
+    }, [materialUnitKeysByPhase]);
+    const toggleMaterialUnit = useCallback((unitKey) => {
+        setExpandedMaterialUnitKeys((prev) => (
+            prev.includes(unitKey)
+                ? prev.filter((key) => key !== unitKey)
+                : [...prev, unitKey]
+        ));
+    }, []);
+
+    const hasMaterialTreeRows = materialUnitKeys.length > 0;
+    const allMaterialExpanded = hasMaterialTreeRows
+        && materialPhaseKeys.every((key) => expandedMaterialPhaseKeys.includes(key))
+        && materialUnitKeys.every((key) => expandedMaterialUnitKeys.includes(key));
+
+    return (
+        <div className="space-y-8">
+            <CostSummaryPanel
+                panelBadge="재료비/인건비/경비"
+                items={summaryCategoryRows.map((category) => ({
+                    key: category.key,
+                    label: COST_TYPE_LABEL[category.key],
+                    budgetLabel: '예산',
+                    executionLabel: '집행금액',
+                    remainingLabel: '잔여 예산',
+                    budget: category.budget,
+                    execution: category.execution,
+                    remaining: category.remaining,
+                    percent: category.percent,
+                }))}
+            />
+
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-lg font-bold text-slate-800">통합 원가 상세</h3>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={collapseAllMaterial}
+                            disabled={!expandedMaterialPhaseKeys.length && !expandedMaterialUnitKeys.length}
+                            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            모두 접기
+                        </button>
+                        <button
+                            type="button"
+                            onClick={expandAllMaterial}
+                            disabled={!hasMaterialTreeRows || allMaterialExpanded}
+                            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            모두 펼치기
+                        </button>
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">보기: 단계별 상세</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-8">
-                    <div className="text-right">
-                        <div className="mb-1 text-xs tracking-wider text-blue-200">총 편차</div>
-                        <div className={cn('text-2xl font-bold', summaryView.total.remaining < 0 ? 'text-rose-300' : 'text-emerald-400')}>
-                            {formatSignedCompact(summaryView.total.remaining)}
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[980px] text-sm text-left">
+                        <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
+                            <tr>
+                                <th className="w-1/4 px-6 py-4 font-semibold">비용 구분 / 단계</th>
+                                <th className="px-6 py-4 text-right font-semibold">배정 예산</th>
+                                <th className="px-6 py-4 text-right font-semibold">집행 금액</th>
+                                <th className="px-6 py-4 text-right font-semibold">편차(잔액)</th>
+                                <th className="w-36 px-6 py-4 text-center font-semibold">진행률</th>
+                                <th className="w-24 px-6 py-4 text-center font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-slate-700">
+                            {summaryCategoryRows.map((category) => {
+                                const theme = SUMMARY_THEME[category.key];
+                                const isMaterialCategory = category.key === 'material';
+                                return (
+                                    <React.Fragment key={category.key}>
+                                        <tr className="bg-slate-50 font-medium">
+                                            <td className="px-6 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn('rounded p-1.5', theme.categoryIcon)}>
+                                                        {category.key === 'material' && <Boxes className="h-4 w-4" />}
+                                                        {category.key === 'labor' && <Users className="h-4 w-4" />}
+                                                        {category.key === 'expense' && <Receipt className="h-4 w-4" />}
+                                                    </div>
+                                                    <span className="font-bold text-slate-900">{category.label}</span>
+                                                    {category.key === 'material' && (
+                                                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                                            설비 {formatCompactNumber(category.equipmentCount)}개
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-slate-900">{formatCompactNumber(category.budget)}</td>
+                                            <td className="px-6 py-3 text-right text-slate-900">{formatCompactNumber(category.execution)}</td>
+                                            <td className={cn('px-6 py-3 text-right', category.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                {formatCompactNumber(category.remaining)}
+                                            </td>
+                                            <td className="px-6 py-3">
+                                                <div className="h-1.5 w-full rounded-full bg-slate-200">
+                                                    <div className={cn('h-1.5 rounded-full', theme.categoryProgress)} style={{ width: `${Math.min(category.percent, 100)}%` }} />
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-center">
+                                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-slate-700">합계</span>
+                                            </td>
+                                        </tr>
+                                        {category.children.map((child) => {
+                                            const childStatus = getBudgetStatusMeta(child.budget, child.execution);
+                                            const isPhaseExpanded = isMaterialCategory && expandedMaterialPhaseKeys.includes(child.key);
+                                            const phaseUnits = isMaterialCategory ? (child.units || []) : [];
+                                            return (
+                                                <React.Fragment key={child.key}>
+                                                    <tr
+                                                        className={cn(
+                                                            'bg-white transition border-l-4',
+                                                            theme.childBorder,
+                                                            isMaterialCategory ? 'cursor-pointer hover:bg-slate-50' : '',
+                                                        )}
+                                                        onClick={isMaterialCategory ? () => toggleMaterialPhase(child.key) : undefined}
+                                                        role={isMaterialCategory ? 'button' : undefined}
+                                                        tabIndex={isMaterialCategory ? 0 : undefined}
+                                                        onKeyDown={isMaterialCategory
+                                                            ? (event) => {
+                                                                if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                                event.preventDefault();
+                                                                toggleMaterialPhase(child.key);
+                                                            }
+                                                            : undefined}
+                                                    >
+                                                        <td className="px-6 py-3 pl-12 text-sm text-slate-600">
+                                                            {isMaterialCategory ? (
+                                                                <div className="inline-flex items-center gap-1.5 text-left text-slate-700">
+                                                                    {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                    <span>{child.label}</span>
+                                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                                        {formatCompactNumber(phaseUnits.length)} 유닛
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                child.label
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-3 text-right text-slate-600">{formatCompactNumber(child.budget)}</td>
+                                                        <td className="px-6 py-3 text-right text-slate-800">{formatCompactNumber(child.execution)}</td>
+                                                        <td className={cn('px-6 py-3 text-right font-medium', child.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                            {formatCompactNumber(child.remaining)}
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-8 text-right text-[10px] text-slate-500">{child.percent.toFixed(0)}%</span>
+                                                                <div className="h-1 w-full rounded-full bg-slate-100">
+                                                                    <div className={cn('h-1 rounded-full', theme.childProgress)} style={{ width: `${Math.min(child.percent, 100)}%` }} />
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-3 text-center">
+                                                            <span className={cn('rounded border px-2 py-1 text-xs font-medium', childStatus.className)}>
+                                                                {childStatus.label}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    {isMaterialCategory && isPhaseExpanded && phaseUnits.map((unit) => {
+                                                        const isUnitExpanded = expandedMaterialUnitKeys.includes(unit.key);
+                                                        return (
+                                                            <React.Fragment key={unit.key}>
+                                                                <tr
+                                                                    className="cursor-pointer border-l-4 border-l-slate-200 bg-slate-50/50 hover:bg-slate-100/70"
+                                                                    onClick={() => toggleMaterialUnit(unit.key)}
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    onKeyDown={(event) => {
+                                                                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                                        event.preventDefault();
+                                                                        toggleMaterialUnit(unit.key);
+                                                                    }}
+                                                                >
+                                                                    <td className="px-6 py-3 pl-16 text-sm text-slate-700">
+                                                                        <div className="inline-flex items-center gap-1.5 text-left text-slate-700">
+                                                                            {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                            <span>
+                                                                                <span className="font-bold">{unit.equipmentName}</span>
+                                                                                <span className="mx-1 text-slate-500">/</span>
+                                                                                <span className="inline-flex items-center gap-1">
+                                                                                    <span>{unit.unitName}</span>
+                                                                                    <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                                                                        수량 {formatCompactNumber(unit.quantity)}
+                                                                                    </span>
+                                                                                </span>
+                                                                            </span>
+                                                                            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                                                                {formatCompactNumber(unit.partCount)} 파츠
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-3 text-right">{formatCompactNumber(unit.budget)}</td>
+                                                                    <td className="px-6 py-3 text-right">{formatCompactNumber(unit.execution)}</td>
+                                                                    <td className={cn('px-6 py-3 text-right font-medium', unit.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                                        {formatCompactNumber(unit.remaining)}
+                                                                    </td>
+                                                                    <td className="px-6 py-3" />
+                                                                    <td className="px-6 py-3" />
+                                                                </tr>
+                                                                {isUnitExpanded && (unit.parts || []).map((part) => {
+                                                                    return (
+                                                                        <tr key={part.key} className="border-l-4 border-l-slate-100 bg-slate-50/80">
+                                                                            <td className="px-6 py-3 pl-20 text-sm text-slate-600">
+                                                                                <div className="inline-flex items-center gap-2">
+                                                                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                                                                    <span>{part.partName}</span>
+                                                                                    <span className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                                                        수량 {formatCompactNumber(part.quantity)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-6 py-3 text-right">{formatCompactNumber(part.budget)}</td>
+                                                                            <td className="px-6 py-3 text-right">{formatCompactNumber(part.execution)}</td>
+                                                                            <td className={cn('px-6 py-3 text-right font-medium', part.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                                                {formatCompactNumber(part.remaining)}
+                                                                            </td>
+                                                                            <td className="px-6 py-3" />
+                                                                            <td className="px-6 py-3" />
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="rounded-xl border border-blue-800 bg-blue-900 p-6 text-white shadow-lg">
+                <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+                    <div>
+                        <h3 className="text-xl font-bold tracking-wide">프로젝트 통합 원가 검토</h3>
+                        <p className="mt-1 text-sm text-blue-200">재료비 + 인건비 + 경비 통합 집계</p>
+                    </div>
+                    <div className="flex items-center gap-8">
+                        <div className="text-right">
+                            <div className="mb-1 text-xs tracking-wider text-blue-200">총 편차</div>
+                            <div className={cn('text-2xl font-bold', summaryView.total.remaining < 0 ? 'text-rose-300' : 'text-emerald-400')}>
+                                {formatSignedCompact(summaryView.total.remaining)}
+                            </div>
+                        </div>
+                        <div className="hidden h-10 w-px bg-blue-700 md:block" />
+                        <div className="text-right">
+                            <div className="mb-1 text-xs tracking-wider text-blue-200">총 집행</div>
+                            <div className="text-3xl font-bold text-amber-200">₩ {formatCompactNumber(summaryView.total.execution)}</div>
                         </div>
                     </div>
-                    <div className="hidden h-10 w-px bg-blue-700 md:block" />
-                    <div className="text-right">
-                        <div className="mb-1 text-xs tracking-wider text-blue-200">총 집행</div>
-                        <div className="text-3xl font-bold text-amber-200">₩ {formatCompactNumber(summaryView.total.execution)}</div>
-                    </div>
                 </div>
-            </div>
-        </section>
-    </div>
-);
+            </section>
+        </div>
+    );
+};
 
 const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const phaseGroups = buildRowsByPhase(rows);
+    const allUnitKeys = useMemo(() => (rows || []).map((row) => row.key), [rows]);
+    const [expandedUnitKeys, setExpandedUnitKeys] = useState([]);
+    const allExpanded = allUnitKeys.length > 0 && allUnitKeys.every((key) => expandedUnitKeys.includes(key));
+
+    useEffect(() => {
+        setExpandedUnitKeys((prev) => prev.filter((key) => allUnitKeys.includes(key)));
+    }, [allUnitKeys]);
+
+    const collapseAllUnits = useCallback(() => {
+        setExpandedUnitKeys([]);
+    }, []);
+    const expandAllUnits = useCallback(() => {
+        setExpandedUnitKeys(allUnitKeys);
+    }, [allUnitKeys]);
+    const toggleUnitRow = useCallback((unitKey) => {
+        setExpandedUnitKeys((prev) => (
+            prev.includes(unitKey)
+                ? prev.filter((key) => key !== unitKey)
+                : [...prev, unitKey]
+        ));
+    }, []);
 
     return (
         <div className="space-y-8">
@@ -1697,7 +2014,27 @@ const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
                 <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-4">
                     <h3 className="text-lg font-bold text-slate-800">재료비 상세 내역</h3>
-                    {!isInputMode && <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">단위: 원</span>}
+                    {!isInputMode && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={collapseAllUnits}
+                                disabled={!expandedUnitKeys.length}
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                모두 접기
+                            </button>
+                            <button
+                                type="button"
+                                onClick={expandAllUnits}
+                                disabled={!allUnitKeys.length || allExpanded}
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                모두 펼치기
+                            </button>
+                            <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-500">단위: 원</span>
+                        </div>
+                    )}
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
@@ -1709,81 +2046,119 @@ const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1080px] text-sm text-left">
+                        <table className="w-full min-w-[900px] table-fixed text-sm text-left">
+                            <colgroup>
+                                <col className="w-[88px]" />
+                                <col className="w-[180px]" />
+                                <col />
+                                <col className="w-[110px]" />
+                                <col className="w-[150px]" />
+                                <col className="w-[170px]" />
+                            </colgroup>
                             <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
                                 <tr>
                                     <th className="w-24 px-4 py-3 text-center font-semibold">단계</th>
                                     <th className="px-4 py-3 font-semibold">설비</th>
-                                    <th className="px-4 py-3 font-semibold">유닛명</th>
-                                    <th className="w-24 px-4 py-3 text-right font-semibold">파트수</th>
+                                    <th className="px-4 py-3 font-semibold">명칭</th>
                                     <th className="w-24 px-4 py-3 text-right font-semibold">수량</th>
                                     <th className="w-32 px-4 py-3 text-right font-semibold">단가</th>
                                     <th className="w-32 px-4 py-3 text-right font-semibold">예산</th>
-                                    <th className="w-32 px-4 py-3 text-right font-semibold">잔액</th>
-                                    <th className="w-24 px-4 py-3 text-center font-semibold">상태</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 text-slate-700">
                                 {rows.length === 0 && (
                                     <tr>
-                                        <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={9}>
+                                        <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
                                             표시할 재료비 데이터가 없습니다.
                                         </td>
                                     </tr>
                                 )}
 
-                                {phaseGroups.map((group) => (
-                                    <React.Fragment key={group.phase}>
-                                        {group.rows.map((row, index) => (
-                                            <tr key={row.key} className={cn(index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}>
-                                                {index === 0 && (
-                                                    <td
-                                                        rowSpan={group.rows.length}
-                                                        className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
-                                                    >
-                                                        <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
-                                                            {group.phase === 'fabrication' ? '제작' : '설치'}
-                                                        </span>
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3 font-semibold">{row.equipmentName}</td>
-                                                <td className="px-4 py-3">{row.unitName}</td>
-                                                <td className="px-4 py-3 text-right">{formatCompactNumber(row.partCount)}</td>
-                                                <td className="px-4 py-3 text-right">{formatCompactNumber(row.quantity)}</td>
-                                                <td className="px-4 py-3 text-right">{formatWon(row.unitCost)}</td>
-                                                <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
-                                                <td className={cn('px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                    {formatWon(row.remaining)}
+                                {phaseGroups.map((group) => {
+                                    const phaseRowSpan = group.rows.reduce((sum, row) => (
+                                        sum + 1 + (expandedUnitKeys.includes(row.key) ? (row.parts || []).length : 0)
+                                    ), 0);
+
+                                    return (
+                                        <React.Fragment key={group.phase}>
+                                            {group.rows.map((row, index) => {
+                                                const isUnitExpanded = expandedUnitKeys.includes(row.key);
+                                                return (
+                                                    <React.Fragment key={row.key}>
+                                                        <tr
+                                                            className={cn(
+                                                                index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
+                                                                'cursor-pointer hover:bg-slate-100/70',
+                                                            )}
+                                                            onClick={() => toggleUnitRow(row.key)}
+                                                            role="button"
+                                                            tabIndex={0}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                                event.preventDefault();
+                                                                toggleUnitRow(row.key);
+                                                            }}
+                                                        >
+                                                            {index === 0 && (
+                                                                <td
+                                                                    rowSpan={phaseRowSpan}
+                                                                    className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
+                                                                >
+                                                                    <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
+                                                                        {group.phase === 'fabrication' ? '제작' : '설치'}
+                                                                    </span>
+                                                                </td>
+                                                            )}
+                                                            <td className="px-4 py-3 font-semibold">
+                                                                <div className="truncate" title={row.equipmentName}>{row.equipmentName}</div>
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                                    {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                    <span className="truncate" title={row.unitName}>{row.unitName}</span>
+                                                                    <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                                                        {formatCompactNumber(row.partCount)} 파츠
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">{formatCompactNumber(row.quantity)}</td>
+                                                            <td className="px-4 py-3 text-right">{formatWon(row.unitCost)}</td>
+                                                            <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                                                        </tr>
+                                                        {isUnitExpanded && (row.parts || []).map((part) => (
+                                                            <tr key={part.key} className="bg-slate-50/70">
+                                                                <td className="px-4 py-2" />
+                                                                <td className="px-4 py-2 pl-10 text-sm text-slate-600">
+                                                                    <div className="flex min-w-0 items-center gap-2">
+                                                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                                                        <span className="truncate" title={part.displayName}>{part.displayName}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-2 text-right text-sm text-slate-600">{formatCompactNumber(part.quantity)}</td>
+                                                                <td className="px-4 py-2 text-right text-sm text-slate-600">{formatWon(part.unitCost)}</td>
+                                                                <td className="px-4 py-2 text-right text-sm font-semibold text-slate-700">{formatWon(part.budget)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                            <tr className={PHASE_TOTAL_THEME[group.phase]}>
+                                                <td className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
+                                                    {group.label} 재료비 소계
                                                 </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <BudgetStatusBadge budget={row.budget} execution={row.execution} />
-                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
                                             </tr>
-                                        ))}
-                                        <tr className={PHASE_TOTAL_THEME[group.phase]}>
-                                            <td className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide" colSpan={6}>
-                                                {group.label} 재료비 소계
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
-                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.remaining)}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <BudgetStatusBadge budget={group.budget} execution={group.execution} />
-                                            </td>
-                                        </tr>
-                                    </React.Fragment>
-                                ))}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </tbody>
                             {rows.length > 0 && (
                                 <tfoot>
                                     <tr className="bg-slate-950 text-white">
-                                        <td className="px-4 py-4 text-right text-sm font-bold uppercase tracking-wide" colSpan={6}>
+                                        <td className="px-4 py-4 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
                                             프로젝트 재료비 총괄
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-4 text-right text-lg font-bold tabular-nums text-amber-300">{formatWon(total.budget)}</td>
-                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg font-bold tabular-nums text-amber-300">{formatWon(remaining)}</td>
-                                        <td className="px-4 py-4 text-center">
-                                            <BudgetStatusBadge budget={total.budget} execution={total.execution} />
-                                        </td>
                                     </tr>
                                 </tfoot>
                             )}

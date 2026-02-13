@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 function toNumber(value) {
     const number = Number(value || 0);
@@ -258,15 +259,15 @@ const BudgetProjectInfoEdit = () => {
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field label="프로젝트 이름" required>
-                        <input
-                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        <Input
+                            className="h-9 w-full"
                             value={editForm.name}
                             onChange={(event) => updateField('name', event.target.value)}
                         />
                     </Field>
                     <Field label="프로젝트 코드">
-                        <input
-                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        <Input
+                            className="h-9 w-full"
                             value={editForm.code}
                             onChange={(event) => updateField('code', event.target.value)}
                         />
@@ -310,22 +311,22 @@ const BudgetProjectInfoEdit = () => {
                         </select>
                     </Field>
                     <Field label="고객사">
-                        <input
-                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        <Input
+                            className="h-9 w-full"
                             value={editForm.customer_name}
                             onChange={(event) => updateField('customer_name', event.target.value)}
                         />
                     </Field>
                     <Field label="설치 장소">
-                        <input
-                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        <Input
+                            className="h-9 w-full"
                             value={editForm.installation_site}
                             onChange={(event) => updateField('installation_site', event.target.value)}
                         />
                     </Field>
                     <Field label="출장 거리(km)">
-                        <input
-                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        <Input
+                            className="h-9 w-full"
                             value={editForm.business_trip_distance_km}
                             onChange={(event) => updateField('business_trip_distance_km', event.target.value.replace(/[^0-9.]/g, ''))}
                             placeholder="편도 거리 입력"
@@ -373,8 +374,8 @@ const BudgetProjectInfoEdit = () => {
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
-                                <input
-                                    className="h-9 flex-1 rounded-md border bg-background px-3 text-sm"
+                                <Input
+                                    className="h-9 flex-1"
                                     value={equipmentDraft}
                                     onChange={(event) => setEquipmentDraft(event.target.value)}
                                     onKeyDown={(event) => {
@@ -405,8 +406,8 @@ const BudgetProjectInfoEdit = () => {
                 </Field>
 
                 <Field label="대표 이미지 URL">
-                    <input
-                        className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    <Input
+                        className="h-9 w-full"
                         placeholder="비워두면 자동 생성 이미지 사용"
                         value={editForm.cover_image_url}
                         onChange={(event) => updateField('cover_image_url', event.target.value)}

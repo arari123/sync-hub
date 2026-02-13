@@ -6,7 +6,7 @@ const MENU_ITEMS = [
     { key: 'overview', label: '프로젝트 메인', subPath: '' },
     { key: 'budget', label: '예산 메인', subPath: '/budget' },
     { key: 'issue', label: '이슈 관리', subPath: '/agenda' },
-    { key: 'schedule', label: '일정 관리', subPath: '/schedule' },
+    { key: 'scheduleManagement', label: '일정 관리', subPath: '/schedule' },
     { key: 'spec', label: '사양 관리', subPath: '/spec' },
     { key: 'data', label: '데이터 관리', subPath: '/data' },
     { key: 'info', label: '프로젝트 설정', subPath: '/info/edit' },
@@ -28,6 +28,7 @@ function isMenuItemActive(itemKey, pathname, basePath) {
     if (itemKey === 'overview') return isProjectOverviewPath(pathname, basePath);
     if (itemKey === 'budget') return isBudgetRootPath(pathname, basePath) || isBudgetInputPath(pathname, basePath);
     if (itemKey === 'info') return pathname.startsWith(`${basePath}/info/edit`);
+    if (itemKey === 'scheduleManagement') return pathname === `${basePath}/schedule` || pathname === `${basePath}/schedule/`;
     return pathname.startsWith(`${basePath}${MENU_ITEMS.find((item) => item.key === itemKey)?.subPath || ''}`);
 }
 

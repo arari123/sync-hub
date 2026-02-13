@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
+import { Input } from '../components/ui/Input';
 
 function formatHours(value) {
     const number = Number(value || 0);
@@ -242,11 +243,11 @@ export default function AgendaList() {
                 <form onSubmit={handleSearchSubmit} className="flex flex-col gap-2 lg:flex-row">
                     <div className="relative flex-1">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
+                        <Input
                             value={inputQuery}
                             onChange={(event) => setInputQuery(event.target.value)}
                             placeholder="검색어를 입력하세요. (공백/콤마로 복수 단어)"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                            className="h-10 w-full rounded-lg bg-card pl-9 pr-3 text-sm"
                         />
                     </div>
                     <button

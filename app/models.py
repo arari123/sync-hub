@@ -108,6 +108,7 @@ class BudgetProject(Base):
     business_trip_distance_km = Column(Float, nullable=True)
     cover_image_url = Column(String(500), nullable=True)
     summary_milestones_json = Column(String, nullable=True)
+    schedule_wbs_json = Column(String, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     manager_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     current_stage = Column(String(32), nullable=False, default="review", index=True)

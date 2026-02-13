@@ -5,6 +5,7 @@ import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
+import { INPUT_COMMON_CLASS } from '../components/ui/Input';
 
 const TAB_GENERAL = 'general';
 const TAB_REPORT = 'work_report';
@@ -233,7 +234,7 @@ export default function AgendaCreate() {
         });
     }, [activeTab, project]);
 
-    const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20';
+    const inputClass = cn(INPUT_COMMON_CLASS, 'rounded-lg');
 
     const setField = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));

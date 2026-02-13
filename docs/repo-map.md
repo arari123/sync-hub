@@ -1,5 +1,7 @@
 # Sync-Hub Repository Map
 
+- 업데이트 기준: 2026-02-13
+
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
 - 저장소 운영 규칙: `AGENTS.md`
@@ -18,6 +20,7 @@
 - `uploads/`: 런타임 업로드 파일(문서/안건 첨부)
 - `reports/`: OCR/리포트 산출물
 - `.agent/execplans/`: 작업 실행 계획 문서
+- `.firebase/`: Firebase 로컬 상태/캐시 파일
 
 ## Backend (`app/`)
 - `app/main.py`: FastAPI 앱 생성, CORS, 라우터 등록, 헬스체크
@@ -34,69 +37,86 @@
   - `pipeline.py`: 문서 처리 파이프라인(OCR/파싱/청킹/임베딩)
   - `vector_store.py`: Elasticsearch 하이브리드 검색
   - `document_summary.py`: 문서 유형 분류/요약
-  - `ocr.py`, `ocr_worker.py`: OCR 워커 연동/워커 API
+  - `ocr.py`: OCR 워커 헬스체크/연동
   - `budget_logic.py`: 예산 집계/정규화 로직
   - `auth_utils.py`, `auth_mailer.py`: 인증 유틸/메일 발송
   - `parsing/`, `chunking/`, `dedup/`, `indexing/`: 파싱/청킹/dedup/재색인 모듈
 - `app/cli/dedup_scan.py`: dedup 배치 스캔 CLI
+- `app/ocr_worker.py`: OCR 워커 FastAPI 서비스 엔트리포인트
+- `app/ocr_parsing_utils.py`: OCR 결과 정규화/후처리 유틸
 
 ## Frontend (`frontend/src/`)
 - `main.jsx`: React 엔트리
 - `App.jsx`: 전체 라우팅 정의
 - `components/`
   - `Layout.jsx`: 라우트별 공통 레이아웃/상단바 분기
+  - `ProtectedRoute.jsx`: 인증 가드
   - `GlobalTopBar.jsx`: 전역 상단바(검색/퀵메뉴/사용자)
+  - `ProjectResultList.jsx`: 프로젝트 검색 결과 카드 목록
+  - `HealthStatus.jsx`: 백엔드/의존성 헬스 상태 표시
   - `ProjectPageHeader.jsx`, `ProjectContextNav.jsx`: 프로젝트 페이지 브레드크럼/서브메뉴
-  - `BudgetBreadcrumb.jsx`, `BudgetSidebar.jsx`: 프로젝트 문맥 네비게이션
+  - `BudgetBreadcrumb.jsx`, `BudgetSidebar.jsx`: 예산 브레드크럼/입력 트리 네비게이션
   - `agenda/RichTextEditor.jsx`: 안건 작성용 리치 텍스트 에디터
   - `budget-dashboard/*Tab.jsx`: 예산 탭 UI 구성 컴포넌트
   - `ui/`: 공용 UI primitives (`Button`, `Input`, `Logo`)
 - `pages/`
   - `SearchResults.jsx`: 홈(`/home`) 통합 검색 화면
-  - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 라우트 미연결)
+  - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 `App.jsx`에서 직접 라우트 연결 없이 레거시 리다이렉트만 유지)
   - `BudgetProjectOverview.jsx`: 프로젝트 메인(상세 요약)
-  - `BudgetProjectBudget.jsx`: 예산 메인
+  - `BudgetProjectBudget.jsx`: 예산 메인(통합요약/재료비/인건비/경비)
   - `BudgetProjectEditor.jsx`: 재료비/인건비/경비 입력 탭
   - `BudgetProjectCreate.jsx`, `BudgetProjectInfoEdit.jsx`: 프로젝트 생성/설정
+  - `BudgetProjectScheduleManagement.jsx`: 프로젝트 일정 통합 조회/필터/타임라인 관리 페이지
+  - `BudgetProjectSchedule.jsx`: 프로젝트 공통 일정(WBS) 작성/편집 페이지
   - `AgendaList.jsx`, `AgendaCreate.jsx`, `AgendaDetail.jsx`: 안건 목록/작성/상세
-  - `ProjectPlaceholderPage.jsx`: 일정/사양/데이터 관리 임시 페이지
+  - `ProjectPlaceholderPage.jsx`: 사양/데이터 관리 임시 페이지
   - `Login.jsx`, `Signup.jsx`, `VerifyEmail.jsx`: 인증 페이지
 - `lib/`
   - `api.js`: API 호출 래퍼
   - `budgetSync.js`: 예산 데이터 갱신 브로드캐스트(입력/조회 페이지 동기화)
+  - `scheduleUtils.js`: WBS 일정 정규화/연쇄 계산/간트 유틸
   - `session.js`: 인증 세션 저장/조회
   - `highlight.jsx`, `utils.js`: 표시/유틸 함수
 
 ## 주요 프론트 라우트
+- `/`: `/home` 리다이렉트
 - `/home`: 메인 검색 페이지
+- `/search`: `/home` 리다이렉트(레거시)
 - `/project-management`: 레거시 경로(현재 `/home` 리다이렉트)
 - `/project-management/projects/new`: 프로젝트 생성
 - `/project-management/projects/:projectId`: 프로젝트 메인
+- `/project-management/projects/:projectId/info/edit`: 프로젝트 정보 수정
 - `/project-management/projects/:projectId/budget`: 예산 메인
+- `/project-management/projects/:projectId/budget-dashboard`: `/project-management/projects/:projectId/budget` 리다이렉트(레거시)
 - `/project-management/projects/:projectId/edit/:section`: 예산 상세 편집(`material|labor|expense`)
 - `/project-management/projects/:projectId/agenda`: 안건 목록
 - `/project-management/projects/:projectId/agenda/new`: 안건 작성
 - `/project-management/projects/:projectId/agenda/:agendaId`: 안건 상세
-- `/project-management/projects/:projectId/schedule`: 일정(임시)
+- `/project-management/projects/:projectId/joblist`: `/project-management/projects/:projectId/agenda` 리다이렉트(레거시)
+- `/project-management/projects/:projectId/schedule`: 일정 관리(통합 조회)
+- `/project-management/projects/:projectId/schedule/write`: 일정 작성(WBS 편집)
 - `/project-management/projects/:projectId/spec`: 사양(임시)
 - `/project-management/projects/:projectId/data`: 데이터 관리(임시)
+- `/knowledge`, `/settings`: `/home` 리다이렉트
+- `/budget-management/*`: `/project-management/*` 리다이렉트(레거시)
 
 ## 주요 API 엔드포인트
 - 기본/헬스: `GET /`, `GET /health`, `GET /health/detail`
 - 인증: `/auth/signup`, `/auth/verify-email`, `/auth/login`, `/auth/me`, `/auth/users`, `/auth/logout`
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
 - 예산:
-  - 프로젝트: `/budget/projects`, `/budget/projects/search`, `/budget/projects/{project_id}`, `/budget/projects/{project_id}/summary`
+  - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`, `POST /budget/projects`, `GET/PUT /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
+  - 일정: `GET/PUT /budget/projects/{project_id}/schedule`
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
-  - 상세: `/budget/versions/{version_id}/equipments`, `/budget/versions/{version_id}/details`
+  - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`
 - 안건:
   - 메타/목록: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`
-  - 생성/수정: `/agenda/projects/{project_id}/threads`, `/agenda/threads/{thread_id}/draft`, `/agenda/threads/{thread_id}/replies`
-  - 상세/코멘트: `/agenda/threads/{thread_id}`, `/agenda/threads/{thread_id}/entries/{entry_id}`, `/agenda/threads/{thread_id}/comments`
+  - 생성/수정: `POST /agenda/projects/{project_id}/threads`, `PUT /agenda/threads/{thread_id}/draft`, `POST /agenda/threads/{thread_id}/replies`
+  - 상세/코멘트: `GET /agenda/threads/{thread_id}`, `GET /agenda/threads/{thread_id}/entries/{entry_id}`, `GET/POST /agenda/threads/{thread_id}/comments`
   - 상태/재등록/첨부: `/agenda/threads/{thread_id}/status`, `/agenda/threads/{thread_id}/reregister-payload`, `/agenda/attachments/{attachment_id}/download`
 - 관리자:
   - 검색 디버그: `/api/admin/search_debug`
-  - dedup: `/api/admin/dedup/clusters`, `/api/admin/dedup/clusters/{cluster_id}`, `/api/admin/dedup/audit`
+  - dedup: `/api/admin/dedup/clusters`, `/api/admin/dedup/clusters/{cluster_id}`, `/api/admin/dedup/clusters/{cluster_id}/set_primary`, `/api/admin/dedup/documents/{doc_id}/ignore`, `/api/admin/dedup/audit`
 
 ## 검증/운영 스크립트
 - localhost 시작/복구: `scripts/start_localhost.sh`
@@ -105,6 +125,8 @@
 - 전체 검증: `scripts/verify.sh`
 - 디자인 토큰 린트: `scripts/lint_frontend_design_tokens.py`
 - 예산 목업 데이터 초기화: `scripts/reset_and_seed_budget_mock_data.py`
+- 검색 E2E 스모크: `scripts/search_e2e_smoke.py`
+- OCR 품질/비교 리포트: `scripts/generate_ocr_quality_report.py`, `scripts/generate_ocr_comparison_report.py`
 
 ## 테스트
 - 테스트 위치: `tests/`

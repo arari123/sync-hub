@@ -184,7 +184,7 @@
   }
 
   .topbar-shell {
-    @apply border-b border-border bg-card/88 backdrop-blur-xl;
+    @apply relative z-[60] overflow-visible border-b border-border bg-card/88 backdrop-blur-xl;
     box-shadow: 0 8px 26px -20px hsl(220 35% 20% / 0.52);
   }
 

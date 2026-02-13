@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Database, Grid2x2, Plus, Search } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '../lib/session';
+import { Input } from './ui/Input';
 
 const SEARCH_PLACEHOLDER = '프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색';
 
@@ -65,12 +66,12 @@ export default function GlobalTopBar() {
                     <form onSubmit={handleSearchSubmit} className="min-w-0 flex-1">
                         <label className="relative block">
                             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
-                            <input
+                            <Input
                                 type="text"
                                 value={inputQuery}
                                 onChange={(event) => setInputQuery(event.target.value)}
                                 placeholder={SEARCH_PLACEHOLDER}
-                                className="h-10 w-full rounded-full border border-border/90 bg-card/85 pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/15"
+                                className="h-10 w-full rounded-full border-border/90 bg-card/85 pl-11 pr-4 text-sm"
                             />
                         </label>
                     </form>
@@ -84,7 +85,7 @@ export default function GlobalTopBar() {
                             <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-primary">
                                 <Bell className="h-4 w-4" />
                             </button>
-                            <div className="relative" ref={quickMenuRef}>
+                            <div className="relative z-[70]" ref={quickMenuRef}>
                                 <button
                                     type="button"
                                     onClick={() => setIsQuickMenuOpen((prev) => !prev)}
@@ -96,7 +97,7 @@ export default function GlobalTopBar() {
                                 </button>
 
                                 {isQuickMenuOpen && (
-                                    <div className="app-surface-soft absolute right-0 top-11 z-30 w-60 p-3">
+                                    <div className="app-surface-soft absolute right-0 top-11 z-[90] w-60 p-3">
                                         <div className="grid grid-cols-2 gap-2">
                                             <Link
                                                 to="/project-management/projects/new"

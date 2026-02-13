@@ -26,6 +26,11 @@ if ! command -v gcloud >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "[ERROR] python3 is required."
+  exit 1
+fi
+
 ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
 if [[ -z "${ACTIVE_ACCOUNT}" ]]; then
   echo "[ERROR] No active gcloud account. Run: gcloud auth login"
@@ -37,15 +42,79 @@ if [[ ! -f "Dockerfile" ]]; then
   exit 1
 fi
 
+CURRENT_SERVICE_JSON=""
+if CURRENT_SERVICE_JSON="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format=json 2>/dev/null)"; then
+  :
+else
+  CURRENT_SERVICE_JSON=""
+fi
+
+get_current_env_var() {
+  local var_name="$1"
+  if [[ -z "${CURRENT_SERVICE_JSON}" ]]; then
+    return 0
+  fi
+  printf '%s' "${CURRENT_SERVICE_JSON}" | python3 - "${var_name}" <<'PY'
+import json
+import sys
+
+target = sys.argv[1]
+try:
+    payload = json.load(sys.stdin)
+except Exception:  # noqa: BLE001
+    raise SystemExit(0)
+
+containers = (((payload.get("spec") or {}).get("template") or {}).get("spec") or {}).get("containers") or []
+if not containers:
+    raise SystemExit(0)
+
+for env in containers[0].get("env") or []:
+    if env.get("name") == target and env.get("value") is not None:
+        print(str(env.get("value")))
+        break
+PY
+}
+
+get_current_annotation() {
+  local annotation_key="$1"
+  if [[ -z "${CURRENT_SERVICE_JSON}" ]]; then
+    return 0
+  fi
+  printf '%s' "${CURRENT_SERVICE_JSON}" | python3 - "${annotation_key}" <<'PY'
+import json
+import sys
+
+target = sys.argv[1]
+try:
+    payload = json.load(sys.stdin)
+except Exception:  # noqa: BLE001
+    raise SystemExit(0)
+
+annotations = (((payload.get("spec") or {}).get("template") or {}).get("metadata") or {}).get("annotations") or {}
+value = annotations.get(target)
+if value:
+    print(str(value))
+PY
+}
+
 FIREBASE_SITE="${FIREBASE_SITE:-${PROJECT_ID}}"
 FRONTEND_BASE_URL="${AUTH_FRONTEND_BASE_URL:-https://${FIREBASE_SITE}.web.app}"
 CORS_ALLOW_ORIGINS="${CORS_ALLOW_ORIGINS:-https://${FIREBASE_SITE}.web.app,https://${FIREBASE_SITE}.firebaseapp.com}"
-DATABASE_URL="${DATABASE_URL:-sqlite:////tmp/sync-hub.db}"
+CURRENT_DATABASE_URL="$(get_current_env_var DATABASE_URL)"
+CURRENT_AUTH_ALLOWED_EMAIL_DOMAINS="$(get_current_env_var AUTH_ALLOWED_EMAIL_DOMAINS)"
+CURRENT_CLOUD_SQL_INSTANCE_CONNECTION="$(get_current_annotation run.googleapis.com/cloudsql-instances)"
+
+DATABASE_URL_INPUT="${DATABASE_URL:-}"
+AUTH_ALLOWED_EMAIL_DOMAINS_INPUT="${AUTH_ALLOWED_EMAIL_DOMAINS:-}"
+CLOUD_SQL_INSTANCE_CONNECTION_INPUT="${CLOUD_SQL_INSTANCE_CONNECTION:-}"
+
+DATABASE_URL="${DATABASE_URL_INPUT:-${CURRENT_DATABASE_URL:-sqlite:////tmp/sync-hub.db}}"
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 OCR_WORKER_URL="${OCR_WORKER_URL:-http://localhost:8100/ocr}"
 OCR_TIMEOUT_SECONDS="${OCR_TIMEOUT_SECONDS:-30}"
-AUTH_ALLOWED_EMAIL_DOMAINS="${AUTH_ALLOWED_EMAIL_DOMAINS:-gmail.com}"
+AUTH_ALLOWED_EMAIL_DOMAINS="${AUTH_ALLOWED_EMAIL_DOMAINS_INPUT:-${CURRENT_AUTH_ALLOWED_EMAIL_DOMAINS:-gmail.com}}"
 AUTH_EMAIL_DEBUG_LINK="${AUTH_EMAIL_DEBUG_LINK:-true}"
+CLOUD_SQL_INSTANCE_CONNECTION="${CLOUD_SQL_INSTANCE_CONNECTION_INPUT:-${CURRENT_CLOUD_SQL_INSTANCE_CONNECTION:-}}"
 
 ENV_VARS_ARG="^##^DATABASE_URL=${DATABASE_URL}##ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
 
@@ -71,6 +140,15 @@ echo "[INFO] Region: ${REGION}"
 echo "[INFO] Service: ${SERVICE_NAME}"
 echo "[INFO] Active account: ${ACTIVE_ACCOUNT}"
 echo "[INFO] Deploy mode: ${DEPLOY_MODE}"
+if [[ -z "${DATABASE_URL_INPUT}" && -n "${CURRENT_DATABASE_URL}" ]]; then
+  echo "[INFO] DATABASE_URL not provided; reusing current Cloud Run value."
+fi
+if [[ -z "${AUTH_ALLOWED_EMAIL_DOMAINS_INPUT}" && -n "${CURRENT_AUTH_ALLOWED_EMAIL_DOMAINS}" ]]; then
+  echo "[INFO] AUTH_ALLOWED_EMAIL_DOMAINS not provided; reusing current Cloud Run value."
+fi
+if [[ -n "${CLOUD_SQL_INSTANCE_CONNECTION}" ]]; then
+  echo "[INFO] Cloud SQL binding: ${CLOUD_SQL_INSTANCE_CONNECTION}"
+fi
 
 echo "[STEP] Enabling required APIs"
 gcloud services enable \
@@ -96,6 +174,10 @@ if [[ "${ALLOW_UNAUTHENTICATED}" == "true" ]]; then
   DEPLOY_ARGS+=(--allow-unauthenticated)
 else
   DEPLOY_ARGS+=(--no-allow-unauthenticated)
+fi
+
+if [[ -n "${CLOUD_SQL_INSTANCE_CONNECTION}" ]]; then
+  DEPLOY_ARGS+=(--add-cloudsql-instances "${CLOUD_SQL_INSTANCE_CONNECTION}")
 fi
 
 DEPLOYED_IMAGE=""

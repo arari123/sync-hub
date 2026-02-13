@@ -24,13 +24,16 @@ bash scripts/deploy_backend_cloudrun.sh
 - `CLOUD_RUN_SERVICE=sync-hub-backend`
 - `GCP_REGION=asia-northeast3`
 - `DEPLOY_MODE=image` (로컬 Docker build/push 후 Cloud Run 배포)
-- `DATABASE_URL=sqlite:////tmp/sync-hub.db` (간편 배포 기본값)
+- `DATABASE_URL`: 현재 Cloud Run 서비스의 `DATABASE_URL`을 우선 재사용, 없을 때만 `sqlite:////tmp/sync-hub.db` 사용
+- `AUTH_ALLOWED_EMAIL_DOMAINS`: 현재 Cloud Run 서비스 값을 우선 재사용, 없을 때만 `gmail.com` 사용
+- `CLOUD_SQL_INSTANCE_CONNECTION`: 현재 Cloud Run의 Cloud SQL 바인딩을 우선 재사용
 - `CORS_ALLOW_ORIGINS=https://<site>.web.app,https://<site>.firebaseapp.com`
 
 옵션 예시:
 
 ```bash
-DATABASE_URL='postgresql://<user>:<pass>@<host>:5432/<db>' \
+CLOUD_SQL_INSTANCE_CONNECTION='<project>:<region>:<instance>' \
+DATABASE_URL='postgresql+psycopg2://<user>:<pass>@/<db>?host=/cloudsql/<project>:<region>:<instance>' \
 AUTH_ALLOWED_EMAIL_DOMAINS='gmail.com,company.com' \
 bash scripts/deploy_backend_cloudrun.sh
 ```

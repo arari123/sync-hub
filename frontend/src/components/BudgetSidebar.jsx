@@ -16,6 +16,7 @@ const BudgetSidebar = ({
     onSelectTreeNode,
     onTreeContextAction,
     hasCopiedUnit = false,
+    showSummary = true,
 }) => {
     const [collapsedByKey, setCollapsedByKey] = useState({});
     const [contextMenuState, setContextMenuState] = useState(null);
@@ -134,18 +135,20 @@ const BudgetSidebar = ({
 
     return (
         <aside className="w-72 border-r bg-slate-50/50 flex flex-col shrink-0">
-            <div className="p-6 border-b bg-white">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cost Summary</h2>
-                <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-200">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{modeLabel} Total</p>
-                    <p className="text-xl font-black">{formatAmount(grandTotal)}</p>
-                    <div className="mt-3 space-y-1.5 text-[11px]">
-                        <SummaryRow label="재료비" value={materialTotal} />
-                        <SummaryRow label="인건비" value={laborTotal} />
-                        <SummaryRow label="경비" value={expenseTotal} />
+            {showSummary && (
+                <div className="p-6 border-b bg-white">
+                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cost Summary</h2>
+                    <div className="mt-4 p-4 rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-200">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{modeLabel} Total</p>
+                        <p className="text-xl font-black">{formatAmount(grandTotal)}</p>
+                        <div className="mt-3 space-y-1.5 text-[11px]">
+                            <SummaryRow label="재료비" value={materialTotal} />
+                            <SummaryRow label="인건비" value={laborTotal} />
+                            <SummaryRow label="경비" value={expenseTotal} />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">

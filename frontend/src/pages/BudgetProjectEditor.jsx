@@ -494,10 +494,15 @@ function buildDuplicatedUnitName(sourceName, existingNameSet) {
     return `${baseName}(복사)`;
 }
 
-const BudgetProjectEditor = () => {
-    const { projectId, section = 'material' } = useParams();
+const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
+    const params = useParams();
+    const projectId = params.projectId;
+    const section = forceSection || params.section || 'material';
 
     if (!SECTION_META[section]) {
+        if (embedded) {
+            return null;
+        }
         return <Navigate to={`/project-management/projects/${projectId}/edit/material`} replace />;
     }
 
@@ -2215,8 +2220,17 @@ const BudgetProjectEditor = () => {
         return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
     }
 
+    const showSidebarSummary = section !== 'material';
+
     return (
-        <div className="flex h-screen border-t border-slate-200 overflow-hidden">
+        <div
+            className={cn(
+                'flex overflow-hidden',
+                embedded
+                    ? 'min-h-[740px] rounded-xl border border-slate-200 bg-white'
+                    : 'h-screen border-t border-slate-200',
+            )}
+        >
             <BudgetSidebar
                 aggregation={aggregation}
                 summary={sidebarSummary}
@@ -2227,31 +2241,41 @@ const BudgetProjectEditor = () => {
                 onSelectTreeNode={handleSelectScopeNode}
                 onTreeContextAction={handleMaterialTreeContextAction}
                 hasCopiedUnit={Boolean(materialUnitClipboard?.rows?.length)}
+                showSummary={showSidebarSummary}
             />
 
-            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
+            <div
+                className={cn(
+                    'flex-1 overflow-y-auto space-y-2 flex flex-col min-w-0',
+                    embedded ? 'px-6 pt-4 pb-4' : 'px-8 pt-2 pb-0',
+                )}
+            >
                 <div className="flex-none">
-                    <ProjectPageHeader
-                        projectId={projectId}
-                        projectName=""
-                        projectCode=""
-                        pageLabel=""
-                        canEdit={project?.can_edit}
-                        breadcrumbItems={[
-                            { label: '프로젝트 관리', to: '/project-management' },
-                            { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
-                            { label: '예산 메인', to: `/project-management/projects/${projectId}/budget` },
-                            { label: `${SECTION_META[section].label} 입력` },
-                        ]}
-                    />
+                    {!embedded && (
+                        <>
+                            <ProjectPageHeader
+                                projectId={projectId}
+                                projectName=""
+                                projectCode=""
+                                pageLabel=""
+                                canEdit={project?.can_edit}
+                                breadcrumbItems={[
+                                    { label: '프로젝트 관리', to: '/project-management' },
+                                    { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
+                                    { label: '예산 메인', to: `/project-management/projects/${projectId}/budget` },
+                                    { label: `${SECTION_META[section].label} 입력` },
+                                ]}
+                            />
 
-                    <div className="mt-1 flex w-full flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-black text-slate-700">
-                            {project?.name || '프로젝트'}
-                        </span>
-                    </div>
+                            <div className="mt-1 flex w-full flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-black text-slate-700">
+                                    {project?.name || '프로젝트'}
+                                </span>
+                            </div>
+                        </>
+                    )}
 
-                    <section className="mt-1 rounded-2xl border bg-card p-4 shadow-sm">
+                    <section className={cn('rounded-2xl border bg-card p-4 shadow-sm', embedded ? '' : 'mt-1')}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs font-bold text-slate-500">
                                 버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
@@ -2282,7 +2306,7 @@ const BudgetProjectEditor = () => {
                                         {isConfirming ? '확정 중...' : '버전 확정'}
                                     </button>
                                 )}
-                                {canEditProject && isConfirmed && (
+                                {!embedded && canEditProject && isConfirmed && (
                                     <button
                                         type="button"
                                         onClick={() => createRevision()}

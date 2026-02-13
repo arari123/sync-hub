@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     BarChart3,
     Boxes,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
+import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
 import { cn } from '../lib/utils';
 import GlobalTopBar from '../components/GlobalTopBar';
 import BudgetProjectEditor from './BudgetProjectEditor';
@@ -821,44 +822,64 @@ const BudgetProjectBudget = () => {
         };
     }, [activeBudgetTab]);
 
-    useEffect(() => {
-        const load = async () => {
-            if (!projectId) return;
+    const loadBudgetData = useCallback(async ({ background = false } = {}) => {
+        if (!projectId) return;
+        if (!background) {
             setIsLoading(true);
-            setError('');
+        }
+        setError('');
 
-            try {
-                const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
-                const payload = versionsResp?.data || {};
-                const currentProject = payload.project || null;
-                setProject(currentProject);
+        try {
+            const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
+            const payload = versionsResp?.data || {};
+            const currentProject = payload.project || null;
+            setProject(currentProject);
 
-                const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
-                setVersion(currentVersion);
+            const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+            setVersion(currentVersion);
 
-                if (!currentVersion?.id) {
-                    setEquipments([]);
-                    setDetails(EMPTY_DETAILS);
-                    return;
-                }
+            if (!currentVersion?.id) {
+                setEquipments([]);
+                setDetails(EMPTY_DETAILS);
+                return;
+            }
 
-                const [equipmentResp, detailResp] = await Promise.all([
-                    api.get(`/budget/versions/${currentVersion.id}/equipments`),
-                    api.get(`/budget/versions/${currentVersion.id}/details`),
-                ]);
+            const [equipmentResp, detailResp] = await Promise.all([
+                api.get(`/budget/versions/${currentVersion.id}/equipments`),
+                api.get(`/budget/versions/${currentVersion.id}/details`),
+            ]);
 
-                const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-                setEquipments(itemList);
-                setDetails(detailResp?.data?.details || EMPTY_DETAILS);
-            } catch (err) {
-                setError(getErrorMessage(err, '예산 메인 데이터를 불러오지 못했습니다.'));
-            } finally {
+            const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            setEquipments(itemList);
+            setDetails(detailResp?.data?.details || EMPTY_DETAILS);
+        } catch (err) {
+            setError(getErrorMessage(err, '예산 메인 데이터를 불러오지 못했습니다.'));
+        } finally {
+            if (!background) {
                 setIsLoading(false);
             }
-        };
-
-        load();
+        }
     }, [projectId]);
+
+    useEffect(() => {
+        loadBudgetData();
+    }, [loadBudgetData]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeBudgetDataUpdated((detail) => {
+            const eventProjectId = String(detail?.projectId || '').trim();
+            const targetProjectId = String(projectId || '').trim();
+            if (eventProjectId && targetProjectId && eventProjectId !== targetProjectId) {
+                return;
+            }
+            loadBudgetData({ background: true });
+        });
+        return unsubscribe;
+    }, [loadBudgetData, projectId]);
+
+    const handleEditorLiveDetailsChange = useCallback((nextDetails) => {
+        setDetails(nextDetails || EMPTY_DETAILS);
+    }, []);
 
     const dashboard = useMemo(() => {
         const settings = { ...DEFAULT_LABOR_SETTINGS, ...(details?.budget_settings || {}) };
@@ -1357,15 +1378,27 @@ const BudgetProjectBudget = () => {
                 )}
 
                 {activeBudgetTab === 'material' && (
-                    <MaterialTabContent rows={materialRows} isInputMode={isInputMode} />
+                    <MaterialTabContent
+                        rows={materialRows}
+                        isInputMode={isInputMode}
+                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                    />
                 )}
 
                 {activeBudgetTab === 'labor' && (
-                    <LaborTabContent rows={laborRows} isInputMode={isInputMode} />
+                    <LaborTabContent
+                        rows={laborRows}
+                        isInputMode={isInputMode}
+                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                    />
                 )}
 
                 {activeBudgetTab === 'expense' && (
-                    <ExpenseTabContent rows={expenseRows} isInputMode={isInputMode} />
+                    <ExpenseTabContent
+                        rows={expenseRows}
+                        isInputMode={isInputMode}
+                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                    />
                 )}
             </main>
         </div>
@@ -1643,7 +1676,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => (
     </div>
 );
 
-const MaterialTabContent = ({ rows, isInputMode }) => {
+const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const phaseGroups = buildRowsByPhase(rows);
@@ -1668,7 +1701,11 @@ const MaterialTabContent = ({ rows, isInputMode }) => {
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
-                        <BudgetProjectEditor embedded forceSection="material" />
+                        <BudgetProjectEditor
+                            embedded
+                            forceSection="material"
+                            onLiveDetailsChange={onLiveDetailsChange}
+                        />
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -1758,7 +1795,7 @@ const MaterialTabContent = ({ rows, isInputMode }) => {
     );
 };
 
-const LaborTabContent = ({ rows, isInputMode }) => {
+const LaborTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const totalPercent = usagePercent(total.budget, total.execution);
@@ -1784,7 +1821,11 @@ const LaborTabContent = ({ rows, isInputMode }) => {
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
-                        <BudgetProjectEditor embedded forceSection="labor" />
+                        <BudgetProjectEditor
+                            embedded
+                            forceSection="labor"
+                            onLiveDetailsChange={onLiveDetailsChange}
+                        />
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -1899,7 +1940,7 @@ const LaborTabContent = ({ rows, isInputMode }) => {
     );
 };
 
-const ExpenseTabContent = ({ rows, isInputMode }) => {
+const ExpenseTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
     const visibleRows = rows.filter((row) => !(toNumber(row.budget) === 0 && toNumber(row.execution) === 0));
     const total = summarizeBudgetExecution(visibleRows);
     const remaining = total.budget - total.execution;
@@ -1925,7 +1966,11 @@ const ExpenseTabContent = ({ rows, isInputMode }) => {
                 </div>
                 {isInputMode ? (
                     <div className="p-4">
-                        <BudgetProjectEditor embedded forceSection="expense" />
+                        <BudgetProjectEditor
+                            embedded
+                            forceSection="expense"
+                            onLiveDetailsChange={onLiveDetailsChange}
+                        />
                     </div>
                 ) : (
                     <div className="overflow-x-auto">

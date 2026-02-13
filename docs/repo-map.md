@@ -63,6 +63,7 @@
   - `Login.jsx`, `Signup.jsx`, `VerifyEmail.jsx`: 인증 페이지
 - `lib/`
   - `api.js`: API 호출 래퍼
+  - `budgetSync.js`: 예산 데이터 갱신 브로드캐스트(입력/조회 페이지 동기화)
   - `session.js`: 인증 세션 저장/조회
   - `highlight.jsx`, `utils.js`: 표시/유틸 함수
 

@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import {
     Loader2,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
 import { cn } from '../lib/utils';
 import GlobalTopBar from '../components/GlobalTopBar';
 
@@ -125,57 +126,75 @@ const BudgetProjectOverview = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        const load = async () => {
-            if (!projectId) return;
+    const loadOverviewData = useCallback(async ({ background = false } = {}) => {
+        if (!projectId) return;
+        if (!background) {
             setIsLoading(true);
             setIsAgendaLoading(true);
-            setError('');
+        }
+        setError('');
+        if (!background) {
             setAgendaError('');
+        }
+
+        try {
+            const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
+            const payload = versionsResp?.data || {};
+            const currentProject = payload.project || null;
+            setProject(currentProject);
+
+            const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+            setVersion(currentVersion);
 
             try {
-                const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
-                const payload = versionsResp?.data || {};
-                const currentProject = payload.project || null;
-                setProject(currentProject);
+                const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
+                    params: { page: 1, per_page: 5, include_drafts: false },
+                });
+                const agendaPayload = agendaResp?.data || {};
+                setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
+                setAgendaTotal(Number(agendaPayload?.total || 0));
+                setAgendaError('');
+            } catch (agendaErr) {
+                setAgendaItems([]);
+                setAgendaTotal(0);
+                setAgendaError(getErrorMessage(agendaErr, '안건 정보를 불러오지 못했습니다.'));
+            }
 
-                const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
-                setVersion(currentVersion);
+            if (!currentVersion?.id) {
+                setEquipments([]);
+                setTotals(currentProject?.totals || null);
+                return;
+            }
 
-                try {
-                    const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
-                        params: { page: 1, per_page: 5, include_drafts: false },
-                    });
-                    const agendaPayload = agendaResp?.data || {};
-                    setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
-                    setAgendaTotal(Number(agendaPayload?.total || 0));
-                    setAgendaError('');
-                } catch (agendaErr) {
-                    setAgendaItems([]);
-                    setAgendaTotal(0);
-                    setAgendaError(getErrorMessage(agendaErr, '안건 정보를 불러오지 못했습니다.'));
-                }
-
-                if (!currentVersion?.id) {
-                    setEquipments([]);
-                    setTotals(currentProject?.totals || null);
-                    return;
-                }
-
-                const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
-                const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-                setEquipments(itemList);
-                setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
-            } catch (err) {
-                setError(getErrorMessage(err, '프로젝트 메인 정보를 불러오지 못했습니다.'));
-            } finally {
+            const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
+            const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            setEquipments(itemList);
+            setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
+        } catch (err) {
+            setError(getErrorMessage(err, '프로젝트 메인 정보를 불러오지 못했습니다.'));
+        } finally {
+            if (!background) {
                 setIsAgendaLoading(false);
                 setIsLoading(false);
             }
-        };
-
-        load();
+        }
     }, [projectId]);
+
+    useEffect(() => {
+        loadOverviewData();
+    }, [loadOverviewData]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeBudgetDataUpdated((detail) => {
+            const eventProjectId = String(detail?.projectId || '').trim();
+            const targetProjectId = String(projectId || '').trim();
+            if (eventProjectId && targetProjectId && eventProjectId !== targetProjectId) {
+                return;
+            }
+            loadOverviewData({ background: true });
+        });
+        return unsubscribe;
+    }, [loadOverviewData, projectId]);
 
     const monitoring = project?.monitoring || {};
     const confirmedMaterial = Math.max(toNumber(monitoring.confirmed_budget_material), toNumber(totals?.material_total));

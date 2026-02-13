@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Save } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { emitBudgetDataUpdated } from '../lib/budgetSync';
 import BudgetSidebar from '../components/BudgetSidebar';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { cn } from '../lib/utils';
@@ -452,6 +453,36 @@ function injectBuffers(detailsObj) {
     return result;
 }
 
+function sanitizeDetailsForRealtime(detailsObj) {
+    const source = detailsObj || {};
+    const result = {
+        material_items: [],
+        labor_items: [],
+        expense_items: [],
+        execution_material_items: [],
+        execution_labor_items: [],
+        execution_expense_items: [],
+        budget_settings: mergeBudgetSettings(source?.budget_settings),
+    };
+
+    Object.entries(SECTION_META).forEach(([sectionKey, meta]) => {
+        result[meta.budgetKey] = (source?.[meta.budgetKey] || [])
+            .filter((row) => !isBudgetRowEmpty(row, sectionKey))
+            .map((row) => ({
+                ...row,
+                phase: (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication',
+            }));
+        result[meta.executionKey] = (source?.[meta.executionKey] || [])
+            .filter((row) => !isExecutionRowEmpty(row, sectionKey))
+            .map((row) => ({
+                ...row,
+                phase: (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication',
+            }));
+    });
+
+    return result;
+}
+
 function calcBudgetAmount(row, section, settings) {
     if (section === 'material') {
         const baseAmount = toNumber(row.quantity) * toNumber(row.unit_price);
@@ -494,7 +525,7 @@ function buildDuplicatedUnitName(sourceName, existingNameSet) {
     return `${baseName}(복사)`;
 }
 
-const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
+const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetailsChange = null }) => {
     const params = useParams();
     const projectId = params.projectId;
     const section = forceSection || params.section || 'material';
@@ -1020,6 +1051,12 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
+
+    useEffect(() => {
+        if (isLoading) return;
+        if (typeof onLiveDetailsChange !== 'function') return;
+        onLiveDetailsChange(sanitizeDetailsForRealtime(details));
+    }, [details, isLoading, onLiveDetailsChange]);
 
     useEffect(() => {
         const defaultEquipmentName = isEquipmentProject
@@ -2069,9 +2106,15 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
                     : COMMON_EQUIPMENT_NAME,
             );
 
+            const nextVersion = response?.data?.version || version;
             setEquipmentNames(refreshedEquipmentNames);
             setDetails(injectBuffers(normalizedSavedDetails));
-            setVersion(response?.data?.version || version);
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'details_saved',
+            });
         } catch (err) {
             setError(getErrorMessage(err, '상세 저장에 실패했습니다.'));
         } finally {
@@ -2086,7 +2129,13 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
         setError('');
         try {
             const response = await api.post(`/budget/versions/${version.id}/confirm`);
-            setVersion(response?.data?.version || version);
+            const nextVersion = response?.data?.version || version;
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'version_confirmed',
+            });
         } catch (err) {
             setError(getErrorMessage(err, '버전 확정에 실패했습니다.'));
         } finally {
@@ -2102,7 +2151,13 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
         setError('');
         try {
             const response = await api.post(`/budget/versions/${version.id}/confirm-cancel`);
-            setVersion(response?.data?.version || version);
+            const nextVersion = response?.data?.version || version;
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'version_confirm_canceled',
+            });
         } catch (err) {
             setError(getErrorMessage(err, '버전 확정 취소에 실패했습니다.'));
         } finally {
@@ -2146,6 +2201,11 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
             );
             setEquipmentNames(refreshedEquipmentNames);
             setDetails(injectBuffers(normalizedRevisionDetails));
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || null,
+                reason: 'revision_created',
+            });
             return nextVersion;
         } catch (err) {
             setError(getErrorMessage(err, '리비전 생성에 실패했습니다.'));
@@ -2380,7 +2440,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
                                                 [activeMaterialUnitScopeKey]: normalized,
                                             }));
                                         }}
-                                        className="h-7 w-16 rounded border border-slate-300 bg-white px-2 text-center text-[11px] font-semibold text-slate-800 disabled:opacity-50"
+                                        className="h-7 w-16 rounded-md border border-input bg-card px-2 text-center text-[11px] font-semibold text-foreground shadow-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 disabled:opacity-50"
                                     />
                                     <button
                                         type="button"

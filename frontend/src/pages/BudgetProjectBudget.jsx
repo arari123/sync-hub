@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     BarChart3,
     Boxes,
     Calculator,
-    ChevronDown,
     Loader2,
     Receipt,
     Scale,
@@ -789,10 +788,6 @@ const BudgetProjectBudget = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const [isBudgetMenuOpen, setIsBudgetMenuOpen] = useState(false);
-    const budgetMenuRef = useRef(null);
-    const budgetMenuCloseTimerRef = useRef(null);
-
     const detailSearchQuery = '';
     const [selectedPhases, setSelectedPhases] = useState([...PHASES]);
     const [selectedCostTypes, setSelectedCostTypes] = useState([...COST_TYPES]);
@@ -801,43 +796,6 @@ const BudgetProjectBudget = () => {
     const [isTotalFixed, setIsTotalFixed] = useState(false);
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
     const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
-
-    useEffect(() => {
-        const handleGlobalClick = (event) => {
-            const target = event.target;
-            const isBudgetMenuTarget = budgetMenuRef.current?.contains(target);
-            if (!isBudgetMenuTarget) setIsBudgetMenuOpen(false);
-        };
-
-        document.addEventListener('mousedown', handleGlobalClick);
-        return () => {
-            document.removeEventListener('mousedown', handleGlobalClick);
-        };
-    }, []);
-
-    useEffect(() => () => {
-        if (!budgetMenuCloseTimerRef.current) return;
-        clearTimeout(budgetMenuCloseTimerRef.current);
-        budgetMenuCloseTimerRef.current = null;
-    }, []);
-
-    const keepBudgetMenuOpen = () => {
-        if (budgetMenuCloseTimerRef.current) {
-            clearTimeout(budgetMenuCloseTimerRef.current);
-            budgetMenuCloseTimerRef.current = null;
-        }
-        setIsBudgetMenuOpen(true);
-    };
-
-    const scheduleBudgetMenuClose = () => {
-        if (budgetMenuCloseTimerRef.current) {
-            clearTimeout(budgetMenuCloseTimerRef.current);
-        }
-        budgetMenuCloseTimerRef.current = setTimeout(() => {
-            setIsBudgetMenuOpen(false);
-            budgetMenuCloseTimerRef.current = null;
-        }, 1000);
-    };
 
     useEffect(() => {
         const load = async () => {
@@ -1120,9 +1078,6 @@ const BudgetProjectBudget = () => {
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
     const budgetMainPath = `${baseProjectPath}/budget`;
-    const budgetMaterialPath = `${baseProjectPath}/edit/material`;
-    const budgetLaborPath = `${baseProjectPath}/edit/labor`;
-    const budgetExpensePath = `${baseProjectPath}/edit/expense`;
     const issueManagementPath = `${baseProjectPath}/agenda`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
     const specManagementPath = `${baseProjectPath}/spec`;
@@ -1208,58 +1163,17 @@ const BudgetProjectBudget = () => {
                                 프로젝트 메인
                             </Link>
 
-                            <div
-                                className="relative"
-                                ref={budgetMenuRef}
-                                onMouseEnter={keepBudgetMenuOpen}
-                                onMouseLeave={scheduleBudgetMenuClose}
-                            >
-                                <Link
-                                    to={budgetMainPath}
-                                    onMouseEnter={keepBudgetMenuOpen}
-                                    className={cn(
-                                        'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                        isBudgetMainActive
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                    )}
-                                >
-                                    예산 메인
-                                    <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isBudgetMenuOpen && 'rotate-180')} />
-                                </Link>
-
-                                {isBudgetMenuOpen && (
-                                    <div
-                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max rounded-lg border border-border bg-card p-1.5 shadow-lg"
-                                        onMouseEnter={keepBudgetMenuOpen}
-                                        onMouseLeave={scheduleBudgetMenuClose}
-                                    >
-                                        <div className="flex items-center gap-1 whitespace-nowrap">
-                                            <Link
-                                                to={budgetMaterialPath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                재료비 관리
-                                            </Link>
-                                            <Link
-                                                to={budgetLaborPath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                인건비 관리
-                                            </Link>
-                                            <Link
-                                                to={budgetExpensePath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                경비 관리
-                                            </Link>
-                                        </div>
-                                    </div>
+                            <Link
+                                to={budgetMainPath}
+                                className={cn(
+                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+                                    isBudgetMainActive
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
                                 )}
-                            </div>
+                            >
+                                예산 메인
+                            </Link>
 
                             <Link
                                 to={issueManagementPath}

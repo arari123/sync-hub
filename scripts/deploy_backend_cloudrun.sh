@@ -11,6 +11,10 @@ CLOUD_RUN_CPU="${CLOUD_RUN_CPU:-1}"
 CLOUD_RUN_MIN_INSTANCES="${CLOUD_RUN_MIN_INSTANCES:-0}"
 CLOUD_RUN_MAX_INSTANCES="${CLOUD_RUN_MAX_INSTANCES:-3}"
 ALLOW_UNAUTHENTICATED="${ALLOW_UNAUTHENTICATED:-true}"
+DEPLOY_MODE="${DEPLOY_MODE:-image}" # image|source
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-cloud-run-source-deploy}"
+IMAGE_TAG="${IMAGE_TAG:-$(date +%Y%m%d-%H%M%S)}"
+IMAGE_OVERRIDE="${IMAGE_OVERRIDE:-}"
 
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "[ERROR] GCP project is not set. Set GCP_PROJECT_ID or run: gcloud config set project <project-id>"
@@ -43,8 +47,7 @@ OCR_TIMEOUT_SECONDS="${OCR_TIMEOUT_SECONDS:-30}"
 AUTH_ALLOWED_EMAIL_DOMAINS="${AUTH_ALLOWED_EMAIL_DOMAINS:-gmail.com}"
 AUTH_EMAIL_DEBUG_LINK="${AUTH_EMAIL_DEBUG_LINK:-true}"
 
-CORS_ALLOW_ORIGINS_ESCAPED="${CORS_ALLOW_ORIGINS//,/\\,}"
-AUTH_ALLOWED_EMAIL_DOMAINS_ESCAPED="${AUTH_ALLOWED_EMAIL_DOMAINS//,/\\,}"
+ENV_VARS_ARG="^##^DATABASE_URL=${DATABASE_URL}##ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
 
 BILLING_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format='value(billingEnabled)' 2>/dev/null || echo false)"
 if [[ "${BILLING_ENABLED}" != "True" && "${BILLING_ENABLED}" != "true" ]]; then
@@ -67,6 +70,7 @@ echo "[INFO] Project: ${PROJECT_ID}"
 echo "[INFO] Region: ${REGION}"
 echo "[INFO] Service: ${SERVICE_NAME}"
 echo "[INFO] Active account: ${ACTIVE_ACCOUNT}"
+echo "[INFO] Deploy mode: ${DEPLOY_MODE}"
 
 echo "[STEP] Enabling required APIs"
 gcloud services enable \
@@ -75,32 +79,64 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   --project "${PROJECT_ID}"
 
-echo "[STEP] Deploying backend to Cloud Run"
 DEPLOY_ARGS=(
   run deploy "${SERVICE_NAME}"
   --project "${PROJECT_ID}"
   --region "${REGION}"
   --platform managed
-  --source .
   --port "${SERVICE_PORT}"
   --memory "${CLOUD_RUN_MEMORY}"
   --cpu "${CLOUD_RUN_CPU}"
   --min-instances "${CLOUD_RUN_MIN_INSTANCES}"
   --max-instances "${CLOUD_RUN_MAX_INSTANCES}"
-  --set-env-vars "DATABASE_URL=${DATABASE_URL}"
-  --set-env-vars "ES_HOST=${ES_HOST}"
-  --set-env-vars "OCR_WORKER_URL=${OCR_WORKER_URL}"
-  --set-env-vars "OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}"
-  --set-env-vars "CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS_ESCAPED}"
-  --set-env-vars "AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}"
-  --set-env-vars "AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS_ESCAPED}"
-  --set-env-vars "AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
+  "--set-env-vars=${ENV_VARS_ARG}"
 )
 
 if [[ "${ALLOW_UNAUTHENTICATED}" == "true" ]]; then
   DEPLOY_ARGS+=(--allow-unauthenticated)
 else
   DEPLOY_ARGS+=(--no-allow-unauthenticated)
+fi
+
+DEPLOYED_IMAGE=""
+if [[ "${DEPLOY_MODE}" == "source" ]]; then
+  echo "[STEP] Deploying backend from source"
+  DEPLOY_ARGS+=(--source .)
+elif [[ "${DEPLOY_MODE}" == "image" ]]; then
+  if [[ -n "${IMAGE_OVERRIDE}" ]]; then
+    DEPLOYED_IMAGE="${IMAGE_OVERRIDE}"
+    echo "[STEP] Deploying backend with provided image"
+    echo "[INFO] Image: ${DEPLOYED_IMAGE}"
+  else
+    if ! command -v docker >/dev/null 2>&1; then
+      echo "[ERROR] docker CLI is required for DEPLOY_MODE=image."
+      exit 1
+    fi
+
+    if ! gcloud artifacts repositories describe "${IMAGE_REPOSITORY}" --location "${REGION}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
+      echo "[STEP] Creating Artifact Registry repository: ${IMAGE_REPOSITORY}"
+      gcloud artifacts repositories create "${IMAGE_REPOSITORY}" \
+        --repository-format=docker \
+        --location "${REGION}" \
+        --project "${PROJECT_ID}" \
+        --description "Cloud Run container images"
+    fi
+
+    gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+    DEPLOYED_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${IMAGE_REPOSITORY}/${SERVICE_NAME}:${IMAGE_TAG}"
+    echo "[STEP] Building backend image"
+    echo "[INFO] Image: ${DEPLOYED_IMAGE}"
+    docker build -t "${DEPLOYED_IMAGE}" .
+
+    echo "[STEP] Pushing backend image"
+    docker push "${DEPLOYED_IMAGE}"
+  fi
+
+  DEPLOY_ARGS+=(--image "${DEPLOYED_IMAGE}")
+else
+  echo "[ERROR] Unsupported DEPLOY_MODE: ${DEPLOY_MODE} (allowed: image, source)"
+  exit 1
 fi
 
 gcloud "${DEPLOY_ARGS[@]}"
@@ -115,6 +151,9 @@ echo
 
 echo "[DONE] Cloud Run backend deployed"
 echo "[INFO] Service URL: ${SERVICE_URL}"
-echo
+if [[ -n "${DEPLOYED_IMAGE}" ]]; then
+  echo "[INFO] Image: ${DEPLOYED_IMAGE}"
+fi
 
+echo
 echo "[NEXT] Firebase API rewrite serviceId should be: ${SERVICE_NAME}"

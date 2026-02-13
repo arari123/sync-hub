@@ -1,0 +1,34 @@
+# VCS / metadata
+.git
+.gitignore
+.agent
+
+# Local env / caches
+.env
+.env.*
+!.env.example
+.cache
+.firebase
+.venv
+.venv*/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Frontend artifacts (not needed for backend runtime image)
+frontend/
+frontend_corrupted/
+node_modules/
+
+# Runtime / generated data
+uploads/
+reports/
+*.log
+
+# Docs / plans / tests (exclude from runtime container)
+docs/
+tests/
+PLANS.md

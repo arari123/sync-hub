@@ -112,6 +112,7 @@
 ## 인프라/설정 파일
 - Compose: `docker-compose.yml`, `docker-compose.gpu.yml`
 - Dockerfile: `Dockerfile`, `Dockerfile.ocr`, `Dockerfile.es`, `Dockerfile.sglang`
+- Docker build ignore: `.dockerignore`
 - 의존성: `requirements.txt`, `requirements.ocr.txt`, `requirements.ocr-worker.txt`
 - 환경변수: `.env`, `.env.example`
 - Firebase Hosting: `firebase.json`, `.firebaserc`

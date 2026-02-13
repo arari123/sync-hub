@@ -23,6 +23,7 @@ bash scripts/deploy_backend_cloudrun.sh
 기본값:
 - `CLOUD_RUN_SERVICE=sync-hub-backend`
 - `GCP_REGION=asia-northeast3`
+- `DEPLOY_MODE=image` (로컬 Docker build/push 후 Cloud Run 배포)
 - `DATABASE_URL=sqlite:////tmp/sync-hub.db` (간편 배포 기본값)
 - `CORS_ALLOW_ORIGINS=https://<site>.web.app,https://<site>.firebaseapp.com`
 
@@ -32,6 +33,20 @@ bash scripts/deploy_backend_cloudrun.sh
 DATABASE_URL='postgresql://<user>:<pass>@<host>:5432/<db>' \
 AUTH_ALLOWED_EMAIL_DOMAINS='gmail.com,company.com' \
 bash scripts/deploy_backend_cloudrun.sh
+```
+
+이미지 태그를 이미 보유한 경우(build/push 생략):
+
+```bash
+DEPLOY_MODE=image \
+IMAGE_OVERRIDE='asia-northeast3-docker.pkg.dev/<project>/<repo>/sync-hub-backend:<tag>' \
+bash scripts/deploy_backend_cloudrun.sh
+```
+
+소스 기반 배포(권한 충족 시에만 권장):
+
+```bash
+DEPLOY_MODE=source bash scripts/deploy_backend_cloudrun.sh
 ```
 
 ## 4) Firebase Hosting 배포
@@ -51,5 +66,5 @@ firebase deploy --only hosting
    - `curl -s https://sync-hub-arari-20260213011439.web.app/health`
 
 ## 6) 현재 확인된 이슈
-- 2026-02-13 기준, 프로젝트 `sync-hub-arari-20260213011439`는 billing 계정이 비활성(`open: false`) 상태면 배포가 차단된다.
-- 조치: 결제 계정 재개 후 `scripts/deploy_backend_cloudrun.sh` 재실행.
+- 2026-02-13 기준, `gcloud run deploy --source`는 Cloud Build 기본 서비스계정 권한 정책에 따라 실패할 수 있다.
+- 조치: 기본 모드(`DEPLOY_MODE=image`)를 사용하거나, Cloud Build 서비스계정 IAM을 별도 보강한다.

@@ -2237,7 +2237,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
         return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
     }
 
-    const showSidebarSummary = section !== 'material';
+    const showSidebarSummary = embedded ? false : section !== 'material';
 
     return (
         <div

@@ -1849,6 +1849,7 @@ const MaterialTabContent = ({ rows }) => {
 };
 
 const LaborTabContent = ({ rows }) => {
+    const [isInputMode, setIsInputMode] = useState(false);
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
     const totalPercent = usagePercent(total.budget, total.execution);
@@ -1870,120 +1871,141 @@ const LaborTabContent = ({ rows }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                     <h3 className="text-sm font-bold tracking-wide text-slate-800">인건비 상세 내역</h3>
-                    <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] border-collapse text-sm">
-                        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-                            <tr>
-                                <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">설비</th>
-                                <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">업무/부서</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">예산</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">잔액</th>
-                                <th className="w-24 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행률</th>
-                                <th className="w-28 px-4 py-3 text-center font-semibold">상태</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-slate-700">
-                            {rows.length === 0 && (
-                                <tr>
-                                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
-                                        표시할 인건비 데이터가 없습니다.
-                                    </td>
-                                </tr>
+                    <div className="flex items-center gap-2">
+                        {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
+                        <button
+                            type="button"
+                            onClick={() => setIsInputMode((prev) => !prev)}
+                            className={cn(
+                                'rounded-md border px-2.5 py-1 text-xs font-bold transition-colors',
+                                isInputMode
+                                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
                             )}
-
-                            {phaseGroups.map((group) => (
-                                <React.Fragment key={group.phase}>
-                                    <tr className={cn('border-y border-slate-200', group.phase === 'fabrication' ? 'bg-blue-50' : 'bg-emerald-50')}>
-                                        <td className="px-4 py-2 text-xs font-bold tracking-wide text-slate-700" colSpan={7}>
-                                            {group.label} 단계
+                        >
+                            {isInputMode ? '조회로 전환' : '입력으로 전환'}
+                        </button>
+                    </div>
+                </div>
+                {isInputMode ? (
+                    <div className="p-4">
+                        <BudgetProjectEditor embedded forceSection="labor" />
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[980px] border-collapse text-sm">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                                <tr>
+                                    <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">설비</th>
+                                    <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">업무/부서</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">예산</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">잔액</th>
+                                    <th className="w-24 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행률</th>
+                                    <th className="w-28 px-4 py-3 text-center font-semibold">상태</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 text-slate-700">
+                                {rows.length === 0 && (
+                                    <tr>
+                                        <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                                            표시할 인건비 데이터가 없습니다.
                                         </td>
                                     </tr>
+                                )}
 
-                                    {group.sourceGroups.map((sourceGroup) => {
-                                        const sourcePercent = usagePercent(sourceGroup.budget, sourceGroup.execution);
-                                        return (
-                                            <React.Fragment key={`${group.phase}-${sourceGroup.source}`}>
-                                                <tr className={cn(
-                                                    sourceGroup.source === '자체' ? 'bg-indigo-50/60' : 'bg-violet-50/60'
-                                                )}>
-                                                    <td className="px-4 py-2 text-xs font-semibold tracking-wide text-slate-700" colSpan={7}>
-                                                        {sourceGroup.source} 인력
-                                                    </td>
-                                                </tr>
+                                {phaseGroups.map((group) => (
+                                    <React.Fragment key={group.phase}>
+                                        <tr className={cn('border-y border-slate-200', group.phase === 'fabrication' ? 'bg-blue-50' : 'bg-emerald-50')}>
+                                            <td className="px-4 py-2 text-xs font-bold tracking-wide text-slate-700" colSpan={7}>
+                                                {group.label} 단계
+                                            </td>
+                                        </tr>
 
-                                                {sourceGroup.rows.map((row) => (
-                                                    <tr key={row.key}>
-                                                        <td className="border-r border-slate-200 px-4 py-3 font-medium">{row.equipmentName}</td>
-                                                        <td className="border-r border-slate-200 px-4 py-3">{row.taskName}</td>
-                                                        <td className="border-r border-slate-200 px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
-                                                        <td className="border-r border-slate-200 px-4 py-3 text-right">{formatWon(row.execution)}</td>
-                                                        <td className={cn('border-r border-slate-200 px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                            {formatWon(row.remaining)}
-                                                        </td>
-                                                        <td className="border-r border-slate-200 px-4 py-3 text-right text-xs font-semibold text-slate-600">
-                                                            {usagePercent(row.budget, row.execution).toFixed(1)}%
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                                        {group.sourceGroups.map((sourceGroup) => {
+                                            const sourcePercent = usagePercent(sourceGroup.budget, sourceGroup.execution);
+                                            return (
+                                                <React.Fragment key={`${group.phase}-${sourceGroup.source}`}>
+                                                    <tr className={cn(
+                                                        sourceGroup.source === '자체' ? 'bg-indigo-50/60' : 'bg-violet-50/60'
+                                                    )}>
+                                                        <td className="px-4 py-2 text-xs font-semibold tracking-wide text-slate-700" colSpan={7}>
+                                                            {sourceGroup.source} 인력
                                                         </td>
                                                     </tr>
-                                                ))}
 
-                                                <tr className="bg-slate-100/80">
-                                                    <td className="px-4 py-2 text-right font-semibold text-slate-700" colSpan={2}>
-                                                        {sourceGroup.source} 소계
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.budget)}</td>
-                                                    <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.execution)}</td>
-                                                    <td className={cn('px-4 py-2 text-right font-semibold', sourceGroup.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                        {formatWon(sourceGroup.remaining)}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right text-xs font-semibold text-slate-600">{sourcePercent.toFixed(1)}%</td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <BudgetStatusBadge budget={sourceGroup.budget} execution={sourceGroup.execution} />
-                                                    </td>
-                                                </tr>
-                                            </React.Fragment>
-                                        );
-                                    })}
+                                                    {sourceGroup.rows.map((row) => (
+                                                        <tr key={row.key}>
+                                                            <td className="border-r border-slate-200 px-4 py-3 font-medium">{row.equipmentName}</td>
+                                                            <td className="border-r border-slate-200 px-4 py-3">{row.taskName}</td>
+                                                            <td className="border-r border-slate-200 px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                                                            <td className="border-r border-slate-200 px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                                                            <td className={cn('border-r border-slate-200 px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                                {formatWon(row.remaining)}
+                                                            </td>
+                                                            <td className="border-r border-slate-200 px-4 py-3 text-right text-xs font-semibold text-slate-600">
+                                                                {usagePercent(row.budget, row.execution).toFixed(1)}%
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
 
-                                    <tr className={PHASE_TOTAL_THEME[group.phase]}>
-                                        <td className="px-4 py-3 text-right font-bold" colSpan={2}>{group.label} 인건비 소계</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.execution)}</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.remaining)}</td>
-                                        <td className="px-4 py-3 text-right font-bold">{usagePercent(group.budget, group.execution).toFixed(1)}%</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <BudgetStatusBadge budget={group.budget} execution={group.execution} />
+                                                    <tr className="bg-slate-100/80">
+                                                        <td className="px-4 py-2 text-right font-semibold text-slate-700" colSpan={2}>
+                                                            {sourceGroup.source} 소계
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.budget)}</td>
+                                                        <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.execution)}</td>
+                                                        <td className={cn('px-4 py-2 text-right font-semibold', sourceGroup.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                            {formatWon(sourceGroup.remaining)}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right text-xs font-semibold text-slate-600">{sourcePercent.toFixed(1)}%</td>
+                                                        <td className="px-4 py-2 text-center">
+                                                            <BudgetStatusBadge budget={sourceGroup.budget} execution={sourceGroup.execution} />
+                                                        </td>
+                                                    </tr>
+                                                </React.Fragment>
+                                            );
+                                        })}
+
+                                        <tr className={PHASE_TOTAL_THEME[group.phase]}>
+                                            <td className="px-4 py-3 text-right font-bold" colSpan={2}>{group.label} 인건비 소계</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.execution)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.remaining)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{usagePercent(group.budget, group.execution).toFixed(1)}%</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <BudgetStatusBadge budget={group.budget} execution={group.execution} />
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+
+                                {rows.length > 0 && (
+                                    <tr className="border-t-4 border-double border-slate-600 bg-slate-950 font-bold text-white">
+                                        <td className="px-4 py-4 text-center" colSpan={2}>프로젝트 인건비 총괄</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(total.budget)}</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{formatWon(total.execution)}</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(remaining)}</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{totalPercent.toFixed(1)}%</td>
+                                        <td className="px-4 py-4 text-center">
+                                            <BudgetStatusBadge budget={total.budget} execution={total.execution} />
                                         </td>
                                     </tr>
-                                </React.Fragment>
-                            ))}
-
-                            {rows.length > 0 && (
-                                <tr className="border-t-4 border-double border-slate-600 bg-slate-950 font-bold text-white">
-                                    <td className="px-4 py-4 text-center" colSpan={2}>프로젝트 인건비 총괄</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(total.budget)}</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{formatWon(total.execution)}</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(remaining)}</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{totalPercent.toFixed(1)}%</td>
-                                    <td className="px-4 py-4 text-center">
-                                        <BudgetStatusBadge budget={total.budget} execution={total.execution} />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </section>
         </div>
     );
 };
 
 const ExpenseTabContent = ({ rows }) => {
+    const [isInputMode, setIsInputMode] = useState(false);
     const visibleRows = rows.filter((row) => !(toNumber(row.budget) === 0 && toNumber(row.execution) === 0));
     const total = summarizeBudgetExecution(visibleRows);
     const remaining = total.budget - total.execution;
@@ -2005,106 +2027,126 @@ const ExpenseTabContent = ({ rows }) => {
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                     <h3 className="text-sm font-bold tracking-wide text-slate-800">경비 상세 내역</h3>
-                    <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1120px] border-collapse text-sm">
-                        <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-                            <tr>
-                                <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">설비</th>
-                                <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">경비 항목</th>
-                                <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">산정 기준</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">예산</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행</th>
-                                <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">잔액</th>
-                                <th className="w-28 px-4 py-3 text-center font-semibold">상태</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-slate-700">
-                            {visibleRows.length === 0 && (
-                                <tr>
-                                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
-                                        표시할 경비 데이터가 없습니다.
-                                    </td>
-                                </tr>
+                    <div className="flex items-center gap-2">
+                        {!isInputMode && <span className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">단위: 원</span>}
+                        <button
+                            type="button"
+                            onClick={() => setIsInputMode((prev) => !prev)}
+                            className={cn(
+                                'rounded-md border px-2.5 py-1 text-xs font-bold transition-colors',
+                                isInputMode
+                                    ? 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
                             )}
-
-                            {phaseGroups.map((group) => (
-                                <React.Fragment key={group.phase}>
-                                    <tr className={cn('border-y border-slate-200', group.phase === 'fabrication' ? 'bg-blue-50' : 'bg-emerald-50')}>
-                                        <td className="px-4 py-2 text-xs font-bold tracking-wide text-slate-700" colSpan={7}>
-                                            {group.label} 단계
+                        >
+                            {isInputMode ? '조회로 전환' : '입력으로 전환'}
+                        </button>
+                    </div>
+                </div>
+                {isInputMode ? (
+                    <div className="p-4">
+                        <BudgetProjectEditor embedded forceSection="expense" />
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[1120px] border-collapse text-sm">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                                <tr>
+                                    <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">설비</th>
+                                    <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">경비 항목</th>
+                                    <th className="border-r border-slate-200 px-4 py-3 text-left font-semibold">산정 기준</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">예산</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">집행</th>
+                                    <th className="w-32 border-r border-slate-200 px-4 py-3 text-right font-semibold">잔액</th>
+                                    <th className="w-28 px-4 py-3 text-center font-semibold">상태</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 text-slate-700">
+                                {visibleRows.length === 0 && (
+                                    <tr>
+                                        <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                                            표시할 경비 데이터가 없습니다.
                                         </td>
                                     </tr>
+                                )}
 
-                                    {group.sourceGroups.map((sourceGroup) => (
-                                        <React.Fragment key={`${group.phase}-${sourceGroup.source}`}>
-                                            <tr className={cn(
-                                                sourceGroup.source === '자체' ? 'bg-indigo-50/60' : 'bg-violet-50/60'
-                                            )}>
-                                                <td className="px-4 py-2 text-xs font-semibold tracking-wide text-slate-700" colSpan={7}>
-                                                    {sourceGroup.source} 경비
-                                                </td>
-                                            </tr>
+                                {phaseGroups.map((group) => (
+                                    <React.Fragment key={group.phase}>
+                                        <tr className={cn('border-y border-slate-200', group.phase === 'fabrication' ? 'bg-blue-50' : 'bg-emerald-50')}>
+                                            <td className="px-4 py-2 text-xs font-bold tracking-wide text-slate-700" colSpan={7}>
+                                                {group.label} 단계
+                                            </td>
+                                        </tr>
 
-                                            {sourceGroup.rows.map((row) => (
-                                                <tr key={row.key}>
-                                                    <td className="border-r border-slate-200 px-4 py-3 font-medium">{row.equipmentName}</td>
-                                                    <td className="border-r border-slate-200 px-4 py-3">{row.expenseName}</td>
-                                                    <td className="border-r border-slate-200 px-4 py-3 text-slate-600">{row.basis || '-'}</td>
-                                                    <td className="border-r border-slate-200 px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
-                                                    <td className="border-r border-slate-200 px-4 py-3 text-right">{formatWon(row.execution)}</td>
-                                                    <td className={cn('border-r border-slate-200 px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                        {formatWon(row.remaining)}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                                        {group.sourceGroups.map((sourceGroup) => (
+                                            <React.Fragment key={`${group.phase}-${sourceGroup.source}`}>
+                                                <tr className={cn(
+                                                    sourceGroup.source === '자체' ? 'bg-indigo-50/60' : 'bg-violet-50/60'
+                                                )}>
+                                                    <td className="px-4 py-2 text-xs font-semibold tracking-wide text-slate-700" colSpan={7}>
+                                                        {sourceGroup.source} 경비
                                                     </td>
                                                 </tr>
-                                            ))}
 
-                                            <tr className="bg-slate-100/80">
-                                                <td className="px-4 py-2 text-right font-semibold text-slate-700" colSpan={3}>
-                                                    {sourceGroup.source} 소계
-                                                </td>
-                                                <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.budget)}</td>
-                                                <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.execution)}</td>
-                                                <td className={cn('px-4 py-2 text-right font-semibold', sourceGroup.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                                                    {formatWon(sourceGroup.remaining)}
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <BudgetStatusBadge budget={sourceGroup.budget} execution={sourceGroup.execution} />
-                                                </td>
-                                            </tr>
-                                        </React.Fragment>
-                                    ))}
+                                                {sourceGroup.rows.map((row) => (
+                                                    <tr key={row.key}>
+                                                        <td className="border-r border-slate-200 px-4 py-3 font-medium">{row.equipmentName}</td>
+                                                        <td className="border-r border-slate-200 px-4 py-3">{row.expenseName}</td>
+                                                        <td className="border-r border-slate-200 px-4 py-3 text-slate-600">{row.basis || '-'}</td>
+                                                        <td className="border-r border-slate-200 px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                                                        <td className="border-r border-slate-200 px-4 py-3 text-right">{formatWon(row.execution)}</td>
+                                                        <td className={cn('border-r border-slate-200 px-4 py-3 text-right font-semibold', row.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                            {formatWon(row.remaining)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <BudgetStatusBadge budget={row.budget} execution={row.execution} />
+                                                        </td>
+                                                    </tr>
+                                                ))}
 
-                                    <tr className={PHASE_TOTAL_THEME[group.phase]}>
-                                        <td className="px-4 py-3 text-right font-bold" colSpan={3}>{group.label} 경비 소계</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.execution)}</td>
-                                        <td className="px-4 py-3 text-right font-bold">{formatWon(group.remaining)}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <BudgetStatusBadge budget={group.budget} execution={group.execution} />
+                                                <tr className="bg-slate-100/80">
+                                                    <td className="px-4 py-2 text-right font-semibold text-slate-700" colSpan={3}>
+                                                        {sourceGroup.source} 소계
+                                                    </td>
+                                                    <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.budget)}</td>
+                                                    <td className="px-4 py-2 text-right font-semibold">{formatWon(sourceGroup.execution)}</td>
+                                                    <td className={cn('px-4 py-2 text-right font-semibold', sourceGroup.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                        {formatWon(sourceGroup.remaining)}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-center">
+                                                        <BudgetStatusBadge budget={sourceGroup.budget} execution={sourceGroup.execution} />
+                                                    </td>
+                                                </tr>
+                                            </React.Fragment>
+                                        ))}
+
+                                        <tr className={PHASE_TOTAL_THEME[group.phase]}>
+                                            <td className="px-4 py-3 text-right font-bold" colSpan={3}>{group.label} 경비 소계</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.execution)}</td>
+                                            <td className="px-4 py-3 text-right font-bold">{formatWon(group.remaining)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <BudgetStatusBadge budget={group.budget} execution={group.execution} />
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+
+                                {visibleRows.length > 0 && (
+                                    <tr className="border-t-4 border-double border-slate-600 bg-slate-950 font-bold text-white">
+                                        <td className="px-4 py-4 text-center" colSpan={3}>프로젝트 경비 총괄</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(total.budget)}</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{formatWon(total.execution)}</td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(remaining)}</td>
+                                        <td className="px-4 py-4 text-center">
+                                            <BudgetStatusBadge budget={total.budget} execution={total.execution} />
                                         </td>
                                     </tr>
-                                </React.Fragment>
-                            ))}
-
-                            {visibleRows.length > 0 && (
-                                <tr className="border-t-4 border-double border-slate-600 bg-slate-950 font-bold text-white">
-                                    <td className="px-4 py-4 text-center" colSpan={3}>프로젝트 경비 총괄</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(total.budget)}</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums">{formatWon(total.execution)}</td>
-                                    <td className="whitespace-nowrap px-4 py-4 text-right text-lg tabular-nums text-amber-300">{formatWon(remaining)}</td>
-                                    <td className="px-4 py-4 text-center">
-                                        <BudgetStatusBadge budget={total.budget} execution={total.execution} />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </section>
         </div>
     );

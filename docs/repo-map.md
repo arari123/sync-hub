@@ -85,7 +85,7 @@
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
 - 예산:
   - 프로젝트: `/budget/projects`, `/budget/projects/search`, `/budget/projects/{project_id}`, `/budget/projects/{project_id}/summary`
-  - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/revision`
+  - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `/budget/versions/{version_id}/equipments`, `/budget/versions/{version_id}/details`
 - 안건:
   - 메타/목록: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`

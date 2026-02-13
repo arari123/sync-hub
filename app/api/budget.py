@@ -1373,6 +1373,27 @@ def confirm_version(
     return {"message": "버전이 확정되었습니다.", "version": _serialize_version(version, db)}
 
 
+@router.post("/versions/{version_id}/confirm-cancel")
+def cancel_confirm_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    version = _get_version_or_404(version_id, db)
+    _require_version_edit_permission(version, user, db)
+    if version.status != "confirmed":
+        return {"message": "확정 상태가 아닙니다.", "version": _serialize_version(version, db)}
+
+    now_iso = to_iso(utcnow())
+    restore_status = "revision" if int(version.revision_no or 0) > 0 or version.parent_version_id else "draft"
+    version.status = restore_status
+    version.confirmed_at = None
+    version.updated_at = now_iso
+    db.commit()
+    db.refresh(version)
+    return {"message": "버전 확정을 취소했습니다.", "version": _serialize_version(version, db)}
+
+
 @router.post("/versions/{version_id}/revision")
 def create_revision(
     version_id: int,

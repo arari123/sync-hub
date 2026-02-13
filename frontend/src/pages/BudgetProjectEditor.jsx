@@ -521,6 +521,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [isCancellingConfirm, setIsCancellingConfirm] = useState(false);
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [treeSelectionBySection, setTreeSelectionBySection] = useState(() => ({
         material: { equipment: '', phase: 'all', unit: '', expenseType: '' },
@@ -2093,6 +2094,22 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
         }
     };
 
+    const cancelConfirmCurrentVersion = async () => {
+        if (!version?.id) return;
+        if (!window.confirm('확정 상태를 취소하시겠습니까?')) return;
+
+        setIsCancellingConfirm(true);
+        setError('');
+        try {
+            const response = await api.post(`/budget/versions/${version.id}/confirm-cancel`);
+            setVersion(response?.data?.version || version);
+        } catch (err) {
+            setError(getErrorMessage(err, '버전 확정 취소에 실패했습니다.'));
+        } finally {
+            setIsCancellingConfirm(false);
+        }
+    };
+
     const createRevision = async (reasonInput = null) => {
         if (!version?.id) return null;
         const reason = reasonInput ?? window.prompt('리비전 사유를 입력해 주세요.');
@@ -2304,6 +2321,16 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '' }) => {
                                     >
                                         <CheckCircle2 size={12} />
                                         {isConfirming ? '확정 중...' : '버전 확정'}
+                                    </button>
+                                )}
+                                {canEditProject && isConfirmed && section === 'material' && (
+                                    <button
+                                        type="button"
+                                        onClick={cancelConfirmCurrentVersion}
+                                        disabled={isCancellingConfirm}
+                                        className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-3 text-[11px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 transition-colors"
+                                    >
+                                        {isCancellingConfirm ? '취소 중...' : '확정 취소'}
                                     </button>
                                 )}
                                 {!embedded && canEditProject && isConfirmed && (

@@ -15,7 +15,7 @@ const Layout = ({ children }) => {
 
     if (isAuthRoute || isHomeRoute) {
         return (
-            <div className="min-h-screen bg-slate-50 font-sans text-foreground antialiased">
+            <div className="app-shell min-h-screen text-foreground antialiased">
                 {children}
             </div>
         );
@@ -23,16 +23,16 @@ const Layout = ({ children }) => {
 
     if (isProjectMainRoute || isProjectBudgetMainRoute) {
         return (
-            <div className="min-h-screen bg-slate-50 font-sans text-foreground antialiased">
+            <div className="app-shell min-h-screen text-foreground antialiased">
                 {children}
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="app-shell min-h-screen text-foreground">
             <GlobalTopBar />
-            <main className="mx-auto max-w-[1600px] px-4 py-4 lg:px-6 lg:py-6">
+            <main className="app-enter mx-auto max-w-[1640px] px-4 py-4 lg:px-6 lg:py-6">
                 {children}
             </main>
         </div>

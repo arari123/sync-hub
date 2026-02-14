@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, Text
 
 from .database import Base
 
@@ -108,6 +108,7 @@ class BudgetProject(Base):
     business_trip_distance_km = Column(Float, nullable=True)
     cover_image_url = Column(String(500), nullable=True)
     summary_milestones_json = Column(String, nullable=True)
+    schedule_wbs_json = Column(String, nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     manager_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     current_stage = Column(String(32), nullable=False, default="review", index=True)
@@ -149,3 +150,96 @@ class BudgetEquipment(Base):
     sort_order = Column(Integer, nullable=False, default=0, index=True)
     created_at = Column(String, nullable=False, index=True)
     updated_at = Column(String, nullable=False, index=True)
+
+
+class AgendaThread(Base):
+    __tablename__ = "agenda_threads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    thread_kind = Column(String(32), nullable=False, index=True)  # general|work_report
+    record_status = Column(String(16), nullable=False, default="published", index=True)  # draft|published
+    progress_status = Column(String(16), nullable=False, default="in_progress", index=True)  # in_progress|completed
+    agenda_code = Column(String(32), nullable=False, unique=True, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    source_thread_id = Column(Integer, ForeignKey("agenda_threads.id"), nullable=True, index=True)
+
+    title = Column(String(240), nullable=False)
+    summary_plain = Column(String(1200), nullable=True)
+
+    requester_name = Column(String(120), nullable=True)
+    requester_org = Column(String(120), nullable=True)
+    responder_name = Column(String(120), nullable=True)
+    responder_org = Column(String(120), nullable=True)
+
+    report_payload_json = Column(Text, nullable=True)
+
+    root_entry_id = Column(Integer, nullable=True, index=True)
+    latest_entry_id = Column(Integer, nullable=True, index=True)
+    reply_count = Column(Integer, nullable=False, default=0)
+    comment_count = Column(Integer, nullable=False, default=0)
+    attachment_count = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(String, nullable=False, index=True)
+    published_at = Column(String, nullable=True, index=True)
+    last_updated_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False, index=True)
+
+
+class AgendaEntry(Base):
+    __tablename__ = "agenda_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    thread_id = Column(Integer, ForeignKey("agenda_threads.id"), nullable=False, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    parent_entry_id = Column(Integer, ForeignKey("agenda_entries.id"), nullable=True, index=True)
+    entry_kind = Column(String(32), nullable=False, index=True)  # root|reply|additional_work
+    record_status = Column(String(16), nullable=False, default="published", index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    title = Column(String(240), nullable=False)
+    content_html = Column(Text, nullable=True)
+    content_plain = Column(Text, nullable=True)
+
+    requester_name = Column(String(120), nullable=True)
+    requester_org = Column(String(120), nullable=True)
+    responder_name = Column(String(120), nullable=True)
+    responder_org = Column(String(120), nullable=True)
+
+    entry_payload_json = Column(Text, nullable=True)
+    attachment_count = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(String, nullable=False, index=True)
+    published_at = Column(String, nullable=True, index=True)
+    updated_at = Column(String, nullable=False, index=True)
+
+
+class AgendaAttachment(Base):
+    __tablename__ = "agenda_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    thread_id = Column(Integer, ForeignKey("agenda_threads.id"), nullable=False, index=True)
+    entry_id = Column(Integer, ForeignKey("agenda_entries.id"), nullable=False, index=True)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    original_filename = Column(String(255), nullable=False)
+    stored_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    mime_type = Column(String(120), nullable=True)
+    file_ext = Column(String(16), nullable=True)
+    file_size = Column(Integer, nullable=False, default=0)
+    is_image = Column(Boolean, nullable=False, default=False, index=True)
+
+    created_at = Column(String, nullable=False, index=True)
+
+
+class AgendaComment(Base):
+    __tablename__ = "agenda_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    thread_id = Column(Integer, ForeignKey("agenda_threads.id"), nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    body = Column(String(2000), nullable=False)
+    created_at = Column(String, nullable=False, index=True)

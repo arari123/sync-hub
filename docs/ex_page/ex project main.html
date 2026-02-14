@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Main Summary Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1152d4",
+                        "primary-hover": "#0d41aa",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                        "surface-dark": "#1a202c",
+                        "surface-light": "#ffffff",
+                        "secondary-teal": "#14b8a6", // Teal for the secondary theme requirement
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for high density lists */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05); 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1); 
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2); 
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200 font-display min-h-screen p-4 md:p-6 lg:p-8">
+<!-- Breadcrumb -->
+<nav class="flex items-center text-sm text-slate-500 dark:text-slate-400 mb-6">
+<a class="hover:text-primary transition-colors" href="#">Project List</a>
+<span class="mx-2 text-slate-400 dark:text-slate-600">/</span>
+<span class="text-slate-800 dark:text-white font-medium">Project Alpha</span>
+</nav>
+<div class="grid grid-cols-12 gap-6 max-w-[1600px] mx-auto">
+<!-- 1. Top Section (Basic Info) -->
+<div class="col-span-12 bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+<div class="flex flex-col lg:flex-row h-full">
+<!-- Project Photo -->
+<div class="w-full lg:w-72 h-48 lg:h-auto relative shrink-0">
+<img alt="Modern corporate building facade low angle" class="w-full h-full object-cover" data-alt="Modern corporate building facade low angle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvZDM4idaRCFf5FB-ZZTs6bu_b0BQhNjL16PXT6ZTwjtBZTta_bMf_L93mVUulf65fSFNBlnL7rne_86oubmM9a2VSbfznA49HdAp47Uad5JowRtg_EPYFgF-Sbqj9J5TFhXoGWoV6cex5f-KtbIv_JfZ3oQJOcTily7ZrWvwVOW-JMFIY2xGodbxwZz_yl1-E2837cOUvXSs818Z_-W2Av-Hhp8Nch_LJdtA2lbkEuRrsFU4F0LsNWGVhW_0hyGUgCpGylFdyGA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent lg:hidden"></div>
+<div class="absolute bottom-4 left-4 lg:hidden text-white font-bold text-xl drop-shadow-md">Project Alpha</div>
+</div>
+<!-- Info Grid -->
+<div class="flex-1 p-5 md:p-6 flex flex-col justify-between">
+<!-- Header & Status -->
+<div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-6">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h1 class="text-2xl font-bold text-slate-900 dark:text-white hidden lg:block">Project Alpha - HQ Renovation</h1>
+<span class="bg-primary/10 text-primary dark:text-blue-400 text-xs font-semibold px-2 py-0.5 rounded border border-primary/20">Active</span>
+</div>
+<p class="text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+                                Complete renovation of the headquarters lobby area including new HVAC systems, security integration, and modern aesthetic overhaul.
+                            </p>
+</div>
+<!-- Status Segmented Control -->
+<div class="bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg inline-flex flex-wrap gap-1">
+<button class="px-3 py-1.5 text-xs font-medium rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Review</button>
+<button class="px-3 py-1.5 text-xs font-medium rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Design</button>
+<button class="px-3 py-1.5 text-xs font-medium rounded bg-primary text-white shadow-sm">Production</button>
+<button class="px-3 py-1.5 text-xs font-medium rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Install</button>
+<button class="px-3 py-1.5 text-xs font-medium rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">AS</button>
+<button class="px-3 py-1.5 text-xs font-medium rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Closed</button>
+</div>
+</div>
+<!-- Detail Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-y-4 gap-x-8 border-t border-slate-100 dark:border-slate-700 pt-5">
+<!-- Client -->
+<div class="space-y-1">
+<label class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+<span class="material-icons text-[14px]">business</span> Client Contacts
+                            </label>
+<div class="flex items-center gap-2">
+<div class="flex -space-x-2 overflow-hidden">
+<img alt="Client 1" class="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-surface-dark" data-alt="Portrait of a woman" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBy2hYrIywHtQJvlZC6wY0ZX_npsxSbZVs7ekAthyDXWUcqUcz7hWnvL6KirZUDas3yASAD_txJPPoB4LPzatK_GUdsadtiwVYWbPgAg5LtVmGbs6K9jY6E6aY5frJSGJ6FwX5xowtCOIpBx6HdxsLRrwrDwakNnhO-rtnvvWbTM5PHYGuGyE5YYY_TXHm4LsaU0VHYBt8uMZEUgrb7xu27ZYNM3dwpaJLwNugdndeyz8V8GQyrOgdjMvMgeJGs_KYEjsGfgXjs3A"/>
+<img alt="Client 2" class="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-surface-dark" data-alt="Portrait of a man" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZUju837PoPY53GPLxR_-5XT7VuanbvA6vCfR9gWNsw7S4RhVU_Dzpt0VqSnKPruMZH0QAYqDRHwY8Rdm4RbFNhyLEukgyiVQj6hOHbi7wx7-IveUNMWzEugJXv9EZjRh1jNaIe5ZIHLubD3LJP_LZ18VimJ27MYv3GxCcFauexMs7sjKc8nVJIUWhSrG__4cKg6ANDVu8ug_jEbWfOS6pfwFEYXSEVlYgfOMgG-5uEv3wAvWjM_PXxGoMECEz1uluEABhPCR5Cg"/>
+</div>
+<span class="text-sm font-medium text-slate-700 dark:text-slate-200">Global Tech Corp</span>
+</div>
+</div>
+<!-- Location -->
+<div class="space-y-1">
+<label class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+<span class="material-icons text-[14px]">public</span> Location
+                            </label>
+<div class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+<span class="fi fi-us"></span> USA <span class="text-slate-400">/</span> New York
+                            </div>
+</div>
+<!-- Manager & Equip -->
+<div class="space-y-1">
+<label class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+<span class="material-icons text-[14px]">manage_accounts</span> Manager
+                            </label>
+<div class="text-sm font-medium text-slate-700 dark:text-slate-200">Michael Chen <span class="text-xs text-slate-500 font-normal">(PM Lead)</span></div>
+</div>
+<!-- ERP Code -->
+<div class="space-y-1">
+<label class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+<span class="material-icons text-[14px]">qr_code</span> ERP Code
+                            </label>
+<div class="font-mono text-sm text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded inline-block">PRJ-2023-8842X</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 2. Middle Left (Issues) -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 flex-1 flex flex-col">
+<div class="p-5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+<span class="w-1.5 h-6 bg-red-500 rounded-full"></span> Latest Issues
+                    </h2>
+<a class="text-xs font-medium text-primary hover:text-primary-hover dark:text-blue-400 dark:hover:text-blue-300" href="#">View All</a>
+</div>
+<div class="p-2 custom-scrollbar overflow-y-auto flex-1 h-[280px]">
+<ul class="space-y-1">
+<!-- Issue Item 1 -->
+<li class="group p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900/30">CRITICAL</span>
+<span class="text-xs text-slate-400">Oct 24, 2023</span>
+</div>
+<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 group-hover:text-primary transition-colors">Material Delay: Steel Beams</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">Supplier notification of 2-week delay due to logistics...</p>
+</li>
+<!-- Issue Item 2 -->
+<li class="group p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded border border-orange-100 dark:border-orange-900/30">MAJOR</span>
+<span class="text-xs text-slate-400">Oct 22, 2023</span>
+</div>
+<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 group-hover:text-primary transition-colors">Design Conflict in HVAC</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">Duct work clashing with electrical conduits on Floor 2...</p>
+</li>
+<!-- Issue Item 3 -->
+<li class="group p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-yellow-600 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-100 dark:border-yellow-900/30">MINOR</span>
+<span class="text-xs text-slate-400">Oct 20, 2023</span>
+</div>
+<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 group-hover:text-primary transition-colors">Permit Renewal Required</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">City council requires updated noise compliance form...</p>
+</li>
+<!-- Issue Item 4 -->
+<li class="group p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<div class="flex justify-between items-start mb-1">
+<span class="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-900/30">INFO</span>
+<span class="text-xs text-slate-400">Oct 18, 2023</span>
+</div>
+<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 group-hover:text-primary transition-colors">Client Visit Scheduled</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">Executive team visiting site next Monday for inspection...</p>
+</li>
+</ul>
+</div>
+</div>
+<!-- 5. Bottom Left (Schedule) - Moved here for grid alignment on desktop -->
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 p-5">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+<span class="w-1.5 h-6 bg-secondary-teal rounded-full"></span> Timeline
+                    </h2>
+<span class="text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">Overall Progress: 65%</span>
+</div>
+<div class="relative px-2">
+<!-- Line -->
+<div class="absolute top-[14px] left-0 w-full h-0.5 bg-slate-200 dark:bg-slate-700 rounded"></div>
+<div class="grid grid-cols-3 gap-2 relative">
+<!-- Step 1: Design -->
+<div class="flex flex-col items-center text-center group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold ring-4 ring-white dark:ring-surface-dark z-10 shadow-lg mb-3">
+<span class="material-icons text-[16px]">check</span>
+</div>
+<div class="text-sm font-bold text-slate-800 dark:text-white mb-1">Design</div>
+<div class="text-[10px] text-slate-500 uppercase font-semibold">Completed</div>
+<div class="text-[10px] text-slate-400 mt-0.5">Sep 15, 2023</div>
+</div>
+<!-- Step 2: Production -->
+<div class="flex flex-col items-center text-center group">
+<div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold ring-4 ring-white dark:ring-surface-dark z-10 shadow-lg shadow-primary/20 mb-3 animate-pulse">
+<span class="material-icons text-[16px]">precision_manufacturing</span>
+</div>
+<div class="text-sm font-bold text-primary dark:text-blue-400 mb-1">Production</div>
+<div class="text-[10px] text-primary dark:text-blue-400 uppercase font-semibold">In Progress</div>
+<div class="text-[10px] text-slate-400 mt-0.5">Due: Nov 30, 2023</div>
+</div>
+<!-- Step 3: Installation -->
+<div class="flex flex-col items-center text-center group opacity-60">
+<div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold ring-4 ring-white dark:ring-surface-dark z-10 mb-3">
+                                3
+                            </div>
+<div class="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">Installation</div>
+<div class="text-[10px] text-slate-500 uppercase font-semibold">Pending</div>
+<div class="text-[10px] text-slate-400 mt-0.5">Est: Dec 15, 2023</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- 3. Middle Right (Budget) & 5. Bottom Right (Stats) -->
+<div class="col-span-12 lg:col-span-7 flex flex-col gap-6">
+<!-- Budget vs Execution Card -->
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 p-6 flex-1">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
+<span class="w-1.5 h-6 bg-primary rounded-full"></span> Budget vs. Execution
+                        </h2>
+<p class="text-xs text-slate-500 dark:text-slate-400">Financial overview for current fiscal quarter</p>
+</div>
+<div class="text-right">
+<div class="text-3xl font-bold text-slate-900 dark:text-white font-mono tracking-tight">$350,000</div>
+<div class="text-xs font-medium text-emerald-500 flex items-center justify-end gap-1">
+<span class="material-icons text-[14px]">trending_up</span> Balance Available
+                        </div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+<!-- Donut Chart / Progress Visualization -->
+<div class="relative flex items-center justify-center p-4">
+<!-- Abstract CSS Donut Chart -->
+<div class="w-48 h-48 rounded-full border-[16px] border-slate-100 dark:border-slate-700 relative flex items-center justify-center">
+<!-- Execution segment (approx 70%) -->
+<div class="absolute inset-0 rounded-full border-[16px] border-primary border-l-transparent border-b-transparent transform -rotate-45" style="clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);"></div>
+<div class="text-center">
+<span class="block text-3xl font-bold text-slate-800 dark:text-white">72%</span>
+<span class="text-xs text-slate-500 uppercase font-medium tracking-wide">Executed</span>
+</div>
+</div>
+<!-- Legend for chart -->
+<div class="absolute bottom-0 right-0 md:-right-4 flex flex-col gap-2 bg-white/90 dark:bg-surface-dark/90 p-3 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 backdrop-blur-sm">
+<div class="flex items-center gap-2 text-xs">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="text-slate-600 dark:text-slate-300">Used: $900k</span>
+</div>
+<div class="flex items-center gap-2 text-xs">
+<span class="w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-700"></span>
+<span class="text-slate-600 dark:text-slate-300">Total: $1.25M</span>
+</div>
+</div>
+</div>
+<!-- Breakdown Bars -->
+<div class="space-y-6">
+<!-- Production Budget -->
+<div>
+<div class="flex justify-between text-sm mb-2">
+<span class="font-medium text-slate-700 dark:text-slate-300">Production</span>
+<span class="font-mono text-slate-500 dark:text-slate-400">$650k / $800k</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+<div class="bg-gradient-to-r from-primary to-blue-400 h-3 rounded-full" style="width: 81%"></div>
+</div>
+<div class="flex justify-end mt-1">
+<span class="text-[10px] text-red-500 font-medium">81% - High Usage</span>
+</div>
+</div>
+<!-- Installation Budget -->
+<div>
+<div class="flex justify-between text-sm mb-2">
+<span class="font-medium text-slate-700 dark:text-slate-300">Installation</span>
+<span class="font-mono text-slate-500 dark:text-slate-400">$250k / $450k</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+<div class="bg-gradient-to-r from-secondary-teal to-teal-400 h-3 rounded-full" style="width: 55%"></div>
+</div>
+<div class="flex justify-end mt-1">
+<span class="text-[10px] text-secondary-teal font-medium">55% - On Track</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stats Grid -->
+<div class="grid grid-cols-2 gap-6">
+<!-- Stat 1 -->
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between group cursor-pointer hover:border-primary/30 transition-all">
+<div>
+<p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Registered Issues</p>
+<h3 class="text-3xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">24</h3>
+<p class="text-xs text-slate-500 mt-1"><span class="text-emerald-500 font-medium">↓ 2</span> from last week</p>
+</div>
+<div class="w-12 h-12 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 dark:text-orange-400 group-hover:scale-110 transition-transform">
+<span class="material-icons">bug_report</span>
+</div>
+</div>
+<!-- Stat 2 -->
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between group cursor-pointer hover:border-primary/30 transition-all">
+<div>
+<p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Resources / Data</p>
+<h3 class="text-3xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">158</h3>
+<p class="text-xs text-slate-500 mt-1"><span class="text-primary font-medium">+ 12</span> new files</p>
+</div>
+<div class="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-primary dark:text-blue-400 group-hover:scale-110 transition-transform">
+<span class="material-icons">folder_shared</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

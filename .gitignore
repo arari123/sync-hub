@@ -27,6 +27,7 @@ uploads/
 reports/
 *.log
 .cache/
+.firebase/
 
 # OS / editor
 .DS_Store

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Plus, RotateCcw } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { cn } from '../lib/utils';
 
 const PROJECT_SORT_OPTIONS = [
@@ -233,27 +234,27 @@ const BudgetManagement = () => {
         <div className="space-y-4 animate-in fade-in duration-300 pb-8">
             <section className="rounded-xl border bg-card/70 p-3 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                    <input
-                        className="h-8 w-[180px] rounded-md border bg-background px-2.5 text-xs outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
+                    <Input
+                        className="h-8 w-[180px] px-2.5 text-xs"
                         placeholder="프로젝트명"
                         value={filters.projectName}
                         onChange={(e) => setFilters((prev) => ({ ...prev, projectName: e.target.value }))}
                     />
-                    <input
-                        className="h-8 w-[150px] rounded-md border bg-background px-2.5 text-xs outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
+                    <Input
+                        className="h-8 w-[150px] px-2.5 text-xs"
                         placeholder="코드"
                         value={filters.projectCode}
                         onChange={(e) => setFilters((prev) => ({ ...prev, projectCode: e.target.value }))}
                     />
-                    <input
+                    <Input
                         list="budget-customer-options"
-                        className="h-8 w-[150px] rounded-md border bg-background px-2.5 text-xs outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
+                        className="h-8 w-[150px] px-2.5 text-xs"
                         placeholder="고객사"
                         value={filters.customerName}
                         onChange={(e) => setFilters((prev) => ({ ...prev, customerName: e.target.value }))}
                     />
-                    <input
-                        className="h-8 w-[130px] rounded-md border bg-background px-2.5 text-xs outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
+                    <Input
+                        className="h-8 w-[130px] px-2.5 text-xs"
                         placeholder="담당자"
                         value={filters.managerName}
                         onChange={(e) => setFilters((prev) => ({ ...prev, managerName: e.target.value }))}

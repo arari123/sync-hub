@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Optional
 from urllib.parse import quote
 
@@ -65,6 +65,28 @@ _ADMIN_IDENTIFIERS = {
     token.strip().lower()
     for token in _RAW_ADMIN_IDENTIFIERS.split(",")
     if token.strip()
+}
+_SCHEDULE_SCHEMA_VERSION = "wbs.v1"
+_SCHEDULE_STAGE_ORDER = ("design", "fabrication", "installation")
+_SCHEDULE_STAGE_LABELS = {
+    "design": "설계",
+    "fabrication": "제작",
+    "installation": "설치",
+}
+_SCHEDULE_STAGE_ALIASES = {
+    "design": "design",
+    "설계": "design",
+    "fabrication": "fabrication",
+    "제작": "fabrication",
+    "installation": "installation",
+    "install": "installation",
+    "설치": "installation",
+}
+_SCHEDULE_WEEKEND_MODES = {"exclude", "include"}
+_SCHEDULE_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_SCHEDULE_ROOT_GROUP_IDS = {
+    stage: f"stage-{stage}"
+    for stage in _SCHEDULE_STAGE_ORDER
 }
 
 
@@ -194,6 +216,37 @@ class BudgetDetailPayload(BaseModel):
     execution_labor_items: list[LaborExecutionItem] = Field(default_factory=list)
     execution_expense_items: list[ExpenseExecutionItem] = Field(default_factory=list)
     budget_settings: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScheduleGroupPayload(BaseModel):
+    id: str = Field(default="", max_length=80)
+    name: str = Field(default="", max_length=120)
+    stage: str = Field(default="design", max_length=32)
+    parent_group_id: Optional[str] = Field(default=None, max_length=80)
+    sort_order: int = 0
+    is_system: bool = False
+
+
+class ScheduleRowPayload(BaseModel):
+    id: str = Field(default="", max_length=80)
+    kind: str = Field(default="task", max_length=16)
+    name: str = Field(default="", max_length=180)
+    stage: str = Field(default="design", max_length=32)
+    parent_group_id: str = Field(default="", max_length=80)
+    sort_order: int = 0
+    duration_days: int = 1
+    start_date: str = Field(default="", max_length=16)
+    end_date: str = Field(default="", max_length=16)
+    note: str = Field(default="", max_length=500)
+
+
+class BudgetProjectSchedulePayload(BaseModel):
+    schema_version: str = Field(default=_SCHEDULE_SCHEMA_VERSION, max_length=32)
+    weekend_mode: str = Field(default="exclude", max_length=16)
+    anchor_date: str = Field(..., min_length=10, max_length=10)
+    groups: list[ScheduleGroupPayload] = Field(default_factory=list)
+    rows: list[ScheduleRowPayload] = Field(default_factory=list)
+    updated_at: Optional[str] = Field(default=None, max_length=64)
 
 
 def _get_project_or_404(project_id: int, db: Session) -> models.BudgetProject:
@@ -382,6 +435,358 @@ def _project_stage_rank(stage: Optional[str]) -> int:
         "closure": 4,
     }
     return order.get((stage or "").strip().lower(), 0)
+
+
+def _normalize_schedule_stage(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    return _SCHEDULE_STAGE_ALIASES.get(normalized, "design")
+
+
+def _schedule_default_anchor_date() -> str:
+    return utcnow().date().isoformat()
+
+
+def _parse_schedule_date(value: Any) -> Optional[date]:
+    text = str(value or "").strip()
+    if not _SCHEDULE_DATE_PATTERN.match(text):
+        return None
+    try:
+        return date.fromisoformat(text)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _format_schedule_date(value: date) -> str:
+    return value.isoformat()
+
+
+def _is_weekend(target: date) -> bool:
+    return target.weekday() >= 5
+
+
+def _schedule_next_day(current: date, weekend_mode: str) -> date:
+    cursor = current + timedelta(days=1)
+    if weekend_mode == "include":
+        return cursor
+    while _is_weekend(cursor):
+        cursor += timedelta(days=1)
+    return cursor
+
+
+def _schedule_duration_from_dates(start: date, end: date, weekend_mode: str) -> int:
+    if end < start:
+        return 1
+    if weekend_mode == "include":
+        return max(1, (end - start).days + 1)
+
+    count = 0
+    cursor = start
+    while cursor <= end:
+        if not _is_weekend(cursor):
+            count += 1
+        cursor += timedelta(days=1)
+    return max(1, count)
+
+
+def _schedule_end_from_duration(start: date, duration_days: int, weekend_mode: str) -> date:
+    duration = max(1, int(duration_days or 1))
+    if weekend_mode == "include":
+        return start + timedelta(days=duration - 1)
+
+    remaining = duration - 1
+    cursor = start
+    while remaining > 0:
+        cursor += timedelta(days=1)
+        if _is_weekend(cursor):
+            continue
+        remaining -= 1
+    return cursor
+
+
+def _schedule_unique_id(raw_value: Any, prefix: str, sequence_no: int, used: set[str]) -> str:
+    text = str(raw_value or "").strip()
+    if text:
+        candidate = text
+    else:
+        candidate = f"{prefix}-{sequence_no}"
+    if candidate not in used:
+        used.add(candidate)
+        return candidate
+
+    index = 2
+    while True:
+        next_candidate = f"{candidate}-{index}"
+        if next_candidate not in used:
+            used.add(next_candidate)
+            return next_candidate
+        index += 1
+
+
+def _build_default_schedule_wbs_payload(anchor_date: Optional[str] = None) -> dict:
+    parsed_anchor = _parse_schedule_date(anchor_date) if anchor_date else None
+    safe_anchor = parsed_anchor.isoformat() if parsed_anchor else _schedule_default_anchor_date()
+    return {
+        "schema_version": _SCHEDULE_SCHEMA_VERSION,
+        "weekend_mode": "exclude",
+        "anchor_date": safe_anchor,
+        "groups": [
+            {
+                "id": _SCHEDULE_ROOT_GROUP_IDS[stage],
+                "name": _SCHEDULE_STAGE_LABELS[stage],
+                "stage": stage,
+                "parent_group_id": None,
+                "sort_order": index,
+                "is_system": True,
+            }
+            for index, stage in enumerate(_SCHEDULE_STAGE_ORDER)
+        ],
+        "rows": [],
+        "updated_at": "",
+    }
+
+
+def _normalize_schedule_wbs_payload(payload: dict[str, Any], *, strict_anchor: bool) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid schedule payload.")
+
+    weekend_mode = str(payload.get("weekend_mode") or "exclude").strip().lower()
+    if weekend_mode not in _SCHEDULE_WEEKEND_MODES:
+        weekend_mode = "exclude"
+
+    parsed_anchor = _parse_schedule_date(payload.get("anchor_date"))
+    if strict_anchor and not parsed_anchor:
+        raise ValueError("anchor_date is required. (YYYY-MM-DD)")
+    if not parsed_anchor:
+        parsed_anchor = _parse_schedule_date(_schedule_default_anchor_date())
+    if parsed_anchor is None:
+        raise ValueError("Failed to resolve anchor_date.")
+    anchor_date = _format_schedule_date(parsed_anchor)
+
+    root_groups = [
+        {
+            "id": _SCHEDULE_ROOT_GROUP_IDS[stage],
+            "name": _SCHEDULE_STAGE_LABELS[stage],
+            "stage": stage,
+            "parent_group_id": None,
+            "sort_order": stage_index,
+            "is_system": True,
+        }
+        for stage_index, stage in enumerate(_SCHEDULE_STAGE_ORDER)
+    ]
+
+    used_group_ids = {item["id"] for item in root_groups}
+    raw_groups = payload.get("groups")
+    custom_groups: list[dict[str, Any]] = []
+    for index, item in enumerate(raw_groups if isinstance(raw_groups, list) else []):
+        if not isinstance(item, dict):
+            continue
+        stage = _normalize_schedule_stage(item.get("stage"))
+        raw_group_id = str(item.get("id") or "").strip()
+        if raw_group_id in _SCHEDULE_ROOT_GROUP_IDS.values():
+            continue
+        group_id = _schedule_unique_id(raw_group_id, f"group-{stage}", index + 1, used_group_ids)
+        name = str(item.get("name") or "").strip() or "그룹"
+        raw_parent = str(item.get("parent_group_id") or "").strip() or None
+        custom_groups.append(
+            {
+                "id": group_id,
+                "name": name,
+                "stage": stage,
+                "raw_parent_group_id": raw_parent,
+                "parent_group_id": _SCHEDULE_ROOT_GROUP_IDS[stage],
+                "sort_order": int(to_number(item.get("sort_order"))),
+                "is_system": False,
+            }
+        )
+
+    custom_group_map = {item["id"]: item for item in custom_groups}
+    root_stage_by_group_id = {
+        group_id: stage
+        for stage, group_id in _SCHEDULE_ROOT_GROUP_IDS.items()
+    }
+    for group in custom_groups:
+        stage = group["stage"]
+        default_parent = _SCHEDULE_ROOT_GROUP_IDS[stage]
+        parent_id = group["raw_parent_group_id"]
+        if not parent_id:
+            group["parent_group_id"] = default_parent
+            continue
+        if parent_id in root_stage_by_group_id:
+            group["parent_group_id"] = parent_id if root_stage_by_group_id[parent_id] == stage else default_parent
+            continue
+        parent_group = custom_group_map.get(parent_id)
+        if not parent_group or parent_group["stage"] != stage:
+            group["parent_group_id"] = default_parent
+            continue
+        group["parent_group_id"] = parent_id
+
+    for group in custom_groups:
+        stage = group["stage"]
+        default_parent = _SCHEDULE_ROOT_GROUP_IDS[stage]
+        visited = {group["id"]}
+        cursor = group["parent_group_id"]
+        while cursor in custom_group_map:
+            if cursor in visited:
+                group["parent_group_id"] = default_parent
+                break
+            visited.add(cursor)
+            cursor = custom_group_map[cursor]["parent_group_id"]
+
+    custom_groups_by_parent: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for group in custom_groups:
+        key = (group["stage"], group["parent_group_id"])
+        custom_groups_by_parent.setdefault(key, []).append(group)
+
+    for siblings in custom_groups_by_parent.values():
+        siblings.sort(key=lambda item: (item.get("sort_order", 0), item["name"], item["id"]))
+        for sibling_index, sibling in enumerate(siblings):
+            sibling["sort_order"] = sibling_index
+
+    normalized_groups = [*root_groups]
+    custom_children_map: dict[str, list[dict[str, Any]]] = {}
+    for group in custom_groups:
+        custom_children_map.setdefault(group["parent_group_id"], []).append(group)
+
+    for children in custom_children_map.values():
+        children.sort(key=lambda item: (item.get("sort_order", 0), item["name"], item["id"]))
+
+    def _append_custom_group_tree(parent_group_id: str) -> None:
+        for child in custom_children_map.get(parent_group_id, []):
+            normalized_groups.append(
+                {
+                    "id": child["id"],
+                    "name": child["name"],
+                    "stage": child["stage"],
+                    "parent_group_id": child["parent_group_id"],
+                    "sort_order": child["sort_order"],
+                    "is_system": False,
+                }
+            )
+            _append_custom_group_tree(child["id"])
+
+    for stage in _SCHEDULE_STAGE_ORDER:
+        _append_custom_group_tree(_SCHEDULE_ROOT_GROUP_IDS[stage])
+
+    normalized_group_map = {group["id"]: group for group in normalized_groups}
+    used_row_ids: set[str] = set()
+    raw_rows = payload.get("rows")
+    parsed_rows: list[dict[str, Any]] = []
+    for row_index, item in enumerate(raw_rows if isinstance(raw_rows, list) else []):
+        if not isinstance(item, dict):
+            continue
+        stage = _normalize_schedule_stage(item.get("stage"))
+        parent_group_id = str(item.get("parent_group_id") or "").strip()
+        parent_group = normalized_group_map.get(parent_group_id)
+        if not parent_group:
+            parent_group_id = _SCHEDULE_ROOT_GROUP_IDS[stage]
+            parent_group = normalized_group_map[parent_group_id]
+        if parent_group["stage"] != stage:
+            stage = parent_group["stage"]
+
+        row_id = _schedule_unique_id(item.get("id"), "row", row_index + 1, used_row_ids)
+        kind = "event" if str(item.get("kind") or "").strip().lower() == "event" else "task"
+        if "name" in item:
+            name = str(item.get("name") or "").strip()
+        else:
+            name = "이벤트" if kind == "event" else "일정"
+        note = str(item.get("note") or "").strip()
+        start_date = _parse_schedule_date(item.get("start_date"))
+        end_date = _parse_schedule_date(item.get("end_date"))
+        duration_days = int(to_number(item.get("duration_days")))
+
+        if kind == "event":
+            duration_days = 0
+            if start_date is None:
+                start_date = end_date or parsed_anchor
+            end_date = start_date
+        else:
+            if duration_days <= 0:
+                duration_days = 1
+            if start_date and end_date:
+                if end_date < start_date:
+                    end_date = start_date
+                duration_days = _schedule_duration_from_dates(start_date, end_date, weekend_mode)
+            elif start_date and not end_date:
+                end_date = start_date
+                duration_days = 1
+            elif not start_date and end_date:
+                start_date = end_date
+                duration_days = 1
+            else:
+                start_date = parsed_anchor
+                end_date = _schedule_end_from_duration(start_date, duration_days, weekend_mode)
+
+        parsed_rows.append(
+            {
+                "id": row_id,
+                "kind": kind,
+                "name": name,
+                "stage": stage,
+                "parent_group_id": parent_group_id,
+                "sort_order": int(to_number(item.get("sort_order"))),
+                "duration_days": duration_days,
+                "start_date": _format_schedule_date(start_date) if start_date else "",
+                "end_date": _format_schedule_date(end_date) if end_date else "",
+                "note": note,
+            }
+        )
+
+    rows_by_parent: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in parsed_rows:
+        key = (row["stage"], row["parent_group_id"])
+        rows_by_parent.setdefault(key, []).append(row)
+
+    for siblings in rows_by_parent.values():
+        siblings.sort(key=lambda item: (item.get("sort_order", 0), item["name"], item["id"]))
+        for sibling_index, sibling in enumerate(siblings):
+            sibling["sort_order"] = sibling_index
+
+    groups_by_parent: dict[str, list[dict[str, Any]]] = {}
+    for group in normalized_groups:
+        groups_by_parent.setdefault(group["parent_group_id"] or "", []).append(group)
+
+    for children in groups_by_parent.values():
+        children.sort(key=lambda item: (item.get("sort_order", 0), item["name"], item["id"]))
+
+    normalized_rows: list[dict[str, Any]] = []
+
+    def _append_rows_by_group(group_id: str) -> None:
+        current_group = normalized_group_map.get(group_id)
+        if current_group:
+            stage = current_group["stage"]
+            normalized_rows.extend(rows_by_parent.get((stage, group_id), []))
+        for child_group in groups_by_parent.get(group_id, []):
+            if child_group["id"] == group_id:
+                continue
+            _append_rows_by_group(child_group["id"])
+
+    for stage in _SCHEDULE_STAGE_ORDER:
+        _append_rows_by_group(_SCHEDULE_ROOT_GROUP_IDS[stage])
+
+    return {
+        "schema_version": _SCHEDULE_SCHEMA_VERSION,
+        "weekend_mode": weekend_mode,
+        "anchor_date": anchor_date,
+        "groups": normalized_groups,
+        "rows": normalized_rows,
+        "updated_at": str(payload.get("updated_at") or "").strip(),
+    }
+
+
+def _parse_schedule_wbs_payload(raw_text: Optional[str]) -> dict[str, Any]:
+    text = (raw_text or "").strip()
+    if not text:
+        return _build_default_schedule_wbs_payload()
+    try:
+        parsed = json.loads(text)
+    except Exception:  # noqa: BLE001
+        return _build_default_schedule_wbs_payload()
+    if not isinstance(parsed, dict):
+        return _build_default_schedule_wbs_payload()
+    try:
+        return _normalize_schedule_wbs_payload(parsed, strict_anchor=False)
+    except Exception:  # noqa: BLE001
+        return _build_default_schedule_wbs_payload()
 
 
 def _build_monitoring_payload(
@@ -1270,6 +1675,49 @@ def update_project(
     return _serialize_project(project, db, user=user)
 
 
+@router.get("/projects/{project_id}/schedule")
+def get_project_schedule(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    schedule_payload = _parse_schedule_wbs_payload(project.schedule_wbs_json)
+    return {
+        "project": _serialize_project(project, db, user=user),
+        "schedule": schedule_payload,
+    }
+
+
+@router.put("/projects/{project_id}/schedule")
+def upsert_project_schedule(
+    project_id: int,
+    payload: BudgetProjectSchedulePayload,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    _require_project_edit_permission(project, user)
+
+    try:
+        normalized = _normalize_schedule_wbs_payload(payload.model_dump(), strict_anchor=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    now_iso = to_iso(utcnow())
+    normalized["updated_at"] = now_iso
+    project.schedule_wbs_json = json.dumps(normalized, ensure_ascii=False)
+    project.updated_at = now_iso
+
+    db.commit()
+    db.refresh(project)
+
+    return {
+        "project": _serialize_project(project, db, user=user),
+        "schedule": normalized,
+    }
+
+
 @router.get("/projects/{project_id}/versions")
 def list_versions(
     project_id: int,
@@ -1371,6 +1819,27 @@ def confirm_version(
     db.commit()
     db.refresh(version)
     return {"message": "버전이 확정되었습니다.", "version": _serialize_version(version, db)}
+
+
+@router.post("/versions/{version_id}/confirm-cancel")
+def cancel_confirm_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    version = _get_version_or_404(version_id, db)
+    _require_version_edit_permission(version, user, db)
+    if version.status != "confirmed":
+        return {"message": "확정 상태가 아닙니다.", "version": _serialize_version(version, db)}
+
+    now_iso = to_iso(utcnow())
+    restore_status = "revision" if int(version.revision_no or 0) > 0 or version.parent_version_id else "draft"
+    version.status = restore_status
+    version.confirmed_at = None
+    version.updated_at = now_iso
+    db.commit()
+    db.refresh(version)
+    return {"message": "버전 확정을 취소했습니다.", "version": _serialize_version(version, db)}
 
 
 @router.post("/versions/{version_id}/revision")

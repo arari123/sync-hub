@@ -39,6 +39,7 @@ _BUDGET_PROJECT_COLUMN_SPECS = {
     "business_trip_distance_km": "FLOAT",
     "cover_image_url": "VARCHAR(500)",
     "summary_milestones_json": "TEXT",
+    "schedule_wbs_json": "TEXT",
 }
 
 def _run_schema_statement(connection, sql: str) -> None:

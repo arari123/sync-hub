@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project Agenda &amp; Report Management List</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00acc1","primary-dark": "#00838f",
+                        "navy-header": "#1a237e","text-main": "#212529","text-secondary": "#6c757d","background-page": "#F8F9FA","surface-card": "#ffffff",
+                        "border-light": "#e9ecef",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                    boxShadow: {
+                        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)',
+                        'hover': '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.025)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8F9FA; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #adb5bd; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00acc1; 
+        }
+    </style>
+</head>
+<body class="bg-background-page text-text-main min-h-screen flex flex-col">
+<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border-light px-6 py-4 shadow-sm">
+<div class="flex items-center justify-between max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<div class="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-cyan-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                    P
+                </div>
+<h1 class="text-xl font-bold font-display tracking-tight text-navy-header">Project Dashboard</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-gray-100 transition-colors">
+<span class="material-icons-round text-text-secondary">notifications</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-gray-200 overflow-hidden ring-2 ring-white shadow-sm">
+<img alt="User Profile" class="h-full w-full object-cover" data-alt="User avatar placeholder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYI5Fu_mD4VSG_yQ2KSKLBg6hr9xDu5EWBJ72FcMB8LrqCHkh2IAiwTM_F6I0H3jg3XTcoAZpKotSfhr6Mlc-FWsMdyJFfmoz9kWHErOXMoBWuXVPaUi15Fq41k1XKX8NhcGVoM_9SQDpJ8GxCSepTU9HBw2YVwb3Iix_Uc9rB6ABJ5KKvzQTpYQW9h4x7Off6TwuzrKhsRPJ7KVBmObKQap3C_3G6s6MxMUL8sRfuFAC_hRad_hy70934SCylqJFlF6-UAIsAau0"/>
+</div>
+</div>
+</div>
+</nav>
+<main class="flex-grow container max-w-7xl mx-auto px-6 py-8">
+<header class="mb-8 space-y-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="text-2xl font-bold text-navy-header font-display">Agenda &amp; Report Management</h2>
+<p class="text-text-secondary text-sm mt-1">Manage project communications and daily work logs.</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-sm text-text-secondary">Showing</span>
+<select class="form-select bg-white border border-gray-300 text-text-main text-sm rounded-lg focus:ring-primary focus:border-primary py-1.5 pl-3 pr-8 shadow-sm">
+<option>10</option>
+<option>30</option>
+<option>50</option>
+</select>
+<span class="text-sm text-text-secondary">per page</span>
+</div>
+</div>
+<div class="bg-surface-card p-4 rounded-xl shadow-soft border border-border-light flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+<div class="flex-1 flex flex-col sm:flex-row gap-2 w-full">
+<div class="relative min-w-[140px]">
+<select class="w-full bg-gray-50 border border-gray-300 text-text-main text-sm rounded-lg focus:ring-primary focus:border-primary py-2.5 pl-3 pr-8 font-medium hover:bg-white transition-colors">
+<option>Total Search</option>
+<option>Title Only</option>
+<option>Title + Content</option>
+<option>Content Only</option>
+<option>Author Name</option>
+<option>Requester Name</option>
+</select>
+</div>
+<div class="relative flex-grow">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
+<span class="material-icons-round text-lg">search</span>
+</span>
+<input class="w-full bg-gray-50 border border-gray-300 text-text-main text-sm rounded-lg focus:ring-primary focus:border-primary py-2.5 pl-10 pr-4 placeholder-gray-400 hover:bg-white transition-colors" placeholder="Search terms (separate by space or comma)..." type="text"/>
+</div>
+<button class="bg-primary hover:bg-primary-dark text-white font-semibold py-2.5 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+<span>Search</span>
+</button>
+</div>
+<div class="flex items-center gap-4 w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-border-light pt-4 lg:pt-0 lg:pl-4">
+<span class="text-sm font-medium text-text-secondary whitespace-nowrap">Status:</span>
+<div class="bg-gray-100 p-1 rounded-lg flex items-center">
+<button class="px-4 py-1.5 rounded-md bg-white text-navy-header shadow-sm text-sm font-bold transition-all border border-gray-200">
+                            In Progress
+                        </button>
+<button class="px-4 py-1.5 rounded-md text-text-secondary hover:text-text-main hover:bg-gray-200/50 text-sm font-medium transition-all">
+                            Completed
+                        </button>
+</div>
+</div>
+</div>
+</header>
+<div class="space-y-4">
+<article class="group bg-surface-card rounded-xl p-4 border border-border-light hover:border-primary/40 shadow-soft hover:shadow-hover transition-all cursor-pointer">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-full sm:w-24 h-48 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 shadow-inner">
+<img alt="Business Chart Analysis" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Spreadsheet analysis on laptop screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3CxDjpeEeOGZSGGPC8n-3FHYaLjPGC1vSfQ4brhwoKDMk-yCLWyfZVFo5BjQzYfaq9L9YPsuUAl_Y1vHzrtlFLOrxuVUHqjv-zw41YFlQvp8o42Oe4LWWj61L9IXd7HevSvvoLmKpLbIplN1e2R5Eqrut0cfaLcHq2gys47ZTu2KGxpQGI--wK9hn3p8UnG6j5szWwMtZA9Lmxjs9xPjr3lr5-IhhMCKJ4dp19G12XhY4SZfC-hmyysNOfaFEqisg1rCQ3Sbg6ZA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-50"></div>
+<span class="absolute bottom-1 right-1 bg-white/90 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">IMG</span>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div class="flex justify-between items-start gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="bg-cyan-50 text-primary border border-cyan-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Agenda</span>
+<h3 class="font-bold text-text-main text-lg leading-tight group-hover:text-primary transition-colors line-clamp-1">Q3 Marketing Budget Reallocation Request</h3>
+</div>
+<p class="text-text-secondary text-sm font-medium flex items-center gap-2 line-clamp-1">
+<span class="material-icons-round text-base align-middle rotate-180 text-gray-400">reply</span>
+                                    RE: Preliminary approval required for ad spend adjustment
+                                </p>
+</div>
+<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
+                                In Progress
+                            </span>
+</div>
+<div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Author</span>
+<span class="font-medium text-text-main">Sarah Jenkins <span class="text-gray-400 text-[10px]">[MKT]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Requester</span>
+<span class="font-medium text-text-main">Finance Dept <span class="text-gray-400 text-[10px]">[HQ]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Responder</span>
+<span class="font-medium text-text-main">David Chen <span class="text-gray-400 text-[10px]">[FIN]</span></span>
+</div>
+<div class="ml-auto flex items-center gap-4 text-gray-400">
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Attachments">
+<span class="material-icons-round text-sm">attach_file</span>
+<span>3</span>
+</div>
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Replies">
+<span class="material-icons-round text-sm">forum</span>
+<span>5</span>
+</div>
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Comments">
+<span class="material-icons-round text-sm">chat_bubble_outline</span>
+<span>12</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<article class="group bg-surface-card rounded-xl p-4 border-l-4 border-l-blue-500 border-y border-r border-border-light hover:shadow-hover transition-all cursor-pointer">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-full sm:w-24 h-48 sm:h-24 rounded-lg overflow-hidden relative bg-blue-50 flex items-center justify-center border border-blue-100">
+<span class="material-icons-round text-blue-500 text-3xl">assessment</span>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div class="flex justify-between items-start gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Report</span>
+<h3 class="font-bold text-text-main text-lg leading-tight group-hover:text-blue-600 transition-colors line-clamp-1">Backend API Optimization - Sprint 42</h3>
+</div>
+<p class="text-text-secondary text-sm font-medium flex items-center gap-2 line-clamp-1">
+<span class="material-icons-round text-base align-middle rotate-180 text-gray-400">reply</span>
+                                    Log: Reduced latency by 40% on user endpoints
+                                </p>
+</div>
+<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
+                                In Progress
+                            </span>
+</div>
+<div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Worker</span>
+<span class="font-medium text-text-main">Alex Kim + 2 <span class="text-gray-400 text-[10px]">[DEV]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Date</span>
+<span class="font-medium text-text-main">Oct 24, 2023</span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Hours</span>
+<span class="font-medium text-navy-header bg-gray-100 px-1.5 rounded border border-gray-200">8.5 H</span>
+</div>
+<div class="ml-auto flex items-center gap-4 text-gray-400">
+<div class="flex items-center gap-1 hover:text-blue-600 transition-colors" title="Replies">
+<span class="material-icons-round text-sm">forum</span>
+<span>2</span>
+</div>
+<div class="flex items-center gap-1 hover:text-blue-600 transition-colors" title="Comments">
+<span class="material-icons-round text-sm">chat_bubble_outline</span>
+<span>0</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<article class="group bg-surface-card rounded-xl p-4 border border-border-light hover:border-primary/40 shadow-soft hover:shadow-hover transition-all cursor-pointer">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-full sm:w-24 h-48 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 shadow-inner">
+<img alt="Meeting room discussion" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Team meeting in modern conference room" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPFrKKCoJaGzvWumCa3tOZruXGuYoRJ0KIyMPUr10xq1llzuup3jce3CLK7QiSHFg9DmXTM5AREBrbhMixQE6DMU4B8EE6E2VBaLeeugS6K0caUIRVmAqAJOofRftzw4Zx594VWNjBviRs1BchE5JZIhHgGb8tr_Lq5x8QYNOdwYvzplmSvzIl4s7rqvtQN1rRRCRhvmtXr9FFrcQ2D4HlAKN0EGtJr7SJ7vmIqRqm0dfdRYGAHn9BJ2OPKfkSYpvKFEOyNt8vAR0"/>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div class="flex justify-between items-start gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="bg-cyan-50 text-primary border border-cyan-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Agenda</span>
+<h3 class="font-bold text-text-main text-lg leading-tight group-hover:text-primary transition-colors line-clamp-1">Q4 Hiring Strategy Alignment</h3>
+</div>
+<p class="text-text-secondary text-sm font-medium flex items-center gap-2 line-clamp-1">
+<span class="material-icons-round text-base align-middle rotate-180 text-gray-400">reply</span>
+                                    Updated: Revised headcount for Engineering department
+                                </p>
+</div>
+<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
+                                In Progress
+                            </span>
+</div>
+<div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Author</span>
+<span class="font-medium text-text-main">Maria G. <span class="text-gray-400 text-[10px]">[HR]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Requester</span>
+<span class="font-medium text-text-main">Engineering <span class="text-gray-400 text-[10px]">[TECH]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Responder</span>
+<span class="font-medium text-text-main">Pending</span>
+</div>
+<div class="ml-auto flex items-center gap-4 text-gray-400">
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Attachments">
+<span class="material-icons-round text-sm">attach_file</span>
+<span>1</span>
+</div>
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Replies">
+<span class="material-icons-round text-sm">forum</span>
+<span>2</span>
+</div>
+<div class="flex items-center gap-1 hover:text-primary transition-colors" title="Comments">
+<span class="material-icons-round text-sm">chat_bubble_outline</span>
+<span>4</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<article class="group bg-surface-card rounded-xl p-4 border border-border-light hover:border-gray-400 shadow-soft transition-all cursor-pointer opacity-95 hover:opacity-100">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-full sm:w-24 h-48 sm:h-24 rounded-lg overflow-hidden relative bg-gray-50 flex items-center justify-center border border-gray-100">
+<span class="material-icons-round text-gray-300 text-3xl">insert_photo</span>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div class="flex justify-between items-start gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Agenda</span>
+<h3 class="font-bold text-gray-700 text-lg leading-tight line-clamp-1">UI Assets Handoff - Mobile App V2</h3>
+</div>
+<p class="text-gray-500 text-sm font-medium flex items-center gap-2 line-clamp-1">
+<span class="material-icons-round text-base align-middle rotate-180 text-gray-400">reply</span>
+                                    Assets.zip uploaded to shared drive (Final)
+                                </p>
+</div>
+<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                Completed
+                            </span>
+</div>
+<div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Author</span>
+<span class="font-medium text-gray-600">Design Team <span class="text-gray-400 text-[10px]">[DSGN]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Requester</span>
+<span class="font-medium text-gray-600">Product Mgmt <span class="text-gray-400 text-[10px]">[PM]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Responder</span>
+<span class="font-medium text-gray-600">J. Doe <span class="text-gray-400 text-[10px]">[DEV]</span></span>
+</div>
+<div class="ml-auto flex items-center gap-4 text-gray-400">
+<div class="flex items-center gap-1" title="Attachments">
+<span class="material-icons-round text-sm">attach_file</span>
+<span>5</span>
+</div>
+<div class="flex items-center gap-1" title="Replies">
+<span class="material-icons-round text-sm">forum</span>
+<span>8</span>
+</div>
+<div class="flex items-center gap-1" title="Comments">
+<span class="material-icons-round text-sm">chat_bubble_outline</span>
+<span>3</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<article class="group bg-surface-card rounded-xl p-4 border-l-4 border-l-gray-400 border-y border-r border-border-light hover:shadow-soft transition-all cursor-pointer opacity-95 hover:opacity-100">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-full sm:w-24 h-48 sm:h-24 rounded-lg overflow-hidden relative bg-gray-50 flex items-center justify-center border border-gray-100">
+<span class="material-icons-round text-gray-400 text-3xl">task</span>
+</div>
+<div class="flex-grow flex flex-col justify-between">
+<div class="flex justify-between items-start gap-4">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="bg-gray-100 text-gray-500 border border-gray-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Report</span>
+<h3 class="font-bold text-gray-700 text-lg leading-tight line-clamp-1">Server Maintenance - Oct Week 3</h3>
+</div>
+<p class="text-gray-500 text-sm font-medium flex items-center gap-2 line-clamp-1">
+<span class="material-icons-round text-base align-middle rotate-180 text-gray-400">reply</span>
+                                    System patches applied successfully
+                                </p>
+</div>
+<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                Completed
+                            </span>
+</div>
+<div class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Worker</span>
+<span class="font-medium text-gray-600">Ops Team <span class="text-gray-400 text-[10px]">[OPS]</span></span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Date</span>
+<span class="font-medium text-gray-600">Oct 20, 2023</span>
+</div>
+<div class="hidden sm:block w-px h-3 bg-gray-300"></div>
+<div class="flex items-center gap-1.5">
+<span class="text-gray-400 uppercase tracking-wider font-semibold">Hours</span>
+<span class="font-medium text-gray-700 bg-gray-100 px-1.5 rounded border border-gray-200">4 H</span>
+</div>
+<div class="ml-auto flex items-center gap-4 text-gray-400">
+<div class="flex items-center gap-1" title="Replies">
+<span class="material-icons-round text-sm">forum</span>
+<span>0</span>
+</div>
+<div class="flex items-center gap-1" title="Comments">
+<span class="material-icons-round text-sm">chat_bubble_outline</span>
+<span>0</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+<div class="opacity-40 pointer-events-none filter blur-[0.5px]">
+<article class="bg-white rounded-xl p-4 border border-gray-200">
+<div class="flex flex-col sm:flex-row gap-4">
+<div class="shrink-0 w-24 h-24 rounded-lg bg-gray-100"></div>
+<div class="flex-grow space-y-4">
+<div class="h-6 w-3/4 bg-gray-200 rounded"></div>
+<div class="h-4 w-1/2 bg-gray-100 rounded"></div>
+</div>
+</div>
+</article>
+</div>
+</div>
+<footer class="mt-8 mb-12 flex justify-center">
+<nav class="flex items-center gap-1 bg-white p-1.5 rounded-xl border border-border-light shadow-soft">
+<button class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+<span class="material-icons-round text-sm">arrow_back_ios_new</span>
+</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg bg-primary hover:bg-primary-dark text-white font-bold shadow-md shadow-primary/20 transition-colors">1</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 transition-colors font-medium">2</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 transition-colors font-medium">3</button>
+<span class="w-9 h-9 flex items-center justify-center text-gray-400">...</span>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 transition-colors font-medium">8</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+<span class="material-icons-round text-sm">arrow_forward_ios</span>
+</button>
+</nav>
+</footer>
+</main>
+
+</body></html>

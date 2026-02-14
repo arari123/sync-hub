@@ -15,10 +15,13 @@
 - **Docker 100% 종속 원칙**: 개발/실행/테스트/검증은 반드시 Docker 환경에서만 수행한다.
 - **비도커 실행 금지**: 로컬 호스트(비도커) 직접 실행 경로는 사용하지 않는다. 문서/스크립트/가이드는 Docker 기준으로만 유지한다.
 - **GPU 사용 규칙**: OCR 등 GPU 고부하 작업은 `docker-compose.gpu.yml`을 사용한다.
+- **REPO-MAP 점검/동기화 규칙**: 모든 작업 완료 시 `docs/repo-map.md`를 반드시 점검하고, 변경된 구조/경로/엔트리포인트가 있으면 같은 작업에서 즉시 업데이트한다.
 - **프로젝트 입력 문서 동기화 규칙**: 프로젝트 생성/수정/버전/설비/예산상세(`budget_settings` 포함) 입력 항목이 추가·변경되면 같은 작업에서 `docs/project-input-spec.md`를 반드시 갱신한다.
 - **저장소 맵 동기화 규칙**: 폴더 구조/주요 엔트리포인트/라우팅/도커 실행 구성 변경 시 같은 작업에서 `docs/repo-map.md`를 반드시 갱신한다.
 
 ## 명령어 가이드
+- `bash scripts/start_localhost.sh`: localhost 웹 기본 기동(자동 복구 포함).
+- `bash scripts/start_localhost.sh gpu`: GPU 포함 localhost 기동(자동 복구 포함).
 - `npm run verify`: 전체 테스트 및 린트 실행(추후 구현).
 - `npm run verify:fast`: 빠른 단위 테스트 실행(추후 구현).
 - `sudo docker-compose up -d`: 서비스 기동.
@@ -34,6 +37,7 @@
 
 ## 저장소 맵 (빠른 링크)
 - 자세한 구조는 [docs/repo-map.md](docs/repo-map.md)를 참고한다.
+- localhost 시작/복구 가이드는 [docs/localhost-startup.md](docs/localhost-startup.md)를 참고한다.
 
 ## 세션 재개 규칙
 - 새 세션에서 사용자가 **`다음 작업 진행해줘`** 또는 동일 의미의 재개 지시(예: `다음 작업 진행해주고 ...`)를 입력하면 재개 명령으로 처리한다.

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom';
 import { CheckCircle2, Save } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { emitBudgetDataUpdated } from '../lib/budgetSync';
 import BudgetSidebar from '../components/BudgetSidebar';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { cn } from '../lib/utils';
@@ -452,6 +453,36 @@ function injectBuffers(detailsObj) {
     return result;
 }
 
+function sanitizeDetailsForRealtime(detailsObj) {
+    const source = detailsObj || {};
+    const result = {
+        material_items: [],
+        labor_items: [],
+        expense_items: [],
+        execution_material_items: [],
+        execution_labor_items: [],
+        execution_expense_items: [],
+        budget_settings: mergeBudgetSettings(source?.budget_settings),
+    };
+
+    Object.entries(SECTION_META).forEach(([sectionKey, meta]) => {
+        result[meta.budgetKey] = (source?.[meta.budgetKey] || [])
+            .filter((row) => !isBudgetRowEmpty(row, sectionKey))
+            .map((row) => ({
+                ...row,
+                phase: (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication',
+            }));
+        result[meta.executionKey] = (source?.[meta.executionKey] || [])
+            .filter((row) => !isExecutionRowEmpty(row, sectionKey))
+            .map((row) => ({
+                ...row,
+                phase: (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication',
+            }));
+    });
+
+    return result;
+}
+
 function calcBudgetAmount(row, section, settings) {
     if (section === 'material') {
         const baseAmount = toNumber(row.quantity) * toNumber(row.unit_price);
@@ -494,10 +525,15 @@ function buildDuplicatedUnitName(sourceName, existingNameSet) {
     return `${baseName}(복사)`;
 }
 
-const BudgetProjectEditor = () => {
-    const { projectId, section = 'material' } = useParams();
+const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetailsChange = null }) => {
+    const params = useParams();
+    const projectId = params.projectId;
+    const section = forceSection || params.section || 'material';
 
     if (!SECTION_META[section]) {
+        if (embedded) {
+            return null;
+        }
         return <Navigate to={`/project-management/projects/${projectId}/edit/material`} replace />;
     }
 
@@ -516,6 +552,7 @@ const BudgetProjectEditor = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [isCancellingConfirm, setIsCancellingConfirm] = useState(false);
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [treeSelectionBySection, setTreeSelectionBySection] = useState(() => ({
         material: { equipment: '', phase: 'all', unit: '', expenseType: '' },
@@ -1014,6 +1051,12 @@ const BudgetProjectEditor = () => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectId]);
+
+    useEffect(() => {
+        if (isLoading) return;
+        if (typeof onLiveDetailsChange !== 'function') return;
+        onLiveDetailsChange(sanitizeDetailsForRealtime(details));
+    }, [details, isLoading, onLiveDetailsChange]);
 
     useEffect(() => {
         const defaultEquipmentName = isEquipmentProject
@@ -2063,9 +2106,15 @@ const BudgetProjectEditor = () => {
                     : COMMON_EQUIPMENT_NAME,
             );
 
+            const nextVersion = response?.data?.version || version;
             setEquipmentNames(refreshedEquipmentNames);
             setDetails(injectBuffers(normalizedSavedDetails));
-            setVersion(response?.data?.version || version);
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'details_saved',
+            });
         } catch (err) {
             setError(getErrorMessage(err, '상세 저장에 실패했습니다.'));
         } finally {
@@ -2080,11 +2129,39 @@ const BudgetProjectEditor = () => {
         setError('');
         try {
             const response = await api.post(`/budget/versions/${version.id}/confirm`);
-            setVersion(response?.data?.version || version);
+            const nextVersion = response?.data?.version || version;
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'version_confirmed',
+            });
         } catch (err) {
             setError(getErrorMessage(err, '버전 확정에 실패했습니다.'));
         } finally {
             setIsConfirming(false);
+        }
+    };
+
+    const cancelConfirmCurrentVersion = async () => {
+        if (!version?.id) return;
+        if (!window.confirm('확정 상태를 취소하시겠습니까?')) return;
+
+        setIsCancellingConfirm(true);
+        setError('');
+        try {
+            const response = await api.post(`/budget/versions/${version.id}/confirm-cancel`);
+            const nextVersion = response?.data?.version || version;
+            setVersion(nextVersion);
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || version?.id || null,
+                reason: 'version_confirm_canceled',
+            });
+        } catch (err) {
+            setError(getErrorMessage(err, '버전 확정 취소에 실패했습니다.'));
+        } finally {
+            setIsCancellingConfirm(false);
         }
     };
 
@@ -2124,6 +2201,11 @@ const BudgetProjectEditor = () => {
             );
             setEquipmentNames(refreshedEquipmentNames);
             setDetails(injectBuffers(normalizedRevisionDetails));
+            emitBudgetDataUpdated({
+                projectId: project?.id || projectId,
+                versionId: nextVersion?.id || null,
+                reason: 'revision_created',
+            });
             return nextVersion;
         } catch (err) {
             setError(getErrorMessage(err, '리비전 생성에 실패했습니다.'));
@@ -2215,8 +2297,17 @@ const BudgetProjectEditor = () => {
         return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
     }
 
+    const showSidebarSummary = embedded ? false : section !== 'material';
+
     return (
-        <div className="flex h-screen border-t border-slate-200 overflow-hidden">
+        <div
+            className={cn(
+                'flex overflow-hidden',
+                embedded
+                    ? 'min-h-[740px] rounded-xl border border-slate-200 bg-white'
+                    : 'h-screen border-t border-slate-200',
+            )}
+        >
             <BudgetSidebar
                 aggregation={aggregation}
                 summary={sidebarSummary}
@@ -2227,31 +2318,41 @@ const BudgetProjectEditor = () => {
                 onSelectTreeNode={handleSelectScopeNode}
                 onTreeContextAction={handleMaterialTreeContextAction}
                 hasCopiedUnit={Boolean(materialUnitClipboard?.rows?.length)}
+                showSummary={showSidebarSummary}
             />
 
-            <div className="flex-1 overflow-y-auto px-8 pt-2 pb-0 space-y-2 flex flex-col min-w-0">
+            <div
+                className={cn(
+                    'flex-1 overflow-y-auto space-y-2 flex flex-col min-w-0',
+                    embedded ? 'px-6 pt-4 pb-4' : 'px-8 pt-2 pb-0',
+                )}
+            >
                 <div className="flex-none">
-                    <ProjectPageHeader
-                        projectId={projectId}
-                        projectName=""
-                        projectCode=""
-                        pageLabel=""
-                        canEdit={project?.can_edit}
-                        breadcrumbItems={[
-                            { label: '프로젝트 관리', to: '/project-management' },
-                            { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
-                            { label: '예산 메인', to: `/project-management/projects/${projectId}/budget` },
-                            { label: `${SECTION_META[section].label} 입력` },
-                        ]}
-                    />
+                    {!embedded && (
+                        <>
+                            <ProjectPageHeader
+                                projectId={projectId}
+                                projectName=""
+                                projectCode=""
+                                pageLabel=""
+                                canEdit={project?.can_edit}
+                                breadcrumbItems={[
+                                    { label: '프로젝트 관리', to: '/project-management' },
+                                    { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
+                                    { label: '예산 메인', to: `/project-management/projects/${projectId}/budget` },
+                                    { label: `${SECTION_META[section].label} 입력` },
+                                ]}
+                            />
 
-                    <div className="mt-1 flex w-full flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-black text-slate-700">
-                            {project?.name || '프로젝트'}
-                        </span>
-                    </div>
+                            <div className="mt-1 flex w-full flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-black text-slate-700">
+                                    {project?.name || '프로젝트'}
+                                </span>
+                            </div>
+                        </>
+                    )}
 
-                    <section className="mt-1 rounded-2xl border bg-card p-4 shadow-sm">
+                    <section className={cn('rounded-2xl border bg-card p-4 shadow-sm', embedded ? '' : 'mt-1')}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs font-bold text-slate-500">
                                 버전 <span className="text-slate-900">v{version?.version_no || 0}</span>
@@ -2282,7 +2383,17 @@ const BudgetProjectEditor = () => {
                                         {isConfirming ? '확정 중...' : '버전 확정'}
                                     </button>
                                 )}
-                                {canEditProject && isConfirmed && (
+                                {canEditProject && isConfirmed && section === 'material' && (
+                                    <button
+                                        type="button"
+                                        onClick={cancelConfirmCurrentVersion}
+                                        disabled={isCancellingConfirm}
+                                        className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-3 text-[11px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 transition-colors"
+                                    >
+                                        {isCancellingConfirm ? '취소 중...' : '확정 취소'}
+                                    </button>
+                                )}
+                                {!embedded && canEditProject && isConfirmed && (
                                     <button
                                         type="button"
                                         onClick={() => createRevision()}
@@ -2329,7 +2440,7 @@ const BudgetProjectEditor = () => {
                                                 [activeMaterialUnitScopeKey]: normalized,
                                             }));
                                         }}
-                                        className="h-7 w-16 rounded border border-slate-300 bg-white px-2 text-center text-[11px] font-semibold text-slate-800 disabled:opacity-50"
+                                        className="h-7 w-16 rounded-md border border-input bg-card px-2 text-center text-[11px] font-semibold text-foreground shadow-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 disabled:opacity-50"
                                     />
                                     <button
                                         type="button"

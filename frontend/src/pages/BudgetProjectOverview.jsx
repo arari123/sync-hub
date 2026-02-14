@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import {
-    ChevronDown,
     Loader2,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
+import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
 import { cn } from '../lib/utils';
 import GlobalTopBar from '../components/GlobalTopBar';
 
@@ -126,98 +126,75 @@ const BudgetProjectOverview = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const [isBudgetMenuOpen, setIsBudgetMenuOpen] = useState(false);
-    const budgetMenuRef = useRef(null);
-    const budgetMenuCloseTimerRef = useRef(null);
-
-    useEffect(() => {
-        const handlePointerDown = (event) => {
-            const target = event.target;
-            const isBudgetMenuTarget = budgetMenuRef.current?.contains(target);
-
-            if (!isBudgetMenuTarget) setIsBudgetMenuOpen(false);
-        };
-        document.addEventListener('mousedown', handlePointerDown);
-        return () => {
-            document.removeEventListener('mousedown', handlePointerDown);
-        };
-    }, []);
-
-    useEffect(() => () => {
-        if (!budgetMenuCloseTimerRef.current) return;
-        clearTimeout(budgetMenuCloseTimerRef.current);
-        budgetMenuCloseTimerRef.current = null;
-    }, []);
-
-    const keepBudgetMenuOpen = () => {
-        if (budgetMenuCloseTimerRef.current) {
-            clearTimeout(budgetMenuCloseTimerRef.current);
-            budgetMenuCloseTimerRef.current = null;
-        }
-        setIsBudgetMenuOpen(true);
-    };
-
-    const scheduleBudgetMenuClose = () => {
-        if (budgetMenuCloseTimerRef.current) {
-            clearTimeout(budgetMenuCloseTimerRef.current);
-        }
-        budgetMenuCloseTimerRef.current = setTimeout(() => {
-            setIsBudgetMenuOpen(false);
-            budgetMenuCloseTimerRef.current = null;
-        }, 1000);
-    };
-
-    useEffect(() => {
-        const load = async () => {
-            if (!projectId) return;
+    const loadOverviewData = useCallback(async ({ background = false } = {}) => {
+        if (!projectId) return;
+        if (!background) {
             setIsLoading(true);
             setIsAgendaLoading(true);
-            setError('');
+        }
+        setError('');
+        if (!background) {
             setAgendaError('');
+        }
+
+        try {
+            const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
+            const payload = versionsResp?.data || {};
+            const currentProject = payload.project || null;
+            setProject(currentProject);
+
+            const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+            setVersion(currentVersion);
 
             try {
-                const versionsResp = await api.get(`/budget/projects/${projectId}/versions`);
-                const payload = versionsResp?.data || {};
-                const currentProject = payload.project || null;
-                setProject(currentProject);
+                const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
+                    params: { page: 1, per_page: 5, include_drafts: false },
+                });
+                const agendaPayload = agendaResp?.data || {};
+                setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
+                setAgendaTotal(Number(agendaPayload?.total || 0));
+                setAgendaError('');
+            } catch (agendaErr) {
+                setAgendaItems([]);
+                setAgendaTotal(0);
+                setAgendaError(getErrorMessage(agendaErr, '안건 정보를 불러오지 못했습니다.'));
+            }
 
-                const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
-                setVersion(currentVersion);
+            if (!currentVersion?.id) {
+                setEquipments([]);
+                setTotals(currentProject?.totals || null);
+                return;
+            }
 
-                try {
-                    const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
-                        params: { page: 1, per_page: 5, include_drafts: false },
-                    });
-                    const agendaPayload = agendaResp?.data || {};
-                    setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
-                    setAgendaTotal(Number(agendaPayload?.total || 0));
-                    setAgendaError('');
-                } catch (agendaErr) {
-                    setAgendaItems([]);
-                    setAgendaTotal(0);
-                    setAgendaError(getErrorMessage(agendaErr, '안건 정보를 불러오지 못했습니다.'));
-                }
-
-                if (!currentVersion?.id) {
-                    setEquipments([]);
-                    setTotals(currentProject?.totals || null);
-                    return;
-                }
-
-                const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
-                const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-                setEquipments(itemList);
-                setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
-            } catch (err) {
-                setError(getErrorMessage(err, '프로젝트 메인 정보를 불러오지 못했습니다.'));
-            } finally {
+            const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
+            const itemList = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
+            setEquipments(itemList);
+            setTotals(equipmentResp?.data?.totals || currentProject?.totals || null);
+        } catch (err) {
+            setError(getErrorMessage(err, '프로젝트 메인 정보를 불러오지 못했습니다.'));
+        } finally {
+            if (!background) {
                 setIsAgendaLoading(false);
                 setIsLoading(false);
             }
-        };
-
-        load();
+        }
     }, [projectId]);
+
+    useEffect(() => {
+        loadOverviewData();
+    }, [loadOverviewData]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeBudgetDataUpdated((detail) => {
+            const eventProjectId = String(detail?.projectId || '').trim();
+            const targetProjectId = String(projectId || '').trim();
+            if (eventProjectId && targetProjectId && eventProjectId !== targetProjectId) {
+                return;
+            }
+            loadOverviewData({ background: true });
+        });
+        return unsubscribe;
+    }, [loadOverviewData, projectId]);
 
     const monitoring = project?.monitoring || {};
     const confirmedMaterial = Math.max(toNumber(monitoring.confirmed_budget_material), toNumber(totals?.material_total));
@@ -265,9 +242,6 @@ const BudgetProjectOverview = () => {
     const baseProjectPath = `/project-management/projects/${project?.id || projectId}`;
     const projectMainPath = baseProjectPath;
     const budgetManagementPath = `${baseProjectPath}/budget`;
-    const budgetMaterialPath = `${baseProjectPath}/edit/material`;
-    const budgetLaborPath = `${baseProjectPath}/edit/labor`;
-    const budgetExpensePath = `${baseProjectPath}/edit/expense`;
     const issueManagementPath = `${baseProjectPath}/agenda`;
     const scheduleManagementPath = `${baseProjectPath}/schedule`;
     const specManagementPath = `${baseProjectPath}/spec`;
@@ -287,10 +261,10 @@ const BudgetProjectOverview = () => {
     const isSettingActive = pathname.startsWith(projectSettingPath);
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="app-shell min-h-screen bg-background text-foreground">
             <GlobalTopBar />
 
-            <div className="border-b border-border bg-secondary/80">
+            <div className="border-b border-border/80 bg-card/65 backdrop-blur">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2">
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <nav
@@ -310,124 +284,55 @@ const BudgetProjectOverview = () => {
                             </span>
                         </nav>
 
-                        <div className="bg-secondary p-1 rounded-lg inline-flex flex-wrap items-center justify-end gap-1">
+                        <div className="app-surface-soft inline-flex flex-wrap items-center justify-end gap-1 p-1.5">
                             <Link
                                 to={projectMainPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isProjectMainActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isProjectMainActive}
+                                className="nav-pill"
                             >
                                 프로젝트 메인
                             </Link>
 
-                            <div
-                                className="relative"
-                                ref={budgetMenuRef}
-                                onMouseEnter={keepBudgetMenuOpen}
-                                onMouseLeave={scheduleBudgetMenuClose}
+                            <Link
+                                to={budgetManagementPath}
+                                data-active={isBudgetActive}
+                                className="nav-pill"
                             >
-                                <Link
-                                    to={budgetManagementPath}
-                                    onMouseEnter={keepBudgetMenuOpen}
-                                    className={cn(
-                                        'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                        isBudgetActive
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                    )}
-                                >
-                                    예산 메인
-                                    <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isBudgetMenuOpen && 'rotate-180')} />
-                                </Link>
-
-                                {isBudgetMenuOpen && (
-                                    <div
-                                        className="absolute right-0 top-[calc(100%+6px)] z-30 w-max rounded-lg border border-border bg-card p-1.5 shadow-lg"
-                                        onMouseEnter={keepBudgetMenuOpen}
-                                        onMouseLeave={scheduleBudgetMenuClose}
-                                    >
-                                        <div className="flex items-center gap-1 whitespace-nowrap">
-                                            <Link
-                                                to={budgetMaterialPath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                재료비 관리
-                                            </Link>
-                                            <Link
-                                                to={budgetLaborPath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                인건비 관리
-                                            </Link>
-                                            <Link
-                                                to={budgetExpensePath}
-                                                onClick={() => setIsBudgetMenuOpen(false)}
-                                                className="inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-secondary"
-                                            >
-                                                경비 관리
-                                            </Link>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                                예산 메인
+                            </Link>
 
                             <Link
                                 to={issueManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isIssueActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isIssueActive}
+                                className="nav-pill"
                             >
                                 이슈 관리
                             </Link>
                             <Link
                                 to={scheduleManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isScheduleActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isScheduleActive}
+                                className="nav-pill"
                             >
                                 일정 관리
                             </Link>
                             <Link
                                 to={specManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isSpecActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isSpecActive}
+                                className="nav-pill"
                             >
                                 사양 관리
                             </Link>
                             <Link
                                 to={dataManagementPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isDataActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isDataActive}
+                                className="nav-pill"
                             >
                                 데이터 관리
                             </Link>
                             <Link
                                 to={projectSettingPath}
-                                className={cn(
-                                    'px-3 py-1.5 text-xs font-medium rounded transition-colors',
-                                    isSettingActive
-                                        ? 'bg-primary text-primary-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                )}
+                                data-active={isSettingActive}
+                                className="nav-pill"
                             >
                                 프로젝트 설정
                             </Link>
@@ -436,7 +341,7 @@ const BudgetProjectOverview = () => {
                 </div>
             </div>
 
-            <main className="mx-auto max-w-[1600px] px-4 lg:px-6 py-5">
+            <main className="app-enter mx-auto max-w-[1640px] px-4 py-5 lg:px-6">
                 {error && (
                     <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {error}

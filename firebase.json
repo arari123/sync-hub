@@ -1,0 +1,59 @@
+{
+  "hosting": {
+    "site": "sync-hub-arari-20260213011439",
+    "public": "frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/auth{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/documents{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/budget{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/agenda{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/api{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "/health{,/**}",
+        "run": {
+          "serviceId": "sync-hub-backend",
+          "region": "asia-northeast3"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

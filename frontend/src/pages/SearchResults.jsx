@@ -14,6 +14,7 @@ import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
+import { Input } from '../components/ui/Input';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const STAGE_OPTIONS = [
@@ -36,11 +37,16 @@ const PROJECT_TYPE_LABEL_MAP = {
     as: '유지보수',
 };
 const PROJECT_SIGNAL_LABELS = ['안건', '예산', '사양'];
+const FILTER_TOGGLE_GROUP_CLASS = 'flex shrink-0 rounded-md border border-border bg-secondary/80 p-0.5';
+const FILTER_TOGGLE_BUTTON_BASE_CLASS =
+    'inline-flex h-6 items-center rounded px-2.5 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+const FILTER_TOGGLE_BUTTON_ACTIVE_CLASS = 'bg-primary text-primary-foreground shadow-sm';
+const FILTER_TOGGLE_BUTTON_INACTIVE_CLASS = 'text-muted-foreground hover:bg-card hover:text-foreground';
 const FILTER_CHIP_BASE_CLASS =
-    'whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none transition-all duration-150 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35';
-const FILTER_CHIP_ACTIVE_CLASS = 'border-sky-500 bg-sky-500 text-white shadow-sm shadow-sky-500/20';
+    'inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+const FILTER_CHIP_ACTIVE_CLASS = 'border-primary bg-primary text-primary-foreground shadow-sm';
 const FILTER_CHIP_INACTIVE_CLASS =
-    'border-slate-200 bg-white/95 text-slate-500 hover:border-sky-400 hover:text-sky-600';
+    'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
 const STAGE_PROGRESS_FALLBACK = {
     review: 18,
     fabrication: 46,
@@ -751,39 +757,39 @@ const SearchResults = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <header className="h-16 border-b border-border bg-card/95 backdrop-blur">
-                <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3">
-                    <Link to="/home" className="w-44 shrink-0 flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-xs font-bold">S</div>
+        <div className="app-shell min-h-screen bg-background text-foreground">
+            <header className="topbar-shell h-16">
+                <div className="mx-auto flex h-full max-w-[1640px] items-center gap-3 px-4 lg:px-6">
+                    <Link to="/home" className="flex w-48 shrink-0 items-center gap-2">
+                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[11px] font-extrabold text-primary-foreground shadow-sm">S</div>
                         <div className="leading-tight">
-                            <p className="font-extrabold tracking-tight text-sm">sync-hub</p>
-                            <p className="text-[10px] text-muted-foreground">검색 워크스페이스</p>
+                            <p className="text-sm font-extrabold tracking-tight text-foreground">Sync-Hub</p>
+                            <p className="text-[10px] font-medium text-muted-foreground">Industrial Knowledge Workspace</p>
                         </div>
                     </Link>
 
                     <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0">
                         <label className="relative block">
-                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <input
+                            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                            <Input
                                 type="text"
                                 value={inputQuery}
                                 onChange={(event) => setInputQuery(event.target.value)}
                                 placeholder="프로젝트, 안건, 사양, PDF, EXCEL 데이터를 자연어로 검색"
-                                className="h-10 w-full rounded-full border border-input bg-secondary pl-11 pr-4 text-sm outline-none transition focus:border-primary focus:bg-card focus:ring-2 focus:ring-primary/20"
+                                className="h-10 w-full rounded-full border-border/90 bg-card/85 pl-11 pr-4 text-sm"
                             />
                         </label>
                     </form>
 
                     <div className="w-40 shrink-0 flex items-center justify-end gap-2">
-                        <button type="button" className="h-9 w-9 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary hover:text-primary">
+                        <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-primary">
                             <Bell className="h-4 w-4" />
                         </button>
-                        <div className="relative" ref={quickMenuRef}>
+                        <div className="relative z-[70]" ref={quickMenuRef}>
                             <button
                                 type="button"
                                 onClick={() => setIsQuickMenuOpen((prev) => !prev)}
-                                className="h-9 w-9 rounded-full grid place-items-center text-muted-foreground hover:bg-secondary hover:text-primary"
+                                className="grid h-9 w-9 place-items-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-primary"
                                 aria-label="빠른 메뉴"
                                 aria-expanded={isQuickMenuOpen}
                             >
@@ -791,21 +797,21 @@ const SearchResults = () => {
                             </button>
 
                             {isQuickMenuOpen && (
-                                <div className="absolute right-0 top-11 z-20 w-56 rounded-2xl border border-border bg-card p-3 shadow-xl">
+                                <div className="app-surface-soft absolute right-0 top-11 z-[90] w-60 p-3">
                                     <div className="grid grid-cols-2 gap-2">
                                         <Link
                                             to="/project-management/projects/new"
                                             onClick={() => setIsQuickMenuOpen(false)}
-                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-foreground hover:bg-secondary"
+                                            className="flex flex-col items-center gap-1 rounded-xl border border-border/70 bg-card/65 p-3 text-foreground transition-colors hover:bg-secondary"
                                         >
-                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground">
+                                            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm">
                                                 <Plus className="h-4 w-4" />
                                             </span>
                                             <span className="text-xs font-semibold text-center">새 프로젝트 생성</span>
                                         </Link>
                                         <button
                                             type="button"
-                                            className="flex flex-col items-center gap-1 rounded-xl p-3 text-muted-foreground/70 cursor-not-allowed"
+                                            className="flex cursor-not-allowed flex-col items-center gap-1 rounded-xl border border-border/70 bg-card/65 p-3 text-muted-foreground/70"
                                             title="데이터 허브는 아직 구현되지 않았습니다."
                                         >
                                             <span className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-muted-foreground">
@@ -817,15 +823,15 @@ const SearchResults = () => {
                                 </div>
                             )}
                         </div>
-                        <button type="button" className="h-9 w-9 rounded-full bg-primary text-primary-foreground text-xs font-bold grid place-items-center">
+                        <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-extrabold text-primary-foreground shadow-sm">
                             <span>{userBadge}</span>
                         </button>
                     </div>
                 </div>
             </header>
 
-            <div className="border-b border-border bg-secondary/80">
-                <div className="mx-auto h-10 max-w-[1600px] px-4 lg:px-6 flex items-center">
+            <div className="border-b border-border/80 bg-card/65 backdrop-blur">
+                <div className="mx-auto flex h-10 max-w-[1640px] items-center px-4 lg:px-6">
                     <nav
                         aria-label="현재 경로"
                         className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
@@ -839,8 +845,8 @@ const SearchResults = () => {
                 </div>
             </div>
 
-            <div className="mx-auto min-h-[calc(100vh-6.5rem)] max-w-[1600px]">
-                <main className="overflow-y-auto p-4 lg:p-6 space-y-4">
+            <div className="mx-auto min-h-[calc(100vh-6.5rem)] max-w-[1640px]">
+                <main className="app-enter overflow-y-auto space-y-4 p-4 lg:p-6">
                     {error && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                             {error}
@@ -848,32 +854,37 @@ const SearchResults = () => {
                     )}
 
                     {hasProjectPanel && (
-                        <section className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2 shadow-sm backdrop-blur-sm">
+                        <section className="app-surface-soft px-3 py-2">
                             <div className="flex items-center justify-between lg:hidden">
                                 <button
                                     type="button"
                                     onClick={() => setIsMobileFilterOpen((prev) => !prev)}
                                     aria-expanded={isMobileFilterOpen}
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm"
+                                    className={cn(
+                                        'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
+                                        isMobileFilterOpen
+                                            ? 'border-primary/40 bg-primary/10 text-primary'
+                                            : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
+                                    )}
                                 >
                                     <SlidersHorizontal className="h-3.5 w-3.5" />
                                     {isMobileFilterOpen ? '필터 닫기' : '필터'}
                                 </button>
-                                <span className="text-[11px] font-medium text-slate-500">
+                                <span className="text-[11px] font-medium text-muted-foreground">
                                     {showAllProjects ? `전체 ${allProjectCount}건` : `내 프로젝트 ${myProjectCount}건`}
                                 </span>
                             </div>
 
                             <div className="hidden lg:flex lg:min-h-8 lg:items-center lg:gap-2">
-                                <div className="flex shrink-0 rounded-md bg-slate-100 p-0.5">
+                                <div className={FILTER_TOGGLE_GROUP_CLASS}>
                                     <button
                                         type="button"
                                         onClick={() => setShowAllProjects(false)}
                                         className={cn(
-                                            'rounded px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                                            FILTER_TOGGLE_BUTTON_BASE_CLASS,
                                             !showAllProjects
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-800'
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         내프로젝트
@@ -882,10 +893,10 @@ const SearchResults = () => {
                                         type="button"
                                         onClick={() => setShowAllProjects(true)}
                                         className={cn(
-                                            'rounded px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                            FILTER_TOGGLE_BUTTON_BASE_CLASS,
                                             showAllProjects
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-800'
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         전체프로젝트
@@ -893,13 +904,13 @@ const SearchResults = () => {
                                 </div>
 
                                 <div className="relative w-52 shrink-0">
-                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    <input
+                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                                    <Input
                                         type="text"
                                         value={projectFilterQuery}
                                         onChange={(event) => setProjectFilterQuery(event.target.value)}
                                         placeholder="프로젝트 검색"
-                                        className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 pr-2 pl-7 text-xs text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-1 focus:ring-sky-300"
+                                        className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
                                     />
                                 </div>
 
@@ -979,15 +990,15 @@ const SearchResults = () => {
                             </div>
 
                             <div className={cn('mt-2 space-y-2 lg:hidden', !isMobileFilterOpen && 'hidden')}>
-                                <div className="flex rounded-md bg-slate-100 p-0.5">
+                                <div className="flex rounded-md border border-border bg-secondary/80 p-0.5">
                                     <button
                                         type="button"
                                         onClick={() => setShowAllProjects(false)}
                                         className={cn(
-                                            'flex-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
                                             !showAllProjects
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-800'
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         내프로젝트
@@ -996,10 +1007,10 @@ const SearchResults = () => {
                                         type="button"
                                         onClick={() => setShowAllProjects(true)}
                                         className={cn(
-                                            'flex-1 rounded px-2.5 py-1 text-[11px] font-medium transition-colors',
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
                                             showAllProjects
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-800'
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         전체프로젝트
@@ -1007,13 +1018,13 @@ const SearchResults = () => {
                                 </div>
 
                                 <div className="relative">
-                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    <input
+                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                                    <Input
                                         type="text"
                                         value={projectFilterQuery}
                                         onChange={(event) => setProjectFilterQuery(event.target.value)}
                                         placeholder="프로젝트 검색"
-                                        className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-2 pr-2 pl-7 text-xs text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-1 focus:ring-sky-300"
+                                        className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
                                     />
                                 </div>
 
@@ -1099,14 +1110,14 @@ const SearchResults = () => {
                     {hasProjectPanel ? (
                         <section className="space-y-3">
                             {isLoading ? (
-                                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-16 text-center shadow-sm">
+                                <div className="app-surface-soft px-4 py-16 text-center">
                                     <div className="inline-flex items-center gap-2 text-slate-500">
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         데이터를 불러오는 중입니다.
                                     </div>
                                 </div>
                             ) : tableProjects.length === 0 ? (
-                                <div className="rounded-2xl border border-slate-200 bg-white/85 px-4 py-16 text-center text-sm text-slate-500 shadow-sm">
+                                <div className="app-surface-soft px-4 py-16 text-center text-sm text-slate-500">
                                     필터 조건에 맞는 프로젝트가 없습니다.
                                 </div>
                             ) : (
@@ -1132,7 +1143,7 @@ const SearchResults = () => {
                                     return (
                                         <article
                                             key={`project-row-${project.id}`}
-                                            className="rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm transition-all hover:border-sky-200 hover:shadow-md"
+                                            className="app-surface-soft p-3 transition-all hover:border-sky-200"
                                         >
                                             <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
                                                 <div className="flex min-w-0 gap-3">

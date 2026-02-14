@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Centered Sync-Scroll Settings Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#3B82F6", 
+                        "background-light": "#F1F5F9", 
+                        "background-dark": "#0F172A", 
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E293B", 
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .settings-scroll {
+            scroll-behavior: smooth;
+        }
+        .settings-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .settings-scroll::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        .settings-scroll::-webkit-scrollbar-thumb {
+            background-color: #CBD5E1; 
+            border-radius: 4px;
+        }
+        .dark .settings-scroll::-webkit-scrollbar-thumb {
+            background-color: #475569; 
+        }
+        .nav-item.active {
+            @apply bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300;
+        }
+        .nav-item.active .material-symbols-outlined {
+            @apply text-blue-700 dark:text-blue-300;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-sans antialiased text-gray-800 dark:text-gray-200 min-h-screen transition-colors duration-300 overflow-hidden">
+<div class="max-w-[1440px] mx-auto h-screen flex flex-col px-4 md:px-8 py-4">
+<header class="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
+<div>
+<h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">settings_applications</span>
+                System Settings
+            </h1>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Global configuration for Project Budget Monitor System</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 rounded-full bg-white dark:bg-surface-dark shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition border border-gray-200 dark:border-gray-700" onclick="document.documentElement.classList.toggle('dark')">
+<i class="fa-solid fa-moon dark:hidden text-gray-600"></i>
+<i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+</button>
+<button class="bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-all flex items-center gap-2">
+<i class="fa-solid fa-rotate-left"></i> Reset Defaults
+            </button>
+<button class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
+<i class="fa-solid fa-save"></i> Save Changes
+            </button>
+</div>
+</header>
+<div class="flex flex-1 gap-6 overflow-hidden pb-4">
+<aside class="w-64 bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden flex-shrink-0">
+<div class="p-4 border-b border-gray-100 dark:border-gray-700">
+<div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Categories</div>
+</div>
+<nav class="flex-1 overflow-y-auto p-2 space-y-1" id="sidebar-nav">
+<a class="nav-item active flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#general">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+                    General
+                </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#budget-rules">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+                    Budget Rules
+                </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#personnel">
+<span class="material-symbols-outlined text-[20px]">group</span>
+                    Personnel Management
+                </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#permissions">
+<span class="material-symbols-outlined text-[20px]">lock_person</span>
+                    Permission Control
+                </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#unit-costs">
+<span class="material-symbols-outlined text-[20px]">monetization_on</span>
+                    Unit Costs
+                </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors group" href="#integration">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+                    System Integration
+                </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xs">AD</div>
+<div>
+<p class="text-xs font-semibold text-gray-900 dark:text-white">Admin User</p>
+<p class="text-[10px] text-gray-500">System Administrator</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark z-10 sticky top-0">
+<div class="relative w-full">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition duration-150 ease-in-out dark:text-white" placeholder="Search settings (e.g., 'currency', 'tax rate', 'alerts')..." type="text"/>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 md:p-10 settings-scroll relative" id="settings-content">
+<div class="max-w-4xl mx-auto space-y-16 pb-32">
+<section class="scroll-mt-8" id="general">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            General Settings
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Core information identifying the current project instance.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Project Name</label>
+<input class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm shadow-sm focus:border-primary focus:ring focus:ring-primary/20 dark:text-white transition" type="text" value="Production Line Alpha - 2024"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cost Center Code</label>
+<input class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm shadow-sm focus:border-primary focus:ring focus:ring-primary/20 dark:text-white transition font-mono" type="text" value="CC-2023-MFG-01"/>
+</div>
+<div class="md:col-span-2">
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+<textarea class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm shadow-sm focus:border-primary focus:ring focus:ring-primary/20 dark:text-white transition" rows="3">Manufacturing line expansion for EV battery module assembly.</textarea>
+</div>
+</div>
+</section>
+<section class="scroll-mt-8" id="budget-rules">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            Budget Rules
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Configure warning levels and hard limits for project spending.</p>
+<div class="space-y-6">
+<div class="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+<div>
+<h3 class="text-sm font-semibold text-gray-900 dark:text-white">Over-budget Alerts</h3>
+<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Send email notifications when sub-category budget exceeds limit.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Soft Warning Threshold (%)</label>
+<div class="relative rounded-md shadow-sm">
+<input class="block w-full rounded-md border-gray-300 dark:border-gray-600 pl-3 pr-10 bg-white dark:bg-gray-800 text-sm focus:border-primary focus:ring focus:ring-primary/20 dark:text-white" type="number" value="85"/>
+<div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+<span class="text-gray-500 dark:text-gray-400 sm:text-sm">%</span>
+</div>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hard Stop Threshold (%)</label>
+<div class="relative rounded-md shadow-sm">
+<input class="block w-full rounded-md border-gray-300 dark:border-gray-600 pl-3 pr-10 bg-white dark:bg-gray-800 text-sm focus:border-primary focus:ring focus:ring-primary/20 dark:text-white" type="number" value="105"/>
+<div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+<span class="text-gray-500 dark:text-gray-400 sm:text-sm">%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="scroll-mt-8" id="personnel">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            Personnel Management
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Manage team roles and individual resource allocations.</p>
+<div class="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<span class="text-sm font-medium">Default Working Hours</span>
+<input class="w-24 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm" type="number" value="40"/>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-sm font-medium">Overtime Multiplier</span>
+<input class="w-24 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm" step="0.1" type="number" value="1.5"/>
+</div>
+</div>
+</div>
+</section>
+<section class="scroll-mt-8" id="permissions">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            Permission Control
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Access levels and data visibility configurations.</p>
+<div class="space-y-3">
+<label class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer">
+<input checked="" class="text-primary focus:ring-primary" name="access" type="radio"/>
+<div>
+<p class="text-sm font-medium">Strict (Approval Required)</p>
+<p class="text-xs text-gray-500">Every expense update requires manager approval.</p>
+</div>
+</label>
+<label class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer">
+<input class="text-primary focus:ring-primary" name="access" type="radio"/>
+<div>
+<p class="text-sm font-medium">Flexible (Audit Trail)</p>
+<p class="text-xs text-gray-500">Updates are live but tracked in a permanent log.</p>
+</div>
+</label>
+</div>
+</section>
+<section class="scroll-mt-8" id="unit-costs">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            Unit Costs
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Standard pricing and global financial variables.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">VAT Rate (%)</label>
+<input class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm" type="number" value="10.0"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default Currency</label>
+<select class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm">
+<option>USD</option>
+<option selected="">KRW</option>
+<option>EUR</option>
+</select>
+</div>
+</div>
+</section>
+<section class="scroll-mt-8" id="integration">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                            System Integration
+                            <span class="h-px bg-gray-200 dark:bg-gray-700 flex-1 ml-4"></span>
+</h2>
+<p class="text-sm text-gray-500 dark:text-gray-400 mb-6">API connections and third-party data synchronization.</p>
+<div class="p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center">
+<span class="material-symbols-outlined text-gray-400 text-4xl mb-2">cloud_sync</span>
+<p class="text-sm text-gray-600 dark:text-gray-400">Configure ERP or SAP connections here.</p>
+<button class="mt-4 text-sm text-primary font-medium hover:underline">Manage Webhooks</button>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</div>
+<script>
+    const content = document.getElementById('settings-content');
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = document.querySelectorAll('section');
+    // Scroll sync function
+    content.addEventListener('scroll', () => {
+        let currentSectionId = '';
+        // Find which section is currently in the viewport
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            // Buffer for detection
+            if (content.scrollTop >= (sectionTop - 120)) {
+                currentSectionId = section.getAttribute('id');
+            }
+        });
+        // Update active state in sidebar
+        navItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.getAttribute('href').substring(1) === currentSectionId) {
+                item.classList.add('active');
+            }
+        });
+    });
+    // Handle sidebar clicks for smooth scrolling
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = item.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                content.scrollTo({
+                    top: targetElement.offsetTop - 32, // Offset matching p-8
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+</script>
+
+</body></html>

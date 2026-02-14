@@ -8,9 +8,9 @@
 ## 2) 사전 조건
 1. `gcloud`, `firebase` CLI 로그인 완료
 2. GCP 프로젝트 선택 완료
-   - `gcloud config set project sync-hub-arari-20260213011439`
+   - 예: `gcloud config set project sync-hub-yonghol-20260214`
 3. **프로젝트 결제(Billing) 활성화 필수**
-   - `gcloud beta billing projects describe sync-hub-arari-20260213011439`
+   - `gcloud beta billing projects describe <project-id>`
    - `billingEnabled: true`여야 Cloud Run/Cloud Build API 활성화 가능
 
 ## 3) 백엔드 배포
@@ -66,7 +66,7 @@ firebase deploy --only hosting
    - `curl -s https://<cloud-run-url>/health`
    - `curl -s https://<cloud-run-url>/health/detail`
 2. Hosting 도메인 경유 API
-   - `curl -s https://sync-hub-arari-20260213011439.web.app/health`
+   - `curl -s https://<firebase-site>.web.app/health`
 
 ## 6) 현재 확인된 이슈
 - 2026-02-13 기준, `gcloud run deploy --source`는 Cloud Build 기본 서비스계정 권한 정책에 따라 실패할 수 있다.

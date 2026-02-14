@@ -2,7 +2,24 @@
 
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-$(gcloud config get-value core/project 2>/dev/null || true)}"
+GCLOUD_BIN="${GCLOUD_BIN:-}"
+if [[ -z "${GCLOUD_BIN}" ]]; then
+  if command -v gcloud >/dev/null 2>&1; then
+    GCLOUD_BIN="gcloud"
+  elif [[ -x "${HOME}/google-cloud-sdk/bin/gcloud" ]]; then
+    GCLOUD_BIN="${HOME}/google-cloud-sdk/bin/gcloud"
+  elif [[ -x "/home/arari123/google-cloud-sdk/bin/gcloud" ]]; then
+    GCLOUD_BIN="/home/arari123/google-cloud-sdk/bin/gcloud"
+  fi
+fi
+
+if [[ -z "${GCLOUD_BIN}" ]]; then
+  echo "[ERROR] gcloud CLI is required."
+  echo "[HINT] Install Google Cloud SDK or set GCLOUD_BIN=/path/to/gcloud"
+  exit 1
+fi
+
+PROJECT_ID="${GCP_PROJECT_ID:-$("${GCLOUD_BIN}" config get-value core/project 2>/dev/null || true)}"
 REGION="${GCP_REGION:-asia-northeast3}"
 SERVICE_NAME="${CLOUD_RUN_SERVICE:-sync-hub-backend}"
 SERVICE_PORT="${SERVICE_PORT:-8000}"
@@ -21,17 +38,12 @@ if [[ -z "${PROJECT_ID}" ]]; then
   exit 1
 fi
 
-if ! command -v gcloud >/dev/null 2>&1; then
-  echo "[ERROR] gcloud CLI is required."
-  exit 1
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "[ERROR] python3 is required."
   exit 1
 fi
 
-ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
+ACTIVE_ACCOUNT="$("${GCLOUD_BIN}" auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)"
 if [[ -z "${ACTIVE_ACCOUNT}" ]]; then
   echo "[ERROR] No active gcloud account. Run: gcloud auth login"
   exit 1
@@ -43,7 +55,7 @@ if [[ ! -f "Dockerfile" ]]; then
 fi
 
 CURRENT_SERVICE_JSON=""
-if CURRENT_SERVICE_JSON="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format=json 2>/dev/null)"; then
+if CURRENT_SERVICE_JSON="$("${GCLOUD_BIN}" run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format=json 2>/dev/null)"; then
   :
 else
   CURRENT_SERVICE_JSON=""
@@ -118,13 +130,13 @@ CLOUD_SQL_INSTANCE_CONNECTION="${CLOUD_SQL_INSTANCE_CONNECTION_INPUT:-${CURRENT_
 
 ENV_VARS_ARG="^##^DATABASE_URL=${DATABASE_URL}##ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
 
-BILLING_ENABLED="$(gcloud beta billing projects describe "${PROJECT_ID}" --format='value(billingEnabled)' 2>/dev/null || echo false)"
+BILLING_ENABLED="$("${GCLOUD_BIN}" beta billing projects describe "${PROJECT_ID}" --format='value(billingEnabled)' 2>/dev/null || echo false)"
 if [[ "${BILLING_ENABLED}" != "True" && "${BILLING_ENABLED}" != "true" ]]; then
-  BILLING_ACCOUNT_NAME="$(gcloud beta billing projects describe "${PROJECT_ID}" --format='value(billingAccountName)' 2>/dev/null || true)"
+  BILLING_ACCOUNT_NAME="$("${GCLOUD_BIN}" beta billing projects describe "${PROJECT_ID}" --format='value(billingAccountName)' 2>/dev/null || true)"
   BILLING_ACCOUNT_ID="${BILLING_ACCOUNT_NAME##*/}"
   BILLING_OPEN="false"
   if [[ -n "${BILLING_ACCOUNT_ID}" ]]; then
-    BILLING_OPEN="$(gcloud billing accounts describe "${BILLING_ACCOUNT_ID}" --format='value(open)' 2>/dev/null || echo false)"
+    BILLING_OPEN="$("${GCLOUD_BIN}" billing accounts describe "${BILLING_ACCOUNT_ID}" --format='value(open)' 2>/dev/null || echo false)"
   fi
 
   echo "[ERROR] Billing is not enabled for project: ${PROJECT_ID}"
@@ -151,7 +163,7 @@ if [[ -n "${CLOUD_SQL_INSTANCE_CONNECTION}" ]]; then
 fi
 
 echo "[STEP] Enabling required APIs"
-gcloud services enable \
+"${GCLOUD_BIN}" services enable \
   run.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com \
@@ -195,16 +207,16 @@ elif [[ "${DEPLOY_MODE}" == "image" ]]; then
       exit 1
     fi
 
-    if ! gcloud artifacts repositories describe "${IMAGE_REPOSITORY}" --location "${REGION}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
+    if ! "${GCLOUD_BIN}" artifacts repositories describe "${IMAGE_REPOSITORY}" --location "${REGION}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
       echo "[STEP] Creating Artifact Registry repository: ${IMAGE_REPOSITORY}"
-      gcloud artifacts repositories create "${IMAGE_REPOSITORY}" \
+      "${GCLOUD_BIN}" artifacts repositories create "${IMAGE_REPOSITORY}" \
         --repository-format=docker \
         --location "${REGION}" \
         --project "${PROJECT_ID}" \
         --description "Cloud Run container images"
     fi
 
-    gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+    "${GCLOUD_BIN}" auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
     DEPLOYED_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${IMAGE_REPOSITORY}/${SERVICE_NAME}:${IMAGE_TAG}"
     echo "[STEP] Building backend image"
@@ -221,9 +233,9 @@ else
   exit 1
 fi
 
-gcloud "${DEPLOY_ARGS[@]}"
+"${GCLOUD_BIN}" "${DEPLOY_ARGS[@]}"
 
-SERVICE_URL="$(gcloud run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
+SERVICE_URL="$("${GCLOUD_BIN}" run services describe "${SERVICE_NAME}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
 
 echo "[STEP] Health check"
 curl --silent --show-error --fail "${SERVICE_URL}/health"

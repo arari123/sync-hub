@@ -82,6 +82,14 @@ function normalizePhase(value) {
     return String(value || '').trim() === 'installation' ? 'installation' : 'fabrication';
 }
 
+function normalizeStage(value) {
+    const stage = String(value || '').trim().toLowerCase();
+    if (stage === 'progress') return 'fabrication';
+    if (stage === 'as' || stage === 'a/s') return 'warranty';
+    if (stage === 'closed') return 'closure';
+    return stage || 'review';
+}
+
 function normalizeEquipmentName(value, fallback = '미지정 설비') {
     const normalized = String(value || '').trim();
     return normalized || fallback;
@@ -929,7 +937,12 @@ const BudgetProjectBudget = () => {
             const currentProject = payload.project || null;
             setProject(currentProject);
 
-            const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+            const versionPool = Array.isArray(payload.versions) ? payload.versions : [];
+            const currentStage = normalizeStage(currentProject?.current_stage || '');
+            const currentVersion = versionPool.find((item) => item.is_current && normalizeStage(item?.stage) === currentStage)
+                || versionPool.find((item) => item.is_current)
+                || versionPool[0]
+                || null;
             setVersion(currentVersion);
 
             if (!currentVersion?.id) {

@@ -23,6 +23,14 @@ function parseEquipmentNames(value) {
     );
 }
 
+function normalizeBudgetStage(value) {
+    const stage = String(value || '').trim().toLowerCase();
+    if (stage === 'progress') return 'fabrication';
+    if (stage === 'as' || stage === 'a/s') return 'warranty';
+    if (stage === 'closed') return 'closure';
+    return stage || 'review';
+}
+
 const EMPTY_EDIT_FORM = {
     name: '',
     code: '',
@@ -60,7 +68,12 @@ const BudgetProjectInfoEdit = () => {
                 const payload = versionsResp?.data || {};
                 const currentProject = payload.project || null;
                 setProject(currentProject);
-                const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+                const versionPool = Array.isArray(payload.versions) ? payload.versions : [];
+                const currentStage = normalizeBudgetStage(currentProject?.current_stage || '');
+                const currentVersion = versionPool.find((item) => item.is_current && normalizeBudgetStage(item?.stage) === currentStage)
+                    || versionPool.find((item) => item.is_current)
+                    || versionPool[0]
+                    || null;
                 setVersion(currentVersion);
 
                 if (currentProject) {

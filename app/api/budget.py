@@ -66,6 +66,8 @@ _ADMIN_IDENTIFIERS = {
     for token in _RAW_ADMIN_IDENTIFIERS.split(",")
     if token.strip()
 }
+_EXECUTION_ONLY_STAGES = {"fabrication", "installation", "warranty", "closure"}
+_REVIEW_STAGE = "review"
 _SCHEDULE_SCHEMA_VERSION = "wbs.v1"
 _SCHEDULE_STAGE_ORDER = ("design", "fabrication", "installation")
 _SCHEDULE_STAGE_LABELS = {
@@ -88,6 +90,73 @@ _SCHEDULE_ROOT_GROUP_IDS = {
     stage: f"stage-{stage}"
     for stage in _SCHEDULE_STAGE_ORDER
 }
+
+
+def _budget_settings_lock_signature(settings: Any) -> tuple:
+    """Return stable signature for settings that affect budget calculations.
+
+    In execution-only stages we lock these values to prevent budget drift while
+    users input executed amounts.
+    """
+
+    normalized = settings if isinstance(settings, dict) else {}
+
+    locale_raw = str(normalized.get("installation_locale") or "domestic").strip().lower()
+    installation_locale = "overseas" if locale_raw in {"overseas", "abroad", "해외"} else "domestic"
+
+    def _positive_or(value: Any, default_value: float) -> float:
+        parsed = to_number(value)
+        return float(parsed) if parsed > 0 else float(default_value)
+
+    material_unit_counts_raw = normalized.get("material_unit_counts")
+    material_unit_counts: list[tuple[str, int]] = []
+    if isinstance(material_unit_counts_raw, dict):
+        for scope_key, raw_count in material_unit_counts_raw.items():
+            key = str(scope_key or "").strip()
+            if not key:
+                continue
+            count = int(to_number(raw_count))
+            if count <= 1:
+                continue
+            material_unit_counts.append((key, count))
+    material_unit_counts.sort()
+
+    return (
+        installation_locale,
+        _positive_or(normalized.get("labor_days_per_week_domestic"), 5.0),
+        _positive_or(normalized.get("labor_days_per_week_overseas"), 7.0),
+        _positive_or(normalized.get("labor_days_per_month_domestic"), 22.0),
+        _positive_or(normalized.get("labor_days_per_month_overseas"), 30.0),
+        tuple(material_unit_counts),
+    )
+
+
+def _has_nonzero_executed_amounts(detail_payload: dict) -> bool:
+    for key in (
+        "material_items",
+        "labor_items",
+        "expense_items",
+        "execution_material_items",
+        "execution_labor_items",
+        "execution_expense_items",
+    ):
+        rows = detail_payload.get(key) or []
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if to_number(row.get("executed_amount")) > 0:
+                return True
+    return False
+
+
+def _effective_stage_for_project(project: models.BudgetProject, version: models.BudgetVersion) -> str:
+    raw_value = project.current_stage or version.stage or _REVIEW_STAGE
+    try:
+        return normalize_stage(raw_value)
+    except ValueError:
+        return _REVIEW_STAGE
 
 
 class BudgetProjectCreate(BaseModel):
@@ -1851,6 +1920,12 @@ def create_revision(
 ):
     source = _get_version_or_404(version_id, db)
     project = _require_version_edit_permission(source, user, db)
+    current_stage = _effective_stage_for_project(project, source)
+    if current_stage in _EXECUTION_ONLY_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="제작/설치/AS/종료 단계에서는 예산 리비전을 생성할 수 없습니다. 집행금액만 입력해 주세요.",
+        )
     if source.status != "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only confirmed version can create revision.")
 
@@ -1951,7 +2026,13 @@ def replace_equipments(
     user: models.User = Depends(get_current_user),
 ):
     version = _get_version_or_404(version_id, db)
-    _require_version_edit_permission(version, user, db)
+    project = _require_version_edit_permission(version, user, db)
+    current_stage = _effective_stage_for_project(project, version)
+    if current_stage in _EXECUTION_ONLY_STAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="제작/설치/AS/종료 단계에서는 예산(설비/항목)을 수정할 수 없습니다. 집행금액만 입력해 주세요.",
+        )
     if version.status == "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")
 
@@ -2007,6 +2088,18 @@ def get_version_details(
     payload = parse_detail_payload(version.budget_detail_json or "")
     totals = summarize_costs(_version_equipments(version.id, db))
     project = _get_project_or_404(version.project_id, db)
+    current_stage = _effective_stage_for_project(project, version)
+    if current_stage == _REVIEW_STAGE:
+        sanitized = {
+            **payload,
+            "material_items": [{**row, "executed_amount": 0.0} for row in (payload.get("material_items") or []) if isinstance(row, dict)],
+            "labor_items": [{**row, "executed_amount": 0.0} for row in (payload.get("labor_items") or []) if isinstance(row, dict)],
+            "expense_items": [{**row, "executed_amount": 0.0} for row in (payload.get("expense_items") or []) if isinstance(row, dict)],
+            "execution_material_items": [],
+            "execution_labor_items": [],
+            "execution_expense_items": [],
+        }
+        payload = sanitized
     return {
         "version": _serialize_version(version, db),
         "project": _serialize_project(project, db, user=user),
@@ -2023,7 +2116,7 @@ def upsert_version_details(
     user: models.User = Depends(get_current_user),
 ):
     version = _get_version_or_404(version_id, db)
-    _require_version_edit_permission(version, user, db)
+    project = _require_version_edit_permission(version, user, db)
     detail_dict = {
         "material_items": [item.model_dump() for item in payload.material_items],
         "labor_items": [item.model_dump() for item in payload.labor_items],
@@ -2033,6 +2126,31 @@ def upsert_version_details(
         "execution_expense_items": [item.model_dump() for item in payload.execution_expense_items],
         "budget_settings": dict(payload.budget_settings or {}),
     }
+
+    current_stage = _effective_stage_for_project(project, version)
+    if current_stage == _REVIEW_STAGE:
+        for key in ("material_items", "labor_items", "expense_items"):
+            for row in detail_dict.get(key, []):
+                if not isinstance(row, dict):
+                    continue
+                row["executed_amount"] = 0.0
+
+        # Review stage: budget input only. Always strip executions to keep data consistent.
+        detail_dict["execution_material_items"] = []
+        detail_dict["execution_labor_items"] = []
+        detail_dict["execution_expense_items"] = []
+    elif current_stage in _EXECUTION_ONLY_STAGES:
+        existing_detail = parse_detail_payload(version.budget_detail_json or "")
+        # Execution-only stages: keep budget + settings fixed, only accept execution rows.
+        detail_dict = {
+            "material_items": list(existing_detail.get("material_items", []) or []),
+            "labor_items": list(existing_detail.get("labor_items", []) or []),
+            "expense_items": list(existing_detail.get("expense_items", []) or []),
+            "execution_material_items": detail_dict.get("execution_material_items", []) or [],
+            "execution_labor_items": detail_dict.get("execution_labor_items", []) or [],
+            "execution_expense_items": detail_dict.get("execution_expense_items", []) or [],
+            "budget_settings": dict(existing_detail.get("budget_settings") or {}),
+        }
 
     if version.status == "confirmed":
         existing_detail = parse_detail_payload(version.budget_detail_json or "")

@@ -7,7 +7,7 @@ import BudgetSidebar from '../components/BudgetSidebar';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { cn } from '../lib/utils';
 
-const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
+const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty', 'closure']);
 
 const SECTION_META = {
     material: { label: '재료비', budgetKey: 'material_items', executionKey: 'execution_material_items' },
@@ -79,6 +79,14 @@ const HIDDEN_EXPENSE_QUANTITY_FORMULAS = new Set([
 ]);
 
 const COMMON_EQUIPMENT_NAME = '공통';
+
+function normalizeStage(value) {
+    const stage = String(value || '').trim().toLowerCase();
+    if (stage === 'progress') return 'fabrication';
+    if (stage === 'as' || stage === 'a/s') return 'warranty';
+    if (stage === 'closed') return 'closure';
+    return stage || 'review';
+}
 
 function toNumber(value) {
     const number = Number(String(value ?? '').replace(/,/g, ''));
@@ -581,7 +589,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
     const activeExpenseType = activeExpenseTypeFilter || '자체';
     const currentPhase = activePhaseFilter === 'installation' ? 'installation' : 'fabrication';
     const isConfirmed = version?.status === 'confirmed';
-    const currentStage = (project?.current_stage || version?.stage || 'review').toLowerCase();
+    const currentStage = normalizeStage(project?.current_stage || version?.stage || 'review');
     const isExecutionStage = EXECUTION_STAGES.has(currentStage);
     const budgetSettings = useMemo(() => mergeBudgetSettings(details?.budget_settings), [details?.budget_settings]);
     const projectInstallationInfo = useMemo(
@@ -1002,7 +1010,10 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             setProject(payload.project || null);
             const projectType = (payload?.project?.project_type || 'equipment');
 
-            let currentVersion = (payload.versions || []).find((item) => item.is_current);
+            const versionPool = Array.isArray(payload.versions) ? payload.versions : [];
+            const currentStage = normalizeStage(payload?.project?.current_stage || '');
+            let currentVersion = versionPool.find((item) => item.is_current && normalizeStage(item?.stage) === currentStage)
+                || versionPool.find((item) => item.is_current);
             if (!currentVersion) {
                 const created = await api.post(`/budget/projects/${projectId}/versions`, { stage: 'review' });
                 currentVersion = created.data;

@@ -69,6 +69,14 @@ function resolveStageKey(value) {
     return 'design';
 }
 
+function normalizeBudgetStage(value) {
+    const stage = String(value || '').trim().toLowerCase();
+    if (stage === 'progress') return 'fabrication';
+    if (stage === 'as' || stage === 'a/s') return 'warranty';
+    if (stage === 'closed') return 'closure';
+    return stage || 'review';
+}
+
 function ratio(actual, total) {
     if (total <= 0) return 0;
     return Math.max(0, Math.min(100, (actual / total) * 100));
@@ -143,7 +151,12 @@ const BudgetProjectOverview = () => {
             const currentProject = payload.project || null;
             setProject(currentProject);
 
-            const currentVersion = (payload.versions || []).find((item) => item.is_current) || (payload.versions || [])[0] || null;
+            const versionPool = Array.isArray(payload.versions) ? payload.versions : [];
+            const currentStage = normalizeBudgetStage(currentProject?.current_stage || '');
+            const currentVersion = versionPool.find((item) => item.is_current && normalizeBudgetStage(item?.stage) === currentStage)
+                || versionPool.find((item) => item.is_current)
+                || versionPool[0]
+                || null;
             setVersion(currentVersion);
 
             try {

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
+    ChevronLeft,
+    ChevronRight,
     Database,
     Grid2x2,
     Loader2,
@@ -451,6 +453,7 @@ const SearchResults = () => {
     const [documentResults, setDocumentResults] = useState([]);
     const [selectedResult, setSelectedResult] = useState(null);
     const [showAllProjects, setShowAllProjects] = useState(false);
+    const [projectPage, setProjectPage] = useState(1);
     const [projectFilters, setProjectFilters] = useState({
         stages: [],
         types: [],
@@ -630,18 +633,30 @@ const SearchResults = () => {
         });
     }, [filteredProjects, projectFilters.stages, projectFilters.types]);
 
+    useEffect(() => {
+        setProjectPage(1);
+    }, [projectRows, projectScope, projectFilterQuery, projectFilters.stages, projectFilters.types, showAllProjects]);
+
+    const totalVisibleCount = visibleProjects.length;
+    const totalProjectPages = Math.max(1, Math.ceil(totalVisibleCount / TABLE_PAGE_SIZE));
+
+    useEffect(() => {
+        setProjectPage((prev) => Math.max(1, Math.min(prev, totalProjectPages)));
+    }, [totalProjectPages]);
+
+    const pageStartIndex = (projectPage - 1) * TABLE_PAGE_SIZE;
+    const pageEndIndex = pageStartIndex + TABLE_PAGE_SIZE;
     const tableProjects = useMemo(
-        () => visibleProjects.slice(0, TABLE_PAGE_SIZE),
-        [visibleProjects]
+        () => visibleProjects.slice(pageStartIndex, pageEndIndex),
+        [pageEndIndex, pageStartIndex, visibleProjects]
     );
     const visibleProjectIds = useMemo(
         () => tableProjects.map((project) => normalizeProjectId(project?.id)).filter(Boolean),
         [tableProjects]
     );
 
-    const totalVisibleCount = visibleProjects.length;
-    const visibleStartIndex = totalVisibleCount > 0 ? 1 : 0;
-    const visibleEndIndex = Math.min(TABLE_PAGE_SIZE, totalVisibleCount);
+    const visibleStartIndex = totalVisibleCount > 0 ? pageStartIndex + 1 : 0;
+    const visibleEndIndex = Math.min(pageEndIndex, totalVisibleCount);
     const myProjectCount = projectPool.filter((project) => project?.is_mine !== false).length;
     const allProjectCount = projectPool.length;
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
@@ -1348,6 +1363,44 @@ const SearchResults = () => {
                                         </article>
                                     );
                                 })
+                            )}
+
+                            {totalVisibleCount > TABLE_PAGE_SIZE && (
+                                <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                    <span className="text-[11px] font-semibold text-slate-500">
+                                        페이지 {projectPage} / {totalProjectPages}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setProjectPage((prev) => Math.max(1, prev - 1))}
+                                            disabled={projectPage <= 1}
+                                            className={cn(
+                                                'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
+                                                projectPage <= 1
+                                                    ? 'cursor-not-allowed border-border bg-background text-muted-foreground/40'
+                                                    : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
+                                            )}
+                                        >
+                                            <ChevronLeft className="h-3.5 w-3.5" />
+                                            이전
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setProjectPage((prev) => Math.min(totalProjectPages, prev + 1))}
+                                            disabled={projectPage >= totalProjectPages}
+                                            className={cn(
+                                                'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
+                                                projectPage >= totalProjectPages
+                                                    ? 'cursor-not-allowed border-border bg-background text-muted-foreground/40'
+                                                    : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
+                                            )}
+                                        >
+                                            다음
+                                            <ChevronRight className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
                             )}
 
                             <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">

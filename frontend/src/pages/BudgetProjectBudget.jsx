@@ -355,11 +355,14 @@ function buildBudgetViewModel({
     const costTypeSet = new Set(selectedCostTypes);
     const sourceSet = new Set(selectedSources);
     const equipmentSet = new Set(selectedEquipments);
+    // When the equipment selection is empty, treat it as \"all selected\".
+    // This prevents transient 0 totals during initial load / route transitions.
+    const shouldFilterEquipment = equipmentSet.size > 0;
     const keyword = String(searchKeyword || '').trim().toLowerCase();
     const hasKeyword = keyword.length > 0;
 
     const items = (equipmentSummaries || [])
-        .filter((equipment) => equipmentSet.has(equipment.name))
+        .filter((equipment) => !shouldFilterEquipment || equipmentSet.has(equipment.name))
         .map((equipment) => {
             const equipmentLabelMatch = matchAnyKeyword(keyword, [equipment.name]);
             const phases = {};

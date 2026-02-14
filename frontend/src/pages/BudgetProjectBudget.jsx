@@ -296,8 +296,6 @@ function ensureNamedAmountBucket(map, key, fallbackLabel = '미지정 항목') {
 }
 
 function collectEquipmentNames(projectType, equipments, details) {
-    if (projectType !== 'equipment') return ['공통'];
-
     const namesFromEquipments = (equipments || []).map((item) => normalizeEquipmentName(item?.equipment_name, ''));
     const uniqueFromEquipments = uniqueValues(namesFromEquipments);
     if (uniqueFromEquipments.length > 0) {
@@ -314,7 +312,17 @@ function collectEquipmentNames(projectType, equipments, details) {
     ];
 
     const merged = uniqueValues(namesFromDetails);
-    return merged.length > 0 ? merged : ['미지정 설비'];
+    if (merged.length > 0) {
+        return merged;
+    }
+
+    // Non-equipment project types (parts/as) may still carry equipment rows.
+    // Fall back to a shared bucket only when we truly have no equipment names.
+    if (projectType !== 'equipment') {
+        return ['공통'];
+    }
+
+    return ['미지정 설비'];
 }
 
 function sortByAmountDesc(items, key = 'budgetAmount') {
@@ -1199,7 +1207,15 @@ const BudgetProjectBudget = () => {
             if (!names.length) return [];
             if (!prev.length) return names;
             const kept = prev.filter((name) => names.includes(name));
-            return kept.length ? kept : names;
+            if (!kept.length) return names;
+
+            // Avoid sticky placeholder selections during initial load when
+            // a single fallback bucket (e.g., '공통') appears before real equipments.
+            if (kept.length === 1 && (kept[0] === '공통' || kept[0] === '미지정 설비') && names.length > 1) {
+                return names;
+            }
+
+            return kept;
         });
     }, [dashboard.equipmentSummaries]);
 

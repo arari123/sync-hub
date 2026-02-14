@@ -87,6 +87,27 @@ class BudgetProjectMetadataTests(unittest.TestCase):
         self.assertEqual(monitoring["actual_spent_expense"], 50000)
         self.assertEqual(monitoring["actual_spent_total"], 250000)
 
+    def test_monitoring_payload_forces_zero_execution_in_review_stage(self):
+        project = self._sample_project(current_stage="review")
+        monitoring = _build_monitoring_payload(
+            project,
+            {
+                "material_total": 500000,
+                "labor_total": 300000,
+                "expense_total": 200000,
+                "grand_total": 1000000,
+            },
+            executed_summary={
+                "material_executed_total": 120000,
+                "labor_executed_total": 80000,
+                "expense_executed_total": 50000,
+            },
+        )
+        self.assertEqual(monitoring["actual_spent_material"], 0)
+        self.assertEqual(monitoring["actual_spent_labor"], 0)
+        self.assertEqual(monitoring["actual_spent_expense"], 0)
+        self.assertEqual(monitoring["actual_spent_total"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

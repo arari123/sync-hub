@@ -872,6 +872,18 @@ def _build_monitoring_payload(
     executed_expense = to_number((executed_summary or {}).get("expense_executed_total"))
     executed_total = executed_material + executed_labor + executed_expense
 
+    try:
+        current_stage = normalize_stage(project.current_stage or _REVIEW_STAGE)
+    except Exception:  # noqa: BLE001
+        current_stage = _REVIEW_STAGE
+
+    # Business rule: review stage cannot have executed amounts.
+    if current_stage == _REVIEW_STAGE:
+        executed_material = 0.0
+        executed_labor = 0.0
+        executed_expense = 0.0
+        executed_total = 0.0
+
     if executed_total > 0:
         actual_spent_material = round(executed_material, 2)
         actual_spent_labor = round(executed_labor, 2)

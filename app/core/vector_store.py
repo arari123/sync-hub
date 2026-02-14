@@ -1,6 +1,7 @@
 import math
 import os
 import re
+import time
 from typing import Dict, List, Tuple
 
 from dotenv import load_dotenv
@@ -15,6 +16,20 @@ HYBRID_REQUIRE_KEYWORD_MATCH = (
     in {"1", "true", "yes", "on"}
 )
 QUERY_TERM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+def _env_float(name: str, default: float) -> float:
+    raw = str(os.getenv(name, "")).strip()
+    if not raw:
+        return float(default)
+    try:
+        return float(raw)
+    except ValueError:
+        return float(default)
+
+
+ES_CONNECT_TIMEOUT_SEC = _env_float("ES_CONNECT_TIMEOUT_SEC", 1.0)
+ES_RECONNECT_BACKOFF_INITIAL_SEC = _env_float("ES_RECONNECT_BACKOFF_INITIAL_SEC", 1.0)
+ES_RECONNECT_BACKOFF_MAX_SEC = _env_float("ES_RECONNECT_BACKOFF_MAX_SEC", 30.0)
 
 try:
     from elasticsearch import Elasticsearch
@@ -75,6 +90,8 @@ class VectorStore:
         self.client = None
         self.memory_mode = Elasticsearch is None
         self._memory_docs: Dict[str, dict] = {}
+        self._connect_failures = 0
+        self._next_connect_attempt_at = 0.0
 
         if self.memory_mode:
             print("[vector_store] elasticsearch package not found, using in-memory store.")
@@ -86,14 +103,25 @@ class VectorStore:
         if Elasticsearch is None:
             return False
 
+        now = time.monotonic()
+        if now < self._next_connect_attempt_at:
+            return False
+
         try:
             self.client = Elasticsearch(ES_HOST)
-            self.client.info()
+            # Avoid long blocks when ES is missing/unreachable (common in dev/Cloud Run).
+            self.client.info(request_timeout=ES_CONNECT_TIMEOUT_SEC)
             self.memory_mode = False
+            self._connect_failures = 0
+            self._next_connect_attempt_at = now
             return True
         except Exception as exc:  # noqa: BLE001
             self.client = None
             self.memory_mode = True
+            self._connect_failures = max(0, int(self._connect_failures)) + 1
+            exponent = min(max(self._connect_failures - 1, 0), 6)
+            backoff = ES_RECONNECT_BACKOFF_INITIAL_SEC * (2**exponent)
+            self._next_connect_attempt_at = now + min(backoff, ES_RECONNECT_BACKOFF_MAX_SEC)
             print(f"[vector_store] Elasticsearch unavailable, using in-memory store: {exc}")
             return False
 

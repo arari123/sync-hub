@@ -12,7 +12,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, case, or_
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -43,7 +43,7 @@ SEARCH_FIELD_AUTHOR = "author"
 SEARCH_FIELD_REQUESTER = "requester"
 SEARCH_FIELD_RESPONDER_WORKER = "responder_worker"
 
-_ALLOWED_PER_PAGE = {10, 30, 50}
+_ALLOWED_PER_PAGE = {3, 10, 30, 50}
 
 _QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -1340,6 +1340,79 @@ def list_agenda_threads(
     elif status_token in {"completed", "완료", "done"}:
         query = query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_COMPLETED)
 
+    query_text = str(q or "").strip()
+    if not query_text:
+        total = int(query.order_by(None).count())
+        if total <= 0:
+            return {
+                "items": [],
+                "page": page,
+                "per_page": per_page,
+                "total": 0,
+                "total_pages": 0,
+            }
+
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+        start = (page - 1) * per_page
+
+        priority_clause = case(
+            (models.AgendaThread.progress_status == PROGRESS_STATUS_IN_PROGRESS, 0),
+            else_=1,
+        )
+        threads = (
+            query
+            .order_by(
+                priority_clause.asc(),
+                models.AgendaThread.last_updated_at.asc(),
+                models.AgendaThread.id.asc(),
+            )
+            .offset(start)
+            .limit(per_page)
+            .all()
+        )
+        if not threads:
+            return {
+                "items": [],
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+            }
+
+        root_entry_ids = [int(item.root_entry_id) for item in threads if item.root_entry_id]
+        latest_entry_ids = [int(item.latest_entry_id) for item in threads if item.latest_entry_id]
+        entry_ids = list({*root_entry_ids, *latest_entry_ids})
+
+        entries = []
+        if entry_ids:
+            entries = (
+                db.query(models.AgendaEntry)
+                .filter(models.AgendaEntry.id.in_(entry_ids))
+                .all()
+            )
+        entry_map = {int(item.id): item for item in entries}
+
+        user_ids = {int(item.created_by_user_id) for item in entries}
+        user_map = _user_map_by_ids(user_ids, db)
+
+        first_image_map = _first_image_attachment_map(entry_ids, db)
+        return {
+            "items": [
+                _serialize_thread(
+                    thread,
+                    entry_map.get(int(thread.root_entry_id)) if thread.root_entry_id else None,
+                    entry_map.get(int(thread.latest_entry_id)) if thread.latest_entry_id else None,
+                    user_map,
+                    first_image_map,
+                )
+                for thread in threads
+            ],
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": total_pages,
+        }
+
     threads = query.all()
     if not threads:
         return {
@@ -1382,7 +1455,6 @@ def list_agenda_threads(
     }:
         normalized_search_field = SEARCH_FIELD_ALL
 
-    query_text = str(q or "").strip()
     tokens = _tokenize_agenda_search_query(query_text)
 
     candidate_rows = []

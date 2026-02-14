@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import and_, exists, func, or_
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -1173,6 +1173,222 @@ def _is_project_visible_to_user(
     return current_version.status == "confirmed"
 
 
+def _project_visibility_clause(user: models.User):
+    if _is_admin_user(user):
+        return None
+
+    user_id = int(user.id)
+    can_edit_clause = or_(
+        func.coalesce(models.BudgetProject.manager_user_id, models.BudgetProject.created_by_user_id) == user_id,
+        and_(
+            models.BudgetProject.manager_user_id.is_(None),
+            models.BudgetProject.created_by_user_id.is_(None),
+        ),
+    )
+    review_confirmed_clause = exists().where(
+        and_(
+            models.BudgetVersion.project_id == models.BudgetProject.id,
+            models.BudgetVersion.stage == models.BudgetProject.current_stage,
+            models.BudgetVersion.is_current.is_(True),
+            models.BudgetVersion.status == "confirmed",
+        )
+    )
+    return or_(
+        can_edit_clause,
+        models.BudgetProject.current_stage != _REVIEW_STAGE,
+        and_(
+            models.BudgetProject.current_stage == _REVIEW_STAGE,
+            review_confirmed_clause,
+        ),
+    )
+
+
+def _get_current_versions_for_projects(
+    projects: list[models.BudgetProject],
+    db: Session,
+) -> dict[int, Optional[models.BudgetVersion]]:
+    if not projects:
+        return {}
+
+    project_ids = [int(item.id) for item in projects]
+    versions = (
+        db.query(models.BudgetVersion)
+        .filter(
+            models.BudgetVersion.project_id.in_(project_ids),
+            models.BudgetVersion.is_current.is_(True),
+        )
+        .order_by(models.BudgetVersion.updated_at.desc(), models.BudgetVersion.id.desc())
+        .all()
+    )
+
+    stage_current_map: dict[tuple[int, str], models.BudgetVersion] = {}
+    for version in versions:
+        key = (int(version.project_id), str(version.stage or "").strip().lower())
+        if key in stage_current_map:
+            continue
+        stage_current_map[key] = version
+
+    output: dict[int, Optional[models.BudgetVersion]] = {}
+    missing_project_ids: list[int] = []
+    for project in projects:
+        project_id = int(project.id)
+        stage_key = str(project.current_stage or "").strip().lower()
+        chosen = stage_current_map.get((project_id, stage_key))
+        output[project_id] = chosen
+        if chosen is None:
+            missing_project_ids.append(project_id)
+
+    if missing_project_ids:
+        fallback_versions = (
+            db.query(models.BudgetVersion)
+            .filter(models.BudgetVersion.project_id.in_(missing_project_ids))
+            .order_by(
+                models.BudgetVersion.project_id.asc(),
+                models.BudgetVersion.updated_at.desc(),
+                models.BudgetVersion.id.desc(),
+            )
+            .all()
+        )
+        fallback_map: dict[int, models.BudgetVersion] = {}
+        for version in fallback_versions:
+            project_id = int(version.project_id)
+            if project_id in fallback_map:
+                continue
+            fallback_map[project_id] = version
+        for project_id in missing_project_ids:
+            output[project_id] = fallback_map.get(project_id)
+
+    return output
+
+
+def _serialize_projects_bulk(
+    projects: list[models.BudgetProject],
+    db: Session,
+    user: Optional[models.User],
+    current_versions: dict[int, Optional[models.BudgetVersion]],
+) -> list[dict]:
+    if not projects:
+        return []
+
+    project_ids = [int(item.id) for item in projects]
+    version_count_map: dict[int, int] = {}
+    version_count_rows = (
+        db.query(models.BudgetVersion.project_id, func.count(models.BudgetVersion.id))
+        .filter(models.BudgetVersion.project_id.in_(project_ids))
+        .group_by(models.BudgetVersion.project_id)
+        .all()
+    )
+    for project_id, count in version_count_rows:
+        version_count_map[int(project_id)] = int(count or 0)
+
+    user_ids = set()
+    for project in projects:
+        manager_id = _project_manager_user_id(project)
+        if manager_id is not None:
+            user_ids.add(int(manager_id))
+        if project.created_by_user_id is not None:
+            user_ids.add(int(project.created_by_user_id))
+
+    user_map: dict[int, models.User] = {}
+    if user_ids:
+        users = db.query(models.User).filter(models.User.id.in_(user_ids)).all()
+        user_map = {int(item.id): item for item in users}
+
+    version_ids = [int(item.id) for item in current_versions.values() if item is not None]
+    equipments_by_version_id: dict[int, list[models.BudgetEquipment]] = {}
+    if version_ids:
+        equipment_rows = (
+            db.query(models.BudgetEquipment)
+            .filter(models.BudgetEquipment.version_id.in_(version_ids))
+            .order_by(
+                models.BudgetEquipment.version_id.asc(),
+                models.BudgetEquipment.sort_order.asc(),
+                models.BudgetEquipment.id.asc(),
+            )
+            .all()
+        )
+        for equipment in equipment_rows:
+            vid = int(equipment.version_id)
+            equipments_by_version_id.setdefault(vid, []).append(equipment)
+
+    output: list[dict] = []
+    for project in projects:
+        project_id = int(project.id)
+        current = current_versions.get(project_id)
+
+        equipment_names: list[str] = []
+        if current is not None:
+            equipments = equipments_by_version_id.get(int(current.id), [])
+            totals = summarize_costs(equipments)
+            seen_equipment_names: set[str] = set()
+            for item in equipments:
+                name = (item.equipment_name or "").strip()
+                if not name:
+                    continue
+                key = name.lower()
+                if key in seen_equipment_names:
+                    continue
+                seen_equipment_names.add(key)
+                equipment_names.append(name)
+            detail_payload = parse_detail_payload(current.budget_detail_json or "")
+            executed_summary = summarize_executed_costs_from_detail(detail_payload)
+            current_version_id: Optional[int] = int(current.id)
+        else:
+            totals = summarize_costs([])
+            executed_summary = summarize_executed_costs_from_detail(default_detail_payload())
+            current_version_id = None
+
+        monitoring = _build_monitoring_payload(project, totals, executed_summary=executed_summary)
+        manager = None
+        manager_user_id = _project_manager_user_id(project)
+        if manager_user_id is not None:
+            manager = user_map.get(int(manager_user_id))
+        owner = None
+        if project.created_by_user_id is not None:
+            owner = user_map.get(int(project.created_by_user_id))
+        manager_name = _user_display_name(manager, empty_label="담당자 미지정")
+        custom_cover_image_url = (project.cover_image_url or "").strip()
+        generated_cover_image_url = _build_generated_cover_image(project)
+        custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
+        summary_milestones = custom_milestones or _build_default_milestones(project)
+
+        output.append(
+            {
+                "id": project_id,
+                "name": project.name,
+                "code": project.code or "",
+                "description": project.description or "",
+                "project_type": _project_type_code_or_empty(project.project_type),
+                "project_type_label": _project_type_label(project.project_type),
+                "customer_name": project.customer_name or "",
+                "installation_site": project.installation_site or "",
+                "equipment_names": equipment_names,
+                "business_trip_distance_km": to_number(project.business_trip_distance_km),
+                "cover_image_url": custom_cover_image_url,
+                "cover_image_fallback_url": generated_cover_image_url,
+                "cover_image_display_url": custom_cover_image_url or generated_cover_image_url,
+                "summary_milestones": summary_milestones,
+                "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
+                "current_stage": project.current_stage,
+                "current_stage_label": stage_label(project.current_stage),
+                "current_version_id": current_version_id,
+                "version_count": int(version_count_map.get(project_id, 0)),
+                "manager_user_id": _project_manager_user_id(project),
+                "manager_name": manager_name,
+                "author_name": manager_name,  # backward compatibility
+                "created_by_name": _user_display_name(owner, empty_label="생성자 미지정"),
+                "can_edit": _project_can_edit(project, user),
+                "is_mine": _is_my_project(project, user),
+                "totals": totals,
+                "monitoring": monitoring,
+                "created_at": project.created_at,
+                "updated_at": project.updated_at,
+            }
+        )
+
+    return output
+
+
 def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
     if project.created_by_user_id is None:
         project.created_by_user_id = int(user.id)
@@ -1526,6 +1742,57 @@ def list_projects(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+    manager_filter_value = (manager_name or author_name or "").strip()
+    use_slow_path = bool(manager_filter_value) or (min_total is not None) or (max_total is not None)
+
+    if not use_slow_path:
+        query_builder = db.query(models.BudgetProject)
+        visibility_clause = _project_visibility_clause(user)
+        if visibility_clause is not None:
+            query_builder = query_builder.filter(visibility_clause)
+
+        name_filter = (project_name or "").strip()
+        if name_filter:
+            query_builder = query_builder.filter(models.BudgetProject.name.ilike(f"%{name_filter}%"))
+
+        code_filter = (project_code or "").strip()
+        if code_filter:
+            query_builder = query_builder.filter(models.BudgetProject.code.ilike(f"%{code_filter}%"))
+
+        customer_filter = (customer_name or "").strip()
+        if customer_filter:
+            query_builder = query_builder.filter(models.BudgetProject.customer_name.ilike(f"%{customer_filter}%"))
+
+        if selected_project_types:
+            # Match legacy normalization: null/empty project_type behaves like "equipment".
+            project_type_expr = func.coalesce(func.nullif(models.BudgetProject.project_type, ""), "equipment")
+            query_builder = query_builder.filter(project_type_expr.in_(selected_project_types))
+
+        if selected_stages:
+            query_builder = query_builder.filter(models.BudgetProject.current_stage.in_(selected_stages))
+
+        total = int(query_builder.order_by(None).count())
+
+        if normalized_sort == "updated_asc":
+            query_builder = query_builder.order_by(models.BudgetProject.updated_at.asc(), models.BudgetProject.id.asc())
+        elif normalized_sort == "name_desc":
+            query_builder = query_builder.order_by(func.lower(models.BudgetProject.name).desc(), models.BudgetProject.id.desc())
+        elif normalized_sort == "name_asc":
+            query_builder = query_builder.order_by(func.lower(models.BudgetProject.name).asc(), models.BudgetProject.id.asc())
+        else:
+            query_builder = query_builder.order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
+
+        start = (page - 1) * page_size
+        projects_page = query_builder.offset(start).limit(page_size).all()
+        current_versions = _get_current_versions_for_projects(projects_page, db)
+        items = _serialize_projects_bulk(projects_page, db, user=user, current_versions=current_versions)
+        return {
+            "items": items,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+        }
+
     all_projects = (
         db.query(models.BudgetProject)
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
@@ -1544,7 +1811,7 @@ def list_projects(
             project_types=selected_project_types,
             stages=selected_stages,
             customer_name=customer_name,
-            manager_name=(manager_name or author_name),
+            manager_name=manager_filter_value,
             min_total=min_total,
             max_total=max_total,
         ):
@@ -1575,32 +1842,111 @@ def search_projects(
         return []
 
     tokens = _tokenize_search_query(query)
-    all_projects = (
-        db.query(models.BudgetProject)
+    query_builder = db.query(models.BudgetProject)
+    visibility_clause = _project_visibility_clause(user)
+    if visibility_clause is not None:
+        query_builder = query_builder.filter(visibility_clause)
+
+    # Coarse prefilter to avoid scoring every project.
+    token_conditions = []
+    needle = query.strip()
+    if needle:
+        token_conditions.append(models.BudgetProject.name.ilike(f"%{needle}%"))
+        token_conditions.append(models.BudgetProject.code.ilike(f"%{needle}%"))
+        token_conditions.append(models.BudgetProject.customer_name.ilike(f"%{needle}%"))
+        token_conditions.append(models.BudgetProject.installation_site.ilike(f"%{needle}%"))
+        token_conditions.append(models.BudgetProject.description.ilike(f"%{needle}%"))
+    for token in tokens:
+        token_conditions.append(models.BudgetProject.name.ilike(f"%{token}%"))
+        token_conditions.append(models.BudgetProject.code.ilike(f"%{token}%"))
+        token_conditions.append(models.BudgetProject.customer_name.ilike(f"%{token}%"))
+        token_conditions.append(models.BudgetProject.installation_site.ilike(f"%{token}%"))
+        token_conditions.append(models.BudgetProject.description.ilike(f"%{token}%"))
+    if token_conditions:
+        query_builder = query_builder.filter(or_(*token_conditions))
+
+    candidate_limit = max(int(limit) * 20, 200)
+    candidates = (
+        query_builder
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())
+        .limit(candidate_limit)
         .all()
     )
+    if not candidates:
+        return []
+
+    current_versions = _get_current_versions_for_projects(candidates, db)
+    version_ids = [int(item.id) for item in current_versions.values() if item is not None]
+    equipment_names_by_version_id: dict[int, list[str]] = {}
+    if version_ids:
+        equipment_rows = (
+            db.query(
+                models.BudgetEquipment.version_id,
+                models.BudgetEquipment.equipment_name,
+            )
+            .filter(models.BudgetEquipment.version_id.in_(version_ids))
+            .order_by(
+                models.BudgetEquipment.version_id.asc(),
+                models.BudgetEquipment.sort_order.asc(),
+                models.BudgetEquipment.id.asc(),
+            )
+            .all()
+        )
+        seen_by_version: dict[int, set[str]] = {}
+        for version_id, equipment_name in equipment_rows:
+            vid = int(version_id)
+            name = (equipment_name or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if vid not in seen_by_version:
+                seen_by_version[vid] = set()
+            if key in seen_by_version[vid]:
+                continue
+            seen_by_version[vid].add(key)
+            equipment_names_by_version_id.setdefault(vid, []).append(name)
+
+    user_ids = set()
+    for project in candidates:
+        manager_id = _project_manager_user_id(project)
+        if manager_id is not None:
+            user_ids.add(int(manager_id))
+    user_map: dict[int, models.User] = {}
+    if user_ids:
+        users = db.query(models.User).filter(models.User.id.in_(user_ids)).all()
+        user_map = {int(item.id): item for item in users}
 
     scored_results: list[dict] = []
-    for project in all_projects:
-        current_version = _get_current_version_for_project(project, db)
-        if not _is_project_visible_to_user(project, current_version=current_version, user=user):
-            continue
+    for project in candidates:
+        project_id = int(project.id)
+        current_version = current_versions.get(project_id)
+        version_id = int(current_version.id) if current_version is not None else None
+        manager_id = _project_manager_user_id(project)
+        manager = user_map.get(int(manager_id)) if manager_id is not None else None
+        manager_name = _user_display_name(manager, empty_label="담당자 미지정")
 
-        payload = _serialize_project(project, db, user=user, current_version=current_version)
-        score = _project_search_score(payload, query, tokens)
+        score_payload = {
+            "name": project.name,
+            "description": project.description or "",
+            "code": project.code or "",
+            "customer_name": project.customer_name or "",
+            "manager_name": manager_name,
+            "installation_site": project.installation_site or "",
+            "equipment_names": equipment_names_by_version_id.get(version_id or 0, []),
+        }
+        score = _project_search_score(score_payload, query, tokens)
         if score <= 0:
             continue
 
         scored_results.append(
             {
-                "project_id": payload.get("id"),
-                "name": payload.get("name") or "",
-                "description": payload.get("description") or "",
-                "customer_name": payload.get("customer_name") or "",
-                "manager_name": payload.get("manager_name") or "",
-                "current_stage": payload.get("current_stage") or "",
-                "current_stage_label": payload.get("current_stage_label") or "",
+                "project_id": project_id,
+                "name": project.name or "",
+                "description": project.description or "",
+                "customer_name": project.customer_name or "",
+                "manager_name": manager_name or "",
+                "current_stage": project.current_stage or "",
+                "current_stage_label": stage_label(project.current_stage),
                 "score": score,
             }
         )

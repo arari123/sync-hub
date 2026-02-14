@@ -52,7 +52,7 @@
   - `Layout.jsx`: 라우트별 공통 레이아웃/상단바 분기
   - `ProtectedRoute.jsx`: 인증 가드
   - `GlobalTopBar.jsx`: 전역 상단바(검색/퀵메뉴/사용자)
-  - `ProjectResultList.jsx`: 프로젝트 검색 결과 카드 목록
+  - `ProjectResultList.jsx`: 프로젝트 검색 결과(구글형 리스트, 매칭 이유/스니펫/하이라이트 표시)
   - `HealthStatus.jsx`: 백엔드/의존성 헬스 상태 표시
   - `ProjectPageHeader.jsx`, `ProjectContextNav.jsx`: 프로젝트 페이지 브레드크럼/서브메뉴
   - `BudgetBreadcrumb.jsx`, `BudgetSidebar.jsx`: 예산 브레드크럼/입력 트리 네비게이션
@@ -60,7 +60,7 @@
   - `budget-dashboard/*Tab.jsx`: 예산 탭 UI 구성 컴포넌트
   - `ui/`: 공용 UI primitives (`Button`, `Input`, `Logo`)
 - `pages/`
-  - `SearchResults.jsx`: 홈(`/home`) 통합 검색 화면
+  - `SearchResults.jsx`: 홈(`/home`) 메인 프로젝트 리스트 + 검색결과(프로젝트/문서) 화면(검색어 `q` 존재 시 검색결과 전용 UI로 전환)
   - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 `App.jsx`에서 직접 라우트 연결 없이 레거시 리다이렉트만 유지)
   - `BudgetProjectOverview.jsx`: 프로젝트 메인(상세 요약)
   - `BudgetProjectBudget.jsx`: 예산 메인(통합요약/재료비/인건비/경비)
@@ -105,7 +105,7 @@
 - 인증: `/auth/signup`, `/auth/verify-email`, `/auth/login`, `/auth/me`, `/auth/users`, `/auth/logout`
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
 - 예산:
-  - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`, `POST /budget/projects`, `GET/PUT /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
+  - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
   - 일정: `GET/PUT /budget/projects/{project_id}/schedule`
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`

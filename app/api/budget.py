@@ -1704,6 +1704,133 @@ def _project_search_score(project_payload: dict, query: str, tokens: list[str]) 
     return score
 
 
+def _collapse_snippet_whitespace(text: str) -> str:
+    return " ".join(str(text or "").split()).strip()
+
+
+def _extract_snippet(text: str, query_lower: str, tokens: list[str], max_len: int = 180) -> str:
+    cleaned = _collapse_snippet_whitespace(text)
+    if not cleaned:
+        return ""
+
+    if len(cleaned) <= max_len:
+        return cleaned
+
+    lowered = cleaned.lower()
+    match_start = -1
+    match_len = 0
+
+    if query_lower:
+        idx = lowered.find(query_lower)
+        if idx >= 0:
+            match_start = idx
+            match_len = len(query_lower)
+
+    if match_start < 0:
+        for token in tokens:
+            idx = lowered.find(token)
+            if idx >= 0:
+                match_start = idx
+                match_len = len(token)
+                break
+
+    if match_start < 0:
+        return cleaned[: max_len - 3].rstrip() + "..."
+
+    context = max(24, int(max_len * 0.45))
+    start = max(0, match_start - context)
+    end = min(len(cleaned), match_start + match_len + context)
+    snippet = cleaned[start:end].strip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(cleaned):
+        snippet = snippet + "..."
+    return snippet
+
+
+def _project_search_explain(project_payload: dict, query: str, tokens: list[str]) -> dict:
+    query_lower = (query or "").strip().lower()
+
+    name = _collapse_snippet_whitespace(project_payload.get("name") or "")
+    description = _collapse_snippet_whitespace(project_payload.get("description") or "")
+    code = _collapse_snippet_whitespace(project_payload.get("code") or "")
+    customer_name = _collapse_snippet_whitespace(project_payload.get("customer_name") or "")
+    manager_name = _collapse_snippet_whitespace(project_payload.get("manager_name") or "")
+    installation_site = _collapse_snippet_whitespace(project_payload.get("installation_site") or "")
+    equipment_names = project_payload.get("equipment_names") or []
+    equipment_name_text = _collapse_snippet_whitespace(
+        " ".join(str(item or "").strip() for item in equipment_names if str(item or "").strip())
+    )
+
+    field_values = [
+        ("name", name),
+        ("code", code),
+        ("customer_name", customer_name),
+        ("installation_site", installation_site),
+        ("manager_name", manager_name),
+        ("equipment_names", equipment_name_text),
+        ("description", description),
+    ]
+
+    match_fields: list[str] = []
+    matched_terms: set[str] = set()
+    for field, value in field_values:
+        if not value:
+            continue
+        lowered = value.lower()
+        field_matched = False
+        if query_lower and query_lower in lowered:
+            field_matched = True
+        for token in tokens:
+            if token and token in lowered:
+                field_matched = True
+                matched_terms.add(token)
+        if field_matched:
+            match_fields.append(field)
+
+    # Pick a snippet field that both reads well and tends to include the query.
+    snippet_field = ""
+    snippet_source = ""
+    for field, value in (
+        ("description", description),
+        ("installation_site", installation_site),
+        ("customer_name", customer_name),
+        ("equipment_names", equipment_name_text),
+        ("manager_name", manager_name),
+        ("code", code),
+    ):
+        if not value:
+            continue
+        lowered = value.lower()
+        if (query_lower and query_lower in lowered) or any(token in lowered for token in tokens):
+            snippet_field = field
+            snippet_source = value
+            break
+
+    if not snippet_source:
+        if description:
+            snippet_field = "description"
+            snippet_source = description
+        elif installation_site:
+            snippet_field = "installation_site"
+            snippet_source = installation_site
+        elif customer_name:
+            snippet_field = "customer_name"
+            snippet_source = customer_name
+        elif name:
+            snippet_field = "name"
+            snippet_source = name
+
+    ordered_terms = [token for token in tokens if token in matched_terms]
+    snippet = _extract_snippet(snippet_source, query_lower, tokens)
+    return {
+        "match_fields": match_fields,
+        "matched_terms": ordered_terms,
+        "snippet_field": snippet_field,
+        "snippet": snippet,
+    }
+
+
 @router.get("/projects")
 def list_projects(
     project_name: Optional[str] = Query(default=None, max_length=120),
@@ -1938,16 +2065,26 @@ def search_projects(
         if score <= 0:
             continue
 
+        explain = _project_search_explain(score_payload, query, tokens)
+
         scored_results.append(
             {
                 "project_id": project_id,
                 "name": project.name or "",
+                "code": project.code or "",
                 "description": project.description or "",
                 "customer_name": project.customer_name or "",
+                "installation_site": project.installation_site or "",
                 "manager_name": manager_name or "",
+                "project_type": _project_type_code_or_empty(project.project_type),
+                "project_type_label": _project_type_label(project.project_type),
                 "current_stage": project.current_stage or "",
                 "current_stage_label": stage_label(project.current_stage),
                 "score": score,
+                "match_fields": explain.get("match_fields") or [],
+                "matched_terms": explain.get("matched_terms") or [],
+                "snippet_field": explain.get("snippet_field") or "",
+                "snippet": explain.get("snippet") or "",
             }
         )
 

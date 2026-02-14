@@ -16,6 +16,7 @@ import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
+import ProjectResultList from '../components/ProjectResultList';
 import { Input } from '../components/ui/Input';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
@@ -450,6 +451,7 @@ const SearchResults = () => {
     const [inputQuery, setInputQuery] = useState(query);
     const [projectPool, setProjectPool] = useState([]);
     const [projectRows, setProjectRows] = useState([]);
+    const [projectSearchResults, setProjectSearchResults] = useState([]);
     const [documentResults, setDocumentResults] = useState([]);
     const [selectedResult, setSelectedResult] = useState(null);
     const [showAllProjects, setShowAllProjects] = useState(false);
@@ -486,73 +488,104 @@ const SearchResults = () => {
     }, []);
 
     useEffect(() => {
+        if (hasSearchQuery) return undefined;
+
         const controller = new AbortController();
         let active = true;
 
-        const fetchResults = async () => {
+        const fetchHomeProjects = async () => {
             setIsLoading(true);
             setError('');
             setSelectedResult(null);
+            setDocumentResults([]);
+            setProjectSearchResults([]);
 
             try {
-                const projectListPromise = api.get('/budget/projects', {
+                const projectListResult = await api.get('/budget/projects', {
                     params: { page: 1, page_size: 200, sort_by: 'updated_desc' },
                     signal: controller.signal,
                 });
 
-                const documentSearchPromise = hasSearchQuery
-                    ? api.get('/documents/search', {
-                        params: { q: searchQuery, page: 1, page_size: 10 },
-                        signal: controller.signal,
-                    })
-                    : Promise.resolve({ data: { items: [] } });
-
-                const projectSearchPromise = hasSearchQuery
-                    ? api.get('/budget/projects/search', {
-                        params: { q: searchQuery, limit: 50 },
-                        signal: controller.signal,
-                    })
-                    : Promise.resolve({ data: [] });
-
-                const [projectListResult, documentSearchResult, projectSearchResult] = await Promise.allSettled([
-                    projectListPromise,
-                    documentSearchPromise,
-                    projectSearchPromise,
-                ]);
-
-                if (projectListResult.status !== 'fulfilled') {
-                    throw projectListResult.reason;
-                }
-
-                if (hasSearchQuery && documentSearchResult.status !== 'fulfilled') {
-                    throw documentSearchResult.reason;
-                }
-
-                const projectList = extractItems(projectListResult.value?.data);
-                const docs = documentSearchResult.status === 'fulfilled'
-                    ? extractItems(documentSearchResult.value?.data)
-                    : [];
-
-                let nextProjectRows = projectList;
-                if (hasSearchQuery) {
-                    if (projectSearchResult.status === 'fulfilled' && Array.isArray(projectSearchResult.value?.data)) {
-                        nextProjectRows = mergeProjectSearchRows(projectList, projectSearchResult.value.data, searchQuery);
-                    } else {
-                        nextProjectRows = searchProjectsLocally(projectList, searchQuery, 50);
-                    }
-                }
-
+                const projectList = extractItems(projectListResult?.data);
                 if (!active) return;
                 setProjectPool(projectList);
-                setProjectRows(nextProjectRows);
-                setDocumentResults(docs);
+                setProjectRows(projectList);
             } catch (err) {
                 if (!active || err?.code === 'ERR_CANCELED') {
                     return;
                 }
                 setProjectPool([]);
                 setProjectRows([]);
+                setError(getErrorMessage(err, '프로젝트 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
+            } finally {
+                if (!active) return;
+                setIsLoading(false);
+            }
+        };
+
+        fetchHomeProjects();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [hasSearchQuery]);
+
+    useEffect(() => {
+        if (!hasSearchQuery) return undefined;
+
+        const controller = new AbortController();
+        let active = true;
+
+        const fetchSearchResults = async () => {
+            setIsLoading(true);
+            setError('');
+            setSelectedResult(null);
+            setDocumentResults([]);
+            setProjectSearchResults([]);
+
+            try {
+                const documentSearchPromise = api.get('/documents/search', {
+                    params: { q: searchQuery, page: 1, page_size: 10 },
+                    signal: controller.signal,
+                });
+
+                const projectSearchPromise = api.get('/budget/projects/search', {
+                    params: { q: searchQuery, limit: 30 },
+                    signal: controller.signal,
+                });
+
+                const [documentSearchResult, projectSearchResult] = await Promise.allSettled([
+                    documentSearchPromise,
+                    projectSearchPromise,
+                ]);
+
+                const docs = documentSearchResult.status === 'fulfilled'
+                    ? extractItems(documentSearchResult.value?.data)
+                    : [];
+                const projects = projectSearchResult.status === 'fulfilled' && Array.isArray(projectSearchResult.value?.data)
+                    ? projectSearchResult.value.data
+                    : [];
+
+                if (!active) return;
+                setDocumentResults(docs);
+                setProjectSearchResults(projects);
+
+                if (documentSearchResult.status !== 'fulfilled' && projectSearchResult.status !== 'fulfilled') {
+                    throw projectSearchResult.status === 'rejected' ? projectSearchResult.reason : documentSearchResult.reason;
+                }
+
+                if (documentSearchResult.status !== 'fulfilled') {
+                    setError(getErrorMessage(documentSearchResult.reason, '문서 검색 결과를 불러오지 못했습니다. 프로젝트 검색 결과는 표시 중입니다.'));
+                } else if (projectSearchResult.status !== 'fulfilled') {
+                    setError(getErrorMessage(projectSearchResult.reason, '프로젝트 검색 결과를 불러오지 못했습니다. 문서 검색 결과는 표시 중입니다.'));
+                }
+            } catch (err) {
+                if (!active || err?.code === 'ERR_CANCELED') {
+                    return;
+                }
                 setDocumentResults([]);
+                setProjectSearchResults([]);
                 setError(getErrorMessage(err, '검색 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
             } finally {
                 if (!active) return;
@@ -560,7 +593,7 @@ const SearchResults = () => {
             }
         };
 
-        fetchResults();
+        fetchSearchResults();
 
         return () => {
             active = false;
@@ -660,9 +693,10 @@ const SearchResults = () => {
     const myProjectCount = projectPool.filter((project) => project?.is_mine !== false).length;
     const allProjectCount = projectPool.length;
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
-    const hasProjectPanel = isLoading || projectRows.length > 0 || !hasSearchQuery;
+    const hasProjectPanel = !hasSearchQuery;
 
     useEffect(() => {
+        if (hasSearchQuery) return undefined;
         if (visibleProjectIds.length <= 0) return undefined;
 
         const pendingProjectIds = visibleProjectIds.filter((projectId) => !(projectId in projectAgendaMap));
@@ -731,7 +765,7 @@ const SearchResults = () => {
             active = false;
             controller.abort();
         };
-    }, [projectAgendaMap, visibleProjectIds]);
+    }, [hasSearchQuery, projectAgendaMap, visibleProjectIds]);
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
@@ -866,6 +900,33 @@ const SearchResults = () => {
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                             {error}
                         </div>
+                    )}
+
+                    {hasSearchQuery && (
+                        <section className="rounded-2xl border border-border bg-card p-4">
+                            <div className="mx-auto max-w-[980px]">
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <h2 className="text-sm font-semibold text-foreground">프로젝트 검색 결과</h2>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            검색어: <span className="font-medium text-foreground/80">{searchQuery}</span>
+                                        </p>
+                                    </div>
+                                    {!isLoading && (
+                                        <span className="text-xs text-muted-foreground">총 {projectSearchResults.length}건</span>
+                                    )}
+                                </div>
+
+                                {isLoading ? (
+                                    <div className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-4 py-10 text-sm text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        검색 결과를 불러오는 중입니다.
+                                    </div>
+                                ) : (
+                                    <ProjectResultList results={projectSearchResults} query={searchQuery} />
+                                )}
+                            </div>
+                        </section>
                     )}
 
                     {hasProjectPanel && (
@@ -1439,7 +1500,7 @@ const SearchResults = () => {
                         </section>
                     )}
 
-                    {hasSearchQuery && !isLoading && !error && totalVisibleCount === 0 && documentResults.length === 0 && (
+                    {hasSearchQuery && !isLoading && !error && projectSearchResults.length === 0 && documentResults.length === 0 && (
                         <div className="rounded-xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
                             검색 결과가 없습니다.
                         </div>

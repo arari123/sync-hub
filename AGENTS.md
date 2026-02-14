@@ -17,7 +17,6 @@
 - **GPU 사용 규칙**: OCR 등 GPU 고부하 작업은 `docker-compose.gpu.yml`을 사용한다.
 - **REPO-MAP 점검/동기화 규칙**: 모든 작업 완료 시 `docs/repo-map.md`를 반드시 점검하고, 변경된 구조/경로/엔트리포인트가 있으면 같은 작업에서 즉시 업데이트한다.
 - **프로젝트 입력 문서 동기화 규칙**: 프로젝트 생성/수정/버전/설비/예산상세(`budget_settings` 포함) 입력 항목이 추가·변경되면 같은 작업에서 `docs/project-input-spec.md`를 반드시 갱신한다.
-- **저장소 맵 동기화 규칙**: 폴더 구조/주요 엔트리포인트/라우팅/도커 실행 구성 변경 시 같은 작업에서 `docs/repo-map.md`를 반드시 갱신한다.
 
 ## 명령어 가이드
 - `bash scripts/start_localhost.sh`: localhost 웹 기본 기동(자동 복구 포함).

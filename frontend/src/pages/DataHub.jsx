@@ -243,15 +243,50 @@ export default function DataHub() {
                 )}
             </section>
 
-            {permissions.can_upload && (
-                <UploadWidget
-                    title="데이터 허브 PDF 업로드"
-                    uploadEndpoint="/data-hub/documents/upload"
-                    allowedExtensions={['.pdf']}
-                    accept=".pdf,application/pdf"
-                    description="텍스트 PDF(카탈로그/데이터시트/메뉴얼)를 업로드하면 자동으로 인덱싱됩니다."
-                />
-            )}
+            <section
+                className={cn(
+                    "grid grid-cols-1 gap-4",
+                    permissions.can_upload ? "lg:grid-cols-2" : "lg:grid-cols-1"
+                )}
+            >
+                <div className="rounded-2xl border border-border bg-card">
+                    <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-primary" />
+                            <h2 className="text-sm font-semibold text-foreground">AI 검색 결과</h2>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{aiCacheHit ? '캐시됨' : ''}</span>
+                    </div>
+                    <div className="space-y-4 p-4">
+                        <div className="rounded-lg border border-border bg-background p-3">
+                            {aiAnswer ? (
+                                <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">
+                                    {aiAnswer}
+                                </pre>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">
+                                    검색 후 <span className="font-semibold text-foreground">AI 답변 생성</span>을 누르면, 검색 결과를 근거로 답변을 생성합니다.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold text-muted-foreground">근거(문서/페이지)</p>
+                            <SourcesPanel sources={aiSources} onSelectDoc={handleSelectSourceDoc} />
+                        </div>
+                    </div>
+                </div>
+
+                {permissions.can_upload ? (
+                    <UploadWidget
+                        title="데이터 허브 PDF 업로드"
+                        uploadEndpoint="/data-hub/documents/upload"
+                        allowedExtensions={['.pdf']}
+                        accept=".pdf,application/pdf"
+                        description="텍스트 PDF(카탈로그/데이터시트/메뉴얼)를 업로드하면 자동으로 인덱싱됩니다."
+                    />
+                ) : null}
+            </section>
 
             <section className="rounded-2xl border border-border bg-card p-4">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -276,7 +311,9 @@ export default function DataHub() {
                                 disabled={!searchQuery || safePage <= 1 || isSearching}
                                 className={cn(
                                     "inline-flex h-9 items-center justify-center rounded-md border px-3 text-xs font-semibold transition-colors",
-                                    safePage <= 1 || isSearching ? "cursor-not-allowed border-border bg-muted text-muted-foreground" : "border-border bg-card hover:bg-secondary"
+                                    safePage <= 1 || isSearching
+                                        ? "cursor-not-allowed border-border bg-muted text-muted-foreground"
+                                        : "border-border bg-card hover:bg-secondary"
                                 )}
                             >
                                 이전
@@ -290,7 +327,9 @@ export default function DataHub() {
                                 disabled={!searchQuery || safePage >= totalPages || isSearching}
                                 className={cn(
                                     "inline-flex h-9 items-center justify-center rounded-md border px-3 text-xs font-semibold transition-colors",
-                                    safePage >= totalPages || isSearching ? "cursor-not-allowed border-border bg-muted text-muted-foreground" : "border-border bg-card hover:bg-secondary"
+                                    safePage >= totalPages || isSearching
+                                        ? "cursor-not-allowed border-border bg-muted text-muted-foreground"
+                                        : "border-border bg-card hover:bg-secondary"
                                 )}
                             >
                                 다음
@@ -300,38 +339,9 @@ export default function DataHub() {
 
                     <div className="space-y-4 lg:col-span-5">
                         <DocumentDetail result={selectedResult} />
-
-                        <div className="rounded-lg border bg-card">
-                            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                    <Bot className="h-4 w-4 text-primary" />
-                                    <h2 className="text-sm font-semibold text-foreground">AI 답변</h2>
-                                </div>
-                                <span className="text-[11px] text-muted-foreground">{aiCacheHit ? '캐시됨' : ''}</span>
-                            </div>
-                            <div className="space-y-4 p-4">
-                                <div className="rounded-lg border border-border bg-background p-3">
-                                    {aiAnswer ? (
-                                        <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">
-                                            {aiAnswer}
-                                        </pre>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground">
-                                            검색 후 <span className="font-semibold text-foreground">AI 답변 생성</span>을 누르면, 검색 결과를 근거로 답변을 생성합니다.
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-xs font-semibold text-muted-foreground">근거(문서/페이지)</p>
-                                    <SourcesPanel sources={aiSources} onSelectDoc={handleSelectSourceDoc} />
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </section>
         </div>
     );
 }
-

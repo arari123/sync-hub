@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Loader2,
     PencilLine,
     Search,
+    SlidersHorizontal,
     TimerReset,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -45,6 +46,26 @@ const STAGE_STYLES = {
         rowBorder: 'border-l-emerald-500',
     },
 };
+
+const FILTER_CHIP_BASE_CLASS =
+    'inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+const FILTER_CHIP_ACTIVE_CLASS = 'border-primary bg-primary text-primary-foreground shadow-sm';
+const FILTER_CHIP_INACTIVE_CLASS =
+    'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
+const MOBILE_FILTER_BUTTON_BASE_CLASS =
+    'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+const MOBILE_FILTER_BUTTON_ACTIVE_CLASS = 'border-primary/40 bg-primary/10 text-primary';
+const MOBILE_FILTER_BUTTON_INACTIVE_CLASS =
+    'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground';
+const KIND_FILTER_OPTIONS = [
+    { value: 'task', label: '일정' },
+    { value: 'event', label: '이벤트' },
+];
+const STATUS_FILTER_OPTIONS = [
+    { value: 'upcoming', label: '예정' },
+    { value: 'in_progress', label: '진행 중' },
+    { value: 'completed', label: '완료' },
+];
 
 function formatDateLabel(value) {
     const text = String(value || '').trim();
@@ -181,9 +202,14 @@ export default function BudgetProjectScheduleManagement() {
     const [stageFilter, setStageFilter] = useState('all');
     const [kindFilter, setKindFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+
+    const milestoneScrollRef = useRef(null);
+    const ganttScrollRef = useRef(null);
+    const isSyncingScrollRef = useRef(false);
 
     useEffect(() => {
         const loadSchedule = async () => {
@@ -305,6 +331,33 @@ export default function BudgetProjectScheduleManagement() {
         setStatusFilter('all');
     };
 
+    const syncHorizontalScroll = (source) => {
+        if (isSyncingScrollRef.current) return;
+
+        const milestoneEl = milestoneScrollRef.current;
+        const ganttEl = ganttScrollRef.current;
+        if (!milestoneEl || !ganttEl) return;
+
+        isSyncingScrollRef.current = true;
+        if (source === 'milestone') {
+            ganttEl.scrollLeft = milestoneEl.scrollLeft;
+        } else {
+            milestoneEl.scrollLeft = ganttEl.scrollLeft;
+        }
+
+        const release = () => {
+            isSyncingScrollRef.current = false;
+        };
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(release);
+        } else {
+            setTimeout(release, 0);
+        }
+    };
+
+    const handleMilestoneScroll = () => syncHorizontalScroll('milestone');
+    const handleGanttScroll = () => syncHorizontalScroll('gantt');
+
     if (isLoading) {
         return (
             <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -384,7 +437,7 @@ export default function BudgetProjectScheduleManagement() {
                 )}
             />
 
-            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <section className="app-surface-soft space-y-3 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-bold text-slate-800">간트 차트 상세 조회</h3>
                     <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
@@ -393,132 +446,340 @@ export default function BudgetProjectScheduleManagement() {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-5">
-                    <label className="xl:col-span-2">
-                        <span className="mb-1 block text-xs font-semibold text-slate-500">검색</span>
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                value={searchText}
-                                onChange={(event) => setSearchText(event.target.value)}
-                                placeholder="일정명, 그룹, 메모, 날짜 검색"
-                                className="pl-9"
-                            />
+                <div className="flex items-center justify-between lg:hidden">
+                    <button
+                        type="button"
+                        onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+                        aria-expanded={isMobileFilterOpen}
+                        className={cn(
+                            MOBILE_FILTER_BUTTON_BASE_CLASS,
+                            isMobileFilterOpen
+                                ? MOBILE_FILTER_BUTTON_ACTIVE_CLASS
+                                : MOBILE_FILTER_BUTTON_INACTIVE_CLASS,
+                        )}
+                    >
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        {isMobileFilterOpen ? '필터 닫기' : '필터'}
+                    </button>
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                        표시 {filteredRows.length.toLocaleString('ko-KR')}건
+                    </span>
+                </div>
+
+                <div className="hidden lg:flex lg:min-h-8 lg:items-center lg:gap-2">
+                    <div className="relative w-60 shrink-0">
+                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                        <Input
+                            type="text"
+                            value={searchText}
+                            onChange={(event) => setSearchText(event.target.value)}
+                            placeholder="일정 검색"
+                            className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
+                        />
+                    </div>
+
+                    <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                    <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setStageFilter('all')}
+                            aria-pressed={stageFilter === 'all'}
+                            className={cn(
+                                FILTER_CHIP_BASE_CLASS,
+                                stageFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                            )}
+                        >
+                            전체 단계
+                        </button>
+                        {STAGE_ORDER.map((stage) => {
+                            const isActive = stageFilter === stage;
+                            return (
+                                <button
+                                    key={`stage-filter-${stage}`}
+                                    type="button"
+                                    onClick={() => setStageFilter(stage)}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                        FILTER_CHIP_BASE_CLASS,
+                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                    )}
+                                >
+                                    {STAGE_LABELS[stage] || stage}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                    <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setKindFilter('all')}
+                            aria-pressed={kindFilter === 'all'}
+                            className={cn(
+                                FILTER_CHIP_BASE_CLASS,
+                                kindFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                            )}
+                        >
+                            전체 구분
+                        </button>
+                        {KIND_FILTER_OPTIONS.map((option) => {
+                            const isActive = kindFilter === option.value;
+                            return (
+                                <button
+                                    key={`kind-filter-${option.value}`}
+                                    type="button"
+                                    onClick={() => setKindFilter(option.value)}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                        FILTER_CHIP_BASE_CLASS,
+                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                    <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('all')}
+                            aria-pressed={statusFilter === 'all'}
+                            className={cn(
+                                FILTER_CHIP_BASE_CLASS,
+                                statusFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                            )}
+                        >
+                            전체 상태
+                        </button>
+                        {STATUS_FILTER_OPTIONS.map((option) => {
+                            const isActive = statusFilter === option.value;
+                            return (
+                                <button
+                                    key={`status-filter-${option.value}`}
+                                    type="button"
+                                    onClick={() => setStatusFilter(option.value)}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                        FILTER_CHIP_BASE_CLASS,
+                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                    )}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className={cn('space-y-2 lg:hidden', !isMobileFilterOpen && 'hidden')}>
+                    <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                        <Input
+                            type="text"
+                            value={searchText}
+                            onChange={(event) => setSearchText(event.target.value)}
+                            placeholder="일정명, 그룹, 메모, 날짜 검색"
+                            className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
+                        />
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-slate-500">단계 필터</p>
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setStageFilter('all')}
+                                aria-pressed={stageFilter === 'all'}
+                                className={cn(
+                                    FILTER_CHIP_BASE_CLASS,
+                                    stageFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                )}
+                            >
+                                전체 단계
+                            </button>
+                            {STAGE_ORDER.map((stage) => {
+                                const isActive = stageFilter === stage;
+                                return (
+                                    <button
+                                        key={`stage-filter-mobile-${stage}`}
+                                        type="button"
+                                        onClick={() => setStageFilter(stage)}
+                                        aria-pressed={isActive}
+                                        className={cn(
+                                            FILTER_CHIP_BASE_CLASS,
+                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                        )}
+                                    >
+                                        {STAGE_LABELS[stage] || stage}
+                                    </button>
+                                );
+                            })}
                         </div>
-                    </label>
+                    </div>
 
-                    <label>
-                        <span className="mb-1 block text-xs font-semibold text-slate-500">단계</span>
-                        <select
-                            value={stageFilter}
-                            onChange={(event) => setStageFilter(event.target.value)}
-                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value="all">전체</option>
-                            {STAGE_ORDER.map((stage) => (
-                                <option key={`stage-filter-${stage}`} value={stage}>{STAGE_LABELS[stage]}</option>
-                            ))}
-                        </select>
-                    </label>
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-slate-500">구분 필터</p>
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setKindFilter('all')}
+                                aria-pressed={kindFilter === 'all'}
+                                className={cn(
+                                    FILTER_CHIP_BASE_CLASS,
+                                    kindFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                )}
+                            >
+                                전체 구분
+                            </button>
+                            {KIND_FILTER_OPTIONS.map((option) => {
+                                const isActive = kindFilter === option.value;
+                                return (
+                                    <button
+                                        key={`kind-filter-mobile-${option.value}`}
+                                        type="button"
+                                        onClick={() => setKindFilter(option.value)}
+                                        aria-pressed={isActive}
+                                        className={cn(
+                                            FILTER_CHIP_BASE_CLASS,
+                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                        )}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
 
-                    <label>
-                        <span className="mb-1 block text-xs font-semibold text-slate-500">구분</span>
-                        <select
-                            value={kindFilter}
-                            onChange={(event) => setKindFilter(event.target.value)}
-                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value="all">전체</option>
-                            <option value="task">일정</option>
-                            <option value="event">이벤트</option>
-                        </select>
-                    </label>
-
-                    <label>
-                        <span className="mb-1 block text-xs font-semibold text-slate-500">상태</span>
-                        <select
-                            value={statusFilter}
-                            onChange={(event) => setStatusFilter(event.target.value)}
-                            className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value="all">전체</option>
-                            <option value="upcoming">예정</option>
-                            <option value="in_progress">진행 중</option>
-                            <option value="completed">완료</option>
-                        </select>
-                    </label>
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-slate-500">상태 필터</p>
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setStatusFilter('all')}
+                                aria-pressed={statusFilter === 'all'}
+                                className={cn(
+                                    FILTER_CHIP_BASE_CLASS,
+                                    statusFilter === 'all' ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                )}
+                            >
+                                전체 상태
+                            </button>
+                            {STATUS_FILTER_OPTIONS.map((option) => {
+                                const isActive = statusFilter === option.value;
+                                return (
+                                    <button
+                                        key={`status-filter-mobile-${option.value}`}
+                                        type="button"
+                                        onClick={() => setStatusFilter(option.value)}
+                                        aria-pressed={isActive}
+                                        className={cn(
+                                            FILTER_CHIP_BASE_CLASS,
+                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                        )}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {chartBounds && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-bold text-slate-700">주요 이벤트 마일스톤</p>
-                            <p className="text-[11px] text-slate-500">
-                                현재 필터 기준 {milestoneData.total.toLocaleString('ko-KR')}건
-                                {milestoneData.total > milestoneData.items.length ? ` (상위 ${milestoneData.items.length}건 표시)` : ''}
-                            </p>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/80">
+                        <div className="p-3">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-bold text-slate-700">주요 이벤트 마일스톤</p>
+                                <p className="text-[11px] text-slate-500">
+                                    현재 필터 기준 {milestoneData.total.toLocaleString('ko-KR')}건
+                                    {milestoneData.total > milestoneData.items.length ? ` (상위 ${milestoneData.items.length}건 표시)` : ''}
+                                </p>
+                            </div>
+
+                            {milestoneData.items.length === 0 ? (
+                                <div className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-4 text-xs text-slate-500">
+                                    이벤트 유형 일정이 없어 마일스톤을 표시할 수 없습니다.
+                                </div>
+                            ) : null}
                         </div>
 
-                        {milestoneData.items.length === 0 ? (
-                            <div className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-4 text-xs text-slate-500">
-                                이벤트 유형 일정이 없어 마일스톤을 표시할 수 없습니다.
-                            </div>
-                        ) : (
-                            <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-                                <div className="relative h-28 w-full overflow-hidden">
-                                    <div className="absolute inset-x-0 top-20 border-t border-slate-300" />
-
-                                    {chartTicks.map((tick) => (
-                                        <div
-                                            key={`milestone-tick-${tick.key}`}
-                                            className="absolute inset-y-0 border-l border-slate-200/90"
-                                            style={{ left: `${tick.left}%` }}
-                                        />
-                                    ))}
-
-                                    {todayLinePos !== null && (
-                                        <div
-                                            className="absolute inset-y-0 border-l-2 border-rose-500/80"
-                                            style={{ left: `${todayLinePos}%` }}
-                                        />
-                                    )}
-
-                                    {milestoneData.items.map((milestone) => {
-                                        const stageStyle = STAGE_STYLES[milestone.stage] || STAGE_STYLES.design;
-                                        const topOffset = 10 + (milestone.lane * 26);
-                                        const alignClass = milestone.align === 'left'
-                                            ? ''
-                                            : milestone.align === 'right'
-                                                ? '-translate-x-full'
-                                                : '-translate-x-1/2';
-                                        return (
-                                            <div
-                                                key={`milestone-${milestone.id}`}
-                                                className="absolute"
-                                                style={{ left: `${milestone.position}%`, top: `${topOffset}px` }}
-                                            >
-                                                <div className={cn('relative', alignClass)}>
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex max-w-[170px] items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
-                                                            stageStyle.badge,
-                                                        )}
-                                                        title={milestone.name}
-                                                    >
-                                                        <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px text-[9px] text-slate-600">
-                                                            {formatMonthDay(milestone.date)}
-                                                        </span>
-                                                        <span className="truncate">{milestone.name}</span>
-                                                    </span>
-                                                    <span className={cn('absolute left-1/2 top-full h-3 w-px -translate-x-1/2', stageStyle.bar)} />
-                                                    <span className={cn('absolute left-1/2 top-[calc(100%+12px)] h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white shadow', stageStyle.bar)} />
-                                                </div>
+                        {milestoneData.items.length > 0 ? (
+                            <div className="border-t border-slate-200">
+                                <div
+                                    ref={milestoneScrollRef}
+                                    onScroll={handleMilestoneScroll}
+                                    className="overflow-x-auto"
+                                >
+                                    <div className="min-w-[1060px]">
+                                        <div className="grid grid-cols-[460px_1fr]">
+                                            <div className="border-r border-slate-200 bg-white/40 px-3 py-2 text-[11px] font-semibold text-slate-600">
+                                                그룹 · 일정 명칭 · 날짜
                                             </div>
-                                        );
-                                    })}
+                                            <div className="relative h-28 overflow-hidden bg-white">
+                                                <div className="absolute inset-x-0 top-20 border-t border-slate-300" />
+
+                                                {chartTicks.map((tick) => (
+                                                    <div
+                                                        key={`milestone-tick-${tick.key}`}
+                                                        className="absolute inset-y-0 border-l border-slate-300/80"
+                                                        style={{ left: `${tick.left}%` }}
+                                                    />
+                                                ))}
+
+                                                {todayLinePos !== null && (
+                                                    <div
+                                                        className="absolute inset-y-0 border-l-2 border-rose-500/80"
+                                                        style={{ left: `${todayLinePos}%` }}
+                                                    />
+                                                )}
+
+                                                {milestoneData.items.map((milestone) => {
+                                                    const stageStyle = STAGE_STYLES[milestone.stage] || STAGE_STYLES.design;
+                                                    const topOffset = 10 + (milestone.lane * 26);
+                                                    const alignClass = milestone.align === 'left'
+                                                        ? ''
+                                                        : milestone.align === 'right'
+                                                            ? '-translate-x-full'
+                                                            : '-translate-x-1/2';
+                                                    return (
+                                                        <div
+                                                            key={`milestone-${milestone.id}`}
+                                                            className="absolute"
+                                                            style={{ left: `${milestone.position}%`, top: `${topOffset}px` }}
+                                                        >
+                                                            <div className={cn('relative', alignClass)}>
+                                                                <span
+                                                                    className={cn(
+                                                                        'inline-flex max-w-[170px] items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
+                                                                        stageStyle.badge,
+                                                                    )}
+                                                                    title={milestone.name}
+                                                                >
+                                                                    <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px text-[9px] text-slate-600">
+                                                                        {formatMonthDay(milestone.date)}
+                                                                    </span>
+                                                                    <span className="truncate">{milestone.name}</span>
+                                                                </span>
+                                                                <span className={cn('absolute left-1/2 top-full h-3 w-px -translate-x-1/2', stageStyle.bar)} />
+                                                                <span className={cn('absolute left-1/2 top-[calc(100%+12px)] h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white shadow', stageStyle.bar)} />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 )}
 
@@ -539,7 +800,11 @@ export default function BudgetProjectScheduleManagement() {
                 )}
 
                 {chartBounds && (
-                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <div
+                        ref={ganttScrollRef}
+                        onScroll={handleGanttScroll}
+                        className="overflow-x-auto rounded-lg border border-slate-200"
+                    >
                         <div className="min-w-[1060px]">
                             <div className="grid grid-cols-[460px_1fr] border-b border-slate-200 bg-slate-50">
                                 <div className="px-2 py-1.5 text-[11px] font-bold text-slate-700">그룹 · 일정 명칭 · 날짜</div>

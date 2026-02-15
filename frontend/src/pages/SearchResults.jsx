@@ -17,6 +17,7 @@ import { cn } from '../lib/utils';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import GlobalSearchResultList from '../components/GlobalSearchResultList';
+import UserMenu from '../components/UserMenu';
 import { Input } from '../components/ui/Input';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
@@ -469,7 +470,6 @@ const SearchResults = () => {
     const [projectAgendaMap, setProjectAgendaMap] = useState({});
 
     const user = getCurrentUser();
-    const userBadge = (user?.full_name || user?.email || 'U').slice(0, 1).toUpperCase();
     const quickMenuRef = useRef(null);
 
     useEffect(() => {
@@ -937,9 +937,7 @@ const SearchResults = () => {
                                 </div>
                             )}
                         </div>
-                        <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-extrabold text-primary-foreground shadow-sm">
-                            <span>{userBadge}</span>
-                        </button>
+                        <UserMenu user={user} />
                     </div>
                 </div>
             </header>

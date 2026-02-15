@@ -52,6 +52,7 @@
   - `Layout.jsx`: 라우트별 공통 레이아웃/상단바 분기
   - `ProtectedRoute.jsx`: 인증 가드
   - `GlobalTopBar.jsx`: 전역 상단바(검색/퀵메뉴/사용자)
+  - `UserMenu.jsx`: 상단바 사용자 메뉴(이름/이메일 표시 + 로그아웃)
   - `ProjectResultList.jsx`: 프로젝트 검색 결과(구글형 리스트, 매칭 이유/스니펫/하이라이트 표시)
   - `HealthStatus.jsx`: 백엔드/의존성 헬스 상태 표시
   - `ProjectPageHeader.jsx`, `ProjectContextNav.jsx`: 프로젝트 페이지 브레드크럼/서브메뉴

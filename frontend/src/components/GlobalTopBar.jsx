@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Database, Grid2x2, Plus, Search } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '../lib/session';
 import { Input } from './ui/Input';
+import UserMenu from './UserMenu';
 
 const SEARCH_PLACEHOLDER = '프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색';
 
@@ -19,7 +20,6 @@ export default function GlobalTopBar() {
     const location = useLocation();
     const authed = isAuthenticated();
     const user = getCurrentUser();
-    const userBadge = (user?.full_name || user?.email || 'U').slice(0, 1).toUpperCase();
 
     const [inputQuery, setInputQuery] = useState('');
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
@@ -96,9 +96,9 @@ export default function GlobalTopBar() {
                                     <Grid2x2 className="h-4 w-4" />
                                 </button>
 
-                                {isQuickMenuOpen && (
-                                    <div className="app-surface-soft absolute right-0 top-11 z-[90] w-60 p-3">
-                                        <div className="grid grid-cols-2 gap-2">
+                            {isQuickMenuOpen && (
+                                <div className="app-surface-soft absolute right-0 top-11 z-[90] w-60 p-3">
+                                    <div className="grid grid-cols-2 gap-2">
                                             <Link
                                                 to="/project-management/projects/new"
                                                 onClick={() => setIsQuickMenuOpen(false)}
@@ -120,13 +120,11 @@ export default function GlobalTopBar() {
                                                 </span>
                                                 <span className="text-xs font-semibold text-center">데이터 허브(미구현)</span>
                                             </button>
-                                        </div>
                                     </div>
-                                )}
-                            </div>
-                            <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-xs font-extrabold text-primary-foreground shadow-sm">
-                                <span>{userBadge}</span>
-                            </button>
+                                </div>
+                            )}
+                        </div>
+                            <UserMenu user={user} />
                         </>
                     ) : (
                         <Link

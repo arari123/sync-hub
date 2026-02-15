@@ -365,8 +365,6 @@ export default function AgendaDetail() {
             }
         }
 
-        if (!window.confirm('답변을 등록하시겠습니까?')) return;
-
         const payload = {
             entry_kind: isWorkReport ? 'additional_work' : 'reply',
             title,

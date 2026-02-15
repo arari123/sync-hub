@@ -2,14 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Bell,
-    Boxes,
-    Building2,
-    ChevronLeft,
-    ChevronRight,
-    Database,
-    Grid2x2,
-    Loader2,
-    MapPin,
+	    Boxes,
+	    Building2,
+	    ChevronLeft,
+	    ChevronRight,
+	    ChevronsLeft,
+	    ChevronsRight,
+	    Database,
+	    Grid2x2,
+	    Loader2,
+	    MapPin,
     Plus,
     Search,
     SlidersHorizontal,
@@ -52,6 +54,7 @@ const PROJECT_TYPE_OPTIONS = [
     { value: 'as', label: 'AS' },
 ];
 const TABLE_PAGE_SIZE = 10;
+const PAGE_GROUP_SIZE = 10;
 const STAGE_LABEL_MAP = Object.fromEntries(EQUIPMENT_STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
@@ -2153,43 +2156,87 @@ const SearchResults = () => {
                                 })
                             )}
 
-                            {totalVisibleCount > TABLE_PAGE_SIZE && (
-                                <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                                    <span className="text-[11px] font-semibold text-slate-500">
-                                        페이지 {projectPage} / {totalProjectPages}
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setProjectPage((prev) => Math.max(1, prev - 1))}
-                                            disabled={projectPage <= 1}
-                                            className={cn(
-                                                'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
-                                                projectPage <= 1
-                                                    ? 'cursor-not-allowed border-border bg-background text-muted-foreground/40'
-                                                    : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
-                                            )}
-                                        >
-                                            <ChevronLeft className="h-3.5 w-3.5" />
-                                            이전
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setProjectPage((prev) => Math.min(totalProjectPages, prev + 1))}
-                                            disabled={projectPage >= totalProjectPages}
-                                            className={cn(
-                                                'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
-                                                projectPage >= totalProjectPages
-                                                    ? 'cursor-not-allowed border-border bg-background text-muted-foreground/40'
-                                                    : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
-                                            )}
-                                        >
-                                            다음
-                                            <ChevronRight className="h-3.5 w-3.5" />
-                                        </button>
+                            {totalVisibleCount > TABLE_PAGE_SIZE && (() => {
+                                const safePage = Math.max(1, Math.min(projectPage, totalProjectPages));
+                                const pageGroupStart = Math.floor((safePage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
+                                const pageGroupEnd = Math.min(totalProjectPages, pageGroupStart + PAGE_GROUP_SIZE - 1);
+                                const pages = Array.from(
+                                    { length: Math.max(0, pageGroupEnd - pageGroupStart + 1) },
+                                    (_, index) => pageGroupStart + index
+                                );
+
+                                const baseButtonClass =
+                                    'inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+                                const disabledButtonClass = 'cursor-not-allowed border-border bg-background text-muted-foreground/40';
+                                const enabledButtonClass = 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground';
+                                const pageButtonClass = (isActive) => cn(
+                                    'min-w-9 px-2 font-semibold',
+                                    isActive ? 'border-primary bg-primary text-primary-foreground' : enabledButtonClass
+                                );
+
+                                return (
+                                    <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                        <span className="text-[11px] font-semibold text-slate-500">
+                                            페이지 {safePage} / {totalProjectPages}
+                                        </span>
+                                        <div className="flex flex-wrap items-center justify-end gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setProjectPage(1)}
+                                                disabled={safePage <= 1}
+                                                className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                                title="맨앞"
+                                            >
+                                                <ChevronsLeft className="h-3.5 w-3.5" />
+                                                맨앞
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setProjectPage((prev) => Math.max(1, prev - 1))}
+                                                disabled={safePage <= 1}
+                                                className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                                title="이전"
+                                            >
+                                                <ChevronLeft className="h-3.5 w-3.5" />
+                                                이전
+                                            </button>
+
+                                            {pages.map((page) => (
+                                                <button
+                                                    key={`project-page-${page}`}
+                                                    type="button"
+                                                    onClick={() => setProjectPage(page)}
+                                                    aria-current={page === safePage ? 'page' : undefined}
+                                                    className={cn(baseButtonClass, pageButtonClass(page === safePage))}
+                                                >
+                                                    {page}
+                                                </button>
+                                            ))}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setProjectPage((prev) => Math.min(totalProjectPages, prev + 1))}
+                                                disabled={safePage >= totalProjectPages}
+                                                className={cn(baseButtonClass, safePage >= totalProjectPages ? disabledButtonClass : enabledButtonClass)}
+                                                title="다음"
+                                            >
+                                                다음
+                                                <ChevronRight className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setProjectPage(totalProjectPages)}
+                                                disabled={safePage >= totalProjectPages}
+                                                className={cn(baseButtonClass, safePage >= totalProjectPages ? disabledButtonClass : enabledButtonClass)}
+                                                title="맨뒤"
+                                            >
+                                                맨뒤
+                                                <ChevronsRight className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
                                 <span>

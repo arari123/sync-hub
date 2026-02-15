@@ -163,10 +163,11 @@ def build_rag_context(
     return contexts
 
 
-def contexts_fingerprint(query: str, contexts: list[RagContextItem]) -> str:
+def contexts_fingerprint(query: str, contexts: list[RagContextItem], *, extra: str = "") -> str:
     normalized_q = normalize_query(query).lower()
     payload = {
         "q": normalized_q,
+        "extra": str(extra or ""),
         "items": [
             {
                 "doc_id": item.doc_id,
@@ -186,9 +187,16 @@ def build_answer_prompt(query: str, contexts: list[RagContextItem]) -> str:
     lines: list[str] = []
     lines.append("당신은 산업용 부품(비전 카메라/레이저 프로파일 센서/서보 모터 등) 문서 기반 지식 검색 비서입니다.")
     lines.append("아래 CONTEXT(문서 발췌)만 근거로 답변하세요. CONTEXT에 없는 정보는 추측하지 말고 '문서에서 확인 불가'라고 말하세요.")
+    lines.append("답변은 한국어로 작성하고, 불필요한 서론/중복을 피하세요.")
+    lines.append("답변은 짧고 실무적으로 작성하세요(권장: 25줄 이내, 최대 12개 항목).")
     lines.append("모델 추천/리스트업이 요청되면, 조건을 만족하는 항목을 표나 리스트로 정리하고 각 항목마다 근거를 [doc_id p.page] 형식으로 표기하세요.")
+    lines.append("사양/스펙 요약이 요청되면, 핵심 사양을 항목별로 정리하고 각 항목마다 근거를 [doc_id p.page] 형식으로 표기하세요.")
     lines.append("알람/조치방법이 요청되면, 단계별 조치 절차를 요약하고 근거를 함께 제시하세요.")
-    lines.append("답변은 한국어로 간결하게 작성하세요.")
+    lines.append("")
+    lines.append("출력 포맷(예시)")
+    lines.append("요약: (1~2문장)")
+    lines.append("- 항목: 값 [doc_id p.page]")
+    lines.append("- 항목: 값 [doc_id p.page]")
     lines.append("")
     lines.append("## QUESTION")
     lines.append(normalized_q)
@@ -238,4 +246,3 @@ class TTLCache:
             sorted_items = sorted(self._store.items(), key=lambda item: item[1][0])
             for drop_key, _ in sorted_items[: max(1, len(self._store) - self.max_items)]:
                 self._store.pop(drop_key, None)
-

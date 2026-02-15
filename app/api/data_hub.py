@@ -30,7 +30,11 @@ DATA_HUB_AI_ENABLED = os.getenv("DATA_HUB_AI_ENABLED", "true").strip().lower() i
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
 # NOTE: Gemini Developer API(v1beta) currently provides 2.x/2.5 flash models.
 # Keep the model configurable via env, but default to an actually-available Flash model.
-GEMINI_MODEL = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+#
+# Important:
+# - `gemini-2.5-flash` may spend most of `maxOutputTokens` on "thoughts", resulting in a very short visible answer.
+# - Prefer a Flash model without that behavior by default.
+GEMINI_MODEL = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-lite").strip()
 GEMINI_BASE_URL = (os.getenv("GEMINI_BASE_URL") or "").strip() or None
 GEMINI_MAX_OUTPUT_TOKENS = max(64, int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "600")))
 
@@ -120,7 +124,12 @@ def ask_data_hub(
         max_total_chars=DATA_HUB_CONTEXT_MAX_TOTAL_CHARS,
     )
 
-    fingerprint = contexts_fingerprint(query, contexts)
+    fingerprint = contexts_fingerprint(
+        query,
+        contexts,
+        # Avoid serving stale cached answers when changing model/prompt behavior.
+        extra=f"model={GEMINI_MODEL};max_out={GEMINI_MAX_OUTPUT_TOKENS};prompt=v2",
+    )
     cached = _answer_cache.get(fingerprint)
     if isinstance(cached, dict):
         return {

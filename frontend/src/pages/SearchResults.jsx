@@ -14,6 +14,13 @@ import {
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
+import {
+    computeGroupStats,
+    formatYmd,
+    normalizeSchedulePayload,
+    parseYmd,
+    ROOT_GROUP_IDS,
+} from '../lib/scheduleUtils';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import GlobalSearchResultList from '../components/GlobalSearchResultList';
@@ -108,6 +115,13 @@ const STAGE_STYLE_MAP = {
         statusLabel: '진행',
     },
 };
+const HOME_STAGE_TIMELINE = [
+    { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-200', textClass: 'text-sky-700' },
+    { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-200', textClass: 'text-indigo-700' },
+    { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-200', textClass: 'text-emerald-700' },
+    { key: 'as', label: 'AS', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
+    { key: 'closure', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-300', textClass: 'text-slate-700' },
+];
 
 function normalizeProjectId(value) {
     const projectId = Number(value || 0);
@@ -323,9 +337,49 @@ function formatCompactKrw(value) {
     return `${amount.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원`;
 }
 
+function formatYmdDot(value) {
+    const text = String(value || '').trim();
+    if (!text || text.length < 10) return '-';
+    return `${text.slice(0, 4)}.${text.slice(5, 7)}.${text.slice(8, 10)}`;
+}
+
+function formatYmdRange(startYmd, endYmd) {
+    const start = String(startYmd || '').trim();
+    const end = String(endYmd || '').trim();
+    if (start && end) {
+        if (start === end) return formatYmdDot(start);
+        return `${formatYmdDot(start)}~${formatYmdDot(end)}`;
+    }
+    if (start) return formatYmdDot(start);
+    if (end) return formatYmdDot(end);
+    return '-';
+}
+
+function addYearsToYmd(value, deltaYears = 1) {
+    const parsed = parseYmd(value);
+    if (!parsed) return '';
+    const delta = Number.isFinite(Number(deltaYears)) ? Math.trunc(Number(deltaYears)) : 1;
+    const next = new Date(Date.UTC(
+        parsed.getUTCFullYear() + delta,
+        parsed.getUTCMonth(),
+        parsed.getUTCDate(),
+    ));
+    return formatYmd(next);
+}
+
 function resolveStageStyle(project) {
     const stage = normalizeStage(project?.current_stage);
     return STAGE_STYLE_MAP[stage] || STAGE_STYLE_MAP.default;
+}
+
+function resolveTimelineActiveKey(project) {
+    const stage = normalizeStage(project?.current_stage);
+    if (stage === 'review') return 'design';
+    if (stage === 'fabrication') return 'fabrication';
+    if (stage === 'installation') return 'installation';
+    if (stage === 'warranty') return 'as';
+    if (stage === 'closure') return 'closure';
+    return 'design';
 }
 
 function resolveBudgetSnapshot(project) {
@@ -468,6 +522,7 @@ const SearchResults = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [projectAgendaMap, setProjectAgendaMap] = useState({});
+    const [projectScheduleMap, setProjectScheduleMap] = useState({});
 
     const user = getCurrentUser();
     const quickMenuRef = useRef(null);
@@ -831,6 +886,103 @@ const SearchResults = () => {
             controller.abort();
         };
     }, [hasSearchQuery, projectAgendaMap, visibleProjectIds]);
+
+    useEffect(() => {
+        if (hasSearchQuery) return undefined;
+        if (visibleProjectIds.length <= 0) return undefined;
+
+        const pendingProjectIds = visibleProjectIds.filter((projectId) => !(projectId in projectScheduleMap));
+        if (pendingProjectIds.length <= 0) return undefined;
+
+        let active = true;
+        const controller = new AbortController();
+
+        const fetchProjectSchedules = async () => {
+            const emptyStages = {
+                design: { start: '', end: '' },
+                fabrication: { start: '', end: '' },
+                installation: { start: '', end: '' },
+                as: { start: '', end: '' },
+                closure: { start: '', end: '' },
+            };
+
+            const responses = await Promise.all(
+                pendingProjectIds.map(async (projectId) => {
+                    try {
+                        const response = await api.get(`/budget/projects/${projectId}/schedule`, { signal: controller.signal });
+                        const schedule = normalizeSchedulePayload(response?.data?.schedule || {});
+                        const stats = computeGroupStats(schedule);
+                        const designStats = stats.get(ROOT_GROUP_IDS.design) || {};
+                        const fabricationStats = stats.get(ROOT_GROUP_IDS.fabrication) || {};
+                        const installationStats = stats.get(ROOT_GROUP_IDS.installation) || {};
+
+                        const installationEnd = String(installationStats?.last_end || '').trim();
+                        const asStart = installationEnd;
+                        const closureDate = addYearsToYmd(asStart, 1);
+
+                        return {
+                            projectId,
+                            value: {
+                                stages: {
+                                    design: {
+                                        start: String(designStats.first_start || '').trim(),
+                                        end: String(designStats.last_end || '').trim(),
+                                    },
+                                    fabrication: {
+                                        start: String(fabricationStats.first_start || '').trim(),
+                                        end: String(fabricationStats.last_end || '').trim(),
+                                    },
+                                    installation: {
+                                        start: String(installationStats.first_start || '').trim(),
+                                        end: String(installationStats.last_end || '').trim(),
+                                    },
+                                    as: {
+                                        start: asStart,
+                                        end: closureDate,
+                                    },
+                                    closure: {
+                                        start: closureDate,
+                                        end: closureDate,
+                                    },
+                                },
+                                fetchedAt: Date.now(),
+                                hasError: false,
+                            },
+                        };
+                    } catch (err) {
+                        if (err?.code === 'ERR_CANCELED') {
+                            return null;
+                        }
+                        return {
+                            projectId,
+                            value: {
+                                stages: emptyStages,
+                                fetchedAt: Date.now(),
+                                hasError: true,
+                            },
+                        };
+                    }
+                })
+            );
+
+            if (!active) return;
+
+            setProjectScheduleMap((prev) => {
+                const next = { ...prev };
+                for (const item of responses.filter(Boolean)) {
+                    next[item.projectId] = item.value;
+                }
+                return next;
+            });
+        };
+
+        fetchProjectSchedules();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [hasSearchQuery, projectScheduleMap, visibleProjectIds]);
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
@@ -1261,23 +1413,28 @@ const SearchResults = () => {
                                 </div>
                             ) : (
                                 tableProjects.map((project) => {
+                                    const normalizedProjectId = normalizeProjectId(project?.id);
                                     const updateLinks = buildUpdateLinks(project);
                                     const updateLinkMap = new Map(updateLinks.map((item) => [item.label, item]));
                                     const signalUpdates = PROJECT_SIGNAL_LABELS.map((label) => ({
                                         label,
                                         ...updateLinkMap.get(label),
                                     }));
-                                    const agendaSummary = projectAgendaMap[normalizeProjectId(project?.id)];
+                                    const agendaSummary = projectAgendaMap[normalizedProjectId];
                                     const agendaItems = Array.isArray(agendaSummary?.items)
                                         ? agendaSummary.items.slice(0, 3)
                                         : [];
                                     const agendaCount = Number(agendaSummary?.total || agendaItems.length || 0);
                                     const isAgendaLoading = !agendaSummary;
+                                    const scheduleSummary = projectScheduleMap[normalizedProjectId];
+                                    const isScheduleLoading = !scheduleSummary;
+                                    const scheduleStages = scheduleSummary?.stages || {};
+                                    const timelineActiveKey = resolveTimelineActiveKey(project);
+                                    const timelineActiveIndex = HOME_STAGE_TIMELINE.findIndex((item) => item.key === timelineActiveKey);
+                                    const isReviewStage = normalizeStage(project?.current_stage) === 'review';
+                                    const createdDateLabel = formatYmdDot(project?.created_at);
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
-                                    const progressPercent = computeProgressPercent(project);
-                                    const progressWidth = `${Math.max(6, Math.min(100, progressPercent))}%`;
-                                    const progressMeta = resolveProgressMeta(project, budget.balance, progressPercent);
                                     const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
                                     return (
                                         <article
@@ -1381,35 +1538,70 @@ const SearchResults = () => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="mb-2 flex items-center justify-between px-1 text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                                                        <span>시작</span>
-                                                        <span className={stageStyle.statusTextClass}>{resolveProjectStatusLabel(project)}</span>
-                                                        <span>종료</span>
-                                                    </div>
-
-                                                    <div className="relative mb-1 py-2">
-                                                        <div className="h-1.5 rounded-full bg-slate-200" />
-                                                        <div
-                                                            className="absolute left-0 top-2 h-1.5 rounded-full transition-all duration-500"
-                                                            style={{
-                                                                width: progressWidth,
-                                                                background: `linear-gradient(90deg, ${stageStyle.progressFrom} 0%, ${stageStyle.progressTo} 100%)`,
-                                                            }}
-                                                        />
-                                                        <div className="absolute left-0 top-2 h-2 w-2 -translate-x-1/2 -translate-y-1/4 rounded-full border border-white bg-slate-300" />
-                                                        <div className="absolute right-0 top-2 h-2 w-2 translate-x-1/2 -translate-y-1/4 rounded-full border border-white bg-slate-300" />
-                                                        <div
-                                                            className="absolute top-2 h-3 w-3 -translate-x-1/2 -translate-y-1/3 rounded-full border-2 border-white shadow-sm"
-                                                            style={{ left: progressWidth, backgroundColor: stageStyle.dotColor }}
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[10px] font-semibold text-slate-500">진행률 {progressPercent}%</span>
-                                                        <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold', progressMeta.textClass)}>
-                                                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: progressMeta.dotColor }} />
-                                                            {progressMeta.label}
+                                                    <div className="mb-2 flex items-center justify-between px-1">
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">단계 일정</span>
+                                                        <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
+                                                            {resolveProjectStatusLabel(project)}
                                                         </span>
+                                                    </div>
+
+                                                    <div className="relative mb-2">
+                                                        <div className="relative h-2 overflow-hidden rounded-full bg-slate-200">
+                                                            <div className="flex h-full divide-x divide-white/70">
+                                                                {HOME_STAGE_TIMELINE.map((item, index) => {
+                                                                    const isDone = timelineActiveIndex > index;
+                                                                    const isActive = timelineActiveIndex === index;
+                                                                    const barClass = isDone || isActive ? item.solidClass : item.softClass;
+                                                                    const opacityClass = isActive ? 'opacity-100' : isDone ? 'opacity-90' : 'opacity-55';
+                                                                    return (
+                                                                        <div
+                                                                            key={`timeline-bar-${project.id}-${item.key}`}
+                                                                            className={cn('h-full flex-1 transition-colors', barClass, opacityClass)}
+                                                                        />
+                                                                    );
+                                                                })}
+                                                            </div>
+
+                                                            {isReviewStage && (
+                                                                <div className="absolute inset-0 flex items-center justify-center px-2">
+                                                                    <span className="truncate rounded-full border border-slate-200 bg-white/85 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-sm">
+                                                                        검토 단계 · 생성 {createdDateLabel}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-5 gap-1 px-1">
+                                                        {HOME_STAGE_TIMELINE.map((item, index) => {
+                                                            const stageDates = scheduleStages[item.key] || {};
+                                                            const isDone = timelineActiveIndex > index;
+                                                            const isActive = timelineActiveIndex === index;
+                                                            const isUpcoming = !isDone && !isActive;
+                                                            const labelClass = isUpcoming ? 'text-slate-400' : item.textClass;
+
+                                                            let dateLabel = '...';
+                                                            if (!isScheduleLoading) {
+                                                                dateLabel = scheduleSummary?.hasError
+                                                                    ? '-'
+                                                                    : formatYmdRange(stageDates.start, stageDates.end);
+                                                            }
+
+                                                            return (
+                                                                <div key={`timeline-meta-${project.id}-${item.key}`} className="min-w-0">
+                                                                    <p className={cn('text-[9px] font-extrabold tracking-wide', labelClass)}>
+                                                                        {item.label}
+                                                                    </p>
+                                                                    <p className={cn(
+                                                                        'truncate font-mono text-[9px]',
+                                                                        isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                    )}
+                                                                    >
+                                                                        {dateLabel}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
 

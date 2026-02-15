@@ -505,6 +505,21 @@ def _serialize_thread(
         worker_summary, total_work_hours = _format_worker_summary(payload_source)
         work_date_label = _format_work_date_label(payload_source)
 
+    root_summary_plain = ""
+    if root_entry and root_entry.content_plain:
+        root_summary_plain = _collapse_snippet_whitespace(root_entry.content_plain)
+    if not root_summary_plain:
+        root_summary_plain = _collapse_snippet_whitespace(thread.summary_plain or "")
+
+    latest_summary_plain = ""
+    if latest_entry and latest_entry.content_plain:
+        latest_summary_plain = _collapse_snippet_whitespace(latest_entry.content_plain)
+    if not latest_summary_plain:
+        latest_summary_plain = _collapse_snippet_whitespace(thread.summary_plain or "")
+
+    root_responder_name = (root_entry.responder_name if root_entry else "") or ""
+    root_responder_org = (root_entry.responder_org if root_entry else "") or ""
+
     return {
         "id": int(thread.id),
         "project_id": int(thread.project_id),
@@ -516,10 +531,14 @@ def _serialize_thread(
         "root_title": root_entry.title if root_entry else thread.title,
         "latest_title": latest_entry.title if latest_entry else thread.title,
         "summary_plain": thread.summary_plain or "",
+        "root_summary_plain": root_summary_plain[:600],
+        "latest_summary_plain": latest_summary_plain[:600],
         "requester_name": thread.requester_name or "",
         "requester_org": thread.requester_org or "",
         "responder_name": (latest_entry.responder_name if latest_entry else "") or thread.responder_name or "",
         "responder_org": (latest_entry.responder_org if latest_entry else "") or thread.responder_org or "",
+        "root_responder_name": root_responder_name,
+        "root_responder_org": root_responder_org,
         "author_name": _display_user_name(root_author),
         "latest_author_name": _display_user_name(latest_author),
         "reply_count": int(thread.reply_count or 0),

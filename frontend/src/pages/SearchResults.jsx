@@ -120,9 +120,8 @@ const HOME_STAGE_TIMELINE = [
     { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-200', textClass: 'text-indigo-700' },
     { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-200', textClass: 'text-emerald-700' },
     { key: 'as', label: 'AS', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
-    { key: 'closure', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-300', textClass: 'text-slate-700' },
 ];
-const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE.filter((item) => item.key !== 'closure');
+const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
 
 function normalizeProjectId(value) {
     const projectId = Number(value || 0);
@@ -373,14 +372,13 @@ function resolveStageStyle(project) {
     return STAGE_STYLE_MAP[stage] || STAGE_STYLE_MAP.default;
 }
 
-function resolveTimelineActiveKey(project) {
-    const stage = normalizeStage(project?.current_stage);
-    if (stage === 'review') return 'design';
-    if (stage === 'fabrication') return 'fabrication';
-    if (stage === 'installation') return 'installation';
-    if (stage === 'warranty') return 'as';
-    if (stage === 'closure') return 'closure';
-    return 'design';
+function resolveTimelineProgressIndex(stageKey) {
+    const stage = normalizeStage(stageKey);
+    if (stage === 'fabrication') return 1;
+    if (stage === 'installation') return 2;
+    if (stage === 'warranty') return 3; // AS
+    if (stage === 'closure') return HOME_STAGE_TIMELINE.length; // all done
+    return 0; // review or unknown
 }
 
 function resolveBudgetSnapshot(project) {
@@ -1430,10 +1428,16 @@ const SearchResults = () => {
                                     const scheduleSummary = projectScheduleMap[normalizedProjectId];
                                     const isScheduleLoading = !scheduleSummary;
                                     const scheduleStages = scheduleSummary?.stages || {};
-                                    const timelineActiveKey = resolveTimelineActiveKey(project);
-                                    const timelineActiveIndex = HOME_STAGE_TIMELINE.findIndex((item) => item.key === timelineActiveKey);
-                                    const isReviewStage = normalizeStage(project?.current_stage) === 'review';
+                                    const projectStageKey = normalizeStage(project?.current_stage);
+                                    const timelineActiveIndex = resolveTimelineProgressIndex(projectStageKey);
+                                    const isReviewStage = projectStageKey === 'review';
+                                    const isClosureStage = projectStageKey === 'closure';
                                     const createdDateLabel = formatYmdDot(project?.created_at);
+                                    const closureDateLabel = (() => {
+                                        if (isScheduleLoading) return '...';
+                                        if (scheduleSummary?.hasError) return '-';
+                                        return formatYmdDot(scheduleStages?.closure?.end || scheduleStages?.as?.end);
+                                    })();
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
@@ -1572,6 +1576,20 @@ const SearchResults = () => {
                                                                         <span className="shrink-0 tracking-[0.08em] text-sky-700">검토</span>
                                                                         <span className="text-slate-300">|</span>
                                                                         <span className="truncate font-mono text-slate-600">생성 {createdDateLabel}</span>
+                                                                        <span className="pointer-events-none absolute -inset-px -z-10 rounded-full bg-white/35 blur-md" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {isClosureStage && (
+                                                            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 px-2">
+                                                                <div className="mx-auto w-fit max-w-full">
+                                                                    <div className="relative inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-slate-200/80 bg-gradient-to-r from-slate-50/95 via-white/90 to-slate-100/90 px-2.5 py-1 text-[10px] font-extrabold text-slate-800 shadow-[0_16px_34px_-26px_hsl(220_40%_15%/0.62)] backdrop-blur">
+                                                                        <span className="h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.8)]" />
+                                                                        <span className="shrink-0 tracking-[0.08em] text-slate-700">종료</span>
+                                                                        <span className="text-slate-300">|</span>
+                                                                        <span className="truncate font-mono text-slate-600">종료일 {closureDateLabel}</span>
                                                                         <span className="pointer-events-none absolute -inset-px -z-10 rounded-full bg-white/35 blur-md" />
                                                                     </div>
                                                                 </div>

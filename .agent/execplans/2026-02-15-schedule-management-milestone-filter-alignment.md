@@ -36,6 +36,7 @@
 3. Extend milestone panel content:
    - Add 3-line stage summary bars (design/fabrication/installation) using the same colors as gantt.
    - Overlay event markers on the corresponding stage summary bar.
+   - Ensure event labels are not clipped by the milestone header (padding/z-index as needed).
    - Hide event rows from gantt table body (events are shown in milestone only).
 4. Verify in Docker:
    - Run `scripts/verify_fast.sh` in `synchub_web`.

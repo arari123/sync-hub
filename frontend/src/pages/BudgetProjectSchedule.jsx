@@ -869,7 +869,10 @@ const BudgetProjectSchedule = () => {
                 {isExpanded && rows.map((row) => (
                     <tr
                         key={row.id}
-                        className="bg-white text-xs"
+                        className={cn(
+                            'text-xs',
+                            row.kind === 'event' ? 'bg-amber-50/80' : 'bg-white',
+                        )}
                         draggable={canEdit}
                         onDragStart={(event) => handleDragStart(event, { type: 'row', id: row.id })}
                         onDragOver={(event) => event.preventDefault()}

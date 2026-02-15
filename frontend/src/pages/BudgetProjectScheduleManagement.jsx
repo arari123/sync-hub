@@ -758,7 +758,7 @@ export default function BudgetProjectScheduleManagement() {
                             >
                                 <div className="min-w-[1060px]">
                                     <div className="grid grid-cols-[460px_1fr]">
-                                        <div className="divide-y divide-slate-200 border-r border-slate-200 bg-white/40">
+                                        <div className="divide-y divide-slate-200 border-r border-slate-200 bg-white/40 pt-3">
                                             {stageSummaries.map((summary) => (
                                                 <div
                                                     key={`milestone-stage-label-${summary.stage}`}
@@ -772,7 +772,7 @@ export default function BudgetProjectScheduleManagement() {
                                             ))}
                                         </div>
 
-                                        <div className="relative overflow-hidden bg-white">
+                                        <div className="relative overflow-visible bg-white">
                                             <div className="pointer-events-none absolute inset-0 z-0">
                                                 {chartTicks.map((tick) => (
                                                     <div
@@ -790,7 +790,7 @@ export default function BudgetProjectScheduleManagement() {
                                                 />
                                             )}
 
-                                            <div className="relative z-10 divide-y divide-slate-200">
+                                            <div className="relative z-10 divide-y divide-slate-200 pt-3">
                                                 {stageSummaries.map((summary) => {
                                                     const stageStyle = STAGE_STYLES[summary.stage] || STAGE_STYLES.design;
                                                     const barLeft = summary.position?.left ?? 0;
@@ -816,12 +816,12 @@ export default function BudgetProjectScheduleManagement() {
                                                                         : event.align === 'right'
                                                                             ? 'right-0'
                                                                             : 'left-1/2 -translate-x-1/2';
-                                                                    const labelOffsetClass = event.lane === 0 ? 'mb-1' : 'mb-5';
+                                                                    const labelOffsetClass = event.lane === 0 ? 'mb-1' : 'mb-3';
 
                                                                     return (
                                                                         <div
                                                                             key={`milestone-event-${summary.stage}-${event.id}`}
-                                                                            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                                                                            className="absolute top-1/2 z-40 -translate-x-1/2 -translate-y-1/2"
                                                                             style={{ left: `${event.position}%` }}
                                                                         >
                                                                             <span
@@ -830,7 +830,7 @@ export default function BudgetProjectScheduleManagement() {
                                                                                     stageStyle.bar,
                                                                                 )}
                                                                             />
-                                                                            <div className={cn('absolute bottom-full', labelOffsetClass, labelAlignClass)}>
+                                                                            <div className={cn('absolute bottom-full z-50', labelOffsetClass, labelAlignClass)}>
                                                                                 <span
                                                                                     className={cn(
                                                                                         'inline-flex max-w-[210px] items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',

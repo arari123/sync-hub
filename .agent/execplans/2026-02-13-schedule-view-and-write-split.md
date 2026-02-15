@@ -25,6 +25,7 @@
 | SCH-UX-001 | 일정관리/일정작성 라우트 분리 및 메뉴 노출 확인 | `docker exec synchub_frontend sh -lc "cd /app && npm run build"` 통과 + 라우트 코드 확인 |
 | SCH-UX-002 | 일정관리 상세 조회 UI 렌더링 정합성 확인 | 동일 빌드 검증 및 컴포넌트 정적 검토 |
 | SCH-UX-003 | 일정작성 라벨/브레드크럼 변경 확인 | `frontend/src/pages/BudgetProjectSchedule.jsx` 확인 |
+| SCH-UX-004 | 일정작성 이벤트 행 배경색 구분 확인 | 브라우저 수동 확인 + `docker exec -w /app synchub_frontend npm run build` 통과 |
 
 ## 5. Implementation Steps
 1. 새 조회 전용 일정관리 페이지를 추가한다.

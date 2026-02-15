@@ -126,6 +126,7 @@
 - 전체 검증: `scripts/verify.sh`
 - 디자인 토큰 린트: `scripts/lint_frontend_design_tokens.py`
 - 예산 목업 데이터 초기화: `scripts/reset_and_seed_budget_mock_data.py`
+- 데모 데이터 초기화/생성(프로젝트/안건/예산/일정): `scripts/reset_and_seed_demo_data.py`
 - 안건 본문 장문화(로컬 데모 데이터): `scripts/expand_agenda_bodies.py`
 - 검색 E2E 스모크: `scripts/search_e2e_smoke.py`
 - OCR 품질/비교 리포트: `scripts/generate_ocr_quality_report.py`, `scripts/generate_ocr_comparison_report.py`

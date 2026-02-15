@@ -520,10 +520,11 @@ def _project_type_code_or_empty(value: Optional[str]) -> str:
 def _project_stage_rank(stage: Optional[str]) -> int:
     order = {
         "review": 0,
-        "fabrication": 1,
-        "installation": 2,
-        "warranty": 3,
-        "closure": 4,
+        "design": 1,
+        "fabrication": 2,
+        "installation": 3,
+        "warranty": 4,
+        "closure": 5,
     }
     return order.get((stage or "").strip().lower(), 0)
 
@@ -1020,7 +1021,9 @@ def _build_default_milestones(project: models.BudgetProject) -> list[dict]:
     except Exception:  # noqa: BLE001
         base_date = utcnow().date()
 
-    stage_rank = _project_stage_rank(project.current_stage)
+    # Default milestones track the execution timeline (design -> fabrication -> installation).
+    # We treat review as "before design" so its rank becomes -1 for milestone status computation.
+    stage_rank = _project_stage_rank(project.current_stage) - 1
     blueprint = [
         ("design", "설계", 0),
         ("fabrication", "제작", 14),
@@ -2854,7 +2857,7 @@ def project_summary(
     project = _get_project_or_404(project_id, db)
     stage_summaries = {}
 
-    for stage_code in ("review", "fabrication", "installation", "warranty", "closure"):
+    for stage_code in ("review", "design", "fabrication", "installation", "warranty", "closure"):
         current_version = (
             db.query(models.BudgetVersion)
             .filter(

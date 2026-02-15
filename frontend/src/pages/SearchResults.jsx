@@ -30,6 +30,7 @@ import { Input } from '../components/ui/Input';
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const STAGE_OPTIONS = [
     { value: 'review', label: '검토' },
+    { value: 'design', label: '설계' },
     { value: 'fabrication', label: '제작' },
     { value: 'installation', label: '설치' },
     { value: 'warranty', label: '워런티' },
@@ -60,6 +61,7 @@ const FILTER_CHIP_INACTIVE_CLASS =
     'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
 const STAGE_PROGRESS_FALLBACK = {
     review: 18,
+    design: 30,
     fabrication: 46,
     installation: 72,
     warranty: 88,
@@ -73,6 +75,14 @@ const STAGE_STYLE_MAP = {
         progressTo: '#10b981',
         dotColor: '#0ea5e9',
         statusLabel: '검토 진행',
+    },
+    design: {
+        badgeClass: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+        statusTextClass: 'text-cyan-600',
+        progressFrom: '#22d3ee',
+        progressTo: '#60a5fa',
+        dotColor: '#06b6d4',
+        statusLabel: '설계 진행',
     },
     fabrication: {
         badgeClass: 'border-indigo-200 bg-indigo-50 text-indigo-700',
@@ -381,6 +391,7 @@ function resolveStageStyle(project) {
 
 function resolveTimelineProgressIndex(stageKey) {
     const stage = normalizeStage(stageKey);
+    if (stage === 'design') return 0;
     if (stage === 'fabrication') return 1;
     if (stage === 'installation') return 2;
     if (stage === 'warranty') return 3; // warranty
@@ -1477,25 +1488,48 @@ const SearchResults = () => {
                                     const projectStageKey = normalizeStage(project?.current_stage);
                                     const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
                                     const isAsProject = projectTypeKey === 'as';
+                                    const isPartsProject = projectTypeKey === 'parts';
+                                    const useStartEndTimeline = isAsProject || isPartsProject;
                                     const parentProject = project?.parent_project || null;
-                                    const timelineActiveIndex = isAsProject
+                                    const timelineActiveIndex = useStartEndTimeline
                                         ? resolveAsTimelineProgressIndex(projectStageKey)
                                         : resolveTimelineProgressIndex(projectStageKey);
                                     const isReviewStage = projectStageKey === 'review';
                                     const isClosureStage = projectStageKey === 'closure';
+                                    const createdAtYmd = String(project?.created_at || '').trim().slice(0, 10);
                                     const createdDateLabel = formatYmdDot(project?.created_at);
-                                    const closureDateLabel = (() => {
-                                        if (isScheduleLoading) return '...';
-                                        if (scheduleSummary?.hasError) return '-';
-                                        return formatYmdDot(scheduleStages?.closure?.end || scheduleStages?.warranty?.end);
-                                    })();
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
-                                    const warrantyFallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+                                    const warrantyFallbackStart = createdAtYmd;
                                     const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || warrantyFallbackStart;
                                     const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
                                         || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
+                                    const partsStartCandidates = [
+                                        scheduleStages?.design?.start,
+                                        scheduleStages?.fabrication?.start,
+                                        scheduleStages?.installation?.start,
+                                    ]
+                                        .map((value) => String(value || '').trim())
+                                        .filter(Boolean)
+                                        .sort();
+                                    const partsEndCandidates = [
+                                        scheduleStages?.design?.end,
+                                        scheduleStages?.fabrication?.end,
+                                        scheduleStages?.installation?.end,
+                                    ]
+                                        .map((value) => String(value || '').trim())
+                                        .filter(Boolean)
+                                        .sort();
+                                    const partsStart = partsStartCandidates[0] || createdAtYmd;
+                                    const partsEnd = partsEndCandidates[partsEndCandidates.length - 1] || partsStart;
+
+                                    const closureDateLabel = (() => {
+                                        if (isScheduleLoading) return '...';
+                                        if (scheduleSummary?.hasError) return '-';
+                                        if (isPartsProject) return formatYmdDot(partsEnd);
+                                        return formatYmdDot(scheduleStages?.closure?.end || scheduleStages?.warranty?.end);
+                                    })();
                                     return (
                                         <article
                                             key={`project-row-${project.id}`}
@@ -1614,7 +1648,7 @@ const SearchResults = () => {
 
                                                     <div className="mb-0.5 flex items-center justify-between px-1">
                                                         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                                                            {isAsProject ? '일정' : '단계 일정'}
+                                                            {useStartEndTimeline ? '일정' : '단계 일정'}
                                                         </span>
                                                         <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
                                                             {resolveProjectStatusLabel(project)}
@@ -1624,7 +1658,7 @@ const SearchResults = () => {
                                                     <div className="relative mb-0.5 h-7">
                                                         <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-slate-200">
                                                             <div className="flex h-full divide-x divide-white/70">
-                                                                {(isAsProject ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
+                                                                {(useStartEndTimeline ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
                                                                     const isDone = timelineActiveIndex > index;
                                                                     const isActive = timelineActiveIndex === index;
                                                                     const barClass = isDone || isActive ? item.solidClass : item.softClass;
@@ -1670,11 +1704,11 @@ const SearchResults = () => {
 
                                                     <div className={cn(
                                                         'grid gap-1 px-1',
-                                                        isAsProject ? 'grid-cols-2' : 'grid-cols-4'
+                                                        useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
                                                     )}
                                                     >
-                                                        {(isAsProject ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index) => {
-                                                            const stageDates = isAsProject ? {} : (scheduleStages[item.key] || {});
+                                                        {(useStartEndTimeline ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index) => {
+                                                            const stageDates = useStartEndTimeline ? {} : (scheduleStages[item.key] || {});
                                                             const isDone = timelineActiveIndex > index;
                                                             const isActive = timelineActiveIndex === index;
                                                             const isUpcoming = !isDone && !isActive;
@@ -1686,10 +1720,11 @@ const SearchResults = () => {
                                                                 if (scheduleSummary?.hasError) {
                                                                     startLabel = '-';
                                                                     endLabel = '-';
-                                                                } else if (isAsProject) {
+                                                                } else if (useStartEndTimeline) {
+                                                                    const range = isAsProject ? { start: warrantyStart, end: warrantyEnd } : { start: partsStart, end: partsEnd };
                                                                     const dateLabel = item.key === 'start'
-                                                                        ? formatYmdDot(warrantyStart)
-                                                                        : formatYmdDot(warrantyEnd);
+                                                                        ? formatYmdDot(range.start)
+                                                                        : formatYmdDot(range.end);
                                                                     startLabel = dateLabel;
                                                                     endLabel = dateLabel;
                                                                 } else {
@@ -1710,7 +1745,7 @@ const SearchResults = () => {
                                                                     >
                                                                         {startLabel}
                                                                     </p>
-                                                                    {isAsProject ? (
+                                                                    {useStartEndTimeline ? (
                                                                         <p className="mt-0.5 text-[9px] leading-none opacity-0">-</p>
                                                                     ) : (
                                                                         <p className={cn(

@@ -17,6 +17,7 @@ import GlobalTopBar from '../components/GlobalTopBar';
 
 const STAGE_SEGMENTS = [
     { key: 'review', label: '검토' },
+    { key: 'design', label: '설계' },
     { key: 'fabrication', label: '제작' },
     { key: 'installation', label: '설치' },
     { key: 'warranty', label: '워런티' },
@@ -343,6 +344,8 @@ const BudgetProjectOverview = () => {
     const currentProjectTypeLabel = localizeProjectTypeLabel(project?.project_type_label, project?.project_type);
     const projectTypeKey = normalizeProjectTypeKey(project?.project_type_label, project?.project_type);
     const isAsProject = projectTypeKey === 'as';
+    const isPartsProject = projectTypeKey === 'parts';
+    const useStartEndTimeline = isAsProject || isPartsProject;
     const parentProject = project?.parent_project || null;
     const coverImageUrl = String(
         project?.cover_image_display_url || project?.cover_image_fallback_url || project?.cover_image_url || ''
@@ -377,6 +380,28 @@ const BudgetProjectOverview = () => {
     const closureDateLabel = useMemo(() => {
         if (isScheduleLoading) return '...';
         if (scheduleError) return '-';
+        if (isPartsProject) {
+            const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+            const starts = [
+                scheduleStages?.design?.start,
+                scheduleStages?.fabrication?.start,
+                scheduleStages?.installation?.start,
+            ]
+                .map((value) => String(value || '').trim())
+                .filter(Boolean)
+                .sort();
+            const ends = [
+                scheduleStages?.design?.end,
+                scheduleStages?.fabrication?.end,
+                scheduleStages?.installation?.end,
+            ]
+                .map((value) => String(value || '').trim())
+                .filter(Boolean)
+                .sort();
+            const end = ends[ends.length - 1] || starts[0] || fallbackStart;
+            return formatYmdDot(end) || '-';
+        }
+
         let value = String(scheduleStages?.closure?.end || scheduleStages?.warranty?.end || '').trim();
         if (isAsProject && !value) {
             const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
@@ -385,21 +410,21 @@ const BudgetProjectOverview = () => {
                 || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
         }
         return formatYmdDot(value) || '-';
-    }, [isAsProject, isScheduleLoading, scheduleError, scheduleStages, project?.created_at]);
+    }, [isAsProject, isPartsProject, isScheduleLoading, scheduleError, scheduleStages, project?.created_at]);
 
     const milestoneStages = useMemo(() => (
-        isAsProject ? WARRANTY_PROJECT_MILESTONE_STAGES : PROJECT_MILESTONE_STAGES
-    ), [isAsProject]);
+        useStartEndTimeline ? WARRANTY_PROJECT_MILESTONE_STAGES : PROJECT_MILESTONE_STAGES
+    ), [useStartEndTimeline]);
 
     const milestoneActiveIndex = useMemo(() => {
         if (currentStageKey === 'review') return -1;
         if (currentStageKey === 'closure') return milestoneStages.length;
-        if (isAsProject) return 0;
+        if (useStartEndTimeline) return 0;
         if (currentStageKey === 'fabrication') return 1;
         if (currentStageKey === 'installation') return 2;
         if (currentStageKey === 'warranty') return 3;
         return 0;
-    }, [currentStageKey, isAsProject, milestoneStages.length]);
+    }, [currentStageKey, useStartEndTimeline, milestoneStages.length]);
 
     const scheduleBadgeLabel = useMemo(() => {
         if (isScheduleLoading) return '일정 불러오는 중';
@@ -427,13 +452,37 @@ const BudgetProjectOverview = () => {
             if (!isScheduleLoading) {
                 if (scheduleError) {
                     dateLabel = '-';
-                } else if (isAsProject) {
-                    const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
-                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || fallbackStart;
-                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
-                        || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
-                    const value = stage.key === 'start' ? warrantyStart : warrantyEnd;
-                    dateLabel = formatYmdDot(value) || '-';
+                } else if (useStartEndTimeline) {
+                    if (isAsProject) {
+                        const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+                        const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || fallbackStart;
+                        const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
+                            || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
+                        const value = stage.key === 'start' ? warrantyStart : warrantyEnd;
+                        dateLabel = formatYmdDot(value) || '-';
+                    } else {
+                        const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+                        const starts = [
+                            scheduleStages?.design?.start,
+                            scheduleStages?.fabrication?.start,
+                            scheduleStages?.installation?.start,
+                        ]
+                            .map((value) => String(value || '').trim())
+                            .filter(Boolean)
+                            .sort();
+                        const ends = [
+                            scheduleStages?.design?.end,
+                            scheduleStages?.fabrication?.end,
+                            scheduleStages?.installation?.end,
+                        ]
+                            .map((value) => String(value || '').trim())
+                            .filter(Boolean)
+                            .sort();
+                        const start = starts[0] || fallbackStart;
+                        const end = ends[ends.length - 1] || start;
+                        const value = stage.key === 'start' ? start : end;
+                        dateLabel = formatYmdDot(value) || '-';
+                    }
                 } else {
                     const stageDates = scheduleStages?.[stage.key] || {};
                     const start = formatYmdDot(stageDates.start);
@@ -456,7 +505,7 @@ const BudgetProjectOverview = () => {
                 date: dateLabel,
             };
         })
-    ), [isAsProject, isScheduleLoading, milestoneActiveIndex, milestoneStages, project?.created_at, scheduleError, scheduleStages]);
+    ), [isAsProject, isScheduleLoading, milestoneActiveIndex, milestoneStages, project?.created_at, scheduleError, scheduleStages, useStartEndTimeline]);
     const pathname = location.pathname;
     const isProjectMainActive = pathname === projectMainPath || pathname === `${projectMainPath}/`;
     const isBudgetActive = pathname === budgetManagementPath
@@ -721,7 +770,7 @@ const BudgetProjectOverview = () => {
 	                                    )}
 	                                    <div className={cn(
 	                                        'grid gap-2 relative',
-	                                        isAsProject ? 'grid-cols-2' : 'grid-cols-4',
+	                                        useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4',
 	                                    )}
 	                                    >
 	                                        {timelineItems.map((item, index) => (

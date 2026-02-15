@@ -60,7 +60,7 @@ AS 프로젝트 추가 규칙:
 | `description` | string | N | 최대 500자 |
 | `project_type` | string | N | `equipment`, `parts`, `as` |
 | `parent_project_id` | integer | N | `as`일 때만 허용, `project_type=equipment`만 가능 |
-| `current_stage` | string | N | `review`, `fabrication`, `installation`, `warranty`, `closure` |
+| `current_stage` | string | N | `review`, `design`, `fabrication`, `installation`, `warranty`, `closure` |
 | `customer_name` | string | N | 최대 180자 |
 | `installation_site` | string | N | 최대 180자 |
 | `business_trip_distance_km` | number | N | `>= 0` |
@@ -73,7 +73,7 @@ AS 프로젝트 추가 규칙:
 
 | field | type | 필수 | 기본값 | 허용값 |
 |---|---|---|---|---|
-| `stage` | string | N | `review` | `review`, `fabrication`, `installation`, `warranty`, `closure` |
+| `stage` | string | N | `review` | `review`, `design`, `fabrication`, `installation`, `warranty`, `closure` |
 
 ### 4.2 리비전 생성 (`POST /budget/versions/{version_id}/revision`)
 

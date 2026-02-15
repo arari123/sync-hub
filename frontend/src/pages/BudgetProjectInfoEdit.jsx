@@ -425,6 +425,7 @@ const BudgetProjectInfoEdit = () => {
                             onChange={(event) => updateField('current_stage', event.target.value)}
                         >
                             <option value="review">검토</option>
+                            <option value="design">설계</option>
                             <option value="fabrication">제작</option>
                             <option value="installation">설치</option>
                             <option value="warranty">워런티</option>

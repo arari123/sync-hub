@@ -14,6 +14,7 @@ COST_FIELDS = (
 
 ALLOWED_STAGES = {
     "review": "검토",
+    "design": "설계",
     "fabrication": "제작",
     "installation": "설치",
     "warranty": "워런티",
@@ -24,6 +25,7 @@ ALLOWED_STATUSES = {"draft", "confirmed", "revision"}
 
 _KOREAN_STAGE_TO_CODE = {
     "검토": "review",
+    "설계": "design",
     "진행": "fabrication",
     "제작": "fabrication",
     "설치": "installation",

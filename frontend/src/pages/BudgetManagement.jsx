@@ -21,6 +21,7 @@ const PROJECT_TYPE_OPTIONS = [
 
 const STAGE_OPTIONS = [
     { value: 'review', label: '검토' },
+    { value: 'design', label: '설계' },
     { value: 'fabrication', label: '제작' },
     { value: 'installation', label: '설치' },
     { value: 'warranty', label: '워런티' },
@@ -202,7 +203,9 @@ const BudgetManagement = () => {
             (acc, project) => {
                 const stage = normalizeStage(project?.current_stage);
                 acc.projectCount += 1;
-                if (stage === 'fabrication') {
+                if (stage === 'design') {
+                    acc.designCount += 1;
+                } else if (stage === 'fabrication') {
                     acc.fabricationCount += 1;
                 } else if (stage === 'installation') {
                     acc.installationCount += 1;
@@ -218,6 +221,7 @@ const BudgetManagement = () => {
             {
                 projectCount: 0,
                 reviewCount: 0,
+                designCount: 0,
                 fabricationCount: 0,
                 installationCount: 0,
                 warrantyCount: 0,
@@ -355,6 +359,17 @@ const BudgetManagement = () => {
                             setFilters((prev) => ({
                                 ...prev,
                                 stages: toggleMultiValue(prev.stages, 'review'),
+                            }))
+                        }
+                    />
+                    <StatusChip
+                        label="설계"
+                        count={summary.designCount}
+                        active={filters.stages.includes('design')}
+                        onClick={() =>
+                            setFilters((prev) => ({
+                                ...prev,
+                                stages: toggleMultiValue(prev.stages, 'design'),
                             }))
                         }
                     />

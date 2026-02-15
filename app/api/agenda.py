@@ -43,7 +43,7 @@ SEARCH_FIELD_AUTHOR = "author"
 SEARCH_FIELD_REQUESTER = "requester"
 SEARCH_FIELD_RESPONDER_WORKER = "responder_worker"
 
-_ALLOWED_PER_PAGE = {3, 10, 30, 50}
+_ALLOWED_PER_PAGE = {3, 5, 10, 30, 50}
 
 _QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
 _TAG_RE = re.compile(r"<[^>]+>")

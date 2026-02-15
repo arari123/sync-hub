@@ -272,7 +272,14 @@ const BudgetProjectOverview = () => {
                     params: { page: 1, per_page: 5, include_drafts: false },
                 });
                 const agendaPayload = agendaResp?.data || {};
-                setAgendaItems(Array.isArray(agendaPayload?.items) ? agendaPayload.items : []);
+                const agendaPool = Array.isArray(agendaPayload?.items) ? agendaPayload.items : [];
+                const sortedAgendaPool = [...agendaPool].sort((left, right) => {
+                    const leftValue = String(left?.last_updated_at || left?.updated_at || '').trim();
+                    const rightValue = String(right?.last_updated_at || right?.updated_at || '').trim();
+                    if (leftValue === rightValue) return 0;
+                    return leftValue > rightValue ? -1 : 1;
+                });
+                setAgendaItems(sortedAgendaPool.slice(0, 5));
                 setAgendaTotal(Number(agendaPayload?.total || 0));
                 setAgendaError('');
             } catch (agendaErr) {

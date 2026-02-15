@@ -9,18 +9,25 @@ from .core.vector_store import vector_store
 from .database import engine, ensure_runtime_schema
 from .api import admin_debug, admin_dedup, agenda, auth, budget, documents
 
-# Create tables
-models.Base.metadata.create_all(bind=engine)
+# Create tables / keep runtime schema compatibility (idempotent).
 ensure_runtime_schema()
 
 def _parse_cors_origins() -> list[str]:
-    raw = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000")
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:9000,http://127.0.0.1:9000",
+    )
     origins: list[str] = []
     for item in raw.split(","):
         origin = item.strip()
         if origin and origin not in origins:
             origins.append(origin)
-    return origins or ["http://localhost:8000", "http://127.0.0.1:8000"]
+    return origins or [
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:9000",
+        "http://127.0.0.1:9000",
+    ]
 
 
 cors_origins = _parse_cors_origins()

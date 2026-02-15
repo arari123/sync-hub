@@ -39,7 +39,9 @@
   - `document_summary.py`: 문서 유형 분류/요약
   - `ocr.py`: OCR 워커 헬스체크/연동
   - `budget_logic.py`: 예산 집계/정규화 로직
+  - `admin_access.py`: 관리자 식별(환경변수 기반) 유틸
   - `auth_utils.py`, `auth_mailer.py`: 인증 유틸/메일 발송
+  - `html_sanitizer.py`: 안건 리치 텍스트 HTML allow-list sanitize(XSS 방어)
   - `parsing/`, `chunking/`, `dedup/`, `indexing/`: 파싱/청킹/dedup/재색인 모듈
 - `app/cli/dedup_scan.py`: dedup 배치 스캔 CLI
 - `app/ocr_worker.py`: OCR 워커 FastAPI 서비스 엔트리포인트
@@ -75,6 +77,7 @@
 - `lib/`
   - `api.js`: API 호출 래퍼
   - `budgetSync.js`: 예산 데이터 갱신 브로드캐스트(입력/조회 페이지 동기화)
+  - `download.js`: Authorization 포함 blob 다운로드 유틸(문서/첨부 공용)
   - `scheduleUtils.js`: WBS 일정 정규화/연쇄 계산/간트 유틸
   - `session.js`: 인증 세션 저장/조회
   - `highlight.jsx`, `utils.js`: 표시/유틸 함수

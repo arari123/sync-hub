@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..core.auth_utils import parse_iso, to_iso, utcnow
+from ..core.html_sanitizer import sanitize_rich_text_html
 from ..database import get_db
 from .auth import get_current_user
 
@@ -1208,9 +1209,13 @@ async def create_agenda_thread(
     if responder_name and not responder_org:
         responder_org = "자사"
 
+    sanitized_content_html = sanitize_rich_text_html(parsed.content_html)
+    extracted_plain = _extract_plain_text_from_html(sanitized_content_html)
     content_plain = _normalize_text(parsed.content_plain, max_length=300000)
-    if not content_plain:
-        content_plain = _extract_plain_text_from_html(parsed.content_html)
+    if extracted_plain:
+        content_plain = extracted_plain
+    elif not content_plain:
+        content_plain = ""
 
     report_payload = {}
     if thread_kind == THREAD_KIND_WORK_REPORT:
@@ -1256,7 +1261,7 @@ async def create_agenda_thread(
         record_status=save_mode,
         created_by_user_id=int(user.id),
         title=parsed.title.strip(),
-        content_html=parsed.content_html,
+        content_html=sanitized_content_html,
         content_plain=content_plain,
         requester_name=requester_name or None,
         requester_org=requester_org or None,
@@ -1355,9 +1360,13 @@ async def update_draft_thread(
     if responder_name and not responder_org:
         responder_org = "자사"
 
+    sanitized_content_html = sanitize_rich_text_html(parsed.content_html)
+    extracted_plain = _extract_plain_text_from_html(sanitized_content_html)
     content_plain = _normalize_text(parsed.content_plain, max_length=300000)
-    if not content_plain:
-        content_plain = _extract_plain_text_from_html(parsed.content_html)
+    if extracted_plain:
+        content_plain = extracted_plain
+    elif not content_plain:
+        content_plain = ""
 
     report_payload = {}
     if thread_kind == THREAD_KIND_WORK_REPORT:
@@ -1383,7 +1392,7 @@ async def update_draft_thread(
         )
 
     root_entry.title = parsed.title.strip()
-    root_entry.content_html = parsed.content_html
+    root_entry.content_html = sanitized_content_html
     root_entry.content_plain = content_plain
     root_entry.requester_name = requester_name or None
     root_entry.requester_org = requester_org or None
@@ -1455,9 +1464,13 @@ async def create_agenda_reply(
     if responder_name and not responder_org:
         responder_org = "자사"
 
+    sanitized_content_html = sanitize_rich_text_html(parsed.content_html)
+    extracted_plain = _extract_plain_text_from_html(sanitized_content_html)
     content_plain = _normalize_text(parsed.content_plain, max_length=300000)
-    if not content_plain:
-        content_plain = _extract_plain_text_from_html(parsed.content_html)
+    if extracted_plain:
+        content_plain = extracted_plain
+    elif not content_plain:
+        content_plain = ""
 
     entry_payload = {}
     if thread.thread_kind == THREAD_KIND_WORK_REPORT:
@@ -1472,7 +1485,7 @@ async def create_agenda_reply(
         record_status=RECORD_STATUS_PUBLISHED,
         created_by_user_id=int(user.id),
         title=parsed.title.strip(),
-        content_html=parsed.content_html,
+        content_html=sanitized_content_html,
         content_plain=content_plain,
         requester_name=requester_name or None,
         requester_org=requester_org or None,
@@ -2111,11 +2124,16 @@ def get_reregister_payload(
 def download_agenda_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     attachment = db.query(models.AgendaAttachment).filter(models.AgendaAttachment.id == attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found.")
+    entry = db.query(models.AgendaEntry).filter(models.AgendaEntry.id == attachment.entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment entry not found.")
+    thread = _get_thread_or_404(int(entry.thread_id), db)
+    _ensure_can_read_thread(thread, user)
     if not attachment.file_path or not os.path.exists(attachment.file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment file not found.")
 

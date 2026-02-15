@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { api, API_BASE_URL, getErrorMessage } from '../lib/api';
+import { api, getErrorMessage } from '../lib/api';
 import { Loader2, File, Download, Tag } from 'lucide-react';
+import { downloadFromApi } from '../lib/download';
 
 const DOCUMENT_TYPE_LABELS = {
     equipment_failure_report: '설비 장애 조치보고서',
@@ -94,6 +95,16 @@ const DocumentDetail = ({ result }) => {
         fetchDetails();
     }, [result]);
 
+    const handleDownload = async () => {
+        if (!result?.doc_id) return;
+        setError('');
+        try {
+            await downloadFromApi(`/documents/${result.doc_id}/download`, result.filename);
+        } catch (err) {
+            setError(getErrorMessage(err, '파일을 다운로드할 수 없습니다.'));
+        }
+    };
+
     if (!result) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 border rounded-lg bg-muted/10">
@@ -148,6 +159,21 @@ const DocumentDetail = ({ result }) => {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="grid gap-1">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">업로드</span>
+                                <p className="text-xs text-muted-foreground">
+                                    {docDetails?.created_at ? String(docDetails.created_at).slice(0, 16).replace('T', ' ') : '-'}
+                                </p>
+                            </div>
+                            <div className="grid gap-1 col-span-2">
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">해시</span>
+                                <p className="text-xs font-mono text-muted-foreground bg-muted p-2 rounded break-all">
+                                    {docDetails?.file_sha256 || '-'}
+                                </p>
+                            </div>
+                        </div>
+
                         <div className="grid gap-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">문서 요약</span>
                             {failureSummary ? (
@@ -176,23 +202,15 @@ const DocumentDetail = ({ result }) => {
                             </div>
                         </div>
 
-                        <div className="grid gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">파일 경로</span>
-                            <p className="text-xs font-mono text-muted-foreground bg-muted p-2 rounded break-all">
-                                {docDetails?.file_path || '확인 불가'}
-                            </p>
-                        </div>
-
                         <div className="pt-1">
-                            <a
-                                href={`${API_BASE_URL}/documents/${result.doc_id}/download`}
-                                target="_blank"
-                                rel="noreferrer"
+                            <button
+                                type="button"
+                                onClick={handleDownload}
                                 className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
                             >
                                 <Download className="h-3.5 w-3.5" />
                                 파일 다운로드
-                            </a>
+                            </button>
                         </div>
 
                         {result.match_points && result.match_points.length > 0 && (

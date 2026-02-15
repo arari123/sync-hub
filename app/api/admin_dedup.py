@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..core.dedup.service import set_cluster_primary, set_document_ignored
 from ..database import get_db
+from .auth import get_current_admin_user
 
 
-router = APIRouter(prefix="/api/admin/dedup", tags=["admin-dedup"])
+router = APIRouter(
+    prefix="/api/admin/dedup",
+    tags=["admin-dedup"],
+    dependencies=[Depends(get_current_admin_user)],
+)
 
 
 def _preview(text: str, limit: int = 200) -> str:

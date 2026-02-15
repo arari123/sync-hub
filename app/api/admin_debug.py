@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from ..core.pipeline import EMBEDDING_BACKEND, model
 from ..core.vector_store import vector_store
+from .auth import get_current_admin_user
 
 
-router = APIRouter(prefix="/api/admin", tags=["admin-debug"])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin-debug"],
+    dependencies=[Depends(get_current_admin_user)],
+)
 
 
 def _preview(text: str, limit: int = 200) -> str:

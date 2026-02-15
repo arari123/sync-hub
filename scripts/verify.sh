@@ -7,12 +7,12 @@ echo "Running integration verification..."
 
 # Check if services are up
 echo "Checking API Health..."
-api_health=$(curl -sS http://localhost:8000/health)
+api_health=$(curl -sS http://localhost:8001/health)
 echo "$api_health"
 echo "$api_health" | grep -q '"healthy"'
 
 echo "Checking Detailed API Health..."
-health_detail=$(curl -sS http://localhost:8000/health/detail)
+health_detail=$(curl -sS http://localhost:8001/health/detail)
 echo "$health_detail"
 printf "%s" "$health_detail" | python3 -c '
 import json

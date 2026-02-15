@@ -1,10 +1,10 @@
-from datetime import datetime
 import html
 import mimetypes
 import os
 import re
 import shutil
 import threading
+import uuid
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .. import models
+from ..core.auth_utils import to_iso, utcnow
 from ..core.document_summary import (
     classify_document_types,
     parse_document_types,
@@ -21,11 +22,23 @@ from ..core.dedup.policies import resolve_policy, search_penalty_for_non_primary
 from ..core.dedup.service import compute_document_hashes
 from ..core.pipeline import EMBEDDING_BACKEND, process_document, model
 from ..core.vector_store import vector_store
+from .auth import get_current_user
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(get_current_user)],
+)
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+DOCUMENT_UPLOAD_DIR = os.getenv("DOCUMENT_UPLOAD_DIR", "uploads/documents")
+os.makedirs(DOCUMENT_UPLOAD_DIR, exist_ok=True)
+DOCUMENT_UPLOAD_MAX_BYTES = max(
+    1,
+    int(os.getenv("DOCUMENT_UPLOAD_MAX_BYTES", str(50 * 1024 * 1024))),
+)
+_FILENAME_MAX_LENGTH = 180
+
+_UPLOADS_ROOT_ABS = os.path.abspath("uploads")
 SNIPPET_RADIUS_BEFORE = 72
 SNIPPET_RADIUS_AFTER = 168
 SNIPPET_MAX_LENGTH = 240
@@ -57,6 +70,53 @@ MAINTENANCE_QUERY_HINTS = (
     "maintenance",
     "troubleshooting",
 )
+
+
+def _safe_original_filename(filename: str) -> str:
+    value = (filename or "").replace("\x00", "").strip()
+    if not value:
+        return ""
+
+    # Some clients send full paths ("C:\\...\\a.pdf" or "/tmp/a.pdf").
+    value = value.replace("\\", "/")
+    value = os.path.basename(value)
+    value = re.sub(r"\s+", " ", value).strip()
+
+    if len(value) <= _FILENAME_MAX_LENGTH:
+        return value
+
+    root, ext = os.path.splitext(value)
+    clipped_root = root[: max(1, _FILENAME_MAX_LENGTH - len(ext))]
+    return f"{clipped_root}{ext}"
+
+
+def _storage_filename(ext: str) -> str:
+    return f"{uuid.uuid4().hex}{ext}"
+
+
+def _copy_upload_limited(file: UploadFile, dest_path: str, max_bytes: int) -> int:
+    total = 0
+    chunk_size = 1024 * 1024
+    with open(dest_path, "wb") as handle:
+        while True:
+            chunk = file.file.read(chunk_size)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError("upload_too_large")
+            handle.write(chunk)
+    return total
+
+
+def _assert_file_is_under_uploads(file_path: str) -> None:
+    abs_path = os.path.abspath(file_path)
+    try:
+        common = os.path.commonpath([abs_path, _UPLOADS_ROOT_ABS])
+    except ValueError:
+        common = ""
+    if common != _UPLOADS_ROOT_ABS:
+        raise HTTPException(status_code=404, detail="Document file not found")
 
 
 def _start_document_pipeline_async(doc_id: int) -> None:
@@ -415,23 +475,50 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    filename = (file.filename or "").strip()
+    filename = _safe_original_filename(file.filename or "")
     ext = os.path.splitext(filename)[1].lower()
     if not filename or ext not in SUPPORTED_UPLOAD_EXTENSIONS:
         allowed = ", ".join(sorted(SUPPORTED_UPLOAD_EXTENSIONS))
         raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
 
     # Save file
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    file_path = ""
+    try:
+        for _ in range(3):
+            candidate = os.path.join(DOCUMENT_UPLOAD_DIR, _storage_filename(ext))
+            if not os.path.exists(candidate):
+                file_path = candidate
+                break
+        if not file_path:
+            raise HTTPException(status_code=500, detail="Failed to allocate upload path.")
+
+        try:
+            _copy_upload_limited(file, file_path, DOCUMENT_UPLOAD_MAX_BYTES)
+        except ValueError as exc:
+            if str(exc) == "upload_too_large":
+                raise HTTPException(status_code=413, detail="Upload is too large.")
+            raise
+    except HTTPException:
+        if file_path and os.path.exists(file_path):
+            try:
+                os.unlink(file_path)
+            except Exception:  # noqa: BLE001
+                pass
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if file_path and os.path.exists(file_path):
+            try:
+                os.unlink(file_path)
+            except Exception:  # noqa: BLE001
+                pass
+        raise HTTPException(status_code=500, detail=f"Failed to store upload: {exc}")
     
     # Create DB record
     db_doc = models.Document(
         filename=filename,
         file_path=file_path,
         status="pending",
-        created_at=datetime.utcnow().isoformat(),
+        created_at=to_iso(utcnow()),
     )
     file_hash, _, _ = compute_document_hashes(file_path=file_path, clean_text="")
     if file_hash:
@@ -580,6 +667,8 @@ def download_document(doc_id: int, db: Session = Depends(get_db)):
     if not doc.file_path or not os.path.exists(doc.file_path):
         raise HTTPException(status_code=404, detail="Document file not found")
 
+    _assert_file_is_under_uploads(doc.file_path)
+
     filename = doc.filename or os.path.basename(doc.file_path)
     media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     return FileResponse(
@@ -593,4 +682,18 @@ def get_document_status(doc_id: int, db: Session = Depends(get_db)):
     doc = db.query(models.Document).filter(models.Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    # Do not leak server-side file paths to clients.
+    return {
+        "id": int(doc.id),
+        "filename": doc.filename,
+        "status": doc.status,
+        "created_at": doc.created_at,
+        "project_id": int(doc.project_id) if doc.project_id else None,
+        "document_types": doc.document_types,
+        "ai_title": doc.ai_title,
+        "ai_summary_short": doc.ai_summary_short,
+        "dedup_status": doc.dedup_status,
+        "dedup_primary_doc_id": doc.dedup_primary_doc_id,
+        "dedup_cluster_id": doc.dedup_cluster_id,
+        "file_sha256": doc.file_sha256,
+    }

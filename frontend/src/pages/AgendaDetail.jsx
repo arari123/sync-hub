@@ -12,6 +12,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
+import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import { INPUT_COMMON_CLASS } from '../components/ui/Input';
 
@@ -59,15 +60,14 @@ function EntryPanel({ entry, label, tone = 'slate' }) {
                 <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <p className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600"><Paperclip className="h-3.5 w-3.5" /> 첨부 파일</p>
                     {(entry.attachments || []).map((attachment) => (
-                        <a
+                        <button
                             key={`att-${attachment.id}`}
-                            href={attachment.download_url}
-                            target="_blank"
-                            rel="noreferrer"
+                            type="button"
+                            onClick={() => downloadFromApi(attachment.download_url, attachment.original_filename)}
                             className="block truncate text-xs text-slate-700 underline-offset-2 hover:underline"
                         >
                             {attachment.original_filename}
-                        </a>
+                        </button>
                     ))}
                 </div>
             )}

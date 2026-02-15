@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
+import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import { INPUT_COMMON_CLASS } from '../components/ui/Input';
 
@@ -789,15 +790,14 @@ export default function AgendaCreate() {
                     <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <p className="text-xs font-semibold text-slate-600">기존 첨부파일</p>
                         {existingAttachments.map((item) => (
-                            <a
+                            <button
                                 key={`existing-${item.id}`}
-                                href={item.download_url}
-                                target="_blank"
-                                rel="noreferrer"
+                                type="button"
+                                onClick={() => downloadFromApi(item.download_url, item.original_filename)}
                                 className="block text-xs text-slate-700 underline-offset-2 hover:underline"
                             >
                                 {item.original_filename}
-                            </a>
+                            </button>
                         ))}
                         <p className="text-[11px] text-slate-500">
                             새 파일을 선택하고 저장하면 기존 파일은 새 선택 파일로 교체됩니다.

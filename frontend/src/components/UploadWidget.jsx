@@ -110,7 +110,7 @@ const UploadWidget = () => {
                     const nextStatus = nextItem.status || job.status;
                     if (nextStatus === job.status) return job; // strict equality check might need expansion if other fields change
                     changed = true;
-                    return { ...job, status: nextStatus, filePath: nextItem.file_path };
+                    return { ...job, status: nextStatus };
                 });
                 return changed ? nextJobs : prev;
             });

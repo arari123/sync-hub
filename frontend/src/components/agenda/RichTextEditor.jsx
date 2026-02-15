@@ -17,7 +17,7 @@ function createTableMarkup(rows, cols) {
     const safeRows = Math.max(1, Math.min(8, Number(rows) || 2));
     const safeCols = Math.max(1, Math.min(8, Number(cols) || 2));
 
-    const headCells = Array.from({ length: safeCols }, () => '<th style="border:1px solid #cbd5e1;padding:6px;background:#f8fafc;">헤더</th>').join('');
+    const headCells = Array.from({ length: safeCols }, () => '<th style="border:1px solid #cbd5e1;padding:6px;background-color:#f8fafc;">헤더</th>').join('');
     const bodyRows = Array.from({ length: safeRows }, () => {
         const cells = Array.from({ length: safeCols }, () => '<td style="border:1px solid #cbd5e1;padding:6px;">내용</td>').join('');
         return `<tr>${cells}</tr>`;

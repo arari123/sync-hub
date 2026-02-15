@@ -24,6 +24,7 @@ from ..core.auth_utils import (
     utcnow,
     verify_password,
 )
+from ..core.admin_access import is_admin_user
 from ..database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -95,6 +96,12 @@ def get_current_user(authorization: str = Header(default=""), db: Session = Depe
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
     if not user.is_active or not user.email_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive.")
+    return user
+
+
+def get_current_admin_user(user: models.User = Depends(get_current_user)) -> models.User:
+    if not is_admin_user(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required.")
     return user
 
 

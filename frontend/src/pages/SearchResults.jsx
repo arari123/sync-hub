@@ -1516,8 +1516,8 @@ const SearchResults = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="border-t border-slate-200 pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                    <div className="mb-3 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                                <div className="border-t border-slate-200 pt-2 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                    <div className="mb-2 grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5">
                                                         <div className="flex flex-col">
                                                             <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">예산</span>
                                                             <span className="text-xs font-bold text-slate-700">
@@ -1543,15 +1543,15 @@ const SearchResults = () => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="mb-1 flex items-center justify-between px-1">
+                                                    <div className="mb-0.5 flex items-center justify-between px-1">
                                                         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">단계 일정</span>
                                                         <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
                                                             {resolveProjectStatusLabel(project)}
                                                         </span>
                                                     </div>
 
-                                                    <div className="relative mb-1">
-                                                        <div className="relative h-2 overflow-hidden rounded-full bg-slate-200">
+                                                    <div className="relative mb-0.5 h-7">
+                                                        <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-slate-200">
                                                             <div className="flex h-full divide-x divide-white/70">
                                                                 {HOME_STAGE_TIMELINE.map((item, index) => {
                                                                     const isDone = timelineActiveIndex > index;
@@ -1569,28 +1569,28 @@ const SearchResults = () => {
                                                         </div>
 
                                                         {isReviewStage && (
-                                                            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 px-2">
-                                                                <div className="mx-auto w-fit max-w-full">
-                                                                    <div className="relative inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-sky-200/70 bg-gradient-to-r from-sky-50/95 via-white/90 to-emerald-50/90 px-2.5 py-1 text-[10px] font-extrabold text-slate-800 shadow-[0_16px_34px_-26px_hsl(220_40%_15%/0.62)] backdrop-blur">
-                                                                        <span className="h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.8)]" />
-                                                                        <span className="shrink-0 tracking-[0.08em] text-sky-700">검토</span>
+                                                            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
+                                                                <div className="w-fit max-w-full">
+                                                                    <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-200/60 bg-gradient-to-r from-sky-50/65 via-white/55 to-emerald-50/65 px-4 py-1.5 text-[11px] font-extrabold leading-none text-slate-800 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+                                                                        <span className="shrink-0 tracking-[0.12em] text-sky-800">검토</span>
                                                                         <span className="text-slate-300">|</span>
-                                                                        <span className="truncate font-mono text-slate-600">생성 {createdDateLabel}</span>
-                                                                        <span className="pointer-events-none absolute -inset-px -z-10 rounded-full bg-white/35 blur-md" />
+                                                                        <span className="truncate font-mono text-slate-700/90">생성 {createdDateLabel}</span>
+                                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-200/20 blur-xl" />
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         )}
 
                                                         {isClosureStage && (
-                                                            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 px-2">
-                                                                <div className="mx-auto w-fit max-w-full">
-                                                                    <div className="relative inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-slate-200/80 bg-gradient-to-r from-slate-50/95 via-white/90 to-slate-100/90 px-2.5 py-1 text-[10px] font-extrabold text-slate-800 shadow-[0_16px_34px_-26px_hsl(220_40%_15%/0.62)] backdrop-blur">
-                                                                        <span className="h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.8)]" />
-                                                                        <span className="shrink-0 tracking-[0.08em] text-slate-700">종료</span>
+                                                            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
+                                                                <div className="w-fit max-w-full">
+                                                                    <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-slate-200/65 bg-gradient-to-r from-slate-50/65 via-white/55 to-slate-100/65 px-4 py-1.5 text-[11px] font-extrabold leading-none text-slate-800 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+                                                                        <span className="shrink-0 tracking-[0.12em] text-slate-800">종료</span>
                                                                         <span className="text-slate-300">|</span>
-                                                                        <span className="truncate font-mono text-slate-600">종료일 {closureDateLabel}</span>
-                                                                        <span className="pointer-events-none absolute -inset-px -z-10 rounded-full bg-white/35 blur-md" />
+                                                                        <span className="truncate font-mono text-slate-700/90">종료일 {closureDateLabel}</span>
+                                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-300/20 blur-xl" />
                                                                     </div>
                                                                 </div>
                                                             </div>

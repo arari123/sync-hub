@@ -28,12 +28,17 @@ import UserMenu from '../components/UserMenu';
 import { Input } from '../components/ui/Input';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
-const STAGE_OPTIONS = [
+const EQUIPMENT_STAGE_OPTIONS = [
     { value: 'review', label: '검토' },
     { value: 'design', label: '설계' },
     { value: 'fabrication', label: '제작' },
     { value: 'installation', label: '설치' },
     { value: 'warranty', label: '워런티' },
+    { value: 'closure', label: '종료' },
+];
+const START_END_STAGE_OPTIONS = [
+    { value: 'review', label: '검토' },
+    { value: 'start', label: '시작' },
     { value: 'closure', label: '종료' },
 ];
 const PROJECT_TYPE_OPTIONS = [
@@ -42,7 +47,7 @@ const PROJECT_TYPE_OPTIONS = [
     { value: 'as', label: 'AS' },
 ];
 const TABLE_PAGE_SIZE = 10;
-const STAGE_LABEL_MAP = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, item.label]));
+const STAGE_LABEL_MAP = Object.fromEntries(EQUIPMENT_STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
     parts: '파츠',
@@ -778,15 +783,42 @@ const SearchResults = () => {
         });
     }, [projectRows, projectScope, projectFilterQuery, showAllProjects]);
 
+    const selectedTypeKey = useMemo(() => {
+        const selected = Array.isArray(projectFilters.types) ? projectFilters.types : [];
+        if (selected.length !== 1) return '';
+        return String(selected[0] || '').trim();
+    }, [projectFilters.types]);
+
+    const stageFilterOptions = useMemo(() => {
+        if (selectedTypeKey === 'equipment') return EQUIPMENT_STAGE_OPTIONS;
+        if (selectedTypeKey === 'parts' || selectedTypeKey === 'as') return START_END_STAGE_OPTIONS;
+        return [];
+    }, [selectedTypeKey]);
+
+    const stageScopeProjects = useMemo(() => {
+        if (!selectedTypeKey) return [];
+        return filteredProjects.filter((project) => (
+            normalizeProjectType(project?.project_type || project?.project_type_label) === selectedTypeKey
+        ));
+    }, [filteredProjects, selectedTypeKey]);
+
     const stageCounts = useMemo(() => {
-        const counts = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, 0]));
-        for (const project of filteredProjects) {
+        const counts = Object.fromEntries(stageFilterOptions.map((item) => [item.value, 0]));
+        if (stageFilterOptions.length === 0) return counts;
+
+        const hasStartBucket = 'start' in counts;
+        for (const project of stageScopeProjects) {
             const stage = normalizeStage(project?.current_stage);
-            if (!(stage in counts)) continue;
-            counts[stage] += 1;
+            if (stage in counts) {
+                counts[stage] += 1;
+                continue;
+            }
+            if (hasStartBucket && stage !== 'review' && stage !== 'closure') {
+                counts.start += 1;
+            }
         }
         return counts;
-    }, [filteredProjects]);
+    }, [stageFilterOptions, stageScopeProjects]);
 
     const typeCounts = useMemo(() => {
         const counts = Object.fromEntries(PROJECT_TYPE_OPTIONS.map((item) => [item.value, 0]));
@@ -803,8 +835,11 @@ const SearchResults = () => {
         const selectedTypes = new Set(Array.isArray(projectFilters.types) ? projectFilters.types : []);
 
         return filteredProjects.filter((project) => {
-            if (selectedStages.size > 0 && !selectedStages.has(normalizeStage(project?.current_stage))) {
-                return false;
+            if (selectedStages.size > 0) {
+                const stageKey = normalizeStage(project?.current_stage);
+                const matches = selectedStages.has(stageKey)
+                    || (selectedStages.has('start') && stageKey !== 'review' && stageKey !== 'closure');
+                if (!matches) return false;
             }
             const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
             if (selectedTypes.size > 0 && !selectedTypes.has(projectTypeKey)) {
@@ -1072,15 +1107,26 @@ const SearchResults = () => {
     const toggleTypeFilter = (type) => {
         setProjectFilters((prev) => {
             const current = Array.isArray(prev.types) ? prev.types : [];
-            const nextTypes = current.includes(type)
-                ? current.filter((value) => value !== type)
-                : [...current, type];
-            return { ...prev, types: nextTypes };
+            const normalizedType = String(type || '').trim();
+            const isSelected = current.length === 1 && current[0] === normalizedType;
+            const nextTypes = isSelected ? [] : [normalizedType];
+
+            const currentStages = Array.isArray(prev.stages) ? prev.stages : [];
+            let nextStages = currentStages;
+            if (nextTypes.length === 0) {
+                nextStages = [];
+            } else {
+                const options = normalizedType === 'equipment' ? EQUIPMENT_STAGE_OPTIONS : START_END_STAGE_OPTIONS;
+                const allowedStages = new Set(options.map((item) => item.value));
+                nextStages = currentStages.filter((stage) => allowedStages.has(stage));
+            }
+
+            return { ...prev, types: nextTypes, stages: nextStages };
         });
     };
 
     const clearTypeFilters = () => {
-        setProjectFilters((prev) => ({ ...prev, types: [] }));
+        setProjectFilters((prev) => ({ ...prev, types: [], stages: [] }));
     };
 
     return (
@@ -1271,43 +1317,6 @@ const SearchResults = () => {
                                 <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
                                     <button
                                         type="button"
-                                        onClick={clearStageFilters}
-                                        aria-pressed={projectFilters.stages.length === 0}
-                                        className={cn(
-                                            FILTER_CHIP_BASE_CLASS,
-                                            projectFilters.stages.length === 0
-                                                ? FILTER_CHIP_ACTIVE_CLASS
-                                                : FILTER_CHIP_INACTIVE_CLASS
-                                        )}
-                                    >
-                                        전체 ({filteredProjects.length})
-                                    </button>
-                                    {STAGE_OPTIONS.map((item) => {
-                                        const isActive = projectFilters.stages.includes(item.value);
-                                        return (
-                                            <button
-                                                key={item.value}
-                                                type="button"
-                                                onClick={() => toggleStageFilter(item.value)}
-                                                aria-pressed={isActive}
-                                                className={cn(
-                                                    FILTER_CHIP_BASE_CLASS,
-                                                    isActive
-                                                        ? FILTER_CHIP_ACTIVE_CLASS
-                                                        : FILTER_CHIP_INACTIVE_CLASS
-                                                )}
-                                            >
-                                                {item.label} ({stageCounts[item.value] || 0})
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="h-5 w-px shrink-0 bg-slate-200" />
-
-                                <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
-                                    <button
-                                        type="button"
                                         onClick={clearTypeFilters}
                                         aria-pressed={projectFilters.types.length === 0}
                                         className={cn(
@@ -1339,6 +1348,47 @@ const SearchResults = () => {
                                         );
                                     })}
                                 </div>
+
+                                {stageFilterOptions.length > 0 && (
+                                    <>
+                                        <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                                        <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={clearStageFilters}
+                                                aria-pressed={projectFilters.stages.length === 0}
+                                                className={cn(
+                                                    FILTER_CHIP_BASE_CLASS,
+                                                    projectFilters.stages.length === 0
+                                                        ? FILTER_CHIP_ACTIVE_CLASS
+                                                        : FILTER_CHIP_INACTIVE_CLASS
+                                                )}
+                                            >
+                                                전체 ({stageScopeProjects.length})
+                                            </button>
+                                            {stageFilterOptions.map((item) => {
+                                                const isActive = projectFilters.stages.includes(item.value);
+                                                return (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive
+                                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                                : FILTER_CHIP_INACTIVE_CLASS
+                                                        )}
+                                                    >
+                                                        {item.label} ({stageCounts[item.value] || 0})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             <div className={cn('mt-2 space-y-2 lg:hidden', !isMobileFilterOpen && 'hidden')}>
@@ -1381,44 +1431,6 @@ const SearchResults = () => {
                                 </div>
 
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-semibold text-slate-500">단계 필터</p>
-                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={clearStageFilters}
-                                            aria-pressed={projectFilters.stages.length === 0}
-                                            className={cn(
-                                                FILTER_CHIP_BASE_CLASS,
-                                                projectFilters.stages.length === 0
-                                                    ? FILTER_CHIP_ACTIVE_CLASS
-                                                    : FILTER_CHIP_INACTIVE_CLASS
-                                            )}
-                                        >
-                                            전체 ({filteredProjects.length})
-                                        </button>
-                                        {STAGE_OPTIONS.map((item) => {
-                                            const isActive = projectFilters.stages.includes(item.value);
-                                            return (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => toggleStageFilter(item.value)}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive
-                                                            ? FILTER_CHIP_ACTIVE_CLASS
-                                                            : FILTER_CHIP_INACTIVE_CLASS
-                                                    )}
-                                                >
-                                                    {item.label} ({stageCounts[item.value] || 0})
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1">
                                     <p className="text-[10px] font-semibold text-slate-500">유형 필터</p>
                                     <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
                                         <button
@@ -1455,6 +1467,46 @@ const SearchResults = () => {
                                         })}
                                     </div>
                                 </div>
+
+                                {stageFilterOptions.length > 0 && (
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-semibold text-slate-500">단계 필터</p>
+                                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={clearStageFilters}
+                                                aria-pressed={projectFilters.stages.length === 0}
+                                                className={cn(
+                                                    FILTER_CHIP_BASE_CLASS,
+                                                    projectFilters.stages.length === 0
+                                                        ? FILTER_CHIP_ACTIVE_CLASS
+                                                        : FILTER_CHIP_INACTIVE_CLASS
+                                                )}
+                                            >
+                                                전체 ({stageScopeProjects.length})
+                                            </button>
+                                            {stageFilterOptions.map((item) => {
+                                                const isActive = projectFilters.stages.includes(item.value);
+                                                return (
+                                                    <button
+                                                        key={item.value}
+                                                        type="button"
+                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive
+                                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                                : FILTER_CHIP_INACTIVE_CLASS
+                                                        )}
+                                                    >
+                                                        {item.label} ({stageCounts[item.value] || 0})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </section>
                     )}

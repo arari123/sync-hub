@@ -9,9 +9,11 @@ import {
     Database,
     Grid2x2,
     Loader2,
+    MapPin,
     Plus,
     Search,
     SlidersHorizontal,
+    User,
     Wrench,
 } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
@@ -1674,15 +1676,16 @@ const SearchResults = () => {
 	                                        : resolveTimelineProgressIndex(projectStageKey);
                                     const isReviewStage = projectStageKey === 'review';
                                     const isClosureStage = projectStageKey === 'closure';
-                                    const createdAtYmd = String(project?.created_at || '').trim().slice(0, 10);
-                                    const createdDateLabel = formatYmdDot(project?.created_at);
-                                    const stageStyle = resolveStageStyle(project);
-                                    const budget = resolveBudgetSnapshot(project);
-                                    const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
-                                    const warrantyFallbackStart = createdAtYmd;
-                                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || warrantyFallbackStart;
-                                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
-                                        || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
+	                                    const createdAtYmd = String(project?.created_at || '').trim().slice(0, 10);
+	                                    const createdDateLabel = formatYmdDot(project?.created_at);
+	                                    const stageStyle = resolveStageStyle(project);
+	                                    const budget = resolveBudgetSnapshot(project);
+	                                    const projectOverview = String(project?.description || '').trim();
+	                                    const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
+	                                    const warrantyFallbackStart = createdAtYmd;
+	                                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || warrantyFallbackStart;
+	                                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
+	                                        || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
                                     const partsStartCandidates = [
                                         scheduleStages?.design?.start,
                                         scheduleStages?.fabrication?.start,
@@ -1865,9 +1868,42 @@ const SearchResults = () => {
                                                             {project.name || '이름 없는 프로젝트'}
                                                         </Link>
 
-                                                        <p className="truncate text-[11px] text-slate-600">
-                                                            고객사 {project.customer_name || '-'} · 설치장소 {project.installation_site || '-'} · 담당자 {project.manager_name || '미지정'}
+                                                        <p
+                                                            className={cn(
+                                                                'text-[11px] leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
+                                                                projectOverview ? 'text-slate-700' : 'text-slate-400'
+                                                            )}
+                                                            title={projectOverview || '프로젝트 개요가 없습니다.'}
+                                                        >
+                                                            {projectOverview || '프로젝트 개요가 없습니다.'}
                                                         </p>
+
+                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                            <span
+                                                                title={project.customer_name || ''}
+                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+                                                            >
+                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">고객사</span>
+                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.customer_name || '-'}</span>
+                                                            </span>
+                                                            <span
+                                                                title={project.installation_site || ''}
+                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+                                                            >
+                                                                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">설치장소</span>
+                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.installation_site || '-'}</span>
+                                                            </span>
+                                                            <span
+                                                                title={project.manager_name || ''}
+                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+                                                            >
+                                                                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">담당자</span>
+                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.manager_name || '미지정'}</span>
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 

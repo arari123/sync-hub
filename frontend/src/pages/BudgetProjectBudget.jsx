@@ -61,6 +61,7 @@ const BUDGET_TAB_ITEMS = [
     { key: 'labor', label: '인건비', icon: Users },
     { key: 'expense', label: '경비', icon: Receipt },
 ];
+const BUDGET_TAB_KEYS = new Set(BUDGET_TAB_ITEMS.map((item) => item.key));
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 const EMPTY_DETAILS = {
@@ -88,6 +89,13 @@ function normalizeStage(value) {
     if (stage === 'as' || stage === 'a/s') return 'warranty';
     if (stage === 'closed') return 'closure';
     return stage || 'review';
+}
+
+function resolveBudgetTabFromSearch(search) {
+    const params = new URLSearchParams(search || '');
+    const rawTab = String(params.get('tab') || '').trim().toLowerCase();
+    if (!rawTab) return '';
+    return BUDGET_TAB_KEYS.has(rawTab) ? rawTab : '';
 }
 
 function normalizeEquipmentName(value, fallback = '미지정 설비') {
@@ -906,7 +914,7 @@ const BudgetProjectBudget = () => {
     const [selectedEquipments, setSelectedEquipments] = useState([]);
     const [isTotalFixed, setIsTotalFixed] = useState(false);
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
-    const [activeBudgetTab, setActiveBudgetTab] = useState('summary');
+    const [activeBudgetTab, setActiveBudgetTab] = useState(() => resolveBudgetTabFromSearch(location.search) || 'summary');
     const [isInputMode, setIsInputMode] = useState(false);
     const pendingScrollTopRef = useRef(null);
 
@@ -931,6 +939,12 @@ const BudgetProjectBudget = () => {
             window.cancelAnimationFrame(rafId);
         };
     }, [activeBudgetTab]);
+
+    useEffect(() => {
+        const requestedTab = resolveBudgetTabFromSearch(location.search);
+        if (!requestedTab) return;
+        setActiveBudgetTab((prev) => (prev === requestedTab ? prev : requestedTab));
+    }, [location.search]);
 
     const loadBudgetData = useCallback(async ({ background = false } = {}) => {
         if (!projectId) return;

@@ -801,6 +801,14 @@ function buildSummaryCategoryRows(items, summaryView) {
         fabrication: [],
         installation: [],
     };
+    const laborUnitsByPhase = {
+        fabrication: [],
+        installation: [],
+    };
+    const expenseUnitsByPhase = {
+        fabrication: [],
+        installation: [],
+    };
     const materialEquipmentSet = new Set();
 
     (items || []).forEach((equipment) => {
@@ -840,6 +848,45 @@ function buildSummaryCategoryRows(items, summaryView) {
                     }),
                 });
             });
+            SOURCE_TYPES.forEach((source) => {
+                const laborSource = phaseData.labor?.bySource?.[source];
+                (laborSource?.rows || []).forEach((row) => {
+                    const budget = toNumber(row?.budgetAmount);
+                    const execution = toNumber(row?.executionAmount);
+                    const name = String(row?.name || '').trim() || '미지정 항목';
+                    const key = `labor::${phase}::${equipment.name}::${source}::${name}`;
+                    laborUnitsByPhase[phase].push({
+                        key,
+                        equipmentName: equipment.name,
+                        source,
+                        name,
+                        budget,
+                        execution,
+                        remaining: budget - execution,
+                        percent: usagePercent(budget, execution),
+                    });
+                });
+
+                const expenseSource = phaseData.expense?.bySource?.[source];
+                (expenseSource?.rows || []).forEach((row) => {
+                    const budget = toNumber(row?.budgetAmount);
+                    const execution = toNumber(row?.executionAmount);
+                    const name = String(row?.name || '').trim() || '미지정 항목';
+                    const basis = String(row?.basis || '').trim();
+                    const key = `expense::${phase}::${equipment.name}::${source}::${name}`;
+                    expenseUnitsByPhase[phase].push({
+                        key,
+                        equipmentName: equipment.name,
+                        source,
+                        name,
+                        basis,
+                        budget,
+                        execution,
+                        remaining: budget - execution,
+                        percent: usagePercent(budget, execution),
+                    });
+                });
+            });
             COST_TYPES.forEach((type) => {
                 const bucket = phaseData[type];
                 if (!bucket?.isVisible) return;
@@ -854,6 +901,20 @@ function buildSummaryCategoryRows(items, summaryView) {
             if (diff !== 0) return diff;
             const aName = `${a?.equipmentName || ''}::${a?.unitName || ''}`;
             const bName = `${b?.equipmentName || ''}::${b?.unitName || ''}`;
+            return aName.localeCompare(bName, 'ko-KR');
+        });
+        laborUnitsByPhase[phase] = [...laborUnitsByPhase[phase]].sort((a, b) => {
+            const diff = toNumber(b?.budget) - toNumber(a?.budget);
+            if (diff !== 0) return diff;
+            const aName = `${a?.equipmentName || ''}::${a?.source || ''}::${a?.name || ''}`;
+            const bName = `${b?.equipmentName || ''}::${b?.source || ''}::${b?.name || ''}`;
+            return aName.localeCompare(bName, 'ko-KR');
+        });
+        expenseUnitsByPhase[phase] = [...expenseUnitsByPhase[phase]].sort((a, b) => {
+            const diff = toNumber(b?.budget) - toNumber(a?.budget);
+            if (diff !== 0) return diff;
+            const aName = `${a?.equipmentName || ''}::${a?.source || ''}::${a?.name || ''}`;
+            const bName = `${b?.equipmentName || ''}::${b?.source || ''}::${b?.name || ''}`;
             return aName.localeCompare(bName, 'ko-KR');
         });
     });
@@ -879,7 +940,9 @@ function buildSummaryCategoryRows(items, summaryView) {
                     execution: phaseExecution,
                     remaining: phaseBudget - phaseExecution,
                     percent: usagePercent(phaseBudget, phaseExecution),
-                    units: type === 'material' ? materialUnitsByPhase[phase] : [],
+                    units: type === 'material'
+                        ? materialUnitsByPhase[phase]
+                        : (type === 'labor' ? laborUnitsByPhase[phase] : expenseUnitsByPhase[phase]),
                 };
             }),
         };
@@ -1718,10 +1781,6 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
         () => summaryCategoryRows.find((category) => category.key === 'material') || null,
         [summaryCategoryRows],
     );
-    const materialPhaseKeys = useMemo(
-        () => (materialCategory?.children || []).map((child) => child.key),
-        [materialCategory],
-    );
     const materialUnitKeysByPhase = useMemo(() => {
         const mapped = {};
         (materialCategory?.children || []).forEach((child) => {
@@ -1733,31 +1792,37 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
         () => Object.values(materialUnitKeysByPhase).flat(),
         [materialUnitKeysByPhase],
     );
-    const [expandedMaterialPhaseKeys, setExpandedMaterialPhaseKeys] = useState([]);
+    const allPhaseKeys = useMemo(
+        () => summaryCategoryRows.flatMap((category) => (category.children || []).map((child) => child.key)),
+        [summaryCategoryRows],
+    );
+    const [expandedPhaseKeys, setExpandedPhaseKeys] = useState([]);
     const [expandedMaterialUnitKeys, setExpandedMaterialUnitKeys] = useState([]);
 
     useEffect(() => {
-        setExpandedMaterialPhaseKeys((prev) => prev.filter((key) => materialPhaseKeys.includes(key)));
+        setExpandedPhaseKeys((prev) => prev.filter((key) => allPhaseKeys.includes(key)));
         setExpandedMaterialUnitKeys((prev) => prev.filter((key) => materialUnitKeys.includes(key)));
-    }, [materialPhaseKeys, materialUnitKeys]);
+    }, [allPhaseKeys, materialUnitKeys]);
 
-    const collapseAllMaterial = useCallback(() => {
-        setExpandedMaterialPhaseKeys([]);
+    const collapseAllTreeRows = useCallback(() => {
+        setExpandedPhaseKeys([]);
         setExpandedMaterialUnitKeys([]);
     }, []);
-    const expandAllMaterial = useCallback(() => {
-        setExpandedMaterialPhaseKeys(materialPhaseKeys);
+    const expandAllTreeRows = useCallback(() => {
+        setExpandedPhaseKeys(allPhaseKeys);
         setExpandedMaterialUnitKeys(materialUnitKeys);
-    }, [materialPhaseKeys, materialUnitKeys]);
-    const toggleMaterialPhase = useCallback((phaseKey) => {
-        const phaseUnitKeys = materialUnitKeysByPhase[phaseKey] || [];
-        setExpandedMaterialPhaseKeys((prev) => {
-            const isExpanded = prev.includes(phaseKey);
+    }, [allPhaseKeys, materialUnitKeys]);
+    const toggleSummaryPhase = useCallback((phaseKey) => {
+        const key = String(phaseKey || '');
+        const categoryKey = key.split('-')[0];
+        const phaseUnitKeys = categoryKey === 'material' ? (materialUnitKeysByPhase[key] || []) : [];
+        setExpandedPhaseKeys((prev) => {
+            const isExpanded = prev.includes(key);
             if (isExpanded) {
                 setExpandedMaterialUnitKeys((unitPrev) => unitPrev.filter((unitKey) => !phaseUnitKeys.includes(unitKey)));
-                return prev.filter((key) => key !== phaseKey);
+                return prev.filter((item) => item !== key);
             }
-            return [...prev, phaseKey];
+            return [...prev, key];
         });
     }, [materialUnitKeysByPhase]);
     const toggleMaterialUnit = useCallback((unitKey) => {
@@ -1768,9 +1833,8 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
         ));
     }, []);
 
-    const hasMaterialTreeRows = materialUnitKeys.length > 0;
-    const allMaterialExpanded = hasMaterialTreeRows
-        && materialPhaseKeys.every((key) => expandedMaterialPhaseKeys.includes(key))
+    const allTreeExpanded = allPhaseKeys.length > 0
+        && allPhaseKeys.every((key) => expandedPhaseKeys.includes(key))
         && materialUnitKeys.every((key) => expandedMaterialUnitKeys.includes(key));
 
     return (
@@ -1796,16 +1860,16 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={collapseAllMaterial}
-                            disabled={!expandedMaterialPhaseKeys.length && !expandedMaterialUnitKeys.length}
+                            onClick={collapseAllTreeRows}
+                            disabled={!expandedPhaseKeys.length && !expandedMaterialUnitKeys.length}
                             className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             모두 접기
                         </button>
                         <button
                             type="button"
-                            onClick={expandAllMaterial}
-                            disabled={!hasMaterialTreeRows || allMaterialExpanded}
+                            onClick={expandAllTreeRows}
+                            disabled={allTreeExpanded}
                             className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             모두 펼치기
@@ -1863,39 +1927,33 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                         </tr>
                                         {category.children.map((child) => {
                                             const childStatus = getBudgetStatusMeta(child.budget, child.execution);
-                                            const isPhaseExpanded = isMaterialCategory && expandedMaterialPhaseKeys.includes(child.key);
-                                            const phaseUnits = isMaterialCategory ? (child.units || []) : [];
+                                            const phaseUnits = Array.isArray(child.units) ? child.units : [];
+                                            const isPhaseExpanded = expandedPhaseKeys.includes(child.key);
                                             return (
                                                 <React.Fragment key={child.key}>
                                                     <tr
                                                         className={cn(
                                                             'bg-white transition border-l-4',
                                                             theme.childBorder,
-                                                            isMaterialCategory ? 'cursor-pointer hover:bg-slate-50' : '',
+                                                            'cursor-pointer hover:bg-slate-50',
                                                         )}
-                                                        onClick={isMaterialCategory ? () => toggleMaterialPhase(child.key) : undefined}
-                                                        role={isMaterialCategory ? 'button' : undefined}
-                                                        tabIndex={isMaterialCategory ? 0 : undefined}
-                                                        onKeyDown={isMaterialCategory
-                                                            ? (event) => {
-                                                                if (event.key !== 'Enter' && event.key !== ' ') return;
-                                                                event.preventDefault();
-                                                                toggleMaterialPhase(child.key);
-                                                            }
-                                                            : undefined}
+                                                        onClick={() => toggleSummaryPhase(child.key)}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                            event.preventDefault();
+                                                            toggleSummaryPhase(child.key);
+                                                        }}
                                                     >
                                                         <td className="px-6 py-3 pl-12 text-sm text-slate-600">
-                                                            {isMaterialCategory ? (
-                                                                <div className="inline-flex items-center gap-1.5 text-left text-slate-700">
-                                                                    {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                                    <span>{child.label}</span>
-                                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
-                                                                        {formatCompactNumber(phaseUnits.length)} 유닛
-                                                                    </span>
-                                                                </div>
-                                                            ) : (
-                                                                child.label
-                                                            )}
+                                                            <div className="inline-flex items-center gap-1.5 text-left text-slate-700">
+                                                                {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                <span>{child.label}</span>
+                                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                                    {formatCompactNumber(phaseUnits.length)} {isMaterialCategory ? '유닛' : '항목'}
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-3 text-right text-slate-600">{formatCompactNumber(child.budget)}</td>
                                                         <td className="px-6 py-3 text-right text-slate-800">{formatCompactNumber(child.execution)}</td>
@@ -1980,6 +2038,47 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                                                     );
                                                                 })}
                                                             </React.Fragment>
+                                                        );
+                                                    })}
+                                                    {!isMaterialCategory && isPhaseExpanded && phaseUnits.map((unit) => {
+                                                        const isLaborCategory = category.key === 'labor';
+                                                        const sourceBadgeClass = unit?.source === '자체'
+                                                            ? 'bg-indigo-100 text-indigo-700'
+                                                            : 'bg-violet-100 text-violet-700';
+                                                        const titleText = isLaborCategory
+                                                            ? `${unit?.equipmentName || ''} / ${unit?.name || ''}`.trim()
+                                                            : `${unit?.equipmentName || ''} / ${unit?.name || ''}${unit?.basis ? ` (${unit.basis})` : ''}`.trim();
+                                                        return (
+                                                            <tr key={unit.key} className="border-l-4 border-l-slate-200 bg-slate-50/50">
+                                                                <td className="px-6 py-3 pl-16 text-sm text-slate-700">
+                                                                    <div className="flex min-w-0 items-center gap-2" title={titleText}>
+                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                                                                        <span className="min-w-0 truncate">
+                                                                            <span className="font-bold">{unit.equipmentName}</span>
+                                                                            <span className="mx-1 text-slate-500">/</span>
+                                                                            <span>{unit.name}</span>
+                                                                            {!isLaborCategory && unit.basis && (
+                                                                                <span className="text-slate-500"> ({unit.basis})</span>
+                                                                            )}
+                                                                        </span>
+                                                                        {unit.source && (
+                                                                            <span className={cn(
+                                                                                'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                                                                                sourceBadgeClass
+                                                                            )}>
+                                                                                {unit.source}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-3 text-right">{formatCompactNumber(unit.budget)}</td>
+                                                                <td className="px-6 py-3 text-right">{formatCompactNumber(unit.execution)}</td>
+                                                                <td className={cn('px-6 py-3 text-right font-medium', unit.remaining < 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                                                                    {formatCompactNumber(unit.remaining)}
+                                                                </td>
+                                                                <td className="px-6 py-3" />
+                                                                <td className="px-6 py-3" />
+                                                            </tr>
                                                         );
                                                     })}
                                                 </React.Fragment>

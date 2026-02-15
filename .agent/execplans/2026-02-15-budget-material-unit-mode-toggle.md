@@ -21,12 +21,14 @@
 | REQ-003 | 예산/집행 전환 버튼 노출 및 전환 | `docker exec -w /app synchub_frontend npm run build` |
 | REQ-004 | 예산 유닛 모드에서 예산 유닛만 표시 | `docker exec -w /app synchub_frontend npm run build` |
 | REQ-005 | 집행 유닛 모드에서 집행 유닛만 표시 | `docker exec -w /app synchub_frontend npm run build` |
+| REQ-006 | 집행 유닛 모드에서 수량/단가 표시 | `docker exec -w /app synchub_frontend npm run build` |
 
 ## 5. Implementation Steps
 1. 재료비 탭 조회 화면에 `예산 유닛/집행 유닛` 토글을 추가한다.
 2. 프로젝트 단계(`review` 여부)에 따라 기본 모드를 결정한다.
 3. 집행 유닛 모드용 집행 데이터 그룹핑(유닛/파츠) 로직을 추가한다.
-4. Docker 검증 스크립트를 실행한다.
+4. 집행 유닛 모드에서도 수량/단가 컬럼을 노출하고 계산 값을 표시한다.
+5. Docker 검증 스크립트를 실행한다.
 
 ## 6. Rollback Plan
 - 해당 커밋을 revert 한다.
@@ -34,4 +36,3 @@
 ## 7. Evidence
 - `docker exec -w /app synchub_web bash scripts/verify_fast.sh`
 - `docker exec -w /app synchub_frontend npm run build`
-

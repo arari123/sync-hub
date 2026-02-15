@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     CheckCircle2,
     ClipboardList,
@@ -158,16 +158,35 @@ export default function AgendaList() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        return () => {
+        const persistScrollTop = () => {
             try {
                 window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
             } catch (error) {
                 // ignore
             }
         };
+
+        let rafId = null;
+        const handleScroll = () => {
+            if (rafId) return;
+            rafId = window.requestAnimationFrame(() => {
+                rafId = null;
+                persistScrollTop();
+            });
+        };
+
+        persistScrollTop();
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            if (rafId) {
+                window.cancelAnimationFrame(rafId);
+            }
+        };
     }, [scrollStorageKey]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isScrollRestored) return;
         if (navigationType !== 'POP') {
             setIsScrollRestored(true);

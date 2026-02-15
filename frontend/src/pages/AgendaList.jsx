@@ -55,8 +55,7 @@ function AgendaCard({ item, onClick }) {
     if (shouldSplit) {
         const rootTitle = item.root_title || item.title;
         const latestTitle = item.latest_title || item.title;
-        const rootSnippet = String(item.root_summary_plain || item.summary_plain || '').trim();
-        const latestSnippet = String(item.latest_summary_plain || item.summary_plain || '').trim();
+        const panelThumbnailUrl = item.thumbnail_url;
 
         return (
             <article
@@ -67,82 +66,80 @@ function AgendaCard({ item, onClick }) {
                 )}
             >
                 <div className="grid grid-cols-1 md:grid-cols-2">
-                    <section className="flex h-full flex-col gap-3 bg-gradient-to-br from-white to-slate-50 p-4">
-                        <header className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
-                                    <ClipboardList className="h-3.5 w-3.5 text-slate-600" />
-                                    최초 등록 안건
-                                </span>
-                                <span className="truncate text-[11px] font-semibold text-slate-400">{item.agenda_code}</span>
+                    <section className="bg-gradient-to-br from-white to-slate-50 p-4">
+                        <div className="flex flex-col gap-4 lg:flex-row">
+                            <div className="h-28 w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 lg:h-24 lg:w-40">
+                                <img src={panelThumbnailUrl} alt="안건 썸네일" className="h-full w-full object-cover" loading="lazy" />
                             </div>
-                            <span className="text-[11px] font-semibold text-slate-400">
-                                {formatDateTime(item.created_at)}
-                            </span>
-                        </header>
 
-                        <div className="min-w-0 space-y-2">
-                            <h3 className="line-clamp-2 text-base font-bold text-slate-900">{rootTitle}</h3>
-                            <p className={cn(
-                                'text-sm leading-relaxed',
-                                rootSnippet ? 'line-clamp-4 text-slate-700' : 'text-slate-400',
-                            )}
-                            >
-                                {rootSnippet || '내용이 없습니다.'}
-                            </p>
-                        </div>
+                            <div className="min-w-0 flex-1 space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
+                                                <ClipboardList className="h-3.5 w-3.5 text-slate-600" />
+                                                최초 등록 안건
+                                            </span>
+                                            <span className="text-xs font-semibold text-slate-400">{item.agenda_code}</span>
+                                        </div>
+                                        <h3 className="line-clamp-2 text-base font-bold text-slate-900">
+                                            {rootTitle}
+                                        </h3>
+                                    </div>
+                                </div>
 
-                        <div className="mt-auto space-y-1 pt-1">
-                            <PersonLine label="작성자" name={item.author_name} />
-                            <PersonLine label="요청자" name={item.requester_name} org={item.requester_org} />
-                            <PersonLine label="답변자" name={item.root_responder_name} org={item.root_responder_org} />
+                                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                                    <PersonLine label="작성자" name={item.author_name} />
+                                    <PersonLine label="요청자" name={item.requester_name} org={item.requester_org} />
+                                    <PersonLine label="답변자" name={item.root_responder_name} org={item.root_responder_org} />
+                                </div>
+                            </div>
                         </div>
                     </section>
 
-                    <section className="flex h-full flex-col gap-3 border-t border-slate-200 bg-gradient-to-br from-cyan-50/70 to-white p-4 md:border-t-0 md:border-l">
-                        <header className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-6 items-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[11px] font-bold text-cyan-700">
-                                    <MessageSquare className="h-3.5 w-3.5 text-cyan-600" />
-                                    최신 답변 안건
-                                </span>
-                                <span className={cn(
-                                    'inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-bold',
-                                    isInProgress
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                        : 'border-slate-200 bg-slate-100 text-slate-600',
-                                )}
-                                >
-                                    {isInProgress ? '진행 중' : '완료'}
-                                </span>
+                    <section className="border-t border-slate-200 bg-gradient-to-br from-cyan-50/70 to-white p-4 md:border-t-0 md:border-l">
+                        <div className="flex flex-col gap-4 lg:flex-row">
+                            <div className="h-28 w-full overflow-hidden rounded-lg border border-cyan-200 bg-slate-100 lg:h-24 lg:w-40">
+                                <img src={panelThumbnailUrl} alt="안건 썸네일" className="h-full w-full object-cover" loading="lazy" />
                             </div>
-                            <span className="text-[11px] font-semibold text-slate-400">
-                                {formatDateTime(item.last_updated_at || item.updated_at)}
-                            </span>
-                        </header>
 
-                        <div className="min-w-0 space-y-2">
-                            <h3 className="line-clamp-2 text-base font-bold text-slate-900">{latestTitle}</h3>
-                            <p className={cn(
-                                'text-sm leading-relaxed',
-                                latestSnippet ? 'line-clamp-4 text-slate-700' : 'text-slate-400',
-                            )}
-                            >
-                                {latestSnippet || '내용이 없습니다.'}
-                            </p>
-                        </div>
+                            <div className="min-w-0 flex-1 space-y-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex h-6 items-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[11px] font-bold text-cyan-700">
+                                                <MessageSquare className="h-3.5 w-3.5 text-cyan-600" />
+                                                최신 답변 안건
+                                            </span>
+                                            <span className={cn(
+                                                'inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-bold',
+                                                isInProgress
+                                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                    : 'border-slate-200 bg-slate-100 text-slate-600',
+                                            )}
+                                            >
+                                                {isInProgress ? '진행 중' : '완료'}
+                                            </span>
+                                        </div>
+                                        <h3 className="line-clamp-2 text-base font-bold text-slate-900">
+                                            {latestTitle}
+                                        </h3>
+                                    </div>
+                                </div>
 
-                        <div className="mt-auto space-y-1 pt-1">
-                            <PersonLine label="작성자" name={item.latest_author_name || item.author_name} />
-                            <PersonLine label="답변자" name={item.responder_name} org={item.responder_org} />
+                                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                                    <PersonLine label="작성자" name={item.latest_author_name || item.author_name} />
+                                    <PersonLine label="답변자" name={item.responder_name} org={item.responder_org} />
+                                </div>
+                            </div>
                         </div>
                     </section>
 
-                    <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white/80 px-4 py-2.5 text-xs text-slate-500 backdrop-blur md:col-span-2">
+                    <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 bg-white px-4 pb-4 pt-2 text-xs text-slate-500 md:col-span-2">
                         <span className="inline-flex items-center gap-1"><Paperclip className="h-3.5 w-3.5" /> 첨부 {item.attachment_count || 0}</span>
                         <span className="inline-flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /> 답변 {item.reply_count || 0}</span>
                         <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> 코멘트 {item.comment_count || 0}</span>
-                        <span className="ml-auto text-[11px] font-semibold text-slate-400">업데이트 {formatDateTime(item.last_updated_at || item.updated_at)}</span>
+                        <span className="ml-auto text-[11px] text-slate-400">업데이트 {formatDateTime(item.last_updated_at || item.updated_at)}</span>
                     </div>
                 </div>
             </article>

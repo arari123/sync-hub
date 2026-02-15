@@ -652,7 +652,16 @@ const BudgetProjectOverview = () => {
                                                         <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
                                                         <span className="shrink-0 text-slate-500">소속</span>
                                                         <span className="truncate">
-                                                            {parentProject.code || parentProject.name || '설비 프로젝트'}
+                                                            {(parentProject.code || '').trim() && (
+                                                                <span className="font-mono">{String(parentProject.code || '').trim()}</span>
+                                                            )}
+                                                            {(parentProject.code || '').trim() && (parentProject.name || '').trim() && (
+                                                                <span className="px-1 text-slate-300">·</span>
+                                                            )}
+                                                            <span>
+                                                                {String(parentProject.name || '').trim()
+                                                                    || (!(parentProject.code || '').trim() ? '설비 프로젝트' : '')}
+                                                            </span>
                                                         </span>
                                                     </Link>
                                                 )}

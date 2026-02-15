@@ -1496,6 +1496,8 @@ const SearchResults = () => {
                                     const isPartsProject = projectTypeKey === 'parts';
                                     const useStartEndTimeline = isAsProject || isPartsProject;
                                     const parentProject = project?.parent_project || null;
+                                    const parentProjectCode = String(parentProject?.code || '').trim();
+                                    const parentProjectName = String(parentProject?.name || '').trim();
                                     const timelineActiveIndex = useStartEndTimeline
                                         ? resolveAsTimelineProgressIndex(projectStageKey)
                                         : resolveTimelineProgressIndex(projectStageKey);
@@ -1570,7 +1572,13 @@ const SearchResults = () => {
                                                                     >
                                                                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
                                                                         <span className="truncate">
-                                                                            {parentProject.code || parentProject.name || '소속 설비'}
+                                                                            {parentProjectCode && (
+                                                                                <span className="font-mono">{parentProjectCode}</span>
+                                                                            )}
+                                                                            {parentProjectCode && parentProjectName && (
+                                                                                <span className="px-1 text-slate-300">·</span>
+                                                                            )}
+                                                                            <span>{parentProjectName || (!parentProjectCode ? '소속 설비' : '')}</span>
                                                                         </span>
                                                                     </Link>
                                                                 )}

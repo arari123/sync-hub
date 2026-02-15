@@ -529,6 +529,26 @@ def _project_stage_rank(stage: Optional[str]) -> int:
     return order.get((stage or "").strip().lower(), 0)
 
 
+def _project_current_stage_label(project: models.BudgetProject) -> str:
+    """Return a user-facing stage label that respects project_type rules.
+
+    - equipment: review/design/fabrication/installation/warranty/closure
+    - parts: review/start/closure
+    - as: review/AS/closure (AS label is used instead of warranty-like stage labels)
+    """
+    project_type = _project_type_code_or_empty(project.project_type)
+    try:
+        stage_key = normalize_stage(project.current_stage or _REVIEW_STAGE)
+    except Exception:  # noqa: BLE001
+        stage_key = (project.current_stage or "").strip().lower() or _REVIEW_STAGE
+
+    if project_type == "as" and stage_key not in {_REVIEW_STAGE, "closure"}:
+        return "AS"
+    if project_type == "parts" and stage_key not in {_REVIEW_STAGE, "closure"}:
+        return "시작"
+    return stage_label(stage_key)
+
+
 def _normalize_schedule_stage(value: Any) -> str:
     normalized = str(value or "").strip().lower()
     return _SCHEDULE_STAGE_ALIASES.get(normalized, "design")
@@ -1421,7 +1441,7 @@ def _serialize_projects_bulk(
                 "summary_milestones": summary_milestones,
                 "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
                 "current_stage": project.current_stage,
-                "current_stage_label": stage_label(project.current_stage),
+                "current_stage_label": _project_current_stage_label(project),
                 "current_version_id": current_version_id,
                 "version_count": int(version_count_map.get(project_id, 0)),
                 "manager_user_id": _project_manager_user_id(project),
@@ -1594,7 +1614,7 @@ def _serialize_project(
         "summary_milestones": summary_milestones,
         "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
         "current_stage": project.current_stage,
-        "current_stage_label": stage_label(project.current_stage),
+        "current_stage_label": _project_current_stage_label(project),
         "current_version_id": current_version_id,
         "version_count": int(version_count),
         "manager_user_id": _project_manager_user_id(project),
@@ -2190,7 +2210,7 @@ def search_projects(
                 "project_type": _project_type_code_or_empty(project.project_type),
                 "project_type_label": _project_type_label(project.project_type),
                 "current_stage": project.current_stage or "",
-                "current_stage_label": stage_label(project.current_stage),
+                "current_stage_label": _project_current_stage_label(project),
                 "score": score,
                 "match_fields": explain.get("match_fields") or [],
                 "matched_terms": explain.get("matched_terms") or [],

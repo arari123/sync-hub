@@ -54,9 +54,9 @@ export default function UserMenu({ user: userProp, className }) {
     }, [isOpen]);
 
     useEffect(() => {
-        if (!isOpen) return;
+        // Close on navigation to prevent stale popovers across pages.
         setIsOpen(false);
-    }, [isOpen, location.pathname, location.search, location.hash]);
+    }, [location.pathname, location.search, location.hash]);
 
     const handleLogout = async () => {
         if (isLoggingOut) return;

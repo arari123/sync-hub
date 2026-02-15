@@ -122,6 +122,7 @@ const HOME_STAGE_TIMELINE = [
     { key: 'as', label: 'AS', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
     { key: 'closure', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-300', textClass: 'text-slate-700' },
 ];
+const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE.filter((item) => item.key !== 'closure');
 
 function normalizeProjectId(value) {
     const projectId = Number(value || 0);
@@ -1538,14 +1539,14 @@ const SearchResults = () => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="mb-2 flex items-center justify-between px-1">
+                                                    <div className="mb-1 flex items-center justify-between px-1">
                                                         <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">단계 일정</span>
                                                         <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
                                                             {resolveProjectStatusLabel(project)}
                                                         </span>
                                                     </div>
 
-                                                    <div className="relative mb-2">
+                                                    <div className="relative mb-1">
                                                         <div className="relative h-2 overflow-hidden rounded-full bg-slate-200">
                                                             <div className="flex h-full divide-x divide-white/70">
                                                                 {HOME_STAGE_TIMELINE.map((item, index) => {
@@ -1578,8 +1579,8 @@ const SearchResults = () => {
                                                         )}
                                                     </div>
 
-                                                    <div className="grid grid-cols-5 gap-1 px-1">
-                                                        {HOME_STAGE_TIMELINE.map((item, index) => {
+                                                    <div className="grid grid-cols-4 gap-1 px-1">
+                                                        {HOME_STAGE_TIMELINE_META.map((item, index) => {
                                                             const stageDates = scheduleStages[item.key] || {};
                                                             const isDone = timelineActiveIndex > index;
                                                             const isActive = timelineActiveIndex === index;
@@ -1599,35 +1600,24 @@ const SearchResults = () => {
                                                             }
 
                                                             return (
-                                                                <div key={`timeline-meta-${project.id}-${item.key}`} className="min-w-0">
-                                                                    <div className="flex items-center justify-between gap-1">
-                                                                        <p className={cn('truncate text-[9px] font-extrabold leading-none tracking-wide', labelClass)}>
-                                                                            {item.label}
-                                                                        </p>
-                                                                        <p className={cn(
-                                                                            'shrink-0 font-mono text-[9px] leading-none',
-                                                                            isUpcoming ? 'text-slate-400' : 'text-slate-600'
-                                                                        )}
-                                                                        >
-                                                                            {startLabel}
-                                                                        </p>
-                                                                    </div>
-                                                                    <div className="flex items-center justify-between gap-1">
-                                                                        <p className={cn(
-                                                                            'text-[9px] font-semibold leading-none',
-                                                                            isUpcoming ? 'text-slate-300' : 'text-slate-400'
-                                                                        )}
-                                                                        >
-                                                                            끝
-                                                                        </p>
-                                                                        <p className={cn(
-                                                                            'shrink-0 font-mono text-[9px] leading-none',
-                                                                            isUpcoming ? 'text-slate-400' : 'text-slate-600'
-                                                                        )}
-                                                                        >
-                                                                            {endLabel}
-                                                                        </p>
-                                                                    </div>
+                                                                <div key={`timeline-meta-${project.id}-${item.key}`} className="min-w-0 text-center">
+                                                                    <p className={cn('truncate text-[9px] font-extrabold leading-none tracking-wide', labelClass)}>
+                                                                        {item.label}
+                                                                    </p>
+                                                                    <p className={cn(
+                                                                        'mt-0.5 font-mono text-[9px] leading-none tabular-nums',
+                                                                        isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                    )}
+                                                                    >
+                                                                        {startLabel}
+                                                                    </p>
+                                                                    <p className={cn(
+                                                                        'mt-0.5 font-mono text-[9px] leading-none tabular-nums',
+                                                                        isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                    )}
+                                                                    >
+                                                                        {endLabel}
+                                                                    </p>
                                                                 </div>
                                                             );
                                                         })}

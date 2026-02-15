@@ -57,6 +57,8 @@ function AgendaCard({ item, onClick }) {
         const latestTitle = item.latest_title || item.title;
         const rootSnippet = String(item.root_summary_plain || item.summary_plain || '').trim();
         const latestSnippet = String(item.latest_summary_plain || item.summary_plain || '').trim();
+        const rootThumbnailUrl = item.root_thumbnail_url || item.thumbnail_url;
+        const latestThumbnailUrl = item.latest_thumbnail_url || item.thumbnail_url;
 
         return (
             <article
@@ -68,18 +70,25 @@ function AgendaCard({ item, onClick }) {
             >
                 <div className="grid grid-cols-1 md:grid-cols-2">
                     <section className="flex h-full flex-col gap-3 bg-gradient-to-br from-white to-slate-50 p-4">
-                        <header className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
-                                    <ClipboardList className="h-3.5 w-3.5 text-slate-600" />
-                                    최초 등록 안건
-                                </span>
-                                <span className="truncate text-[11px] font-semibold text-slate-400">{item.agenda_code}</span>
+                        <div className="flex items-start gap-3">
+                            <div className="h-16 w-28 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                <img src={rootThumbnailUrl} alt="최초 등록 썸네일" className="h-full w-full object-cover" loading="lazy" />
                             </div>
-                            <span className="text-[11px] font-semibold text-slate-400">
-                                {formatDateTime(item.created_at)}
-                            </span>
-                        </header>
+                            <header className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-700">
+                                            <ClipboardList className="h-3.5 w-3.5 text-slate-600" />
+                                            최초 등록 안건
+                                        </span>
+                                        <span className="truncate text-[11px] font-semibold text-slate-400">{item.agenda_code}</span>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-slate-400">
+                                        {formatDateTime(item.created_at)}
+                                    </span>
+                                </div>
+                            </header>
+                        </div>
 
                         <div className="min-w-0 space-y-2">
                             <h3 className="line-clamp-2 text-base font-bold text-slate-900">{rootTitle}</h3>
@@ -100,26 +109,33 @@ function AgendaCard({ item, onClick }) {
                     </section>
 
                     <section className="flex h-full flex-col gap-3 border-t border-slate-200 bg-gradient-to-br from-cyan-50/70 to-white p-4 md:border-t-0 md:border-l">
-                        <header className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-6 items-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[11px] font-bold text-cyan-700">
-                                    <MessageSquare className="h-3.5 w-3.5 text-cyan-600" />
-                                    최신 답변 안건
-                                </span>
-                                <span className={cn(
-                                    'inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-bold',
-                                    isInProgress
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                        : 'border-slate-200 bg-slate-100 text-slate-600',
-                                )}
-                                >
-                                    {isInProgress ? '진행 중' : '완료'}
-                                </span>
+                        <div className="flex items-start gap-3">
+                            <div className="h-16 w-28 shrink-0 overflow-hidden rounded-lg border border-cyan-200 bg-slate-100">
+                                <img src={latestThumbnailUrl} alt="최신 답변 썸네일" className="h-full w-full object-cover" loading="lazy" />
                             </div>
-                            <span className="text-[11px] font-semibold text-slate-400">
-                                {formatDateTime(item.last_updated_at || item.updated_at)}
-                            </span>
-                        </header>
+                            <header className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="inline-flex h-6 items-center gap-1 rounded-md border border-cyan-200 bg-white px-2 text-[11px] font-bold text-cyan-700">
+                                            <MessageSquare className="h-3.5 w-3.5 text-cyan-600" />
+                                            최신 답변 안건
+                                        </span>
+                                        <span className={cn(
+                                            'inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-bold',
+                                            isInProgress
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                : 'border-slate-200 bg-slate-100 text-slate-600',
+                                        )}
+                                        >
+                                            {isInProgress ? '진행 중' : '완료'}
+                                        </span>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-slate-400">
+                                        {formatDateTime(item.last_updated_at || item.updated_at)}
+                                    </span>
+                                </div>
+                            </header>
+                        </div>
 
                         <div className="min-w-0 space-y-2">
                             <h3 className="line-clamp-2 text-base font-bold text-slate-900">{latestTitle}</h3>

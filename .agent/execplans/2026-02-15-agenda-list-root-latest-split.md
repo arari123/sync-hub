@@ -20,11 +20,12 @@
 | REQ-002 | 좌 패널에 작성자/요청자/답변자(최초) 표시 확인 | 수동 확인 |
 | REQ-003 | 우 패널에 작성자(최신)/답변자(최신) 표시 확인 | 수동 확인 |
 | REQ-004 | 라벨/배경/구분선으로 패널 구분이 명확한지 확인 | 수동 확인 |
+| REQ-005 | 좌/우 패널 모두 썸네일이 표시되는지 확인 | 수동 확인 |
 | - | 리그레션(린트/빌드/기본 테스트) | `docker exec -w /app synchub_web bash scripts/verify_fast.sh` |
 
 ## 5. Implementation Steps
-1. `GET /agenda/projects/{project_id}/threads`의 아이템에 `root_summary_plain`, `latest_summary_plain`, `root_responder_*` 필드를 추가한다.
-2. `frontend/src/pages/AgendaList.jsx`의 카드 컴포넌트를 수정해, 답변이 있는 일반 안건은 2패널(50:50) 레이아웃으로 렌더링한다.
+1. `GET /agenda/projects/{project_id}/threads`의 아이템에 `root_summary_plain`, `latest_summary_plain`, `root_responder_*`, `root_thumbnail_url`, `latest_thumbnail_url` 필드를 추가한다.
+2. `frontend/src/pages/AgendaList.jsx`의 카드 컴포넌트를 수정해, 답변이 있는 일반 안건은 2패널(50:50) 레이아웃 + 좌/우 썸네일을 렌더링한다.
 3. 라벨/배경/구분선을 적용해 좌/우 패널이 명확히 구분되도록 디자인을 정리한다.
 4. Docker 환경에서 `verify_fast` 및 프론트 빌드를 실행해 검증한다.
 
@@ -34,4 +35,3 @@
 ## 7. Evidence
 - `docker exec -w /app synchub_web bash scripts/verify_fast.sh` 통과 로그
 - `docker exec -w /app synchub_frontend npm run build` 성공 로그
-

@@ -293,7 +293,7 @@ const BudgetProjectInfoEdit = () => {
                         >
                             <option value="equipment">설비</option>
                             <option value="parts">파츠</option>
-                            <option value="as">AS</option>
+                            <option value="as">워런티</option>
                         </select>
                     </Field>
                     <Field label="현재 진행 단계">
@@ -305,7 +305,7 @@ const BudgetProjectInfoEdit = () => {
                             <option value="review">검토</option>
                             <option value="fabrication">제작</option>
                             <option value="installation">설치</option>
-                            <option value="warranty">AS</option>
+                            <option value="warranty">워런티</option>
                             <option value="closure">종료</option>
                         </select>
                     </Field>
@@ -406,7 +406,7 @@ const BudgetProjectInfoEdit = () => {
                             <p className="text-[11px] text-slate-500">여러 설비를 한 번에 입력하려면 쉼표(,) 또는 줄바꿈으로 구분해 추가할 수 있습니다.</p>
                         </div>
                     ) : (
-                        <p className="text-[11px] text-slate-500">파츠/AS 프로젝트는 설비 입력이 필요하지 않습니다.</p>
+                        <p className="text-[11px] text-slate-500">파츠/워런티 프로젝트는 설비 입력이 필요하지 않습니다.</p>
                     )}
                 </div>
 

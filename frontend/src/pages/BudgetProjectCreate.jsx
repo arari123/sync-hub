@@ -122,7 +122,7 @@ const BudgetProjectCreate = () => {
     const projectTypeButtons = useMemo(() => ([
         { key: 'equipment', label: '설비' },
         { key: 'parts', label: '파츠' },
-        { key: 'as', label: 'AS' },
+        { key: 'as', label: '워런티' },
     ]), []);
 
     const saveDraft = () => {
@@ -565,7 +565,7 @@ const BudgetProjectCreate = () => {
                                                 </div>
                                             </>
                                         ) : (
-                                            <p className="text-sm text-slate-500">파츠/AS 프로젝트는 설비 입력이 필요하지 않습니다.</p>
+                                            <p className="text-sm text-slate-500">파츠/워런티 프로젝트는 설비 입력이 필요하지 않습니다.</p>
                                         )}
                                     </div>
                                 </div>

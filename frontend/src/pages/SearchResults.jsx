@@ -38,14 +38,14 @@ const STAGE_OPTIONS = [
 const PROJECT_TYPE_OPTIONS = [
     { value: 'equipment', label: '설비' },
     { value: 'parts', label: '파츠' },
-    { value: 'as', label: 'AS' },
+    { value: 'as', label: '워런티' },
 ];
 const TABLE_PAGE_SIZE = 10;
 const STAGE_LABEL_MAP = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
     parts: '파츠',
-    as: '유지보수',
+    as: '워런티',
 };
 const PROJECT_SIGNAL_LABELS = ['안건', '예산', '사양'];
 const FILTER_TOGGLE_GROUP_CLASS = 'flex shrink-0 rounded-md border border-border bg-secondary/80 p-0.5';
@@ -119,7 +119,7 @@ const HOME_STAGE_TIMELINE = [
     { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-200', textClass: 'text-sky-700' },
     { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-200', textClass: 'text-indigo-700' },
     { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-200', textClass: 'text-emerald-700' },
-    { key: 'as', label: 'AS', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
+    { key: 'as', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
 ];
 const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
 
@@ -228,7 +228,9 @@ function normalizeProjectType(value) {
     if (!raw) return '';
     if (raw === 'equipment' || raw === '설비') return 'equipment';
     if (raw === 'parts' || raw === '파츠') return 'parts';
-    if (raw === 'as' || raw === 'a/s' || raw === '유지보수' || raw === 'as project') return 'as';
+    if (raw === 'as' || raw === 'a/s' || raw === '워런티' || raw === '유지보수' || raw === 'warranty' || raw === 'as project') {
+        return 'as';
+    }
     return raw;
 }
 
@@ -376,7 +378,7 @@ function resolveTimelineProgressIndex(stageKey) {
     const stage = normalizeStage(stageKey);
     if (stage === 'fabrication') return 1;
     if (stage === 'installation') return 2;
-    if (stage === 'warranty') return 3; // AS
+    if (stage === 'warranty') return 3; // warranty
     if (stage === 'closure') return HOME_STAGE_TIMELINE.length; // all done
     return 0; // review or unknown
 }

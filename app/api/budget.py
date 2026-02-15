@@ -34,7 +34,7 @@ router = APIRouter(prefix="/budget", tags=["budget"])
 _PROJECT_TYPE_LABELS = {
     "equipment": "설비",
     "parts": "파츠",
-    "as": "AS",
+    "as": "워런티",
 }
 
 _PROJECT_TYPE_TO_CODE = {
@@ -44,6 +44,10 @@ _PROJECT_TYPE_TO_CODE = {
     "파츠": "parts",
     "부품": "parts",
     "parts": "parts",
+    "워런티": "as",
+    "유지보수": "as",
+    "a/s": "as",
+    "warranty": "as",
     "as": "as",
 }
 
@@ -2480,7 +2484,7 @@ def create_revision(
     if current_stage in _EXECUTION_ONLY_STAGES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="제작/설치/AS/종료 단계에서는 예산 리비전을 생성할 수 없습니다. 집행금액만 입력해 주세요.",
+            detail="제작/설치/워런티/종료 단계에서는 예산 리비전을 생성할 수 없습니다. 집행금액만 입력해 주세요.",
         )
     if source.status != "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only confirmed version can create revision.")
@@ -2587,7 +2591,7 @@ def replace_equipments(
     if current_stage in _EXECUTION_ONLY_STAGES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="제작/설치/AS/종료 단계에서는 예산(설비/항목)을 수정할 수 없습니다. 집행금액만 입력해 주세요.",
+            detail="제작/설치/워런티/종료 단계에서는 예산(설비/항목)을 수정할 수 없습니다. 집행금액만 입력해 주세요.",
         )
     if version.status == "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")

@@ -6,21 +6,28 @@ import {
 import { api, getErrorMessage } from '../lib/api';
 import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
 import { cn } from '../lib/utils';
+import {
+    computeGroupStats,
+    formatYmd,
+    normalizeSchedulePayload,
+    parseYmd,
+    ROOT_GROUP_IDS,
+} from '../lib/scheduleUtils';
 import GlobalTopBar from '../components/GlobalTopBar';
 
 const STAGE_SEGMENTS = [
     { key: 'review', label: '검토' },
-    { key: 'design', label: '설계' },
-    { key: 'production', label: '제작' },
-    { key: 'install', label: '설치' },
-    { key: 'as', label: '유지보수' },
-    { key: 'closed', label: '종료' },
+    { key: 'fabrication', label: '제작' },
+    { key: 'installation', label: '설치' },
+    { key: 'warranty', label: '워런티' },
+    { key: 'closure', label: '종료' },
 ];
 
-const MOCK_TIMELINE_ITEMS = [
-    { key: 'design', label: '설계', status: 'completed', statusLabel: '완료', date: '2026-03-15' },
-    { key: 'production', label: '제작', status: 'in_progress', statusLabel: '진행 중', date: '2026-04-30' },
-    { key: 'install', label: '설치', status: 'pending', statusLabel: '대기', date: '2026-05-20' },
+const PROJECT_MILESTONE_STAGES = [
+    { key: 'design', label: '설계' },
+    { key: 'fabrication', label: '제작' },
+    { key: 'installation', label: '설치' },
+    { key: 'as', label: '워런티' },
 ];
 
 const STAGE_LABEL_ALIAS = {
@@ -29,8 +36,8 @@ const STAGE_LABEL_ALIAS = {
     production: '제작',
     install: '설치',
     installation: '설치',
-    as: '유지보수',
-    warranty: '유지보수',
+    as: '워런티',
+    warranty: '워런티',
     closed: '종료',
     closure: '종료',
     fabrication: '제작',
@@ -40,7 +47,7 @@ const STAGE_LABEL_ALIAS = {
 const PROJECT_TYPE_LABEL_ALIAS = {
     equipment: '설비',
     parts: '파츠',
-    as: '유지보수',
+    as: '워런티',
 };
 
 function toNumber(value) {
@@ -60,13 +67,7 @@ function truncateProjectName(value, max = 10) {
 }
 
 function resolveStageKey(value) {
-    const stage = String(value || '').trim().toLowerCase();
-    if (stage === 'review') return 'review';
-    if (stage === 'fabrication' || stage === 'progress') return 'production';
-    if (stage === 'installation') return 'install';
-    if (stage === 'warranty') return 'as';
-    if (stage === 'closure') return 'closed';
-    return 'design';
+    return normalizeBudgetStage(value);
 }
 
 function normalizeBudgetStage(value) {
@@ -90,12 +91,61 @@ function formatAgendaDate(value) {
     return `${month}.${day}`;
 }
 
+function formatYmdDot(value) {
+    const text = String(value || '').trim();
+    if (!text || text.length < 10) return '';
+    return `${text.slice(0, 4)}.${text.slice(5, 7)}.${text.slice(8, 10)}`;
+}
+
+function formatIsoYmdDot(value) {
+    const text = String(value || '').trim();
+    if (!text || text.length < 10) return '';
+    return `${text.slice(0, 4)}.${text.slice(5, 7)}.${text.slice(8, 10)}`;
+}
+
+function addYearsToYmd(ymd, years) {
+    const parsed = parseYmd(ymd);
+    if (!parsed) return '';
+    const copied = new Date(parsed.getTime());
+    copied.setUTCFullYear(copied.getUTCFullYear() + years);
+    return formatYmd(copied);
+}
+
+function buildProjectMilestoneScheduleStages(schedulePayload) {
+    const normalized = normalizeSchedulePayload(schedulePayload || {});
+    const statsByGroupId = computeGroupStats(normalized);
+
+    const stageRange = (stageKey) => {
+        const groupId = ROOT_GROUP_IDS[stageKey];
+        const stats = groupId ? (statsByGroupId.get(groupId) || {}) : {};
+        return {
+            start: String(stats.first_start || ''),
+            end: String(stats.last_end || ''),
+        };
+    };
+
+    const design = stageRange('design');
+    const fabrication = stageRange('fabrication');
+    const installation = stageRange('installation');
+
+    const asStart = installation.end;
+    const closureDate = asStart ? addYearsToYmd(asStart, 1) : '';
+
+    return {
+        design,
+        fabrication,
+        installation,
+        as: { start: asStart, end: closureDate },
+        closure: { start: closureDate, end: closureDate },
+    };
+}
+
 function localizeStageLabel(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
     const normalized = raw.toLowerCase();
     if (STAGE_LABEL_ALIAS[normalized]) return STAGE_LABEL_ALIAS[normalized];
-    if (raw === 'A/S') return '유지보수';
+    if (raw === 'A/S') return '워런티';
     if (/[A-Za-z]/.test(raw)) return '';
     return raw;
 }
@@ -131,6 +181,15 @@ const BudgetProjectOverview = () => {
     const [agendaTotal, setAgendaTotal] = useState(0);
     const [isAgendaLoading, setIsAgendaLoading] = useState(false);
     const [agendaError, setAgendaError] = useState('');
+    const [scheduleStages, setScheduleStages] = useState(() => ({
+        design: { start: '', end: '' },
+        fabrication: { start: '', end: '' },
+        installation: { start: '', end: '' },
+        as: { start: '', end: '' },
+        closure: { start: '', end: '' },
+    }));
+    const [isScheduleLoading, setIsScheduleLoading] = useState(true);
+    const [scheduleError, setScheduleError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -158,6 +217,28 @@ const BudgetProjectOverview = () => {
                 || versionPool[0]
                 || null;
             setVersion(currentVersion);
+
+            if (!background) {
+                setIsScheduleLoading(true);
+                setScheduleError('');
+            }
+            try {
+                const scheduleResp = await api.get(`/budget/projects/${projectId}/schedule`);
+                const schedulePayload = scheduleResp?.data?.schedule || {};
+                setScheduleStages(buildProjectMilestoneScheduleStages(schedulePayload));
+                setScheduleError('');
+            } catch (scheduleErr) {
+                setScheduleStages({
+                    design: { start: '', end: '' },
+                    fabrication: { start: '', end: '' },
+                    installation: { start: '', end: '' },
+                    as: { start: '', end: '' },
+                    closure: { start: '', end: '' },
+                });
+                setScheduleError(getErrorMessage(scheduleErr, '일정 정보를 불러오지 못했습니다.'));
+            } finally {
+                setIsScheduleLoading(false);
+            }
 
             try {
                 const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
@@ -228,6 +309,8 @@ const BudgetProjectOverview = () => {
     const projectName = String(project?.name || '프로젝트').trim() || '프로젝트';
     const trimmedProjectName = truncateProjectName(projectName, 10);
     const currentStageKey = resolveStageKey(project?.current_stage);
+    const isReviewStage = currentStageKey === 'review';
+    const isClosureStage = currentStageKey === 'closure';
     const currentStageLabel = localizeStageLabel(project?.current_stage_label)
         || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label
         || '-';
@@ -261,7 +344,68 @@ const BudgetProjectOverview = () => {
     const dataManagementPath = `${baseProjectPath}/data`;
     const projectSettingPath = `${baseProjectPath}/info/edit`;
 
-    const timelineItems = useMemo(() => MOCK_TIMELINE_ITEMS, []);
+    const createdDateLabel = formatIsoYmdDot(project?.created_at) || '-';
+    const closureDateLabel = useMemo(() => {
+        if (isScheduleLoading) return '...';
+        if (scheduleError) return '-';
+        const value = scheduleStages?.closure?.end || scheduleStages?.as?.end || '';
+        return formatYmdDot(value) || '-';
+    }, [isScheduleLoading, scheduleError, scheduleStages]);
+
+    const milestoneActiveIndex = useMemo(() => {
+        if (currentStageKey === 'review') return -1;
+        if (currentStageKey === 'fabrication') return 1;
+        if (currentStageKey === 'installation') return 2;
+        if (currentStageKey === 'warranty') return 3;
+        if (currentStageKey === 'closure') return PROJECT_MILESTONE_STAGES.length;
+        return 0;
+    }, [currentStageKey]);
+
+    const scheduleBadgeLabel = useMemo(() => {
+        if (isScheduleLoading) return '일정 불러오는 중';
+        if (scheduleError) return '일정 불러오기 실패';
+        const hasAny = Boolean(
+            scheduleStages?.design?.start
+            || scheduleStages?.fabrication?.start
+            || scheduleStages?.installation?.start
+        );
+        return hasAny ? '일정관리 반영' : '일정 미입력';
+    }, [isScheduleLoading, scheduleError, scheduleStages]);
+
+    const timelineItems = useMemo(() => (
+        PROJECT_MILESTONE_STAGES.map((stage, index) => {
+            const isDone = milestoneActiveIndex >= 0 && milestoneActiveIndex > index;
+            const isActive = milestoneActiveIndex === index;
+            const status = isDone ? 'completed' : isActive ? 'in_progress' : 'pending';
+            const statusLabel = isDone ? '완료' : isActive ? '진행 중' : '대기';
+            const stageDates = scheduleStages?.[stage.key] || {};
+
+            let dateLabel = '...';
+            if (!isScheduleLoading) {
+                if (scheduleError) {
+                    dateLabel = '-';
+                } else {
+                    const start = formatYmdDot(stageDates.start);
+                    const end = formatYmdDot(stageDates.end);
+                    if (!start || !end) {
+                        dateLabel = '-';
+                    } else if (start === end) {
+                        dateLabel = start;
+                    } else {
+                        dateLabel = `${start} ~ ${end}`;
+                    }
+                }
+            }
+
+            return {
+                key: stage.key,
+                label: stage.label,
+                status,
+                statusLabel,
+                date: dateLabel,
+            };
+        })
+    ), [milestoneActiveIndex, scheduleError, scheduleStages, isScheduleLoading]);
     const pathname = location.pathname;
     const isProjectMainActive = pathname === projectMainPath || pathname === `${projectMainPath}/`;
     const isBudgetActive = pathname === budgetManagementPath
@@ -478,27 +622,50 @@ const BudgetProjectOverview = () => {
                                 </div>
                             </section>
 
-                            <section className="bg-card rounded-xl shadow-sm border border-border p-5">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                        <span className="w-1.5 h-6 bg-teal-500 rounded-full" /> 일정 타임라인
-                                    </h2>
-                                    <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">향후 일정 연동 예정</span>
-                                </div>
+	                            <section className="bg-card rounded-xl shadow-sm border border-border p-5">
+	                                <div className="flex items-center justify-between mb-6">
+	                                    <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+	                                        <span className="w-1.5 h-6 bg-teal-500 rounded-full" /> 일정 타임라인
+	                                    </h2>
+	                                    <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">{scheduleBadgeLabel}</span>
+	                                </div>
 
-                                <div className="relative px-2">
-                                    <div className="absolute top-[14px] left-0 w-full h-0.5 bg-border rounded" />
-                                    <div className="grid grid-cols-3 gap-2 relative">
-                                        {timelineItems.map((item, index) => (
-                                            <TimelineStep
-                                                key={item.key}
-                                                item={item}
-                                                step={index + 1}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            </section>
+	                                <div className="relative px-2">
+	                                    <div className="absolute top-[14px] left-0 w-full h-0.5 bg-border rounded" />
+	                                    {(isReviewStage || isClosureStage) && (
+	                                        <div className="pointer-events-none absolute inset-x-0 top-[4px] z-10 flex justify-center px-2">
+	                                            <div className="w-fit max-w-full">
+	                                                {isReviewStage ? (
+	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-sky-200/60 bg-gradient-to-r from-sky-50/65 via-white/55 to-emerald-50/65 px-5 py-2 text-[12px] font-extrabold leading-none text-slate-900 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
+	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+	                                                        <span className="shrink-0 tracking-[0.14em] text-sky-800">검토</span>
+	                                                        <span className="text-slate-300">|</span>
+	                                                        <span className="truncate font-mono text-slate-700/90">생성 {createdDateLabel}</span>
+	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-200/20 blur-xl" />
+	                                                    </div>
+	                                                ) : (
+	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-slate-200/65 bg-gradient-to-r from-slate-50/65 via-white/55 to-slate-100/65 px-5 py-2 text-[12px] font-extrabold leading-none text-slate-900 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
+	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+	                                                        <span className="shrink-0 tracking-[0.14em] text-slate-800">종료</span>
+	                                                        <span className="text-slate-300">|</span>
+	                                                        <span className="truncate font-mono text-slate-700/90">종료일 {closureDateLabel}</span>
+	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-300/20 blur-xl" />
+	                                                    </div>
+	                                                )}
+	                                            </div>
+	                                        </div>
+	                                    )}
+	                                    <div className="grid grid-cols-4 gap-2 relative">
+	                                        {timelineItems.map((item, index) => (
+	                                            <TimelineStep
+	                                                key={item.key}
+	                                                item={item}
+	                                                step={index + 1}
+	                                            />
+	                                        ))}
+	                                    </div>
+	                                </div>
+	                            </section>
                         </div>
 
                         <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">

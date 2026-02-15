@@ -28,7 +28,9 @@ router = APIRouter(prefix="/data-hub", tags=["data-hub"])
 
 DATA_HUB_AI_ENABLED = os.getenv("DATA_HUB_AI_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
-GEMINI_MODEL = (os.getenv("GEMINI_MODEL") or "gemini-3.0-flash").strip()
+# NOTE: Gemini Developer API(v1beta) currently provides 2.x/2.5 flash models.
+# Keep the model configurable via env, but default to an actually-available Flash model.
+GEMINI_MODEL = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
 GEMINI_BASE_URL = (os.getenv("GEMINI_BASE_URL") or "").strip() or None
 GEMINI_MAX_OUTPUT_TOKENS = max(64, int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "600")))
 
@@ -165,4 +167,3 @@ def ask_data_hub(
     }
     _answer_cache.set(fingerprint, response)
     return response
-

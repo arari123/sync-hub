@@ -665,6 +665,78 @@ function buildMaterialRows(items) {
     return rows;
 }
 
+function buildMaterialExecutionRows(executionItems) {
+    const unitMap = new Map();
+    const formatPartDisplayName = (part) => {
+        const partName = String(part?.partName || '').trim() || '미지정 파츠';
+        const modelName = String(part?.modelName || '').trim();
+        return modelName ? `${partName}(${modelName})` : partName;
+    };
+
+    (executionItems || []).forEach((row) => {
+        if (!row) return;
+        const equipmentName = normalizeEquipmentName(row?.equipment_name, '미지정 설비');
+        const phase = normalizePhase(row?.phase);
+        const unitName = String(row?.unit_name || row?.part_name || '미지정 유닛').trim() || '미지정 유닛';
+        const partName = String(row?.part_name || '').trim() || '미지정 파츠';
+        const modelName = String(row?.spec || '').trim();
+        const execution = toNumber(row?.executed_amount);
+
+        const unitKey = `${equipmentName}-${phase}-material-execution-${unitName}`;
+        if (!unitMap.has(unitKey)) {
+            unitMap.set(unitKey, {
+                key: unitKey,
+                phase,
+                equipmentName,
+                unitName,
+                execution: 0,
+                parts: new Map(),
+            });
+        }
+
+        const unit = unitMap.get(unitKey);
+        unit.execution += execution;
+
+        const partKey = `${partName}-${modelName}`;
+        if (!unit.parts.has(partKey)) {
+            unit.parts.set(partKey, {
+                key: `${unitKey}-part-${partKey}`,
+                partName,
+                modelName,
+                displayName: formatPartDisplayName({ partName, modelName }),
+                execution: 0,
+            });
+        }
+        const part = unit.parts.get(partKey);
+        part.execution += execution;
+    });
+
+    const rows = Array.from(unitMap.values())
+        .map((unit) => {
+            const parts = Array.from(unit.parts.values()).sort((a, b) => {
+                const diff = toNumber(b.execution) - toNumber(a.execution);
+                if (diff !== 0) return diff;
+                return String(a.displayName).localeCompare(String(b.displayName), 'ko-KR');
+            });
+            return {
+                ...unit,
+                partCount: parts.length,
+                parts,
+            };
+        })
+        .sort((a, b) => {
+            const phaseDiff = PHASES.indexOf(a.phase) - PHASES.indexOf(b.phase);
+            if (phaseDiff !== 0) return phaseDiff;
+            const executionDiff = toNumber(b.execution) - toNumber(a.execution);
+            if (executionDiff !== 0) return executionDiff;
+            const equipmentDiff = String(a.equipmentName).localeCompare(String(b.equipmentName), 'ko-KR');
+            if (equipmentDiff !== 0) return equipmentDiff;
+            return String(a.unitName).localeCompare(String(b.unitName), 'ko-KR');
+        });
+
+    return rows;
+}
+
 function buildLaborRows(items) {
     const rows = [];
     (items || []).forEach((equipment) => {
@@ -1620,6 +1692,8 @@ const BudgetProjectBudget = () => {
                 {activeBudgetTab === 'material' && (
                     <MaterialTabContent
                         rows={materialRows}
+                        executionItems={details?.execution_material_items || []}
+                        currentStage={normalizeStage(project?.current_stage || '')}
                         isInputMode={isInputMode}
                         onLiveDetailsChange={handleEditorLiveDetailsChange}
                     />
@@ -2135,17 +2209,48 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
     );
 };
 
-const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
+const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, onLiveDetailsChange }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
-    const phaseGroups = buildRowsByPhase(rows);
-    const allUnitKeys = useMemo(() => (rows || []).map((row) => row.key), [rows]);
+    const defaultUnitViewMode = currentStage === 'review' ? 'budget' : 'execution';
+    const [unitViewMode, setUnitViewMode] = useState(defaultUnitViewMode);
+
+    useEffect(() => {
+        setUnitViewMode(defaultUnitViewMode);
+    }, [defaultUnitViewMode]);
+
+    const budgetRows = useMemo(
+        () => (rows || []).filter((row) => toNumber(row?.budget) > 0),
+        [rows],
+    );
+    const executionRows = useMemo(
+        () => buildMaterialExecutionRows(executionItems || []),
+        [executionItems],
+    );
+    const activeUnitRows = unitViewMode === 'execution' ? executionRows : budgetRows;
+    const allUnitKeys = useMemo(() => (activeUnitRows || []).map((row) => row.key), [activeUnitRows]);
     const [expandedUnitKeys, setExpandedUnitKeys] = useState([]);
     const allExpanded = allUnitKeys.length > 0 && allUnitKeys.every((key) => expandedUnitKeys.includes(key));
 
     useEffect(() => {
         setExpandedUnitKeys((prev) => prev.filter((key) => allUnitKeys.includes(key)));
     }, [allUnitKeys]);
+
+    const executionPhaseGroups = useMemo(() => {
+        return PHASES.map((phase) => {
+            const phaseRows = executionRows.filter((row) => row.phase === phase);
+            return {
+                phase,
+                label: PHASE_LABEL[phase] || phase,
+                rows: phaseRows,
+                execution: phaseRows.reduce((sum, row) => sum + toNumber(row?.execution), 0),
+            };
+        }).filter((group) => group.rows.length > 0);
+    }, [executionRows]);
+    const executionTotal = useMemo(
+        () => executionRows.reduce((sum, row) => sum + toNumber(row?.execution), 0),
+        [executionRows],
+    );
 
     const collapseAllUnits = useCallback(() => {
         setExpandedUnitKeys([]);
@@ -2179,6 +2284,32 @@ const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
                     <h3 className="text-lg font-bold text-slate-800">재료비 상세 내역</h3>
                     {!isInputMode && (
                         <div className="flex items-center gap-2">
+                            <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setUnitViewMode('budget')}
+                                    className={cn(
+                                        'rounded-md px-3 py-1 text-xs font-semibold transition-colors',
+                                        unitViewMode === 'budget'
+                                            ? 'bg-slate-900 text-white'
+                                            : 'text-slate-600 hover:bg-slate-100',
+                                    )}
+                                >
+                                    예산 유닛
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setUnitViewMode('execution')}
+                                    className={cn(
+                                        'rounded-md px-3 py-1 text-xs font-semibold transition-colors',
+                                        unitViewMode === 'execution'
+                                            ? 'bg-slate-900 text-white'
+                                            : 'text-slate-600 hover:bg-slate-100',
+                                    )}
+                                >
+                                    집행 유닛
+                                </button>
+                            </div>
                             <button
                                 type="button"
                                 onClick={collapseAllUnits}
@@ -2209,123 +2340,235 @@ const MaterialTabContent = ({ rows, isInputMode, onLiveDetailsChange }) => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[900px] table-fixed text-sm text-left">
-                            <colgroup>
-                                <col className="w-[88px]" />
-                                <col className="w-[180px]" />
-                                <col />
-                                <col className="w-[110px]" />
-                                <col className="w-[150px]" />
-                                <col className="w-[170px]" />
-                            </colgroup>
-                            <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
-                                <tr>
-                                    <th className="w-24 px-4 py-3 text-center font-semibold">단계</th>
-                                    <th className="px-4 py-3 font-semibold">설비</th>
-                                    <th className="px-4 py-3 font-semibold">명칭</th>
-                                    <th className="w-24 px-4 py-3 text-right font-semibold">수량</th>
-                                    <th className="w-32 px-4 py-3 text-right font-semibold">단가</th>
-                                    <th className="w-32 px-4 py-3 text-right font-semibold">예산</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 text-slate-700">
-                                {rows.length === 0 && (
+                        {unitViewMode === 'execution' ? (
+                            <table className="w-full min-w-[720px] table-fixed text-sm text-left">
+                                <colgroup>
+                                    <col className="w-[88px]" />
+                                    <col className="w-[180px]" />
+                                    <col />
+                                    <col className="w-[180px]" />
+                                </colgroup>
+                                <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
                                     <tr>
-                                        <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
-                                            표시할 재료비 데이터가 없습니다.
-                                        </td>
+                                        <th className="w-24 px-4 py-3 text-center font-semibold">단계</th>
+                                        <th className="px-4 py-3 font-semibold">설비</th>
+                                        <th className="px-4 py-3 font-semibold">명칭</th>
+                                        <th className="w-40 px-4 py-3 text-right font-semibold">집행</th>
                                     </tr>
-                                )}
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 text-slate-700">
+                                    {executionRows.length === 0 && (
+                                        <tr>
+                                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                                                표시할 재료비 집행 데이터가 없습니다. (예산 유닛으로 전환할 수 있습니다.)
+                                            </td>
+                                        </tr>
+                                    )}
 
-                                {phaseGroups.map((group) => {
-                                    const phaseRowSpan = group.rows.reduce((sum, row) => (
-                                        sum + 1 + (expandedUnitKeys.includes(row.key) ? (row.parts || []).length : 0)
-                                    ), 0);
+                                    {executionPhaseGroups.map((group) => {
+                                        const phaseRowSpan = group.rows.reduce((sum, row) => (
+                                            sum + 1 + (expandedUnitKeys.includes(row.key) ? (row.parts || []).length : 0)
+                                        ), 0);
 
-                                    return (
-                                        <React.Fragment key={group.phase}>
-                                            {group.rows.map((row, index) => {
-                                                const isUnitExpanded = expandedUnitKeys.includes(row.key);
-                                                return (
-                                                    <React.Fragment key={row.key}>
-                                                        <tr
-                                                            className={cn(
-                                                                index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
-                                                                'cursor-pointer hover:bg-slate-100/70',
-                                                            )}
-                                                            onClick={() => toggleUnitRow(row.key)}
-                                                            role="button"
-                                                            tabIndex={0}
-                                                            onKeyDown={(event) => {
-                                                                if (event.key !== 'Enter' && event.key !== ' ') return;
-                                                                event.preventDefault();
-                                                                toggleUnitRow(row.key);
-                                                            }}
-                                                        >
-                                                            {index === 0 && (
-                                                                <td
-                                                                    rowSpan={phaseRowSpan}
-                                                                    className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
-                                                                >
-                                                                    <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
-                                                                        {group.phase === 'fabrication' ? '제작' : '설치'}
-                                                                    </span>
+                                        return (
+                                            <React.Fragment key={group.phase}>
+                                                {group.rows.map((row, index) => {
+                                                    const isUnitExpanded = expandedUnitKeys.includes(row.key);
+                                                    return (
+                                                        <React.Fragment key={row.key}>
+                                                            <tr
+                                                                className={cn(
+                                                                    index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
+                                                                    'cursor-pointer hover:bg-slate-100/70',
+                                                                )}
+                                                                onClick={() => toggleUnitRow(row.key)}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                                    event.preventDefault();
+                                                                    toggleUnitRow(row.key);
+                                                                }}
+                                                            >
+                                                                {index === 0 && (
+                                                                    <td
+                                                                        rowSpan={phaseRowSpan}
+                                                                        className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
+                                                                    >
+                                                                        <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
+                                                                            {group.phase === 'fabrication' ? '제작' : '설치'}
+                                                                        </span>
+                                                                    </td>
+                                                                )}
+                                                                <td className="px-4 py-3 font-semibold">
+                                                                    <div className="truncate" title={row.equipmentName}>{row.equipmentName}</div>
                                                                 </td>
-                                                            )}
-                                                            <td className="px-4 py-3 font-semibold">
-                                                                <div className="truncate" title={row.equipmentName}>{row.equipmentName}</div>
-                                                            </td>
-                                                            <td className="px-4 py-3">
-                                                                <div className="flex min-w-0 items-center gap-1.5">
-                                                                    {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                                                    <span className="truncate" title={row.unitName}>{row.unitName}</span>
-                                                                    <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
-                                                                        {formatCompactNumber(row.partCount)} 파츠
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right">{formatCompactNumber(row.quantity)}</td>
-                                                            <td className="px-4 py-3 text-right">{formatWon(row.unitCost)}</td>
-                                                            <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
-                                                        </tr>
-                                                        {isUnitExpanded && (row.parts || []).map((part) => (
-                                                            <tr key={part.key} className="bg-slate-50/70">
-                                                                <td className="px-4 py-2" />
-                                                                <td className="px-4 py-2 pl-10 text-sm text-slate-600">
-                                                                    <div className="flex min-w-0 items-center gap-2">
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                                                        <span className="truncate" title={part.displayName}>{part.displayName}</span>
+                                                                <td className="px-4 py-3">
+                                                                    <div className="flex min-w-0 items-center gap-1.5">
+                                                                        {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                        <span className="truncate" title={row.unitName}>{row.unitName}</span>
+                                                                        <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                                                            {formatCompactNumber(row.partCount)} 파츠
+                                                                        </span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="px-4 py-2 text-right text-sm text-slate-600">{formatCompactNumber(part.quantity)}</td>
-                                                                <td className="px-4 py-2 text-right text-sm text-slate-600">{formatWon(part.unitCost)}</td>
-                                                                <td className="px-4 py-2 text-right text-sm font-semibold text-slate-700">{formatWon(part.budget)}</td>
+                                                                <td className="px-4 py-3 text-right font-semibold">{formatWon(row.execution)}</td>
                                                             </tr>
-                                                        ))}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                            <tr className={PHASE_TOTAL_THEME[group.phase]}>
-                                                <td className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
-                                                    {group.label} 재료비 소계
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
-                                            </tr>
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </tbody>
-                            {rows.length > 0 && (
-                                <tfoot>
-                                    <tr className="bg-slate-950 text-white">
-                                        <td className="px-4 py-4 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
-                                            프로젝트 재료비 총괄
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-4 text-right text-lg font-bold tabular-nums text-amber-300">{formatWon(total.budget)}</td>
+                                                            {isUnitExpanded && (row.parts || []).map((part) => (
+                                                                <tr key={part.key} className="bg-slate-50/70">
+                                                                    <td className="px-4 py-2" />
+                                                                    <td className="px-4 py-2 pl-10 text-sm text-slate-600">
+                                                                        <div className="flex min-w-0 items-center gap-2">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                                                            <span className="truncate" title={part.displayName}>{part.displayName}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-right text-sm font-semibold text-slate-700">{formatWon(part.execution)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                                <tr className={PHASE_TOTAL_THEME[group.phase]}>
+                                                    <td className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide" colSpan={3}>
+                                                        {group.label} 재료비 집행 소계
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold">{formatWon(group.execution)}</td>
+                                                </tr>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                                {executionRows.length > 0 && (
+                                    <tfoot>
+                                        <tr className="bg-slate-950 text-white">
+                                            <td className="px-4 py-4 text-right text-sm font-bold uppercase tracking-wide" colSpan={3}>
+                                                프로젝트 재료비 집행 총괄
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-4 text-right text-lg font-bold tabular-nums text-amber-300">{formatWon(executionTotal)}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        ) : (
+                            <table className="w-full min-w-[900px] table-fixed text-sm text-left">
+                                <colgroup>
+                                    <col className="w-[88px]" />
+                                    <col className="w-[180px]" />
+                                    <col />
+                                    <col className="w-[110px]" />
+                                    <col className="w-[150px]" />
+                                    <col className="w-[170px]" />
+                                </colgroup>
+                                <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
+                                    <tr>
+                                        <th className="w-24 px-4 py-3 text-center font-semibold">단계</th>
+                                        <th className="px-4 py-3 font-semibold">설비</th>
+                                        <th className="px-4 py-3 font-semibold">명칭</th>
+                                        <th className="w-24 px-4 py-3 text-right font-semibold">수량</th>
+                                        <th className="w-32 px-4 py-3 text-right font-semibold">단가</th>
+                                        <th className="w-32 px-4 py-3 text-right font-semibold">예산</th>
                                     </tr>
-                                </tfoot>
-                            )}
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 text-slate-700">
+                                    {budgetRows.length === 0 && (
+                                        <tr>
+                                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                                                표시할 재료비 데이터가 없습니다.
+                                            </td>
+                                        </tr>
+                                    )}
+
+                                    {buildRowsByPhase(budgetRows).map((group) => {
+                                        const phaseRowSpan = group.rows.reduce((sum, row) => (
+                                            sum + 1 + (expandedUnitKeys.includes(row.key) ? (row.parts || []).length : 0)
+                                        ), 0);
+
+                                        return (
+                                            <React.Fragment key={group.phase}>
+                                                {group.rows.map((row, index) => {
+                                                    const isUnitExpanded = expandedUnitKeys.includes(row.key);
+                                                    return (
+                                                        <React.Fragment key={row.key}>
+                                                            <tr
+                                                                className={cn(
+                                                                    index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
+                                                                    'cursor-pointer hover:bg-slate-100/70',
+                                                                )}
+                                                                onClick={() => toggleUnitRow(row.key)}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                                                                    event.preventDefault();
+                                                                    toggleUnitRow(row.key);
+                                                                }}
+                                                            >
+                                                                {index === 0 && (
+                                                                    <td
+                                                                        rowSpan={phaseRowSpan}
+                                                                        className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
+                                                                    >
+                                                                        <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
+                                                                            {group.phase === 'fabrication' ? '제작' : '설치'}
+                                                                        </span>
+                                                                    </td>
+                                                                )}
+                                                                <td className="px-4 py-3 font-semibold">
+                                                                    <div className="truncate" title={row.equipmentName}>{row.equipmentName}</div>
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <div className="flex min-w-0 items-center gap-1.5">
+                                                                        {isUnitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                                        <span className="truncate" title={row.unitName}>{row.unitName}</span>
+                                                                        <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                                                            {formatCompactNumber(row.partCount)} 파츠
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right">{formatCompactNumber(row.quantity)}</td>
+                                                                <td className="px-4 py-3 text-right">{formatWon(row.unitCost)}</td>
+                                                                <td className="px-4 py-3 text-right font-semibold">{formatWon(row.budget)}</td>
+                                                            </tr>
+                                                            {isUnitExpanded && (row.parts || []).map((part) => (
+                                                                <tr key={part.key} className="bg-slate-50/70">
+                                                                    <td className="px-4 py-2" />
+                                                                    <td className="px-4 py-2 pl-10 text-sm text-slate-600">
+                                                                        <div className="flex min-w-0 items-center gap-2">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                                                            <span className="truncate" title={part.displayName}>{part.displayName}</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-right text-sm text-slate-600">{formatCompactNumber(part.quantity)}</td>
+                                                                    <td className="px-4 py-2 text-right text-sm text-slate-600">{formatWon(part.unitCost)}</td>
+                                                                    <td className="px-4 py-2 text-right text-sm font-semibold text-slate-700">{formatWon(part.budget)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                                <tr className={PHASE_TOTAL_THEME[group.phase]}>
+                                                    <td className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
+                                                        {group.label} 재료비 소계
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold">{formatWon(group.budget)}</td>
+                                                </tr>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                                {budgetRows.length > 0 && (
+                                    <tfoot>
+                                        <tr className="bg-slate-950 text-white">
+                                            <td className="px-4 py-4 text-right text-sm font-bold uppercase tracking-wide" colSpan={5}>
+                                                프로젝트 재료비 총괄
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-4 text-right text-lg font-bold tabular-nums text-amber-300">{formatWon(total.budget)}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        )}
                     </div>
                 )}
             </section>

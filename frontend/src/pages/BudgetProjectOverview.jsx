@@ -518,7 +518,7 @@ const BudgetProjectOverview = () => {
     const isSettingActive = pathname.startsWith(projectSettingPath);
 
     return (
-        <div className="app-shell min-h-screen bg-background text-foreground">
+        <div className="app-shell min-h-screen text-foreground">
             <GlobalTopBar />
 
             <div className="border-b border-border/80 bg-card/65 backdrop-blur">

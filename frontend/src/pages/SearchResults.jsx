@@ -1130,7 +1130,7 @@ const SearchResults = () => {
     };
 
     return (
-        <div className="app-shell min-h-screen bg-background text-foreground">
+        <div className="app-shell min-h-screen text-foreground">
             <header className="topbar-shell h-16">
                 <div className="mx-auto flex h-full max-w-[1640px] items-center gap-3 px-4 lg:px-6">
                     <Link to="/home" className="flex w-48 shrink-0 items-center gap-2">

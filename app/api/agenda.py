@@ -1591,9 +1591,9 @@ def list_agenda_threads(
         threads = (
             query
             .order_by(
+                models.AgendaThread.last_updated_at.desc(),
                 priority_clause.asc(),
-                models.AgendaThread.last_updated_at.asc(),
-                models.AgendaThread.id.asc(),
+                models.AgendaThread.id.desc(),
             )
             .offset(start)
             .limit(per_page)

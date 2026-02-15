@@ -48,6 +48,15 @@ function AgendaCard({ item, onClick }) {
     const isReport = item.thread_kind === 'work_report';
     const isDraft = item.record_status === 'draft';
     const isInProgress = item.progress_status === 'in_progress';
+    const replyCount = Number(item.reply_count || 0);
+    const hasReplies = replyCount > 0 && !isDraft;
+
+    const rootTitle = item.root_title || item.title || '';
+    const latestTitle = item.latest_title || item.title || '';
+    const rootSummary = String(item.root_summary_plain || '').trim();
+    const latestSummary = String(item.latest_summary_plain || item.summary_plain || '').trim();
+    const createdLabel = item.created_at?.slice(0, 16).replace('T', ' ') || '-';
+    const updatedLabel = item.last_updated_at?.slice(0, 16).replace('T', ' ') || '-';
 
     return (
         <article
@@ -82,13 +91,42 @@ function AgendaCard({ item, onClick }) {
                                 )}
                                 <span className="text-xs font-semibold text-slate-400">{item.agenda_code}</span>
                             </div>
-                            <h3 className="line-clamp-2 text-base font-bold text-slate-900">
-                                {item.root_title || item.title}
-                            </h3>
-                            {item.latest_title && item.latest_title !== item.root_title && (
-                                <p className="line-clamp-1 text-sm font-medium text-slate-600">
-                                    최근 답변: {item.latest_title}
-                                </p>
+                            {hasReplies ? (
+                                <div className="grid grid-cols-1 gap-2 pt-1 lg:grid-cols-2">
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] font-bold text-slate-500">최초 등록 안건</span>
+                                            <span className="font-mono text-[10px] text-slate-400">{createdLabel}</span>
+                                        </div>
+                                        <p className="mt-1 line-clamp-2 text-sm font-bold text-slate-900">{rootTitle}</p>
+                                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{rootSummary || '-'}</p>
+                                        <p className="mt-2 text-[11px] text-slate-500">
+                                            <span className="font-semibold text-slate-500">작성자</span> <span className="font-semibold text-slate-800">{item.author_name || '-'}</span>
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] font-bold text-slate-500">최신 답변 안건</span>
+                                            <span className="font-mono text-[10px] text-slate-400">{updatedLabel}</span>
+                                        </div>
+                                        <p className="mt-1 line-clamp-2 text-sm font-bold text-slate-900">{latestTitle}</p>
+                                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{latestSummary || '-'}</p>
+                                        <p className="mt-2 text-[11px] text-slate-500">
+                                            <span className="font-semibold text-slate-500">최종 작성자</span> <span className="font-semibold text-slate-800">{item.latest_author_name || '-'}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <h3 className="line-clamp-2 text-base font-bold text-slate-900">
+                                        {rootTitle}
+                                    </h3>
+                                    {item.latest_title && item.latest_title !== item.root_title && (
+                                        <p className="line-clamp-1 text-sm font-medium text-slate-600">
+                                            최근 답변: {item.latest_title}
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </div>
 

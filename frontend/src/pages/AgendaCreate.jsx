@@ -365,6 +365,10 @@ export default function AgendaCreate() {
             }
         }
 
+        if (saveMode === 'published') {
+            if (!window.confirm('안건을 등록하시겠습니까?')) return;
+        }
+
         const formData = new FormData();
         formData.append('payload', JSON.stringify(buildPayload(saveMode)));
         newFiles.forEach((file) => formData.append('files', file));

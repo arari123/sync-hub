@@ -1,6 +1,6 @@
 # Sync-Hub Repository Map
 
-- 업데이트 기준: 2026-02-14
+- 업데이트 기준: 2026-02-15
 
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
@@ -110,7 +110,7 @@
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`
 - 안건:
-  - 메타/목록: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`
+  - 메타/목록/검색: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`, `GET /agenda/threads/search`
   - 생성/수정: `POST /agenda/projects/{project_id}/threads`, `PUT /agenda/threads/{thread_id}/draft`, `POST /agenda/threads/{thread_id}/replies`
   - 상세/코멘트: `GET /agenda/threads/{thread_id}`, `GET /agenda/threads/{thread_id}/entries/{entry_id}`, `GET/POST /agenda/threads/{thread_id}/comments`
   - 상태/재등록/첨부: `/agenda/threads/{thread_id}/status`, `/agenda/threads/{thread_id}/reregister-payload`, `/agenda/attachments/{attachment_id}/download`

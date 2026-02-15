@@ -16,7 +16,7 @@ import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
-import ProjectResultList from '../components/ProjectResultList';
+import GlobalSearchResultList from '../components/GlobalSearchResultList';
 import { Input } from '../components/ui/Input';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
@@ -452,6 +452,7 @@ const SearchResults = () => {
     const [projectPool, setProjectPool] = useState([]);
     const [projectRows, setProjectRows] = useState([]);
     const [projectSearchResults, setProjectSearchResults] = useState([]);
+    const [agendaSearchResults, setAgendaSearchResults] = useState([]);
     const [documentResults, setDocumentResults] = useState([]);
     const [selectedResult, setSelectedResult] = useState(null);
     const [showAllProjects, setShowAllProjects] = useState(false);
@@ -499,6 +500,7 @@ const SearchResults = () => {
             setSelectedResult(null);
             setDocumentResults([]);
             setProjectSearchResults([]);
+            setAgendaSearchResults([]);
 
             try {
                 const projectListResult = await api.get('/budget/projects', {
@@ -516,6 +518,7 @@ const SearchResults = () => {
                 }
                 setProjectPool([]);
                 setProjectRows([]);
+                setAgendaSearchResults([]);
                 setError(getErrorMessage(err, '프로젝트 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
             } finally {
                 if (!active) return;
@@ -531,6 +534,36 @@ const SearchResults = () => {
         };
     }, [hasSearchQuery]);
 
+    const globalEntityResults = useMemo(() => {
+        const projects = (Array.isArray(projectSearchResults) ? projectSearchResults : []).map((item) => ({
+            ...item,
+            kind: 'project',
+            score: Number(item?.score || 0),
+        }));
+        const agendas = (Array.isArray(agendaSearchResults) ? agendaSearchResults : []).map((item) => ({
+            ...item,
+            kind: 'agenda',
+            score: Number(item?.score || 0),
+        }));
+
+        const merged = [...projects, ...agendas];
+        const priority = { project: 0, agenda: 1 };
+
+        merged.sort((a, b) => {
+            const scoreDiff = Number(b?.score || 0) - Number(a?.score || 0);
+            if (scoreDiff !== 0) return scoreDiff;
+
+            const kindDiff = (priority[a?.kind] ?? 99) - (priority[b?.kind] ?? 99);
+            if (kindDiff !== 0) return kindDiff;
+
+            const aId = a?.kind === 'agenda' ? Number(a?.thread_id || 0) : Number(a?.project_id || 0);
+            const bId = b?.kind === 'agenda' ? Number(b?.thread_id || 0) : Number(b?.project_id || 0);
+            return bId - aId;
+        });
+
+        return merged;
+    }, [agendaSearchResults, projectSearchResults]);
+
     useEffect(() => {
         if (!hasSearchQuery) return undefined;
 
@@ -543,6 +576,7 @@ const SearchResults = () => {
             setSelectedResult(null);
             setDocumentResults([]);
             setProjectSearchResults([]);
+            setAgendaSearchResults([]);
 
             try {
                 const documentSearchPromise = api.get('/documents/search', {
@@ -555,9 +589,15 @@ const SearchResults = () => {
                     signal: controller.signal,
                 });
 
-                const [documentSearchResult, projectSearchResult] = await Promise.allSettled([
+                const agendaSearchPromise = api.get('/agenda/threads/search', {
+                    params: { q: searchQuery, limit: 30 },
+                    signal: controller.signal,
+                });
+
+                const [documentSearchResult, projectSearchResult, agendaSearchResult] = await Promise.allSettled([
                     documentSearchPromise,
                     projectSearchPromise,
+                    agendaSearchPromise,
                 ]);
 
                 const docs = documentSearchResult.status === 'fulfilled'
@@ -566,19 +606,43 @@ const SearchResults = () => {
                 const projects = projectSearchResult.status === 'fulfilled' && Array.isArray(projectSearchResult.value?.data)
                     ? projectSearchResult.value.data
                     : [];
+                const agendas = agendaSearchResult.status === 'fulfilled' && Array.isArray(agendaSearchResult.value?.data)
+                    ? agendaSearchResult.value.data
+                    : [];
 
                 if (!active) return;
                 setDocumentResults(docs);
                 setProjectSearchResults(projects);
+                setAgendaSearchResults(agendas);
 
-                if (documentSearchResult.status !== 'fulfilled' && projectSearchResult.status !== 'fulfilled') {
-                    throw projectSearchResult.status === 'rejected' ? projectSearchResult.reason : documentSearchResult.reason;
+                const hasAnyResult = (
+                    documentSearchResult.status === 'fulfilled'
+                    || projectSearchResult.status === 'fulfilled'
+                    || agendaSearchResult.status === 'fulfilled'
+                );
+
+                if (!hasAnyResult) {
+                    throw documentSearchResult.status === 'rejected'
+                        ? documentSearchResult.reason
+                        : projectSearchResult.status === 'rejected'
+                            ? projectSearchResult.reason
+                            : agendaSearchResult.reason;
                 }
 
-                if (documentSearchResult.status !== 'fulfilled') {
-                    setError(getErrorMessage(documentSearchResult.reason, '문서 검색 결과를 불러오지 못했습니다. 프로젝트 검색 결과는 표시 중입니다.'));
-                } else if (projectSearchResult.status !== 'fulfilled') {
-                    setError(getErrorMessage(projectSearchResult.reason, '프로젝트 검색 결과를 불러오지 못했습니다. 문서 검색 결과는 표시 중입니다.'));
+                const missingLabels = [];
+                if (documentSearchResult.status !== 'fulfilled') missingLabels.push('문서');
+                if (projectSearchResult.status !== 'fulfilled') missingLabels.push('프로젝트');
+                if (agendaSearchResult.status !== 'fulfilled') missingLabels.push('안건');
+
+                const rejected = [documentSearchResult, projectSearchResult, agendaSearchResult]
+                    .filter((item) => item.status === 'rejected');
+                if (missingLabels.length > 0 && rejected.length > 0) {
+                    setError(
+                        getErrorMessage(
+                            rejected[0].reason,
+                            `${missingLabels.join(', ')} 검색 결과를 불러오지 못했습니다. 나머지 결과는 표시 중입니다.`
+                        )
+                    );
                 }
             } catch (err) {
                 if (!active || err?.code === 'ERR_CANCELED') {
@@ -586,6 +650,7 @@ const SearchResults = () => {
                 }
                 setDocumentResults([]);
                 setProjectSearchResults([]);
+                setAgendaSearchResults([]);
                 setError(getErrorMessage(err, '검색 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'));
             } finally {
                 if (!active) return;
@@ -907,13 +972,13 @@ const SearchResults = () => {
                             <div className="mx-auto max-w-[980px]">
                                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <h2 className="text-sm font-semibold text-foreground">프로젝트 검색 결과</h2>
+                                        <h2 className="text-sm font-semibold text-foreground">검색 결과</h2>
                                         <p className="mt-0.5 text-xs text-muted-foreground">
                                             검색어: <span className="font-medium text-foreground/80">{searchQuery}</span>
                                         </p>
                                     </div>
                                     {!isLoading && (
-                                        <span className="text-xs text-muted-foreground">총 {projectSearchResults.length}건</span>
+                                        <span className="text-xs text-muted-foreground">총 {globalEntityResults.length}건</span>
                                     )}
                                 </div>
 
@@ -923,7 +988,7 @@ const SearchResults = () => {
                                         검색 결과를 불러오는 중입니다.
                                     </div>
                                 ) : (
-                                    <ProjectResultList results={projectSearchResults} query={searchQuery} />
+                                    <GlobalSearchResultList results={globalEntityResults} query={searchQuery} />
                                 )}
                             </div>
                         </section>
@@ -1500,7 +1565,7 @@ const SearchResults = () => {
                         </section>
                     )}
 
-                    {hasSearchQuery && !isLoading && !error && projectSearchResults.length === 0 && documentResults.length === 0 && (
+                    {hasSearchQuery && !isLoading && !error && globalEntityResults.length === 0 && documentResults.length === 0 && (
                         <div className="rounded-xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
                             검색 결과가 없습니다.
                         </div>

@@ -786,6 +786,222 @@ def _agenda_match_score_tuple(haystack: str, query: str, tokens: list[str]) -> t
     return (in_order, all_match, match_count, has_phrase)
 
 
+def _collapse_snippet_whitespace(text: str) -> str:
+    return " ".join(str(text or "").split()).strip()
+
+
+def _extract_snippet(text: str, query_lower: str, token_lowers: list[str], max_len: int = 180) -> str:
+    cleaned = _collapse_snippet_whitespace(text)
+    if not cleaned:
+        return ""
+
+    if len(cleaned) <= max_len:
+        return cleaned
+
+    lowered = cleaned.lower()
+    match_start = -1
+    match_len = 0
+
+    if query_lower:
+        idx = lowered.find(query_lower)
+        if idx >= 0:
+            match_start = idx
+            match_len = len(query_lower)
+
+    if match_start < 0:
+        for token in token_lowers:
+            idx = lowered.find(token)
+            if idx >= 0:
+                match_start = idx
+                match_len = len(token)
+                break
+
+    if match_start < 0:
+        return cleaned[: max_len - 3].rstrip() + "..."
+
+    context = max(24, int(max_len * 0.45))
+    start = max(0, match_start - context)
+    end = min(len(cleaned), match_start + match_len + context)
+    snippet = cleaned[start:end].strip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(cleaned):
+        snippet = snippet + "..."
+    return snippet
+
+
+def _agenda_search_score_and_explain(
+    *,
+    thread_payload: dict[str, Any],
+    root_entry: Optional[models.AgendaEntry],
+    latest_entry: Optional[models.AgendaEntry],
+    project_name: str,
+    project_code: str,
+    query: str,
+    tokens: list[str],
+) -> tuple[float, dict[str, Any]]:
+    query_lower = (query or "").strip().lower()
+    token_lowers = [str(token).lower() for token in tokens if str(token).strip()]
+    if not query_lower and not token_lowers:
+        return 0.0, {}
+
+    root_content = (root_entry.content_plain if root_entry else "") or ""
+    latest_content = (latest_entry.content_plain if latest_entry else "") or ""
+    content_text = "\n".join(part for part in (root_content, latest_content) if str(part).strip()).strip()
+
+    title_text = " ".join(
+        part
+        for part in (
+            thread_payload.get("title") or "",
+            thread_payload.get("root_title") or "",
+            thread_payload.get("latest_title") or "",
+        )
+        if str(part).strip()
+    ).strip()
+    agenda_code = str(thread_payload.get("agenda_code") or "").strip()
+    summary_plain = str(thread_payload.get("summary_plain") or "").strip()
+    requester_text = " ".join(
+        part
+        for part in (
+            thread_payload.get("requester_name") or "",
+            thread_payload.get("requester_org") or "",
+        )
+        if str(part).strip()
+    ).strip()
+    responder_text = " ".join(
+        part
+        for part in (
+            thread_payload.get("responder_name") or "",
+            thread_payload.get("responder_org") or "",
+        )
+        if str(part).strip()
+    ).strip()
+    author_text = " ".join(
+        part
+        for part in (
+            thread_payload.get("author_name") or "",
+            thread_payload.get("latest_author_name") or "",
+        )
+        if str(part).strip()
+    ).strip()
+    worker_text = str(thread_payload.get("worker_summary") or "").strip()
+    project_text = " ".join(part for part in (project_name or "", project_code or "") if str(part).strip()).strip()
+
+    field_map = {
+        "title": title_text,
+        "agenda_code": agenda_code,
+        "project": project_text,
+        "summary_plain": summary_plain,
+        "content": content_text,
+        "requester": requester_text,
+        "responder": responder_text,
+        "author": author_text,
+        "worker_summary": worker_text,
+    }
+    lowered_fields = {key: value.lower() for key, value in field_map.items() if value}
+    haystack = " ".join(lowered_fields.values()).strip()
+    if not haystack:
+        return 0.0, {}
+
+    matched_tokens = 0
+    for token in token_lowers:
+        if token and token in haystack:
+            matched_tokens += 1
+
+    score = 0.0
+    exact_phrase_match = False
+    match_fields: set[str] = set()
+    matched_terms_lower: set[str] = set()
+
+    def add_phrase(field_key: str, weight: float) -> None:
+        nonlocal score, exact_phrase_match
+        target = lowered_fields.get(field_key, "")
+        if query_lower and query_lower in target:
+            score += float(weight)
+            exact_phrase_match = True
+            match_fields.add(field_key)
+
+    def add_token(field_key: str, token: str, weight: float) -> None:
+        nonlocal score
+        if not token:
+            return
+        target = lowered_fields.get(field_key, "")
+        if token in target:
+            score += float(weight)
+            match_fields.add(field_key)
+            matched_terms_lower.add(token)
+
+    add_phrase("title", 4.0)
+    add_phrase("agenda_code", 3.3)
+    add_phrase("project", 2.4)
+    add_phrase("requester", 2.0)
+    add_phrase("responder", 1.9)
+    add_phrase("worker_summary", 1.7)
+    add_phrase("summary_plain", 1.5)
+    add_phrase("content", 1.1)
+    add_phrase("author", 1.0)
+
+    for token in token_lowers:
+        add_token("title", token, 1.5)
+        add_token("agenda_code", token, 1.2)
+        add_token("project", token, 0.9)
+        add_token("requester", token, 0.9)
+        add_token("responder", token, 0.9)
+        add_token("worker_summary", token, 0.8)
+        add_token("summary_plain", token, 0.7)
+        add_token("content", token, 0.5)
+        add_token("author", token, 0.4)
+
+    if not exact_phrase_match and len(token_lowers) >= 2:
+        required_token_matches = 2 if len(token_lowers) <= 3 else 3
+        if matched_tokens < required_token_matches:
+            return 0.0, {}
+
+    if score <= 0.0:
+        return 0.0, {}
+
+    matched_terms = [
+        str(token)
+        for token in tokens
+        if str(token).strip() and str(token).lower() in matched_terms_lower
+    ]
+
+    snippet_field = ""
+    snippet = ""
+    for field_key in (
+        "title",
+        "summary_plain",
+        "content",
+        "project",
+        "agenda_code",
+        "worker_summary",
+        "requester",
+        "responder",
+        "author",
+    ):
+        raw = field_map.get(field_key) or ""
+        lowered = raw.lower()
+        if query_lower and query_lower in lowered:
+            snippet_field = field_key
+            snippet = _extract_snippet(raw, query_lower=query_lower, token_lowers=token_lowers)
+            break
+        if any(token in lowered for token in token_lowers):
+            snippet_field = field_key
+            snippet = _extract_snippet(raw, query_lower=query_lower, token_lowers=token_lowers)
+            break
+
+    if not snippet_field:
+        snippet_field = "summary_plain" if summary_plain else "title"
+        snippet = _extract_snippet(field_map.get(snippet_field) or "", query_lower=query_lower, token_lowers=token_lowers)
+
+    return score, {
+        "match_fields": sorted(match_fields),
+        "matched_terms": matched_terms,
+        "snippet_field": snippet_field,
+        "snippet": snippet,
+    }
+
+
 def _tokenize_agenda_search_query(query: str) -> list[str]:
     return _sanitize_query_tokens(query)
 
@@ -1513,6 +1729,144 @@ def list_agenda_threads(
         "total": total,
         "total_pages": total_pages,
     }
+
+
+@router.get("/threads/search")
+def search_agenda_threads(
+    q: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    query_text = str(q or "").strip()
+    if not query_text:
+        return []
+
+    tokens = _tokenize_agenda_search_query(query_text)
+
+    query_builder = db.query(models.AgendaThread).filter(
+        or_(
+            models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED,
+            and_(
+                models.AgendaThread.record_status == RECORD_STATUS_DRAFT,
+                models.AgendaThread.created_by_user_id == int(user.id),
+            ),
+        )
+    )
+
+    token_conditions = []
+    needle = query_text.strip()
+    fields = (
+        models.AgendaThread.title,
+        models.AgendaThread.agenda_code,
+        models.AgendaThread.summary_plain,
+        models.AgendaThread.requester_name,
+        models.AgendaThread.requester_org,
+        models.AgendaThread.responder_name,
+        models.AgendaThread.responder_org,
+    )
+    if needle:
+        token_conditions.extend(field.ilike(f"%{needle}%") for field in fields)
+    for token in tokens:
+        token_conditions.extend(field.ilike(f"%{token}%") for field in fields)
+    if token_conditions:
+        query_builder = query_builder.filter(or_(*token_conditions))
+
+    candidate_limit = max(int(limit) * 30, 300)
+    candidates = (
+        query_builder
+        .order_by(models.AgendaThread.last_updated_at.desc(), models.AgendaThread.id.desc())
+        .limit(candidate_limit)
+        .all()
+    )
+    if not candidates:
+        return []
+
+    project_ids = {int(thread.project_id) for thread in candidates if thread.project_id}
+    project_map: dict[int, models.BudgetProject] = {}
+    if project_ids:
+        projects = (
+            db.query(models.BudgetProject)
+            .filter(models.BudgetProject.id.in_(sorted(project_ids)))
+            .all()
+        )
+        project_map = {int(project.id): project for project in projects}
+
+    root_entry_ids = [int(item.root_entry_id) for item in candidates if item.root_entry_id]
+    latest_entry_ids = [int(item.latest_entry_id) for item in candidates if item.latest_entry_id]
+    entry_ids = list({*root_entry_ids, *latest_entry_ids})
+
+    entries = []
+    if entry_ids:
+        entries = (
+            db.query(models.AgendaEntry)
+            .filter(models.AgendaEntry.id.in_(entry_ids))
+            .all()
+        )
+    entry_map = {int(item.id): item for item in entries}
+
+    user_ids = {int(item.created_by_user_id) for item in entries if item.created_by_user_id}
+    user_map = _user_map_by_ids(user_ids, db)
+    first_image_map = _first_image_attachment_map(entry_ids, db) if entry_ids else {}
+
+    scored_results: list[dict[str, Any]] = []
+    for thread in candidates:
+        root_entry = entry_map.get(int(thread.root_entry_id)) if thread.root_entry_id else None
+        latest_entry = entry_map.get(int(thread.latest_entry_id)) if thread.latest_entry_id else None
+        payload = _serialize_thread(thread, root_entry, latest_entry, user_map, first_image_map)
+
+        project = project_map.get(int(thread.project_id))
+        project_name = (project.name if project else "") or ""
+        project_code = (project.code if project else "") or ""
+
+        score, explain = _agenda_search_score_and_explain(
+            thread_payload=payload,
+            root_entry=root_entry,
+            latest_entry=latest_entry,
+            project_name=project_name,
+            project_code=project_code,
+            query=query_text,
+            tokens=tokens,
+        )
+        if score <= 0:
+            continue
+
+        scored_results.append(
+            {
+                "thread_id": int(thread.id),
+                "project_id": int(thread.project_id),
+                "project_name": project_name,
+                "project_code": project_code,
+                "agenda_code": payload.get("agenda_code") or "",
+                "title": payload.get("title") or "",
+                "thread_kind": payload.get("thread_kind") or "",
+                "progress_status": payload.get("progress_status") or "",
+                "last_updated_at": payload.get("last_updated_at") or "",
+                "updated_at": payload.get("updated_at") or "",
+                "score": float(score),
+                "match_fields": explain.get("match_fields") or [],
+                "matched_terms": explain.get("matched_terms") or [],
+                "snippet_field": explain.get("snippet_field") or "",
+                "snippet": explain.get("snippet") or "",
+            }
+        )
+
+    def _safe_ts(value: str) -> float:
+        try:
+            return float(parse_iso(value).timestamp())
+        except Exception:  # noqa: BLE001
+            return 0.0
+
+    scored_results.sort(
+        key=lambda item: (
+            float(item.get("score") or 0.0),
+            _safe_ts(str(item.get("last_updated_at") or "")),
+            int(item.get("thread_id") or 0),
+        ),
+        reverse=True,
+    )
+
+    return scored_results[: int(limit)]
 
 
 @router.get("/threads/{thread_id}")

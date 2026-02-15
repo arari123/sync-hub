@@ -1,6 +1,10 @@
 import unittest
 
-from app.api.agenda import _agenda_match_score_tuple, _tokenize_agenda_search_query
+from app.api.agenda import (
+    _agenda_match_score_tuple,
+    _agenda_search_score_and_explain,
+    _tokenize_agenda_search_query,
+)
 
 
 class AgendaSearchTests(unittest.TestCase):
@@ -26,6 +30,52 @@ class AgendaSearchTests(unittest.TestCase):
         tokens = _tokenize_agenda_search_query(query)
         score = _agenda_match_score_tuple('정기 점검 보고서', query, tokens)
         self.assertEqual(score, (0, 0, 0, 0))
+
+    def test_global_search_score_returns_positive_when_title_matches(self):
+        query = '긴급 장애'
+        tokens = _tokenize_agenda_search_query(query)
+
+        score, explain = _agenda_search_score_and_explain(
+            thread_payload={
+                "title": "긴급 장애 조치 보고",
+                "root_title": "긴급 장애 조치 보고",
+                "latest_title": "긴급 장애 조치 보고",
+                "agenda_code": "AG-2026-000001",
+                "summary_plain": "",
+            },
+            root_entry=None,
+            latest_entry=None,
+            project_name="로컬 데모 001",
+            project_code="PJT-001",
+            query=query,
+            tokens=tokens,
+        )
+
+        self.assertGreater(score, 0.0)
+        self.assertIn("title", explain.get("match_fields", []))
+
+    def test_global_search_score_requires_multiple_tokens_when_no_phrase_match(self):
+        query = '라인 센서 교체'
+        tokens = _tokenize_agenda_search_query(query)
+
+        score, explain = _agenda_search_score_and_explain(
+            thread_payload={
+                "title": "라인 점검 보고",
+                "root_title": "라인 점검 보고",
+                "latest_title": "라인 점검 보고",
+                "agenda_code": "AG-2026-000002",
+                "summary_plain": "",
+            },
+            root_entry=None,
+            latest_entry=None,
+            project_name="",
+            project_code="",
+            query=query,
+            tokens=tokens,
+        )
+
+        self.assertEqual(score, 0.0)
+        self.assertEqual(explain, {})
 
 
 if __name__ == '__main__':

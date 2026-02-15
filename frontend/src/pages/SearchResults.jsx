@@ -1561,15 +1561,21 @@ const SearchResults = () => {
                                                                     );
                                                                 })}
                                                             </div>
-
-                                                            {isReviewStage && (
-                                                                <div className="absolute inset-0 flex items-center justify-center px-2">
-                                                                    <span className="truncate rounded-full border border-slate-200 bg-white/85 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-sm">
-                                                                        검토 단계 · 생성 {createdDateLabel}
-                                                                    </span>
-                                                                </div>
-                                                            )}
                                                         </div>
+
+                                                        {isReviewStage && (
+                                                            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-full -translate-x-1/2 -translate-y-1/2 px-2">
+                                                                <div className="mx-auto w-fit max-w-full">
+                                                                    <div className="relative inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-sky-200/70 bg-gradient-to-r from-sky-50/95 via-white/90 to-emerald-50/90 px-2.5 py-1 text-[10px] font-extrabold text-slate-800 shadow-[0_16px_34px_-26px_hsl(220_40%_15%/0.62)] backdrop-blur">
+                                                                        <span className="h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.8)]" />
+                                                                        <span className="shrink-0 tracking-[0.08em] text-sky-700">검토</span>
+                                                                        <span className="text-slate-300">|</span>
+                                                                        <span className="truncate font-mono text-slate-600">생성 {createdDateLabel}</span>
+                                                                        <span className="pointer-events-none absolute -inset-px -z-10 rounded-full bg-white/35 blur-md" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="grid grid-cols-5 gap-1 px-1">
@@ -1580,25 +1586,48 @@ const SearchResults = () => {
                                                             const isUpcoming = !isDone && !isActive;
                                                             const labelClass = isUpcoming ? 'text-slate-400' : item.textClass;
 
-                                                            let dateLabel = '...';
+                                                            let startLabel = '...';
+                                                            let endLabel = '...';
                                                             if (!isScheduleLoading) {
-                                                                dateLabel = scheduleSummary?.hasError
-                                                                    ? '-'
-                                                                    : formatYmdRange(stageDates.start, stageDates.end);
+                                                                if (scheduleSummary?.hasError) {
+                                                                    startLabel = '-';
+                                                                    endLabel = '-';
+                                                                } else {
+                                                                    startLabel = formatYmdDot(stageDates.start);
+                                                                    endLabel = formatYmdDot(stageDates.end);
+                                                                }
                                                             }
 
                                                             return (
                                                                 <div key={`timeline-meta-${project.id}-${item.key}`} className="min-w-0">
-                                                                    <p className={cn('text-[9px] font-extrabold tracking-wide', labelClass)}>
-                                                                        {item.label}
-                                                                    </p>
-                                                                    <p className={cn(
-                                                                        'truncate font-mono text-[9px]',
-                                                                        isUpcoming ? 'text-slate-400' : 'text-slate-600'
-                                                                    )}
-                                                                    >
-                                                                        {dateLabel}
-                                                                    </p>
+                                                                    <div className="flex items-center justify-between gap-1">
+                                                                        <p className={cn('truncate text-[9px] font-extrabold leading-none tracking-wide', labelClass)}>
+                                                                            {item.label}
+                                                                        </p>
+                                                                        <p className={cn(
+                                                                            'shrink-0 font-mono text-[9px] leading-none',
+                                                                            isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                        )}
+                                                                        >
+                                                                            {startLabel}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between gap-1">
+                                                                        <p className={cn(
+                                                                            'text-[9px] font-semibold leading-none',
+                                                                            isUpcoming ? 'text-slate-300' : 'text-slate-400'
+                                                                        )}
+                                                                        >
+                                                                            끝
+                                                                        </p>
+                                                                        <p className={cn(
+                                                                            'shrink-0 font-mono text-[9px] leading-none',
+                                                                            isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                        )}
+                                                                        >
+                                                                            {endLabel}
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
                                                             );
                                                         })}

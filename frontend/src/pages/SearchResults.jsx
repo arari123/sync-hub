@@ -244,7 +244,9 @@ function parseScopedQuery(rawQuery) {
 
 function normalizeStage(value) {
     const stage = String(value || '').trim().toLowerCase();
+    if (stage === 'as' || stage === 'a/s') return 'warranty';
     if (stage === 'progress') return 'fabrication';
+    if (stage === 'closed' || stage === 'end') return 'closure';
     return stage;
 }
 
@@ -263,11 +265,10 @@ function resolveProjectStatusLabel(project) {
     const stage = normalizeStage(project?.current_stage);
     const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
     const explicitLabel = String(project?.current_stage_label || '').trim();
-    if ((projectTypeKey === 'as' || projectTypeKey === 'parts') && (stage === 'start' || explicitLabel === '시작')) {
-        return '진행 중';
-    }
-    if (projectTypeKey === 'as' && stage !== 'review' && stage !== 'closure') {
-        return 'AS';
+    if (projectTypeKey === 'as' || projectTypeKey === 'parts') {
+        // For start/end projects, everything between review and closure is "in progress".
+        if (stage && stage !== 'review' && stage !== 'closure') return '진행 중';
+        if (explicitLabel === 'AS' || explicitLabel === '시작' || explicitLabel === '진행 중') return '진행 중';
     }
 
     if (explicitLabel) return explicitLabel;

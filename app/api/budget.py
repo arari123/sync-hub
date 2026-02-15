@@ -533,8 +533,8 @@ def _project_current_stage_label(project: models.BudgetProject) -> str:
     """Return a user-facing stage label that respects project_type rules.
 
     - equipment: review/design/fabrication/installation/warranty/closure
-    - parts: review/start/closure
-    - as: review/AS/closure (AS label is used instead of warranty-like stage labels)
+    - parts: review/진행 중/closure
+    - as: review/진행 중/closure
     """
     project_type = _project_type_code_or_empty(project.project_type)
     try:
@@ -542,10 +542,8 @@ def _project_current_stage_label(project: models.BudgetProject) -> str:
     except Exception:  # noqa: BLE001
         stage_key = (project.current_stage or "").strip().lower() or _REVIEW_STAGE
 
-    if project_type == "as" and stage_key not in {_REVIEW_STAGE, "closure"}:
-        return "AS"
-    if project_type == "parts" and stage_key not in {_REVIEW_STAGE, "closure"}:
-        return "시작"
+    if project_type in {"as", "parts"} and stage_key not in {_REVIEW_STAGE, "closure"}:
+        return "진행 중"
     return stage_label(stage_key)
 
 

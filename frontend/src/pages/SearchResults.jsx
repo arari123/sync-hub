@@ -250,9 +250,14 @@ function normalizeProjectType(value) {
 }
 
 function resolveProjectStatusLabel(project) {
+    const stage = normalizeStage(project?.current_stage);
+    const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
+    if (projectTypeKey === 'as' && stage !== 'review' && stage !== 'closure') {
+        return 'AS';
+    }
+
     const explicitLabel = String(project?.current_stage_label || '').trim();
     if (explicitLabel) return explicitLabel;
-    const stage = normalizeStage(project?.current_stage);
     return STAGE_LABEL_MAP[stage] || '-';
 }
 

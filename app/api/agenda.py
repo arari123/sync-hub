@@ -482,17 +482,17 @@ def _serialize_thread(
         except Exception:  # noqa: BLE001
             latest_payload = {}
 
-    def resolve_thumbnail_url(entry: Optional[models.AgendaEntry]) -> str:
-        if not entry:
-            return ""
-        src = _first_image_src_from_html(entry.content_html)
-        if not src:
-            src = first_image_by_entry_id.get(int(entry.id), "")
-        return str(src or "").strip()
-
-    root_thumbnail_url = resolve_thumbnail_url(root_entry) or _DEFAULT_THUMBNAIL_IMAGE
-    latest_thumbnail_url = resolve_thumbnail_url(latest_entry) or root_thumbnail_url or _DEFAULT_THUMBNAIL_IMAGE
-    thumbnail_url = latest_thumbnail_url or root_thumbnail_url or _DEFAULT_THUMBNAIL_IMAGE
+    thumbnail_url = ""
+    if latest_entry:
+        thumbnail_url = _first_image_src_from_html(latest_entry.content_html)
+    if not thumbnail_url and latest_entry:
+        thumbnail_url = first_image_by_entry_id.get(int(latest_entry.id), "")
+    if not thumbnail_url and root_entry:
+        thumbnail_url = _first_image_src_from_html(root_entry.content_html)
+    if not thumbnail_url and root_entry:
+        thumbnail_url = first_image_by_entry_id.get(int(root_entry.id), "")
+    if not thumbnail_url:
+        thumbnail_url = _DEFAULT_THUMBNAIL_IMAGE
 
     root_author = user_map.get(int(root_entry.created_by_user_id)) if root_entry else None
     latest_author = user_map.get(int(latest_entry.created_by_user_id)) if latest_entry else None
@@ -544,8 +544,6 @@ def _serialize_thread(
         "reply_count": int(thread.reply_count or 0),
         "comment_count": int(thread.comment_count or 0),
         "attachment_count": int(thread.attachment_count or 0),
-        "root_thumbnail_url": root_thumbnail_url,
-        "latest_thumbnail_url": latest_thumbnail_url,
         "thumbnail_url": thumbnail_url,
         "worker_summary": worker_summary,
         "total_work_hours": total_work_hours,

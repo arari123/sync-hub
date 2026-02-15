@@ -5,7 +5,7 @@ import {
     Search,
     TimerReset,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -316,6 +316,50 @@ export default function BudgetProjectScheduleManagement() {
 
     if (!project) {
         return <p className="text-sm text-slate-500">{error || '프로젝트를 찾을 수 없습니다.'}</p>;
+    }
+
+    const projectTypeKey = String(project?.project_type || '').trim().toLowerCase();
+    const isAsProject = projectTypeKey === 'as';
+    const parentProject = project?.parent_project || null;
+
+    if (isAsProject) {
+        return (
+            <div className="space-y-5">
+                <ProjectPageHeader
+                    projectId={project.id}
+                    projectName={project.name || '프로젝트'}
+                    projectCode={project.code || ''}
+                    pageLabel="일정 관리"
+                    breadcrumbItems={[
+                        { label: '프로젝트 관리', to: '/project-management' },
+                        { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
+                        { label: '일정 관리' },
+                    ]}
+                    actions={parentProject?.id ? (
+                        <Link to={`/project-management/projects/${parentProject.id}/schedule`}>
+                            <Button type="button" size="sm" variant="outline">
+                                소속 설비 일정 보기
+                            </Button>
+                        </Link>
+                    ) : null}
+                />
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">워런티 프로젝트는 일정 입력이 필요하지 않습니다.</p>
+                    {parentProject?.id ? (
+                        <p className="mt-2 text-xs text-amber-900/80">
+                            소속 설비: <Link className="font-semibold underline underline-offset-2" to={`/project-management/projects/${parentProject.id}`}>
+                                {(parentProject.code || parentProject.name || `#${parentProject.id}`)}
+                            </Link>
+                        </p>
+                    ) : (
+                        <p className="mt-2 text-xs text-amber-900/80">
+                            소속 설비 프로젝트가 지정되어 있지 않습니다. 프로젝트 정보에서 소속 설비를 선택해 주세요.
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
     }
 
     const scaleText = chartScale === 'day' ? '일 단위' : chartScale === 'week' ? '주 단위' : '월 단위';

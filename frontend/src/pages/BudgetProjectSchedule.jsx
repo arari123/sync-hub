@@ -750,6 +750,53 @@ const BudgetProjectSchedule = () => {
         return <p className="text-sm text-slate-500">프로젝트를 찾을 수 없습니다.</p>;
     }
 
+    const projectTypeKey = String(project?.project_type || '').trim().toLowerCase();
+    const isAsProject = projectTypeKey === 'as';
+    const parentProject = project?.parent_project || null;
+
+    if (isAsProject) {
+        return (
+            <div className="space-y-5">
+                <ProjectPageHeader
+                    projectId={project.id}
+                    projectName={project.name || '프로젝트'}
+                    projectCode={project.code || ''}
+                    pageLabel="일정 작성"
+                    canEdit={false}
+                    breadcrumbItems={[
+                        { label: '프로젝트 관리', to: '/project-management' },
+                        { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
+                        { label: '일정 관리', to: `/project-management/projects/${project.id}/schedule` },
+                        { label: '일정 작성' },
+                    ]}
+                    actions={parentProject?.id ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/project-management/projects/${parentProject.id}/schedule`)}
+                        >
+                            소속 설비 일정 보기
+                        </Button>
+                    ) : null}
+                />
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">워런티 프로젝트는 일정 입력이 필요하지 않습니다.</p>
+                    {parentProject?.id ? (
+                        <p className="mt-2 text-xs text-amber-900/80">
+                            소속 설비 프로젝트에서 일정을 관리해 주세요.
+                        </p>
+                    ) : (
+                        <p className="mt-2 text-xs text-amber-900/80">
+                            소속 설비 프로젝트가 지정되어 있지 않습니다. 프로젝트 정보에서 소속 설비를 선택해 주세요.
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     const renderGroupNode = (groupNode, depth = 0) => {
         const isExpanded = expandedGroupIds.has(groupNode.id);
         const stats = groupStats.get(groupNode.id) || {

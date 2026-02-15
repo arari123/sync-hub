@@ -122,6 +122,11 @@ const HOME_STAGE_TIMELINE = [
     { key: 'as', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
 ];
 const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
+const HOME_AS_TIMELINE = [
+    { key: 'start', label: '시작', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
+    { key: 'end', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-200', textClass: 'text-slate-700' },
+];
+const HOME_AS_TIMELINE_META = HOME_AS_TIMELINE;
 
 function normalizeProjectId(value) {
     const projectId = Number(value || 0);
@@ -381,6 +386,12 @@ function resolveTimelineProgressIndex(stageKey) {
     if (stage === 'warranty') return 3; // warranty
     if (stage === 'closure') return HOME_STAGE_TIMELINE.length; // all done
     return 0; // review or unknown
+}
+
+function resolveAsTimelineProgressIndex(stageKey) {
+    const stage = normalizeStage(stageKey);
+    if (stage === 'closure') return HOME_AS_TIMELINE.length;
+    return 0;
 }
 
 function resolveBudgetSnapshot(project) {
@@ -907,10 +918,36 @@ const SearchResults = () => {
                 closure: { start: '', end: '' },
             };
 
-            const responses = await Promise.all(
-                pendingProjectIds.map(async (projectId) => {
+            const pendingProjects = tableProjects.filter((project) => pendingProjectIds.includes(normalizeProjectId(project?.id)));
+            const targets = new Map();
+            const immediateResponses = [];
+            pendingProjects.forEach((project) => {
+                const projectId = normalizeProjectId(project?.id);
+                const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
+                const parentId = normalizeProjectId(project?.parent_project_id || project?.parent_project?.id);
+                const targetId = projectTypeKey === 'as' && parentId ? parentId : projectId;
+
+                if (!targetId) {
+                    immediateResponses.push({
+                        projectId,
+                        value: {
+                            stages: emptyStages,
+                            fetchedAt: Date.now(),
+                            hasError: true,
+                        },
+                    });
+                    return;
+                }
+
+                const existing = targets.get(targetId) || [];
+                existing.push(projectId);
+                targets.set(targetId, existing);
+            });
+
+            const targetResponses = await Promise.all(
+                Array.from(targets.entries()).map(async ([targetId, projectIds]) => {
                     try {
-                        const response = await api.get(`/budget/projects/${projectId}/schedule`, { signal: controller.signal });
+                        const response = await api.get(`/budget/projects/${targetId}/schedule`, { signal: controller.signal });
                         const schedule = normalizeSchedulePayload(response?.data?.schedule || {});
                         const stats = computeGroupStats(schedule);
                         const designStats = stats.get(ROOT_GROUP_IDS.design) || {};
@@ -922,7 +959,7 @@ const SearchResults = () => {
                         const closureDate = addYearsToYmd(asStart, 1);
 
                         return {
-                            projectId,
+                            projectIds,
                             value: {
                                 stages: {
                                     design: {
@@ -955,7 +992,7 @@ const SearchResults = () => {
                             return null;
                         }
                         return {
-                            projectId,
+                            projectIds,
                             value: {
                                 stages: emptyStages,
                                 fetchedAt: Date.now(),
@@ -965,6 +1002,13 @@ const SearchResults = () => {
                     }
                 })
             );
+
+            const responses = [
+                ...immediateResponses,
+                ...targetResponses
+                    .filter(Boolean)
+                    .flatMap((item) => item.projectIds.map((projectId) => ({ projectId, value: item.value }))),
+            ];
 
             if (!active) return;
 
@@ -1431,7 +1475,12 @@ const SearchResults = () => {
                                     const isScheduleLoading = !scheduleSummary;
                                     const scheduleStages = scheduleSummary?.stages || {};
                                     const projectStageKey = normalizeStage(project?.current_stage);
-                                    const timelineActiveIndex = resolveTimelineProgressIndex(projectStageKey);
+                                    const projectTypeKey = normalizeProjectType(project?.project_type || project?.project_type_label);
+                                    const isAsProject = projectTypeKey === 'as';
+                                    const parentProject = project?.parent_project || null;
+                                    const timelineActiveIndex = isAsProject
+                                        ? resolveAsTimelineProgressIndex(projectStageKey)
+                                        : resolveTimelineProgressIndex(projectStageKey);
                                     const isReviewStage = projectStageKey === 'review';
                                     const isClosureStage = projectStageKey === 'closure';
                                     const createdDateLabel = formatYmdDot(project?.created_at);
@@ -1443,6 +1492,10 @@ const SearchResults = () => {
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
+                                    const warrantyFallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+                                    const warrantyStart = String(scheduleStages?.as?.start || '').trim() || warrantyFallbackStart;
+                                    const warrantyEnd = String(scheduleStages?.as?.end || '').trim()
+                                        || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
                                     return (
                                         <article
                                             key={`project-row-${project.id}`}
@@ -1469,13 +1522,27 @@ const SearchResults = () => {
                                                             <span className="truncate text-[10px] font-mono tracking-wider text-slate-400">
                                                                 {project.code || '코드 없음'}
                                                             </span>
-                                                            <span className={cn(
-                                                                'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
-                                                                stageStyle.badgeClass
-                                                            )}
-                                                            >
-                                                                {resolveProjectStatusLabel(project)}
-                                                            </span>
+                                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                                {isAsProject && parentProject?.id && (
+                                                                    <Link
+                                                                        to={`/project-management/projects/${parentProject.id}`}
+                                                                        title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
+                                                                        className="inline-flex max-w-[170px] items-center gap-1 rounded-full border border-slate-200 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-white"
+                                                                    >
+                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                                                                        <span className="truncate">
+                                                                            {parentProject.code || parentProject.name || '소속 설비'}
+                                                                        </span>
+                                                                    </Link>
+                                                                )}
+                                                                <span className={cn(
+                                                                    'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                                                    stageStyle.badgeClass
+                                                                )}
+                                                                >
+                                                                    {resolveProjectStatusLabel(project)}
+                                                                </span>
+                                                            </div>
                                                         </div>
 
                                                         <Link
@@ -1546,7 +1613,9 @@ const SearchResults = () => {
                                                     </div>
 
                                                     <div className="mb-0.5 flex items-center justify-between px-1">
-                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">단계 일정</span>
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                                                            {isAsProject ? '일정' : '단계 일정'}
+                                                        </span>
                                                         <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
                                                             {resolveProjectStatusLabel(project)}
                                                         </span>
@@ -1555,7 +1624,7 @@ const SearchResults = () => {
                                                     <div className="relative mb-0.5 h-7">
                                                         <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-slate-200">
                                                             <div className="flex h-full divide-x divide-white/70">
-                                                                {HOME_STAGE_TIMELINE.map((item, index) => {
+                                                                {(isAsProject ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
                                                                     const isDone = timelineActiveIndex > index;
                                                                     const isActive = timelineActiveIndex === index;
                                                                     const barClass = isDone || isActive ? item.solidClass : item.softClass;
@@ -1599,9 +1668,13 @@ const SearchResults = () => {
                                                         )}
                                                     </div>
 
-                                                    <div className="grid grid-cols-4 gap-1 px-1">
-                                                        {HOME_STAGE_TIMELINE_META.map((item, index) => {
-                                                            const stageDates = scheduleStages[item.key] || {};
+                                                    <div className={cn(
+                                                        'grid gap-1 px-1',
+                                                        isAsProject ? 'grid-cols-2' : 'grid-cols-4'
+                                                    )}
+                                                    >
+                                                        {(isAsProject ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index) => {
+                                                            const stageDates = isAsProject ? {} : (scheduleStages[item.key] || {});
                                                             const isDone = timelineActiveIndex > index;
                                                             const isActive = timelineActiveIndex === index;
                                                             const isUpcoming = !isDone && !isActive;
@@ -1613,6 +1686,12 @@ const SearchResults = () => {
                                                                 if (scheduleSummary?.hasError) {
                                                                     startLabel = '-';
                                                                     endLabel = '-';
+                                                                } else if (isAsProject) {
+                                                                    const dateLabel = item.key === 'start'
+                                                                        ? formatYmdDot(warrantyStart)
+                                                                        : formatYmdDot(warrantyEnd);
+                                                                    startLabel = dateLabel;
+                                                                    endLabel = dateLabel;
                                                                 } else {
                                                                     startLabel = formatYmdDot(stageDates.start);
                                                                     endLabel = formatYmdDot(stageDates.end);
@@ -1631,13 +1710,17 @@ const SearchResults = () => {
                                                                     >
                                                                         {startLabel}
                                                                     </p>
-                                                                    <p className={cn(
-                                                                        'mt-0.5 font-mono text-[9px] leading-none tabular-nums',
-                                                                        isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                    {isAsProject ? (
+                                                                        <p className="mt-0.5 text-[9px] leading-none opacity-0">-</p>
+                                                                    ) : (
+                                                                        <p className={cn(
+                                                                            'mt-0.5 font-mono text-[9px] leading-none tabular-nums',
+                                                                            isUpcoming ? 'text-slate-400' : 'text-slate-600'
+                                                                        )}
+                                                                        >
+                                                                            {endLabel}
+                                                                        </p>
                                                                     )}
-                                                                    >
-                                                                        {endLabel}
-                                                                    </p>
                                                                 </div>
                                                             );
                                                         })}

@@ -6,6 +6,12 @@ import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
+function extractItems(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+}
+
 function toNumber(value) {
     const number = Number(value || 0);
     return Number.isFinite(number) ? number : 0;
@@ -35,6 +41,7 @@ const EMPTY_EDIT_FORM = {
     name: '',
     code: '',
     project_type: 'equipment',
+    parent_project_id: '',
     current_stage: 'review',
     customer_name: '',
     installation_site: '',
@@ -53,6 +60,10 @@ const BudgetProjectInfoEdit = () => {
     const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
     const [equipmentNames, setEquipmentNames] = useState([]);
     const [equipmentDraft, setEquipmentDraft] = useState('');
+    const [equipmentProjects, setEquipmentProjects] = useState([]);
+    const [equipmentProjectQuery, setEquipmentProjectQuery] = useState('');
+    const [isEquipmentProjectLoading, setIsEquipmentProjectLoading] = useState(false);
+    const [equipmentProjectError, setEquipmentProjectError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -81,6 +92,7 @@ const BudgetProjectInfoEdit = () => {
                         name: currentProject.name || '',
                         code: currentProject.code || '',
                         project_type: currentProject.project_type || 'equipment',
+                        parent_project_id: currentProject.parent_project_id ? String(currentProject.parent_project_id) : '',
                         current_stage: currentProject.current_stage || 'review',
                         customer_name: currentProject.customer_name || '',
                         installation_site: currentProject.installation_site || '',
@@ -133,11 +145,66 @@ const BudgetProjectInfoEdit = () => {
         };
     }, [project?.can_edit]);
 
+    useEffect(() => {
+        if (editForm.project_type !== 'as') return undefined;
+        if (equipmentProjects.length > 0) return undefined;
+
+        let mounted = true;
+        const controller = new AbortController();
+
+        const loadEquipmentProjects = async () => {
+            setIsEquipmentProjectLoading(true);
+            setEquipmentProjectError('');
+            try {
+                const response = await api.get('/budget/projects', {
+                    params: {
+                        page: 1,
+                        page_size: 200,
+                        sort_by: 'updated_desc',
+                        project_types: 'equipment',
+                    },
+                    signal: controller.signal,
+                });
+                const items = extractItems(response?.data);
+                if (!mounted) return;
+                setEquipmentProjects(items);
+            } catch (err) {
+                if (!mounted || err?.code === 'ERR_CANCELED') return;
+                setEquipmentProjects([]);
+                setEquipmentProjectError(getErrorMessage(err, '설비 프로젝트 목록을 불러오지 못했습니다.'));
+            } finally {
+                if (!mounted) return;
+                setIsEquipmentProjectLoading(false);
+            }
+        };
+
+        loadEquipmentProjects();
+        return () => {
+            mounted = false;
+            controller.abort();
+        };
+    }, [editForm.project_type, equipmentProjects.length]);
+
     const baseProjectPath = project?.id ? `/project-management/projects/${project.id}` : '/project-management';
     const uniqueEquipmentNames = useMemo(
         () => Array.from(new Set((equipmentNames || []).map((name) => String(name || '').trim()).filter(Boolean))),
         [equipmentNames],
     );
+    const filteredEquipmentProjects = useMemo(() => {
+        const keyword = equipmentProjectQuery.trim().toLowerCase();
+        const list = Array.isArray(equipmentProjects) ? equipmentProjects : [];
+        const filtered = list.filter((candidate) => String(candidate?.id || '') !== String(project?.id || ''));
+        if (!keyword) return filtered;
+        return filtered.filter((candidate) => {
+            const haystack = [
+                candidate?.name,
+                candidate?.code,
+                candidate?.customer_name,
+                candidate?.installation_site,
+            ].join(' ').toLowerCase();
+            return haystack.includes(keyword);
+        });
+    }, [equipmentProjectQuery, equipmentProjects, project?.id]);
 
     const updateField = (key, value) => {
         setEditForm((prev) => ({
@@ -171,6 +238,10 @@ const BudgetProjectInfoEdit = () => {
         }
 
         const normalizedProjectType = editForm.project_type || 'equipment';
+        if (normalizedProjectType === 'as' && !String(editForm.parent_project_id || '').trim()) {
+            setSaveError('워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.');
+            return;
+        }
         if (normalizedProjectType === 'equipment' && !uniqueEquipmentNames.length) {
             setSaveError('설비 프로젝트는 설비를 최소 1개 이상 등록해야 합니다.');
             return;
@@ -183,6 +254,7 @@ const BudgetProjectInfoEdit = () => {
                 name,
                 code: (editForm.code || '').trim(),
                 project_type: normalizedProjectType,
+                parent_project_id: normalizedProjectType === 'as' ? Number(editForm.parent_project_id) : undefined,
                 current_stage: editForm.current_stage || 'review',
                 customer_name: (editForm.customer_name || '').trim(),
                 installation_site: (editForm.installation_site || '').trim(),
@@ -289,13 +361,63 @@ const BudgetProjectInfoEdit = () => {
                         <select
                             className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                             value={editForm.project_type}
-                            onChange={(event) => updateField('project_type', event.target.value)}
+                            onChange={(event) => {
+                                const nextType = event.target.value;
+                                setEditForm((prev) => ({
+                                    ...prev,
+                                    project_type: nextType,
+                                    parent_project_id: nextType === 'as' ? prev.parent_project_id : '',
+                                }));
+                            }}
                         >
                             <option value="equipment">설비</option>
                             <option value="parts">파츠</option>
                             <option value="as">워런티</option>
                         </select>
                     </Field>
+                    {editForm.project_type === 'as' && (
+                        <div className="sm:col-span-2">
+                            <Field label="소속 설비 프로젝트" required>
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                                    <div className="md:col-span-5">
+                                        <Input
+                                            className="h-9 w-full"
+                                            value={equipmentProjectQuery}
+                                            onChange={(event) => setEquipmentProjectQuery(event.target.value)}
+                                            placeholder="프로젝트명/코드/고객사로 검색"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-7">
+                                        <select
+                                            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                                            value={editForm.parent_project_id}
+                                            onChange={(event) => updateField('parent_project_id', event.target.value)}
+                                        >
+                                            <option value="">설비 프로젝트 선택</option>
+                                            {filteredEquipmentProjects.map((candidate) => {
+                                                const label = `${candidate.code ? `${candidate.code} · ` : ''}${candidate.name || `#${candidate.id}`}`;
+                                                return (
+                                                    <option key={`equipment-project-${candidate.id}`} value={String(candidate.id)}>
+                                                        {label}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+                                </div>
+                                {isEquipmentProjectLoading && (
+                                    <p className="mt-1 text-[11px] text-slate-500">설비 프로젝트 목록을 불러오는 중...</p>
+                                )}
+                                {equipmentProjectError && (
+                                    <p className="mt-1 text-[11px] text-rose-600">{equipmentProjectError}</p>
+                                )}
+                                {!isEquipmentProjectLoading && !equipmentProjectError && equipmentProjects.length <= 0 && (
+                                    <p className="mt-1 text-[11px] text-slate-500">선택 가능한 설비 프로젝트가 없습니다.</p>
+                                )}
+                                <p className="mt-1 text-[11px] text-slate-500">워런티 프로젝트는 소속 설비 프로젝트에 종속됩니다.</p>
+                            </Field>
+                        </div>
+                    )}
                     <Field label="현재 진행 단계">
                         <select
                             className="h-9 w-full rounded-md border bg-background px-3 text-sm"

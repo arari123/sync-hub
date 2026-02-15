@@ -30,6 +30,11 @@ const PROJECT_MILESTONE_STAGES = [
     { key: 'as', label: '워런티' },
 ];
 
+const WARRANTY_PROJECT_MILESTONE_STAGES = [
+    { key: 'start', label: '시작' },
+    { key: 'end', label: '종료' },
+];
+
 const STAGE_LABEL_ALIAS = {
     review: '검토',
     design: '설계',
@@ -49,6 +54,18 @@ const PROJECT_TYPE_LABEL_ALIAS = {
     parts: '파츠',
     as: '워런티',
 };
+
+function normalizeProjectTypeKey(labelValue, typeValue) {
+    const normalizedType = String(typeValue || '').trim().toLowerCase();
+    if (normalizedType === 'as' || normalizedType === 'a/s' || normalizedType === 'warranty') return 'as';
+    if (normalizedType === 'equipment') return 'equipment';
+    if (normalizedType === 'parts') return 'parts';
+
+    const normalizedLabel = String(labelValue || '').trim().toLowerCase();
+    if (normalizedLabel === '워런티' || normalizedLabel === '유지보수') return 'as';
+    if (PROJECT_TYPE_LABEL_ALIAS[normalizedLabel]) return normalizedLabel;
+    return normalizedType || normalizedLabel || '';
+}
 
 function toNumber(value) {
     const number = Number(value || 0);
@@ -223,7 +240,12 @@ const BudgetProjectOverview = () => {
                 setScheduleError('');
             }
             try {
-                const scheduleResp = await api.get(`/budget/projects/${projectId}/schedule`);
+                const projectTypeKey = normalizeProjectTypeKey(currentProject?.project_type_label, currentProject?.project_type);
+                const parentProjectId = Number(currentProject?.parent_project_id || currentProject?.parent_project?.id || 0);
+                const scheduleTargetProjectId = projectTypeKey === 'as' && parentProjectId > 0
+                    ? parentProjectId
+                    : projectId;
+                const scheduleResp = await api.get(`/budget/projects/${scheduleTargetProjectId}/schedule`);
                 const schedulePayload = scheduleResp?.data?.schedule || {};
                 setScheduleStages(buildProjectMilestoneScheduleStages(schedulePayload));
                 setScheduleError('');
@@ -235,7 +257,11 @@ const BudgetProjectOverview = () => {
                     as: { start: '', end: '' },
                     closure: { start: '', end: '' },
                 });
-                setScheduleError(getErrorMessage(scheduleErr, '일정 정보를 불러오지 못했습니다.'));
+                const projectTypeKey = normalizeProjectTypeKey(currentProject?.project_type_label, currentProject?.project_type);
+                const fallbackMessage = projectTypeKey === 'as'
+                    ? '소속 설비의 일정 정보를 불러오지 못했습니다.'
+                    : '일정 정보를 불러오지 못했습니다.';
+                setScheduleError(getErrorMessage(scheduleErr, fallbackMessage));
             } finally {
                 setIsScheduleLoading(false);
             }
@@ -315,6 +341,9 @@ const BudgetProjectOverview = () => {
         || STAGE_SEGMENTS.find((item) => item.key === currentStageKey)?.label
         || '-';
     const currentProjectTypeLabel = localizeProjectTypeLabel(project?.project_type_label, project?.project_type);
+    const projectTypeKey = normalizeProjectTypeKey(project?.project_type_label, project?.project_type);
+    const isAsProject = projectTypeKey === 'as';
+    const parentProject = project?.parent_project || null;
     const coverImageUrl = String(
         project?.cover_image_display_url || project?.cover_image_fallback_url || project?.cover_image_url || ''
     ).trim();
@@ -348,43 +377,65 @@ const BudgetProjectOverview = () => {
     const closureDateLabel = useMemo(() => {
         if (isScheduleLoading) return '...';
         if (scheduleError) return '-';
-        const value = scheduleStages?.closure?.end || scheduleStages?.as?.end || '';
+        let value = String(scheduleStages?.closure?.end || scheduleStages?.as?.end || '').trim();
+        if (isAsProject && !value) {
+            const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+            const warrantyStart = String(scheduleStages?.as?.start || '').trim() || fallbackStart;
+            value = String(scheduleStages?.as?.end || '').trim()
+                || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
+        }
         return formatYmdDot(value) || '-';
-    }, [isScheduleLoading, scheduleError, scheduleStages]);
+    }, [isAsProject, isScheduleLoading, scheduleError, scheduleStages, project?.created_at]);
+
+    const milestoneStages = useMemo(() => (
+        isAsProject ? WARRANTY_PROJECT_MILESTONE_STAGES : PROJECT_MILESTONE_STAGES
+    ), [isAsProject]);
 
     const milestoneActiveIndex = useMemo(() => {
         if (currentStageKey === 'review') return -1;
+        if (currentStageKey === 'closure') return milestoneStages.length;
+        if (isAsProject) return 0;
         if (currentStageKey === 'fabrication') return 1;
         if (currentStageKey === 'installation') return 2;
         if (currentStageKey === 'warranty') return 3;
-        if (currentStageKey === 'closure') return PROJECT_MILESTONE_STAGES.length;
         return 0;
-    }, [currentStageKey]);
+    }, [currentStageKey, isAsProject, milestoneStages.length]);
 
     const scheduleBadgeLabel = useMemo(() => {
         if (isScheduleLoading) return '일정 불러오는 중';
         if (scheduleError) return '일정 불러오기 실패';
+        if (isAsProject) {
+            const hasSource = Boolean(scheduleStages?.installation?.end);
+            return hasSource ? '설비 일정 반영' : '워런티 자동 계산';
+        }
         const hasAny = Boolean(
             scheduleStages?.design?.start
             || scheduleStages?.fabrication?.start
             || scheduleStages?.installation?.start
         );
         return hasAny ? '일정관리 반영' : '일정 미입력';
-    }, [isScheduleLoading, scheduleError, scheduleStages]);
+    }, [isAsProject, isScheduleLoading, scheduleError, scheduleStages]);
 
     const timelineItems = useMemo(() => (
-        PROJECT_MILESTONE_STAGES.map((stage, index) => {
+        milestoneStages.map((stage, index) => {
             const isDone = milestoneActiveIndex >= 0 && milestoneActiveIndex > index;
             const isActive = milestoneActiveIndex === index;
             const status = isDone ? 'completed' : isActive ? 'in_progress' : 'pending';
             const statusLabel = isDone ? '완료' : isActive ? '진행 중' : '대기';
-            const stageDates = scheduleStages?.[stage.key] || {};
 
             let dateLabel = '...';
             if (!isScheduleLoading) {
                 if (scheduleError) {
                     dateLabel = '-';
+                } else if (isAsProject) {
+                    const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
+                    const warrantyStart = String(scheduleStages?.as?.start || '').trim() || fallbackStart;
+                    const warrantyEnd = String(scheduleStages?.as?.end || '').trim()
+                        || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
+                    const value = stage.key === 'start' ? warrantyStart : warrantyEnd;
+                    dateLabel = formatYmdDot(value) || '-';
                 } else {
+                    const stageDates = scheduleStages?.[stage.key] || {};
                     const start = formatYmdDot(stageDates.start);
                     const end = formatYmdDot(stageDates.end);
                     if (!start || !end) {
@@ -405,7 +456,7 @@ const BudgetProjectOverview = () => {
                 date: dateLabel,
             };
         })
-    ), [milestoneActiveIndex, scheduleError, scheduleStages, isScheduleLoading]);
+    ), [isAsProject, isScheduleLoading, milestoneActiveIndex, milestoneStages, project?.created_at, scheduleError, scheduleStages]);
     const pathname = location.pathname;
     const isProjectMainActive = pathname === projectMainPath || pathname === `${projectMainPath}/`;
     const isBudgetActive = pathname === budgetManagementPath
@@ -543,6 +594,19 @@ const BudgetProjectOverview = () => {
                                                 <span className="text-xs font-semibold px-2 py-0.5 rounded border border-emerald-200 bg-emerald-50 text-emerald-700">
                                                     {currentProjectTypeLabel}
                                                 </span>
+                                                {isAsProject && parentProject?.id && (
+                                                    <Link
+                                                        to={`/project-management/projects/${parentProject.id}`}
+                                                        title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
+                                                        className="inline-flex max-w-[280px] items-center gap-1 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-white"
+                                                    >
+                                                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                                                        <span className="shrink-0 text-slate-500">소속</span>
+                                                        <span className="truncate">
+                                                            {parentProject.code || parentProject.name || '설비 프로젝트'}
+                                                        </span>
+                                                    </Link>
+                                                )}
                                             </div>
                                             <p className="text-sm text-muted-foreground max-w-2xl">
                                                 {project.description || '프로젝트 설명이 아직 등록되지 않았습니다.'}
@@ -655,7 +719,11 @@ const BudgetProjectOverview = () => {
 	                                            </div>
 	                                        </div>
 	                                    )}
-	                                    <div className="grid grid-cols-4 gap-2 relative">
+	                                    <div className={cn(
+	                                        'grid gap-2 relative',
+	                                        isAsProject ? 'grid-cols-2' : 'grid-cols-4',
+	                                    )}
+	                                    >
 	                                        {timelineItems.map((item, index) => (
 	                                            <TimelineStep
 	                                                key={item.key}

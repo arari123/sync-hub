@@ -5,6 +5,7 @@ import {
     Check,
     CirclePlus,
     ImagePlus,
+    Loader2,
     MapPin,
     QrCode,
     Save,
@@ -15,6 +16,12 @@ import {
 import { api, getErrorMessage } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { Input } from '../components/ui/Input';
+
+function extractItems(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+}
 
 function parseEquipmentNames(value) {
     const raw = String(value || '');
@@ -44,6 +51,11 @@ const BudgetProjectCreate = () => {
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [projectType, setProjectType] = useState('equipment');
+    const [parentProjectId, setParentProjectId] = useState('');
+    const [equipmentProjects, setEquipmentProjects] = useState([]);
+    const [equipmentProjectQuery, setEquipmentProjectQuery] = useState('');
+    const [isEquipmentProjectLoading, setIsEquipmentProjectLoading] = useState(false);
+    const [equipmentProjectError, setEquipmentProjectError] = useState('');
     const [equipmentInput, setEquipmentInput] = useState('');
     const [description, setDescription] = useState('');
     const [customerName, setCustomerName] = useState('');
@@ -70,12 +82,14 @@ const BudgetProjectCreate = () => {
                 setName(String(draft?.name || ''));
                 setCode(String(draft?.code || ''));
                 setProjectType(String(draft?.projectType || 'equipment'));
+                setParentProjectId(String(draft?.parentProjectId || ''));
                 setEquipmentInput(String(draft?.equipmentInput || ''));
                 setDescription(String(draft?.description || ''));
                 setCustomerName(String(draft?.customerName || ''));
                 setInstallationSite(String(draft?.installationSite || ''));
                 setBusinessTripDistanceKm(String(draft?.businessTripDistanceKm || ''));
                 setManagerUserId(String(draft?.managerUserId || ''));
+                setEquipmentProjectQuery(String(draft?.equipmentProjectQuery || ''));
                 const draftContacts = Array.isArray(draft?.clientContacts) ? draft.clientContacts : null;
                 if (draftContacts?.length) {
                     setClientContacts(draftContacts.map((item) => ({
@@ -119,6 +133,46 @@ const BudgetProjectCreate = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (projectType !== 'as') return undefined;
+        if (equipmentProjects.length > 0) return undefined;
+
+        let mounted = true;
+        const controller = new AbortController();
+
+        const loadEquipmentProjects = async () => {
+            setIsEquipmentProjectLoading(true);
+            setEquipmentProjectError('');
+            try {
+                const response = await api.get('/budget/projects', {
+                    params: {
+                        page: 1,
+                        page_size: 200,
+                        sort_by: 'updated_desc',
+                        project_types: 'equipment',
+                    },
+                    signal: controller.signal,
+                });
+                const items = extractItems(response?.data);
+                if (!mounted) return;
+                setEquipmentProjects(items);
+            } catch (err) {
+                if (!mounted || err?.code === 'ERR_CANCELED') return;
+                setEquipmentProjects([]);
+                setEquipmentProjectError(getErrorMessage(err, '설비 프로젝트 목록을 불러오지 못했습니다.'));
+            } finally {
+                if (!mounted) return;
+                setIsEquipmentProjectLoading(false);
+            }
+        };
+
+        loadEquipmentProjects();
+        return () => {
+            mounted = false;
+            controller.abort();
+        };
+    }, [equipmentProjects.length, projectType]);
+
     const projectTypeButtons = useMemo(() => ([
         { key: 'equipment', label: '설비' },
         { key: 'parts', label: '파츠' },
@@ -130,12 +184,14 @@ const BudgetProjectCreate = () => {
             name,
             code,
             projectType,
+            parentProjectId,
             equipmentInput,
             description,
             customerName,
             installationSite,
             businessTripDistanceKm,
             managerUserId,
+            equipmentProjectQuery,
             clientContacts,
             savedAt: Date.now(),
         };
@@ -191,6 +247,10 @@ const BudgetProjectCreate = () => {
             setError('설비 프로젝트는 설비를 최소 1개 이상 입력해 주세요.');
             return;
         }
+        if (projectType === 'as' && !parentProjectId) {
+            setError('워런티 프로젝트는 소속 설비 프로젝트를 선택해 주세요.');
+            return;
+        }
         if (!managerUserId) {
             setError('담당자를 선택해 주세요.');
             return;
@@ -203,6 +263,7 @@ const BudgetProjectCreate = () => {
                 name: name.trim(),
                 code: code.trim(),
                 project_type: projectType,
+                parent_project_id: projectType === 'as' ? Number(parentProjectId) : undefined,
                 description: description.trim(),
                 customer_name: customerName.trim(),
                 installation_site: installationSite.trim(),
@@ -230,6 +291,21 @@ const BudgetProjectCreate = () => {
             setIsSubmitting(false);
         }
     };
+
+    const filteredEquipmentProjects = useMemo(() => {
+        const keyword = equipmentProjectQuery.trim().toLowerCase();
+        const list = Array.isArray(equipmentProjects) ? equipmentProjects : [];
+        if (!keyword) return list;
+        return list.filter((project) => {
+            const haystack = [
+                project?.name,
+                project?.code,
+                project?.customer_name,
+                project?.installation_site,
+            ].join(' ').toLowerCase();
+            return haystack.includes(keyword);
+        });
+    }, [equipmentProjectQuery, equipmentProjects]);
 
     return (
         <div className="mx-auto flex h-[calc(100vh-10rem)] w-full max-w-7xl flex-col">
@@ -519,32 +595,34 @@ const BudgetProjectCreate = () => {
                                             <Building2 className="h-4 w-4 text-primary" />
                                             <span className="text-sm font-semibold text-slate-900">주요 설비 연동</span>
                                         </div>
-                                        <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 p-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => setEquipmentMode('registered')}
-                                                className={[
-                                                    'rounded-md px-3 py-1.5 text-xs font-medium transition',
-                                                    equipmentMode === 'registered'
-                                                        ? 'bg-white text-primary shadow-sm'
-                                                        : 'text-slate-600 hover:text-primary',
-                                                ].join(' ')}
-                                            >
-                                                등록 설비 선택
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setEquipmentMode('new')}
-                                                className={[
-                                                    'rounded-md px-3 py-1.5 text-xs font-medium transition',
-                                                    equipmentMode === 'new'
-                                                        ? 'bg-white text-primary shadow-sm'
-                                                        : 'text-slate-600 hover:text-primary',
-                                                ].join(' ')}
-                                            >
-                                                신규 설비 등록
-                                            </button>
-                                        </div>
+                                        {projectType === 'equipment' && (
+                                            <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 p-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEquipmentMode('registered')}
+                                                    className={[
+                                                        'rounded-md px-3 py-1.5 text-xs font-medium transition',
+                                                        equipmentMode === 'registered'
+                                                            ? 'bg-white text-primary shadow-sm'
+                                                            : 'text-slate-600 hover:text-primary',
+                                                    ].join(' ')}
+                                                >
+                                                    등록 설비 선택
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEquipmentMode('new')}
+                                                    className={[
+                                                        'rounded-md px-3 py-1.5 text-xs font-medium transition',
+                                                        equipmentMode === 'new'
+                                                            ? 'bg-white text-primary shadow-sm'
+                                                            : 'text-slate-600 hover:text-primary',
+                                                    ].join(' ')}
+                                                >
+                                                    신규 설비 등록
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="space-y-3 p-6">
                                         {projectType === 'equipment' ? (
@@ -564,8 +642,59 @@ const BudgetProjectCreate = () => {
                                                     <p>생성 시 입력한 설비명으로 초기 설비 목록이 자동 등록됩니다.</p>
                                                 </div>
                                             </>
+                                        ) : projectType === 'as' ? (
+                                            <div className="space-y-3">
+                                                <label className="block text-xs font-medium uppercase tracking-wider text-slate-500">
+                                                    소속 설비 프로젝트 선택 <span className="text-rose-500">*</span>
+                                                </label>
+                                                <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                                                    <div className="md:col-span-5">
+                                                        <Input
+                                                            className="w-full"
+                                                            placeholder="프로젝트명/코드/고객사로 검색"
+                                                            value={equipmentProjectQuery}
+                                                            onChange={(event) => setEquipmentProjectQuery(event.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="md:col-span-7">
+                                                        <select
+                                                            className="h-10 w-full rounded-md border-slate-300 bg-white px-3 text-sm shadow-sm transition focus:border-primary focus:ring-primary/20"
+                                                            value={parentProjectId}
+                                                            onChange={(event) => setParentProjectId(event.target.value)}
+                                                        >
+                                                            <option value="">설비 프로젝트를 선택해 주세요.</option>
+                                                            {filteredEquipmentProjects.map((project) => {
+                                                                const label = `${project.code ? `${project.code} · ` : ''}${project.name || `#${project.id}`}`;
+                                                                return (
+                                                                    <option key={`parent-project-${project.id}`} value={String(project.id)}>
+                                                                        {label}
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {isEquipmentProjectLoading && (
+                                                    <p className="flex items-center gap-2 text-xs text-slate-500">
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        설비 프로젝트 목록을 불러오는 중...
+                                                    </p>
+                                                )}
+                                                {equipmentProjectError && (
+                                                    <p className="text-xs text-rose-600">{equipmentProjectError}</p>
+                                                )}
+                                                {!isEquipmentProjectLoading && !equipmentProjectError && equipmentProjects.length <= 0 && (
+                                                    <p className="text-xs text-slate-500">
+                                                        선택 가능한 설비 프로젝트가 없습니다. 먼저 설비 프로젝트를 생성해 주세요.
+                                                    </p>
+                                                )}
+                                                <p className="text-xs text-slate-500">
+                                                    워런티 프로젝트는 선택한 설비 프로젝트에 종속되며, 별도 일정 입력이 필요하지 않습니다.
+                                                </p>
+                                            </div>
                                         ) : (
-                                            <p className="text-sm text-slate-500">파츠/워런티 프로젝트는 설비 입력이 필요하지 않습니다.</p>
+                                            <p className="text-sm text-slate-500">파츠 프로젝트는 설비 입력이 필요하지 않습니다.</p>
                                         )}
                                     </div>
                                 </div>

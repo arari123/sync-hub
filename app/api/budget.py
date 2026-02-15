@@ -184,6 +184,7 @@ class BudgetProjectCreate(BaseModel):
     code: Optional[str] = Field(default=None, max_length=64)
     description: Optional[str] = Field(default=None, max_length=500)
     project_type: Optional[str] = Field(default="equipment", max_length=32)
+    parent_project_id: Optional[int] = Field(default=None, ge=1)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
     business_trip_distance_km: Optional[float] = Field(default=0, ge=0)
@@ -195,6 +196,7 @@ class BudgetProjectUpdate(BaseModel):
     code: Optional[str] = Field(default=None, max_length=64)
     description: Optional[str] = Field(default=None, max_length=500)
     project_type: Optional[str] = Field(default=None, max_length=32)
+    parent_project_id: Optional[int] = Field(default=None, ge=1)
     customer_name: Optional[str] = Field(default=None, max_length=180)
     installation_site: Optional[str] = Field(default=None, max_length=180)
     business_trip_distance_km: Optional[float] = Field(default=None, ge=0)
@@ -1331,6 +1333,28 @@ def _serialize_projects_bulk(
             vid = int(equipment.version_id)
             equipments_by_version_id.setdefault(vid, []).append(equipment)
 
+    parent_ids = {
+        int(project.parent_project_id)
+        for project in projects
+        if project.parent_project_id is not None and int(project.parent_project_id) > 0
+    }
+    parent_payload_by_id: dict[int, dict] = {}
+    if parent_ids:
+        parent_rows = (
+            db.query(models.BudgetProject)
+            .filter(models.BudgetProject.id.in_(sorted(parent_ids)))
+            .all()
+        )
+        for parent in parent_rows:
+            pid = int(parent.id)
+            parent_payload_by_id[pid] = {
+                "id": pid,
+                "name": parent.name or "",
+                "code": parent.code or "",
+                "project_type": _project_type_code_or_empty(parent.project_type),
+                "project_type_label": _project_type_label(parent.project_type),
+            }
+
     output: list[dict] = []
     for project in projects:
         project_id = int(project.id)
@@ -1371,6 +1395,8 @@ def _serialize_projects_bulk(
         generated_cover_image_url = _build_generated_cover_image(project)
         custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
         summary_milestones = custom_milestones or _build_default_milestones(project)
+        parent_project_id = int(project.parent_project_id) if project.parent_project_id is not None else None
+        parent_project_payload = parent_payload_by_id.get(parent_project_id or 0)
 
         output.append(
             {
@@ -1380,6 +1406,8 @@ def _serialize_projects_bulk(
                 "description": project.description or "",
                 "project_type": _project_type_code_or_empty(project.project_type),
                 "project_type_label": _project_type_label(project.project_type),
+                "parent_project_id": parent_project_id,
+                "parent_project": parent_project_payload,
                 "customer_name": project.customer_name or "",
                 "installation_site": project.installation_site or "",
                 "equipment_names": equipment_names,
@@ -1524,6 +1552,19 @@ def _serialize_project(
     custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
     summary_milestones = custom_milestones or _build_default_milestones(project)
 
+    parent_project_id: Optional[int] = int(project.parent_project_id) if project.parent_project_id is not None else None
+    parent_project_payload = None
+    if parent_project_id:
+        parent_project = db.query(models.BudgetProject).filter(models.BudgetProject.id == parent_project_id).first()
+        if parent_project is not None:
+            parent_project_payload = {
+                "id": int(parent_project.id),
+                "name": parent_project.name or "",
+                "code": parent_project.code or "",
+                "project_type": _project_type_code_or_empty(parent_project.project_type),
+                "project_type_label": _project_type_label(parent_project.project_type),
+            }
+
     version_count = (
         db.query(func.count(models.BudgetVersion.id))
         .filter(models.BudgetVersion.project_id == project.id)
@@ -1538,6 +1579,8 @@ def _serialize_project(
         "description": project.description or "",
         "project_type": _project_type_code_or_empty(project.project_type),
         "project_type_label": _project_type_label(project.project_type),
+        "parent_project_id": parent_project_id,
+        "parent_project": parent_project_payload,
         "customer_name": project.customer_name or "",
         "installation_site": project.installation_site or "",
         "equipment_names": equipment_names,
@@ -2173,10 +2216,41 @@ def create_project(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
+    parent_project_id = int(payload.parent_project_id) if payload.parent_project_id is not None else None
+    parent_project = None
+    if project_type == "as":
+        if not parent_project_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
+            )
+        parent_project = db.query(models.BudgetProject).filter(models.BudgetProject.id == parent_project_id).first()
+        if not parent_project:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent_project_id.")
+        parent_type = _project_type_code_or_empty(parent_project.project_type) or "equipment"
+        if parent_type != "equipment":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="워런티 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
+            )
+    elif parent_project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="parent_project_id is only allowed for warranty projects.",
+        )
+
     manager_user_id = int(payload.manager_user_id) if payload.manager_user_id is not None else int(user.id)
     manager = db.query(models.User).filter(models.User.id == manager_user_id).first()
     if not manager or not manager.is_active or not manager.email_verified:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid manager_user_id.")
+
+    customer_name = (payload.customer_name or "").strip() or None
+    installation_site = (payload.installation_site or "").strip() or None
+    if project_type == "as" and parent_project is not None:
+        if not customer_name:
+            customer_name = (parent_project.customer_name or "").strip() or None
+        if not installation_site:
+            installation_site = (parent_project.installation_site or "").strip() or None
 
     now_iso = to_iso(utcnow())
     project = models.BudgetProject(
@@ -2184,8 +2258,9 @@ def create_project(
         code=code,
         description=(payload.description or "").strip() or None,
         project_type=project_type,
-        customer_name=(payload.customer_name or "").strip() or None,
-        installation_site=(payload.installation_site or "").strip() or None,
+        parent_project_id=parent_project_id,
+        customer_name=customer_name,
+        installation_site=installation_site,
         business_trip_distance_km=to_number(payload.business_trip_distance_km),
         created_by_user_id=int(user.id),
         manager_user_id=manager_user_id,
@@ -2254,6 +2329,13 @@ def update_project(
             project.project_type = normalized_type
             changed = True
 
+    if "parent_project_id" in fields_set:
+        parent_project_id = int(payload.parent_project_id) if payload.parent_project_id is not None else None
+        current_parent_project_id = int(project.parent_project_id) if project.parent_project_id is not None else None
+        if parent_project_id != current_parent_project_id:
+            project.parent_project_id = parent_project_id
+            changed = True
+
     if "current_stage" in fields_set and payload.current_stage is not None:
         try:
             normalized_stage = normalize_stage(payload.current_stage)
@@ -2296,6 +2378,32 @@ def update_project(
             project.manager_user_id = manager_user_id
             changed = True
 
+    final_project_type = _project_type_code_or_empty(project.project_type) or "equipment"
+    if final_project_type == "as":
+        if not project.parent_project_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
+            )
+        parent_project = db.query(models.BudgetProject).filter(models.BudgetProject.id == project.parent_project_id).first()
+        if not parent_project:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent_project_id.")
+        parent_type = _project_type_code_or_empty(parent_project.project_type) or "equipment"
+        if parent_type != "equipment":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="워런티 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
+            )
+    else:
+        if "parent_project_id" in fields_set and payload.parent_project_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="parent_project_id is only allowed for warranty projects.",
+            )
+        if project.parent_project_id is not None:
+            project.parent_project_id = None
+            changed = True
+
     if changed:
         project.updated_at = to_iso(utcnow())
         db.commit()
@@ -2327,6 +2435,12 @@ def upsert_project_schedule(
 ):
     project = _get_project_or_404(project_id, db)
     _require_project_edit_permission(project, user)
+    project_type = _project_type_code_or_empty(project.project_type) or "equipment"
+    if project_type == "as":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="워런티 프로젝트는 일정 입력이 필요하지 않습니다.",
+        )
 
     try:
         normalized = _normalize_schedule_wbs_payload(payload.model_dump(), strict_anchor=True)

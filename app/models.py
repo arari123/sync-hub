@@ -103,6 +103,7 @@ class BudgetProject(Base):
     code = Column(String(64), nullable=True, unique=True, index=True)
     description = Column(String(500), nullable=True)
     project_type = Column(String(32), nullable=True, index=True)
+    parent_project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=True, index=True)
     customer_name = Column(String(180), nullable=True)
     installation_site = Column(String(180), nullable=True)
     business_trip_distance_km = Column(Float, nullable=True)

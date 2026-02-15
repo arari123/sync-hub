@@ -38,14 +38,14 @@ const STAGE_OPTIONS = [
 const PROJECT_TYPE_OPTIONS = [
     { value: 'equipment', label: '설비' },
     { value: 'parts', label: '파츠' },
-    { value: 'as', label: '워런티' },
+    { value: 'as', label: 'AS' },
 ];
 const TABLE_PAGE_SIZE = 10;
 const STAGE_LABEL_MAP = Object.fromEntries(STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
     parts: '파츠',
-    as: '워런티',
+    as: 'AS',
 };
 const PROJECT_SIGNAL_LABELS = ['안건', '예산', '사양'];
 const FILTER_TOGGLE_GROUP_CLASS = 'flex shrink-0 rounded-md border border-border bg-secondary/80 p-0.5';
@@ -119,7 +119,7 @@ const HOME_STAGE_TIMELINE = [
     { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-200', textClass: 'text-sky-700' },
     { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-200', textClass: 'text-indigo-700' },
     { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-200', textClass: 'text-emerald-700' },
-    { key: 'as', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
+    { key: 'warranty', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
 ];
 const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
 const HOME_AS_TIMELINE = [
@@ -914,7 +914,7 @@ const SearchResults = () => {
                 design: { start: '', end: '' },
                 fabrication: { start: '', end: '' },
                 installation: { start: '', end: '' },
-                as: { start: '', end: '' },
+                warranty: { start: '', end: '' },
                 closure: { start: '', end: '' },
             };
 
@@ -955,8 +955,8 @@ const SearchResults = () => {
                         const installationStats = stats.get(ROOT_GROUP_IDS.installation) || {};
 
                         const installationEnd = String(installationStats?.last_end || '').trim();
-                        const asStart = installationEnd;
-                        const closureDate = addYearsToYmd(asStart, 1);
+                        const warrantyStart = installationEnd;
+                        const closureDate = addYearsToYmd(warrantyStart, 1);
 
                         return {
                             projectIds,
@@ -974,8 +974,8 @@ const SearchResults = () => {
                                         start: String(installationStats.first_start || '').trim(),
                                         end: String(installationStats.last_end || '').trim(),
                                     },
-                                    as: {
-                                        start: asStart,
+                                    warranty: {
+                                        start: warrantyStart,
                                         end: closureDate,
                                     },
                                     closure: {
@@ -1487,14 +1487,14 @@ const SearchResults = () => {
                                     const closureDateLabel = (() => {
                                         if (isScheduleLoading) return '...';
                                         if (scheduleSummary?.hasError) return '-';
-                                        return formatYmdDot(scheduleStages?.closure?.end || scheduleStages?.as?.end);
+                                        return formatYmdDot(scheduleStages?.closure?.end || scheduleStages?.warranty?.end);
                                     })();
                                     const stageStyle = resolveStageStyle(project);
                                     const budget = resolveBudgetSnapshot(project);
                                     const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
                                     const warrantyFallbackStart = String(project?.created_at || '').trim().slice(0, 10);
-                                    const warrantyStart = String(scheduleStages?.as?.start || '').trim() || warrantyFallbackStart;
-                                    const warrantyEnd = String(scheduleStages?.as?.end || '').trim()
+                                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || warrantyFallbackStart;
+                                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
                                         || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
                                     return (
                                         <article

@@ -239,7 +239,7 @@ const BudgetProjectInfoEdit = () => {
 
         const normalizedProjectType = editForm.project_type || 'equipment';
         if (normalizedProjectType === 'as' && !String(editForm.parent_project_id || '').trim()) {
-            setSaveError('워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.');
+            setSaveError('AS 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.');
             return;
         }
         if (normalizedProjectType === 'equipment' && !uniqueEquipmentNames.length) {
@@ -372,7 +372,7 @@ const BudgetProjectInfoEdit = () => {
                         >
                             <option value="equipment">설비</option>
                             <option value="parts">파츠</option>
-                            <option value="as">워런티</option>
+                            <option value="as">AS</option>
                         </select>
                     </Field>
                     {editForm.project_type === 'as' && (
@@ -414,7 +414,7 @@ const BudgetProjectInfoEdit = () => {
                                 {!isEquipmentProjectLoading && !equipmentProjectError && equipmentProjects.length <= 0 && (
                                     <p className="mt-1 text-[11px] text-slate-500">선택 가능한 설비 프로젝트가 없습니다.</p>
                                 )}
-                                <p className="mt-1 text-[11px] text-slate-500">워런티 프로젝트는 소속 설비 프로젝트에 종속됩니다.</p>
+                                <p className="mt-1 text-[11px] text-slate-500">AS 프로젝트는 소속 설비 프로젝트에 종속됩니다.</p>
                             </Field>
                         </div>
                     )}
@@ -528,7 +528,7 @@ const BudgetProjectInfoEdit = () => {
                             <p className="text-[11px] text-slate-500">여러 설비를 한 번에 입력하려면 쉼표(,) 또는 줄바꿈으로 구분해 추가할 수 있습니다.</p>
                         </div>
                     ) : (
-                        <p className="text-[11px] text-slate-500">파츠/워런티 프로젝트는 설비 입력이 필요하지 않습니다.</p>
+                        <p className="text-[11px] text-slate-500">파츠/AS 프로젝트는 설비 입력이 필요하지 않습니다.</p>
                     )}
                 </div>
 

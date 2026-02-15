@@ -345,7 +345,7 @@ export default function BudgetProjectScheduleManagement() {
                 />
 
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    <p className="font-semibold">워런티 프로젝트는 일정 입력이 필요하지 않습니다.</p>
+                    <p className="font-semibold">AS 프로젝트는 일정 입력이 필요하지 않습니다.</p>
                     {parentProject?.id ? (
                         <p className="mt-2 text-xs text-amber-900/80">
                             소속 설비: <Link className="font-semibold underline underline-offset-2" to={`/project-management/projects/${parentProject.id}`}>

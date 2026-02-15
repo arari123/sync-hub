@@ -1,7 +1,7 @@
-# Execution Plan: AS(워런티) 프로젝트 종속/일정 간소화 (2026-02-15)
+# Execution Plan: AS 프로젝트 종속/일정 간소화 (2026-02-15)
 
 ## 1. Goal
-AS(워런티) 프로젝트를 설비 프로젝트에 종속시키고, AS 프로젝트의 일정 UI를 시작/종료 2단계로 간소화한다. 생성/수정 UI에서 소속 설비 선택을 필수로 하고, 기존 데이터도 종속 구조로 마이그레이션한다.
+AS 프로젝트를 설비 프로젝트에 종속시키고, AS 프로젝트의 일정 UI를 시작/종료 2단계로 간소화한다. 생성/수정 UI에서 소속 설비 선택을 필수로 하고, 기존 데이터도 종속 구조로 마이그레이션한다.
 
 ## 2. Entry Points
 - 프로젝트 API/직렬화: `app/api/budget.py`
@@ -45,4 +45,3 @@ AS(워런티) 프로젝트를 설비 프로젝트에 종속시키고, AS 프로�
 ## 7. Evidence
 - `docker exec -w /app synchub_web bash scripts/verify_fast.sh`
 - `docker exec -w /app synchub_frontend npm run build`
-

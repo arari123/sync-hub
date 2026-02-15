@@ -27,7 +27,7 @@ const PROJECT_MILESTONE_STAGES = [
     { key: 'design', label: '설계' },
     { key: 'fabrication', label: '제작' },
     { key: 'installation', label: '설치' },
-    { key: 'as', label: '워런티' },
+    { key: 'warranty', label: '워런티' },
 ];
 
 const WARRANTY_PROJECT_MILESTONE_STAGES = [
@@ -52,12 +52,12 @@ const STAGE_LABEL_ALIAS = {
 const PROJECT_TYPE_LABEL_ALIAS = {
     equipment: '설비',
     parts: '파츠',
-    as: '워런티',
+    as: 'AS',
 };
 
 function normalizeProjectTypeKey(labelValue, typeValue) {
     const normalizedType = String(typeValue || '').trim().toLowerCase();
-    if (normalizedType === 'as' || normalizedType === 'a/s' || normalizedType === 'warranty') return 'as';
+    if (normalizedType === 'as' || normalizedType === 'a/s') return 'as';
     if (normalizedType === 'equipment') return 'equipment';
     if (normalizedType === 'parts') return 'parts';
 
@@ -145,14 +145,14 @@ function buildProjectMilestoneScheduleStages(schedulePayload) {
     const fabrication = stageRange('fabrication');
     const installation = stageRange('installation');
 
-    const asStart = installation.end;
-    const closureDate = asStart ? addYearsToYmd(asStart, 1) : '';
+    const warrantyStart = installation.end;
+    const closureDate = warrantyStart ? addYearsToYmd(warrantyStart, 1) : '';
 
     return {
         design,
         fabrication,
         installation,
-        as: { start: asStart, end: closureDate },
+        warranty: { start: warrantyStart, end: closureDate },
         closure: { start: closureDate, end: closureDate },
     };
 }
@@ -202,7 +202,7 @@ const BudgetProjectOverview = () => {
         design: { start: '', end: '' },
         fabrication: { start: '', end: '' },
         installation: { start: '', end: '' },
-        as: { start: '', end: '' },
+        warranty: { start: '', end: '' },
         closure: { start: '', end: '' },
     }));
     const [isScheduleLoading, setIsScheduleLoading] = useState(true);
@@ -254,7 +254,7 @@ const BudgetProjectOverview = () => {
                     design: { start: '', end: '' },
                     fabrication: { start: '', end: '' },
                     installation: { start: '', end: '' },
-                    as: { start: '', end: '' },
+                    warranty: { start: '', end: '' },
                     closure: { start: '', end: '' },
                 });
                 const projectTypeKey = normalizeProjectTypeKey(currentProject?.project_type_label, currentProject?.project_type);
@@ -377,11 +377,11 @@ const BudgetProjectOverview = () => {
     const closureDateLabel = useMemo(() => {
         if (isScheduleLoading) return '...';
         if (scheduleError) return '-';
-        let value = String(scheduleStages?.closure?.end || scheduleStages?.as?.end || '').trim();
+        let value = String(scheduleStages?.closure?.end || scheduleStages?.warranty?.end || '').trim();
         if (isAsProject && !value) {
             const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
-            const warrantyStart = String(scheduleStages?.as?.start || '').trim() || fallbackStart;
-            value = String(scheduleStages?.as?.end || '').trim()
+            const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || fallbackStart;
+            value = String(scheduleStages?.warranty?.end || '').trim()
                 || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
         }
         return formatYmdDot(value) || '-';
@@ -429,8 +429,8 @@ const BudgetProjectOverview = () => {
                     dateLabel = '-';
                 } else if (isAsProject) {
                     const fallbackStart = String(project?.created_at || '').trim().slice(0, 10);
-                    const warrantyStart = String(scheduleStages?.as?.start || '').trim() || fallbackStart;
-                    const warrantyEnd = String(scheduleStages?.as?.end || '').trim()
+                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || fallbackStart;
+                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()
                         || (warrantyStart ? addYearsToYmd(warrantyStart, 1) : '');
                     const value = stage.key === 'start' ? warrantyStart : warrantyEnd;
                     dateLabel = formatYmdDot(value) || '-';

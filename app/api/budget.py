@@ -34,7 +34,7 @@ router = APIRouter(prefix="/budget", tags=["budget"])
 _PROJECT_TYPE_LABELS = {
     "equipment": "설비",
     "parts": "파츠",
-    "as": "워런티",
+    "as": "AS",
 }
 
 _PROJECT_TYPE_TO_CODE = {
@@ -2222,7 +2222,7 @@ def create_project(
         if not parent_project_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
+                detail="AS 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
             )
         parent_project = db.query(models.BudgetProject).filter(models.BudgetProject.id == parent_project_id).first()
         if not parent_project:
@@ -2231,12 +2231,12 @@ def create_project(
         if parent_type != "equipment":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="워런티 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
+                detail="AS 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
             )
     elif parent_project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="parent_project_id is only allowed for warranty projects.",
+            detail="parent_project_id is only allowed for AS projects.",
         )
 
     manager_user_id = int(payload.manager_user_id) if payload.manager_user_id is not None else int(user.id)
@@ -2383,7 +2383,7 @@ def update_project(
         if not project.parent_project_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="워런티 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
+                detail="AS 프로젝트는 소속 설비 프로젝트를 선택해야 합니다.",
             )
         parent_project = db.query(models.BudgetProject).filter(models.BudgetProject.id == project.parent_project_id).first()
         if not parent_project:
@@ -2392,13 +2392,13 @@ def update_project(
         if parent_type != "equipment":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="워런티 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
+                detail="AS 프로젝트는 설비 프로젝트에만 종속될 수 있습니다.",
             )
     else:
         if "parent_project_id" in fields_set and payload.parent_project_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="parent_project_id is only allowed for warranty projects.",
+                detail="parent_project_id is only allowed for AS projects.",
             )
         if project.parent_project_id is not None:
             project.parent_project_id = None
@@ -2439,7 +2439,7 @@ def upsert_project_schedule(
     if project_type == "as":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="워런티 프로젝트는 일정 입력이 필요하지 않습니다.",
+            detail="AS 프로젝트는 일정 입력이 필요하지 않습니다.",
         )
 
     try:

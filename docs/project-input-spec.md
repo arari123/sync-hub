@@ -21,7 +21,7 @@
 | `code` | string | N | `null` | 최대 64자, 전체 프로젝트 유니크 | 프로젝트 코드 |
 | `description` | string | N | `null` | 최대 500자 | 프로젝트 개요 |
 | `project_type` | string | N | `equipment` | `equipment`, `parts`, `as` | 프로젝트 구분 |
-| `parent_project_id` | integer | `as`일 때 Y | `null` | `>= 1`, `project_type=equipment`만 허용 | 워런티 프로젝트 소속 설비 프로젝트 ID |
+| `parent_project_id` | integer | `as`일 때 Y | `null` | `>= 1`, `project_type=equipment`만 허용 | AS 프로젝트 소속 설비 프로젝트 ID |
 | `customer_name` | string | N | `null` | 최대 180자 | 고객사 |
 | `installation_site` | string | N | `null` | 최대 180자 | 설치 장소 |
 | `business_trip_distance_km` | number | N | `0` | `>= 0` | 출장 거리(km, 편도) |
@@ -34,7 +34,7 @@
 - `project_type!=as`이면 `parent_project_id`는 허용되지 않음
 - `manager_user_id`는 유효 사용자여야 함
 
-워런티 프로젝트 추가 규칙:
+AS 프로젝트 추가 규칙:
 - `customer_name`, `installation_site`가 비어있으면 서버에서 소속 설비 프로젝트 값을 자동으로 채운다.
 
 ### 2.2 UI 전용 입력(설비 프로젝트)
@@ -219,9 +219,9 @@
 
 `budget_projects.schedule_wbs_json`은 프로젝트 공통 WBS 일정 JSON이며, 버전 상세(`budget_detail_json`)와 별도로 저장된다.
 
-워런티 프로젝트(`project_type=as`) 규칙:
+AS 프로젝트(`project_type=as`) 규칙:
 - `PUT /budget/projects/{project_id}/schedule`은 허용되지 않는다(400).
-- 기존 워런티 프로젝트에 저장된 `schedule_wbs_json`은 데이터 정합성을 위해 마이그레이션에서 비워진다.
+- 기존 AS 프로젝트에 저장된 `schedule_wbs_json`은 데이터 정합성을 위해 마이그레이션에서 비워진다.
 
 | key | type | 필수 | 기본값 | 설명 |
 |---|---|---|---|---|

@@ -16,7 +16,7 @@ const PROJECT_SORT_OPTIONS = [
 const PROJECT_TYPE_OPTIONS = [
     { value: 'equipment', label: '설비' },
     { value: 'parts', label: '파츠' },
-    { value: 'as', label: '워런티' },
+    { value: 'as', label: 'AS' },
 ];
 
 const STAGE_OPTIONS = [

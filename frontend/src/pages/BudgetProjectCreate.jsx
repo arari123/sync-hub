@@ -176,7 +176,7 @@ const BudgetProjectCreate = () => {
     const projectTypeButtons = useMemo(() => ([
         { key: 'equipment', label: '설비' },
         { key: 'parts', label: '파츠' },
-        { key: 'as', label: '워런티' },
+        { key: 'as', label: 'AS' },
     ]), []);
 
     const saveDraft = () => {
@@ -248,7 +248,7 @@ const BudgetProjectCreate = () => {
             return;
         }
         if (projectType === 'as' && !parentProjectId) {
-            setError('워런티 프로젝트는 소속 설비 프로젝트를 선택해 주세요.');
+            setError('AS 프로젝트는 소속 설비 프로젝트를 선택해 주세요.');
             return;
         }
         if (!managerUserId) {
@@ -690,7 +690,7 @@ const BudgetProjectCreate = () => {
                                                     </p>
                                                 )}
                                                 <p className="text-xs text-slate-500">
-                                                    워런티 프로젝트는 선택한 설비 프로젝트에 종속되며, 별도 일정 입력이 필요하지 않습니다.
+                                                    AS 프로젝트는 선택한 설비 프로젝트에 종속되며, 별도 일정 입력이 필요하지 않습니다.
                                                 </p>
                                             </div>
                                         ) : (

@@ -73,6 +73,13 @@ function formatDateLabel(value) {
     return `${text.slice(0, 4)}.${text.slice(5, 7)}.${text.slice(8, 10)}`;
 }
 
+function formatRangeLabel(startValue, endValue) {
+    const start = formatDateLabel(startValue);
+    const end = formatDateLabel(endValue);
+    if (start === '-' && end === '-') return '-';
+    return `${start} ~ ${end}`;
+}
+
 function formatMonthDay(value) {
     const text = String(value || '').trim();
     if (!text || text.length < 10) return '-';
@@ -332,13 +339,21 @@ export default function BudgetProjectScheduleManagement() {
                     if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
                     return a.name.localeCompare(b.name, 'ko-KR');
                 })
-                .map((row) => {
+                .map((row, index) => {
                     const rawPos = getDatePositionPercent(chartBounds, row.start_date);
+                    const safePosition = clampPercent(rawPos);
+                    const align = safePosition <= 14
+                        ? 'left'
+                        : safePosition >= 86
+                            ? 'right'
+                            : 'center';
                     return {
                         id: row.id,
                         name: row.name || '이벤트',
                         date: row.start_date,
-                        position: clampPercent(rawPos),
+                        lane: index % 2,
+                        align,
+                        position: safePosition,
                     };
                 })
                 .filter((item) => item.position !== null);
@@ -750,9 +765,8 @@ export default function BudgetProjectScheduleManagement() {
                                                     className="flex h-12 items-center justify-between gap-3 px-3"
                                                 >
                                                     <span className="text-xs font-bold text-slate-800">{summary.label}</span>
-                                                    <div className="text-right font-mono text-[10px] leading-tight text-slate-600">
-                                                        <div>{formatDateLabel(summary.start_date)}</div>
-                                                        <div className="text-slate-500">{formatDateLabel(summary.end_date)}</div>
+                                                    <div className="text-right font-mono text-[11px] text-slate-600">
+                                                        {formatRangeLabel(summary.start_date, summary.end_date)}
                                                     </div>
                                                 </div>
                                             ))}
@@ -796,17 +810,43 @@ export default function BudgetProjectScheduleManagement() {
                                                                     />
                                                                 ) : null}
 
-                                                                {showEvents && summary.events.map((event) => (
-                                                                    <span
-                                                                        key={`milestone-event-${summary.stage}-${event.id}`}
-                                                                        className={cn(
-                                                                            'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white shadow',
-                                                                            stageStyle.bar,
-                                                                        )}
-                                                                        style={{ left: `${event.position}%` }}
-                                                                        title={`${event.name} (${formatDateLabel(event.date)})`}
-                                                                    />
-                                                                ))}
+                                                                {showEvents && summary.events.map((event) => {
+                                                                    const labelAlignClass = event.align === 'left'
+                                                                        ? 'left-0'
+                                                                        : event.align === 'right'
+                                                                            ? 'right-0'
+                                                                            : 'left-1/2 -translate-x-1/2';
+                                                                    const labelOffsetClass = event.lane === 0 ? 'mb-1' : 'mb-5';
+
+                                                                    return (
+                                                                        <div
+                                                                            key={`milestone-event-${summary.stage}-${event.id}`}
+                                                                            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                                                                            style={{ left: `${event.position}%` }}
+                                                                        >
+                                                                            <span
+                                                                                className={cn(
+                                                                                    'block h-3 w-3 rounded-full ring-2 ring-white shadow',
+                                                                                    stageStyle.bar,
+                                                                                )}
+                                                                            />
+                                                                            <div className={cn('absolute bottom-full', labelOffsetClass, labelAlignClass)}>
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'inline-flex max-w-[210px] items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
+                                                                                        stageStyle.badge,
+                                                                                    )}
+                                                                                    title={event.name}
+                                                                                >
+                                                                                    <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px font-mono text-[10px] text-slate-700">
+                                                                                        {formatDateLabel(event.date)}
+                                                                                    </span>
+                                                                                    <span className="truncate">{event.name}</span>
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     );
@@ -857,7 +897,7 @@ export default function BudgetProjectScheduleManagement() {
                                             className="absolute inset-y-0 border-l border-slate-300/80"
                                             style={{ left: `${tick.left}%` }}
                                         >
-                                            <span className="absolute left-1 top-0.5 text-[9px] font-semibold text-slate-500">{tick.label}</span>
+                                            <span className="absolute left-1 top-0.5 text-[10px] font-semibold text-slate-500">{tick.label}</span>
                                         </div>
                                     ))}
                                     {todayLinePos !== null && (
@@ -902,8 +942,8 @@ export default function BudgetProjectScheduleManagement() {
                                                         {row.name || '-'}
                                                     </span>
                                                     <span className="shrink-0 text-slate-300">|</span>
-                                                    <span className="shrink-0 font-mono text-[10px] text-slate-600">
-                                                        {formatDateLabel(row.start_date)}~{formatDateLabel(row.end_date)}
+                                                    <span className="shrink-0 font-mono text-[11px] text-slate-600">
+                                                        {formatRangeLabel(row.start_date, row.end_date)}
                                                     </span>
                                                 </div>
                                             </div>

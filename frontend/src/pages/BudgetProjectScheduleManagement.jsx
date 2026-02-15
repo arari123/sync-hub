@@ -191,6 +191,12 @@ function getDatePositionPercent(bounds, ymd) {
     return (offset / Math.max(1, bounds.days)) * 100;
 }
 
+function clampPercent(value, min = 0.5, max = 99.5) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return null;
+    return Math.min(max, Math.max(min, number));
+}
+
 export default function BudgetProjectScheduleManagement() {
     const { projectId } = useParams();
     const navigate = useNavigate();
@@ -245,13 +251,12 @@ export default function BudgetProjectScheduleManagement() {
         });
     }, [schedule, today]);
 
-    const filteredRows = useMemo(() => {
+    const scopedRows = useMemo(() => {
         const keyword = searchText.trim().toLowerCase();
 
         return rawRows
             .filter((row) => {
                 if (stageFilter !== 'all' && row.stage !== stageFilter) return false;
-                if (kindFilter !== 'all' && row.kind !== kindFilter) return false;
                 if (statusFilter !== 'all' && row.status !== statusFilter) return false;
 
                 if (!keyword) return true;
@@ -274,10 +279,20 @@ export default function BudgetProjectScheduleManagement() {
                 if (a.end_date !== b.end_date) return a.end_date.localeCompare(b.end_date);
                 return a.name.localeCompare(b.name, 'ko-KR');
             });
-    }, [kindFilter, rawRows, searchText, stageFilter, statusFilter]);
+    }, [rawRows, searchText, stageFilter, statusFilter]);
 
-    const chartBounds = useMemo(() => getScheduleBounds(filteredRows), [filteredRows]);
-    const chartScale = useMemo(() => pickAutoScale(filteredRows), [filteredRows]);
+    const kindFilteredRows = useMemo(() => {
+        if (kindFilter === 'all') return scopedRows;
+        return scopedRows.filter((row) => row.kind === kindFilter);
+    }, [kindFilter, scopedRows]);
+
+    const ganttRows = useMemo(() => {
+        if (kindFilter === 'event') return [];
+        return scopedRows.filter((row) => row.kind === 'task');
+    }, [kindFilter, scopedRows]);
+
+    const chartBounds = useMemo(() => getScheduleBounds(scopedRows), [scopedRows]);
+    const chartScale = useMemo(() => pickAutoScale(scopedRows), [scopedRows]);
     const chartTicks = useMemo(() => buildTickItems(chartBounds, chartScale), [chartBounds, chartScale]);
     const chartWeekendBands = useMemo(() => (
         schedule.weekend_mode === WEEKEND_MODES.exclude
@@ -285,44 +300,60 @@ export default function BudgetProjectScheduleManagement() {
             : []
     ), [chartBounds, schedule.weekend_mode]);
     const todayLinePos = useMemo(() => getTodayLinePosition(chartBounds, today), [chartBounds, today]);
-    const milestoneData = useMemo(() => {
-        if (!chartBounds) {
-            return { total: 0, items: [] };
-        }
+    const stageSummaries = useMemo(() => {
+        if (!chartBounds) return [];
 
-        const sortedEvents = filteredRows
-            .filter((row) => row.kind === 'event' && parseYmd(row.start_date))
-            .sort((a, b) => {
-                if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
-                const stageDiff = STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage);
-                if (stageDiff !== 0) return stageDiff;
-                return a.name.localeCompare(b.name, 'ko-KR');
+        return STAGE_ORDER.map((stage) => {
+            const tasks = scopedRows.filter((row) => (
+                row.stage === stage
+                && row.kind === 'task'
+                && parseYmd(row.start_date)
+                && parseYmd(row.end_date)
+            ));
+
+            let startDate = '';
+            let endDate = '';
+            tasks.forEach((row) => {
+                if (!startDate || (row.start_date && row.start_date < startDate)) {
+                    startDate = row.start_date || startDate;
+                }
+                if (!endDate || (row.end_date && row.end_date > endDate)) {
+                    endDate = row.end_date || endDate;
+                }
             });
 
-        const items = sortedEvents.slice(0, 20).map((row, index) => {
-            const position = getDatePositionPercent(chartBounds, row.start_date);
-            const safePosition = Math.max(1, Math.min(99, Number(position ?? 0)));
-            const align = safePosition <= 14
-                ? 'left'
-                : safePosition >= 86
-                    ? 'right'
-                    : 'center';
+            const position = startDate && endDate
+                ? ganttPosition({ kind: 'task', start_date: startDate, end_date: endDate }, chartBounds)
+                : null;
+
+            const events = scopedRows
+                .filter((row) => row.stage === stage && row.kind === 'event' && parseYmd(row.start_date))
+                .sort((a, b) => {
+                    if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+                    return a.name.localeCompare(b.name, 'ko-KR');
+                })
+                .map((row) => {
+                    const rawPos = getDatePositionPercent(chartBounds, row.start_date);
+                    return {
+                        id: row.id,
+                        name: row.name || '이벤트',
+                        date: row.start_date,
+                        position: clampPercent(rawPos),
+                    };
+                })
+                .filter((item) => item.position !== null);
+
             return {
-                id: row.id,
-                name: row.name || '이벤트',
-                stage: row.stage,
-                date: row.start_date,
-                lane: index % 2,
-                align,
-                position: safePosition,
+                stage,
+                label: STAGE_LABELS[stage] || stage,
+                start_date: startDate,
+                end_date: endDate,
+                position,
+                task_count: tasks.length,
+                events,
             };
         });
-
-        return {
-            total: sortedEvents.length,
-            items,
-        };
-    }, [chartBounds, filteredRows]);
+    }, [chartBounds, scopedRows]);
 
     const resetFilters = () => {
         setSearchText('');
@@ -462,7 +493,7 @@ export default function BudgetProjectScheduleManagement() {
                         {isMobileFilterOpen ? '필터 닫기' : '필터'}
                     </button>
                     <span className="text-[11px] font-medium text-muted-foreground">
-                        표시 {filteredRows.length.toLocaleString('ko-KR')}건
+                        표시 {kindFilteredRows.length.toLocaleString('ko-KR')}건
                     </span>
                 </div>
 
@@ -695,81 +726,87 @@ export default function BudgetProjectScheduleManagement() {
 
                 {chartBounds && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50/80">
-                        <div className="p-3">
-                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs font-bold text-slate-700">주요 이벤트 마일스톤</p>
-                                <p className="text-[11px] text-slate-500">
-                                    현재 필터 기준 {milestoneData.total.toLocaleString('ko-KR')}건
-                                    {milestoneData.total > milestoneData.items.length ? ` (상위 ${milestoneData.items.length}건 표시)` : ''}
-                                </p>
-                            </div>
-
-                            {milestoneData.items.length === 0 ? (
-                                <div className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-4 text-xs text-slate-500">
-                                    이벤트 유형 일정이 없어 마일스톤을 표시할 수 없습니다.
-                                </div>
-                            ) : null}
+                        <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+                            <p className="text-[11px] font-bold text-slate-700">마일스톤 요약</p>
+                            <p className="text-[11px] text-slate-500">
+                                일정 {stageSummaries.reduce((sum, item) => sum + item.task_count, 0).toLocaleString('ko-KR')}건
+                                {' · '}
+                                이벤트 {stageSummaries.reduce((sum, item) => sum + item.events.length, 0).toLocaleString('ko-KR')}건
+                            </p>
                         </div>
 
-                        {milestoneData.items.length > 0 ? (
-                            <div className="border-t border-slate-200">
-                                <div
-                                    ref={milestoneScrollRef}
-                                    onScroll={handleMilestoneScroll}
-                                    className="overflow-x-auto"
-                                >
-                                    <div className="min-w-[1060px]">
-                                        <div className="grid grid-cols-[460px_1fr]">
-                                            <div className="border-r border-slate-200 bg-white/40 px-3 py-2 text-[11px] font-semibold text-slate-600">
-                                                그룹 · 일정 명칭 · 날짜
-                                            </div>
-                                            <div className="relative h-28 overflow-hidden bg-white">
-                                                <div className="absolute inset-x-0 top-20 border-t border-slate-300" />
+                        <div className="border-t border-slate-200">
+                            <div
+                                ref={milestoneScrollRef}
+                                onScroll={handleMilestoneScroll}
+                                className="overflow-x-auto"
+                            >
+                                <div className="min-w-[1060px]">
+                                    <div className="grid grid-cols-[460px_1fr]">
+                                        <div className="divide-y divide-slate-200 border-r border-slate-200 bg-white/40">
+                                            {stageSummaries.map((summary) => (
+                                                <div
+                                                    key={`milestone-stage-label-${summary.stage}`}
+                                                    className="flex h-12 items-center justify-between gap-3 px-3"
+                                                >
+                                                    <span className="text-xs font-bold text-slate-800">{summary.label}</span>
+                                                    <div className="text-right font-mono text-[10px] leading-tight text-slate-600">
+                                                        <div>{formatDateLabel(summary.start_date)}</div>
+                                                        <div className="text-slate-500">{formatDateLabel(summary.end_date)}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
 
+                                        <div className="relative overflow-hidden bg-white">
+                                            <div className="pointer-events-none absolute inset-0 z-0">
                                                 {chartTicks.map((tick) => (
                                                     <div
                                                         key={`milestone-tick-${tick.key}`}
-                                                        className="absolute inset-y-0 border-l border-slate-300/80"
+                                                        className="absolute inset-y-0 border-l border-slate-200/90"
                                                         style={{ left: `${tick.left}%` }}
                                                     />
                                                 ))}
+                                            </div>
 
-                                                {todayLinePos !== null && (
-                                                    <div
-                                                        className="absolute inset-y-0 border-l-2 border-rose-500/80"
-                                                        style={{ left: `${todayLinePos}%` }}
-                                                    />
-                                                )}
+                                            {todayLinePos !== null && (
+                                                <div
+                                                    className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-rose-500/80"
+                                                    style={{ left: `${todayLinePos}%` }}
+                                                />
+                                            )}
 
-                                                {milestoneData.items.map((milestone) => {
-                                                    const stageStyle = STAGE_STYLES[milestone.stage] || STAGE_STYLES.design;
-                                                    const topOffset = 10 + (milestone.lane * 26);
-                                                    const alignClass = milestone.align === 'left'
-                                                        ? ''
-                                                        : milestone.align === 'right'
-                                                            ? '-translate-x-full'
-                                                            : '-translate-x-1/2';
+                                            <div className="relative z-10 divide-y divide-slate-200">
+                                                {stageSummaries.map((summary) => {
+                                                    const stageStyle = STAGE_STYLES[summary.stage] || STAGE_STYLES.design;
+                                                    const barLeft = summary.position?.left ?? 0;
+                                                    const barWidth = summary.position ? Math.max(summary.position.width, 0.6) : 0;
+                                                    const showEvents = kindFilter !== 'task';
+
                                                     return (
                                                         <div
-                                                            key={`milestone-${milestone.id}`}
-                                                            className="absolute"
-                                                            style={{ left: `${milestone.position}%`, top: `${topOffset}px` }}
+                                                            key={`milestone-stage-row-${summary.stage}`}
+                                                            className="flex h-12 items-center px-2"
                                                         >
-                                                            <div className={cn('relative', alignClass)}>
-                                                                <span
-                                                                    className={cn(
-                                                                        'inline-flex max-w-[170px] items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
-                                                                        stageStyle.badge,
-                                                                    )}
-                                                                    title={milestone.name}
-                                                                >
-                                                                    <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px text-[9px] text-slate-600">
-                                                                        {formatMonthDay(milestone.date)}
-                                                                    </span>
-                                                                    <span className="truncate">{milestone.name}</span>
-                                                                </span>
-                                                                <span className={cn('absolute left-1/2 top-full h-3 w-px -translate-x-1/2', stageStyle.bar)} />
-                                                                <span className={cn('absolute left-1/2 top-[calc(100%+12px)] h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-white shadow', stageStyle.bar)} />
+                                                            <div className={cn('relative h-3.5 w-full rounded-md border border-slate-200/70', stageStyle.rail)}>
+                                                                {summary.position ? (
+                                                                    <span
+                                                                        className={cn('absolute inset-y-0 rounded-md shadow-sm', stageStyle.bar)}
+                                                                        style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
+                                                                    />
+                                                                ) : null}
+
+                                                                {showEvents && summary.events.map((event) => (
+                                                                    <span
+                                                                        key={`milestone-event-${summary.stage}-${event.id}`}
+                                                                        className={cn(
+                                                                            'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white shadow',
+                                                                            stageStyle.bar,
+                                                                        )}
+                                                                        style={{ left: `${event.position}%` }}
+                                                                        title={`${event.name} (${formatDateLabel(event.date)})`}
+                                                                    />
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     );
@@ -779,7 +816,7 @@ export default function BudgetProjectScheduleManagement() {
                                     </div>
                                 </div>
                             </div>
-                        ) : null}
+                        </div>
                     </div>
                 )}
 
@@ -789,7 +826,12 @@ export default function BudgetProjectScheduleManagement() {
                         <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> 오늘 기준선
                     </span>
                     <span className="inline-flex items-center gap-1">
-                        <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> 이벤트 포인트
+                        <span className="inline-flex items-center -space-x-1">
+                            <span className={cn('h-2.5 w-2.5 rounded-full ring-1 ring-white', STAGE_STYLES.design.bar)} />
+                            <span className={cn('h-2.5 w-2.5 rounded-full ring-1 ring-white', STAGE_STYLES.fabrication.bar)} />
+                            <span className={cn('h-2.5 w-2.5 rounded-full ring-1 ring-white', STAGE_STYLES.installation.bar)} />
+                        </span>
+                        이벤트 포인트
                     </span>
                 </div>
 
@@ -829,8 +871,13 @@ export default function BudgetProjectScheduleManagement() {
                                 </div>
                             </div>
 
-                            <div className="divide-y divide-slate-200">
-                                {filteredRows.map((row) => {
+                            {ganttRows.length === 0 ? (
+                                <div className="px-4 py-10 text-center text-xs text-slate-500">
+                                    표시할 일정이 없습니다. 이벤트는 상단 마일스톤 패널에서 확인할 수 있습니다.
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-200">
+                                    {ganttRows.map((row) => {
                                     const stageStyle = STAGE_STYLES[row.stage] || STAGE_STYLES.design;
                                     const position = ganttPosition(row, chartBounds);
 
@@ -896,8 +943,9 @@ export default function BudgetProjectScheduleManagement() {
                                             </div>
                                         </div>
                                     );
-                                })}
-                            </div>
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

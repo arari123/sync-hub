@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     CheckCircle2,
     ClipboardList,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     FileClock,
     MessageCircle,
     MessageSquare,
@@ -14,6 +18,14 @@ import ProjectPageHeader from '../components/ProjectPageHeader';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Input } from '../components/ui/Input';
+
+const PER_PAGE = 10;
+const PAGE_GROUP_SIZE = 10;
+const FILTER_CHIP_BASE_CLASS =
+    'inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+const FILTER_CHIP_ACTIVE_CLASS = 'border-primary bg-primary text-primary-foreground shadow-sm';
+const FILTER_CHIP_INACTIVE_CLASS =
+    'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
 
 function formatHours(value) {
     const number = Number(value || 0);
@@ -150,7 +162,6 @@ export default function AgendaList() {
     const [includeDrafts, setIncludeDrafts] = useState(false);
 
     const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(10);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
@@ -250,7 +261,7 @@ export default function AgendaList() {
                         thread_kind: threadKind,
                         include_drafts: includeDrafts,
                         page,
-                        per_page: perPage,
+                        per_page: PER_PAGE,
                     },
                 });
 
@@ -266,17 +277,14 @@ export default function AgendaList() {
         };
 
         loadList();
-    }, [projectId, query, searchField, progressStatus, threadKind, includeDrafts, page, perPage]);
+    }, [projectId, query, searchField, progressStatus, threadKind, includeDrafts, page]);
 
     const pageNumbers = useMemo(() => {
         if (!totalPages || totalPages <= 0) return [];
-        const start = Math.max(1, page - 2);
-        const end = Math.min(totalPages, page + 2);
-        const output = [];
-        for (let current = start; current <= end; current += 1) {
-            output.push(current);
-        }
-        return output;
+        const safePage = Math.max(1, Math.min(page, totalPages));
+        const pageGroupStart = Math.floor((safePage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
+        const pageGroupEnd = Math.min(totalPages, pageGroupStart + PAGE_GROUP_SIZE - 1);
+        return Array.from({ length: Math.max(0, pageGroupEnd - pageGroupStart + 1) }, (_, index) => pageGroupStart + index);
     }, [page, totalPages]);
 
     const handleSearchSubmit = (event) => {
@@ -312,35 +320,17 @@ export default function AgendaList() {
                 )}
             />
 
-            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <form onSubmit={handleSearchSubmit} className="flex flex-col gap-2 lg:flex-row">
-                    <div className="relative flex-1">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <Input
-                            value={inputQuery}
-                            onChange={(event) => setInputQuery(event.target.value)}
-                            placeholder="검색어를 입력하세요. (공백/콤마로 복수 단어)"
-                            className="h-10 w-full rounded-lg bg-card pl-9 pr-3 text-sm"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-cyan-600 px-4 text-sm font-semibold text-white hover:bg-cyan-700"
-                    >
-                        검색
-                    </button>
-                </form>
-
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
-                    <label className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-500">검색 조건</span>
+            <section className="app-surface-soft px-3 py-2">
+                <form onSubmit={handleSearchSubmit} className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                         <select
                             value={searchField}
                             onChange={(event) => {
                                 setSearchField(event.target.value);
                                 setPage(1);
                             }}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                            className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs font-semibold text-muted-foreground sm:w-32"
+                            aria-label="검색 조건"
                         >
                             <option value="all">전체</option>
                             <option value="title">제목</option>
@@ -350,72 +340,101 @@ export default function AgendaList() {
                             <option value="requester">요청자</option>
                             <option value="responder_worker">답변자/작업자</option>
                         </select>
-                    </label>
-                    <label className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-500">상태</span>
-                        <select
-                            value={progressStatus}
-                            onChange={(event) => {
-                                setProgressStatus(event.target.value);
-                                setPage(1);
-                            }}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value="all">전체</option>
-                            <option value="in_progress">진행 중</option>
-                            <option value="completed">완료</option>
-                        </select>
-                    </label>
-                    <label className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-500">유형</span>
-                        <select
-                            value={threadKind}
-                            onChange={(event) => {
-                                setThreadKind(event.target.value);
-                                setPage(1);
-                            }}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value="all">전체</option>
-                            <option value="general">일반 안건</option>
-                            <option value="work_report">작업보고서</option>
-                        </select>
-                    </label>
-                    <label className="space-y-1">
-                        <span className="text-xs font-semibold text-slate-500">표시 개수</span>
-                        <select
-                            value={perPage}
-                            onChange={(event) => {
-                                setPerPage(Number(event.target.value));
-                                setPage(1);
-                            }}
-                            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                        >
-                            <option value={10}>10개</option>
-                            <option value={30}>30개</option>
-                            <option value={50}>50개</option>
-                        </select>
-                    </label>
 
-                    <label className="col-span-2 flex items-end">
+                        <div className="relative w-full sm:w-[320px]">
+                            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                            <Input
+                                value={inputQuery}
+                                onChange={(event) => setInputQuery(event.target.value)}
+                                placeholder="안건 검색"
+                                className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
+                            />
+                        </div>
+
                         <button
-                            type="button"
-                            onClick={() => {
-                                setIncludeDrafts((prev) => !prev);
-                                setPage(1);
-                            }}
-                            className={cn(
-                                'inline-flex h-9 items-center gap-1 rounded-lg border px-3 text-sm font-semibold',
-                                includeDrafts
-                                    ? 'border-amber-300 bg-amber-50 text-amber-700'
-                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
-                            )}
+                            type="submit"
+                            className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1"
                         >
-                            <FileClock className="h-4 w-4" />
-                            {includeDrafts ? '임시 저장 포함' : '임시 저장 제외'}
+                            검색
                         </button>
-                    </label>
-                </div>
+                    </div>
+
+                    <div className="hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
+
+                    <div className="min-w-0 flex flex-wrap items-center gap-1 overflow-x-auto pb-0.5">
+                        {[
+                            { value: 'all', label: '상태 전체' },
+                            { value: 'in_progress', label: '진행 중' },
+                            { value: 'completed', label: '완료' },
+                        ].map((item) => {
+                            const isActive = progressStatus === item.value;
+                            return (
+                                <button
+                                    key={`progress-${item.value}`}
+                                    type="button"
+                                    onClick={() => {
+                                        setProgressStatus(item.value);
+                                        setPage(1);
+                                    }}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                        FILTER_CHIP_BASE_CLASS,
+                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                    )}
+                                >
+                                    {item.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
+
+                    <div className="min-w-0 flex flex-wrap items-center gap-1 overflow-x-auto pb-0.5">
+                        {[
+                            { value: 'all', label: '유형 전체' },
+                            { value: 'general', label: '일반 안건' },
+                            { value: 'work_report', label: '작업보고서' },
+                        ].map((item) => {
+                            const isActive = threadKind === item.value;
+                            return (
+                                <button
+                                    key={`kind-${item.value}`}
+                                    type="button"
+                                    onClick={() => {
+                                        setThreadKind(item.value);
+                                        setPage(1);
+                                    }}
+                                    aria-pressed={isActive}
+                                    className={cn(
+                                        FILTER_CHIP_BASE_CLASS,
+                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                    )}
+                                >
+                                    {item.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="hidden h-5 w-px shrink-0 bg-slate-200 lg:block" />
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIncludeDrafts((prev) => !prev);
+                            setPage(1);
+                        }}
+                        aria-pressed={includeDrafts}
+                        className={cn(
+                            FILTER_CHIP_BASE_CLASS,
+                            includeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                        )}
+                    >
+                        <FileClock className="mr-1 h-3.5 w-3.5" />
+                        임시 저장 포함
+                    </button>
+                </form>
             </section>
 
             {error && (
@@ -455,43 +474,91 @@ export default function AgendaList() {
                         ))}
                     </div>
                 )}
-            </section>
 
-            {totalPages > 1 && (
-                <section className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <button
-                        type="button"
-                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                        disabled={page <= 1}
-                        className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        이전
-                    </button>
-                    {pageNumbers.map((pageNo) => (
-                        <button
-                            key={`page-${pageNo}`}
-                            type="button"
-                            onClick={() => setPage(pageNo)}
-                            className={cn(
-                                'inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                pageNo === page
-                                    ? 'border-cyan-600 bg-cyan-600 text-white'
-                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
-                            )}
-                        >
-                            {pageNo}
-                        </button>
-                    ))}
-                    <button
-                        type="button"
-                        onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                        disabled={page >= totalPages}
-                        className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        다음
-                    </button>
-                </section>
-            )}
+                {totalPages > 1 && (() => {
+                    const safePage = Math.max(1, Math.min(page, totalPages));
+                    const visibleStart = total > 0 ? (safePage - 1) * PER_PAGE + 1 : 0;
+                    const visibleEnd = Math.min(safePage * PER_PAGE, total);
+
+                    const baseButtonClass =
+                        'inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+                    const disabledButtonClass = 'cursor-not-allowed border-border bg-background text-muted-foreground/40';
+                    const enabledButtonClass = 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground';
+                    const pageButtonClass = (isActive) => cn(
+                        'min-w-9 px-2 font-semibold',
+                        isActive ? 'border-primary bg-primary text-primary-foreground' : enabledButtonClass,
+                    );
+
+                    return (
+                        <>
+                            <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                <span className="text-[11px] font-semibold text-slate-500">
+                                    페이지 {safePage} / {totalPages}
+                                </span>
+                                <div className="flex flex-wrap items-center justify-end gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage(1)}
+                                        disabled={safePage <= 1}
+                                        className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                        title="맨앞"
+                                    >
+                                        <ChevronsLeft className="h-3.5 w-3.5" />
+                                        맨앞
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                                        disabled={safePage <= 1}
+                                        className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                        title="이전"
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5" />
+                                        이전
+                                    </button>
+
+                                    {pageNumbers.map((pageNo) => (
+                                        <button
+                                            key={`agenda-page-${pageNo}`}
+                                            type="button"
+                                            onClick={() => setPage(pageNo)}
+                                            aria-current={pageNo === safePage ? 'page' : undefined}
+                                            className={cn(baseButtonClass, pageButtonClass(pageNo === safePage))}
+                                        >
+                                            {pageNo}
+                                        </button>
+                                    ))}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                                        disabled={safePage >= totalPages}
+                                        className={cn(baseButtonClass, safePage >= totalPages ? disabledButtonClass : enabledButtonClass)}
+                                        title="다음"
+                                    >
+                                        다음
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage(totalPages)}
+                                        disabled={safePage >= totalPages}
+                                        className={cn(baseButtonClass, safePage >= totalPages ? disabledButtonClass : enabledButtonClass)}
+                                        title="맨뒤"
+                                    >
+                                        맨뒤
+                                        <ChevronsRight className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
+                                <span>안건 {visibleStart}-{visibleEnd} / 총 {total.toLocaleString('ko-KR')}건</span>
+                            </div>
+                        </>
+                    );
+                })()}
+            </section>
 
             <section className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500 shadow-sm">
                 <p className="mb-1 inline-flex items-center gap-1 font-semibold text-slate-700">

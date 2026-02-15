@@ -9,7 +9,7 @@ import {
     Plus,
     Search,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -130,6 +130,14 @@ function AgendaCard({ item, onClick }) {
 export default function AgendaList() {
     const { projectId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const navigationType = useNavigationType();
+
+    const scrollStorageKey = useMemo(
+        () => `agenda_list_scroll:${location.pathname}${location.search}`,
+        [location.pathname, location.search],
+    );
+    const [isScrollRestored, setIsScrollRestored] = useState(false);
 
     const [project, setProject] = useState(null);
     const [items, setItems] = useState([]);
@@ -148,6 +156,52 @@ export default function AgendaList() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        return () => {
+            try {
+                window.sessionStorage.setItem(scrollStorageKey, String(window.scrollY));
+            } catch (error) {
+                // ignore
+            }
+        };
+    }, [scrollStorageKey]);
+
+    useEffect(() => {
+        if (isScrollRestored) return;
+        if (navigationType !== 'POP') {
+            setIsScrollRestored(true);
+            return;
+        }
+        if (isLoading) return;
+
+        let raw = null;
+        try {
+            raw = window.sessionStorage.getItem(scrollStorageKey);
+        } catch (error) {
+            setIsScrollRestored(true);
+            return;
+        }
+        if (!raw) {
+            setIsScrollRestored(true);
+            return;
+        }
+        const value = Number(raw);
+        if (!Number.isFinite(value)) {
+            try {
+                window.sessionStorage.removeItem(scrollStorageKey);
+            } catch (error) {
+                // ignore
+            }
+            setIsScrollRestored(true);
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            window.scrollTo({ top: value, left: 0, behavior: 'auto' });
+            setIsScrollRestored(true);
+        });
+    }, [isLoading, isScrollRestored, navigationType, scrollStorageKey]);
 
     useEffect(() => {
         const loadProject = async () => {

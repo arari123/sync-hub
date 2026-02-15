@@ -50,6 +50,17 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _MULTI_SPACE_RE = re.compile(r"\s+")
 _IMAGE_SRC_RE = re.compile(r"<img[^>]*src=[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
 _SAFE_FILE_RE = re.compile(r"[^A-Za-z0-9._-]+")
+_AGENDA_SEARCH_STOPWORDS = {
+    # Field-hint tokens that users often prepend (e.g., "작성자 이용호").
+    "담당자",
+    "담당",
+    "작성자",
+    "요청자",
+    "응답자",
+    "작업자",
+    "work",
+    "report",
+}
 
 AGENDA_UPLOAD_DIR = os.getenv("AGENDA_UPLOAD_DIR", "uploads/agendas")
 os.makedirs(AGENDA_UPLOAD_DIR, exist_ok=True)
@@ -1003,7 +1014,9 @@ def _agenda_search_score_and_explain(
 
 
 def _tokenize_agenda_search_query(query: str) -> list[str]:
-    return _sanitize_query_tokens(query)
+    tokens = _sanitize_query_tokens(query)
+    cleaned = [token for token in tokens if token.lower() not in _AGENDA_SEARCH_STOPWORDS]
+    return cleaned or tokens
 
 
 def _collect_search_haystack(
@@ -1754,6 +1767,8 @@ def search_agenda_threads(
         )
     )
 
+    candidate_limit = max(int(limit) * 30, 300)
+
     token_conditions = []
     needle = query_text.strip()
     fields = (
@@ -1769,10 +1784,52 @@ def search_agenda_threads(
         token_conditions.extend(field.ilike(f"%{needle}%") for field in fields)
     for token in tokens:
         token_conditions.extend(field.ilike(f"%{token}%") for field in fields)
+
+    # Author name/email matches are stored on the related User row; map those to created_by_user_id.
+    user_conditions = []
+    if needle:
+        user_conditions.append(models.User.full_name.ilike(f"%{needle}%"))
+        user_conditions.append(models.User.email.ilike(f"%{needle}%"))
+    for token in tokens:
+        user_conditions.append(models.User.full_name.ilike(f"%{token}%"))
+        user_conditions.append(models.User.email.ilike(f"%{token}%"))
+    if user_conditions:
+        author_rows = (
+            db.query(models.User.id)
+            .filter(
+                models.User.is_active.is_(True),
+                models.User.email_verified.is_(True),
+            )
+            .filter(or_(*user_conditions))
+            .limit(200)
+            .all()
+        )
+        author_ids = {int(row[0]) for row in author_rows if row and row[0]}
+        if author_ids:
+            token_conditions.append(models.AgendaThread.created_by_user_id.in_(sorted(author_ids)))
+
+    # Full-text candidates can live in AgendaEntry; preselect matching thread ids.
+    entry_conditions = []
+    if needle:
+        entry_conditions.append(models.AgendaEntry.title.ilike(f"%{needle}%"))
+        entry_conditions.append(models.AgendaEntry.content_plain.ilike(f"%{needle}%"))
+    for token in tokens:
+        entry_conditions.append(models.AgendaEntry.title.ilike(f"%{token}%"))
+        entry_conditions.append(models.AgendaEntry.content_plain.ilike(f"%{token}%"))
+    if entry_conditions:
+        thread_rows = (
+            db.query(models.AgendaEntry.thread_id)
+            .filter(or_(*entry_conditions))
+            .distinct()
+            .limit(candidate_limit * 20)
+            .all()
+        )
+        entry_thread_ids = {int(row[0]) for row in thread_rows if row and row[0]}
+        if entry_thread_ids:
+            token_conditions.append(models.AgendaThread.id.in_(sorted(entry_thread_ids)))
     if token_conditions:
         query_builder = query_builder.filter(or_(*token_conditions))
 
-    candidate_limit = max(int(limit) * 30, 300)
     candidates = (
         query_builder
         .order_by(models.AgendaThread.last_updated_at.desc(), models.AgendaThread.id.desc())

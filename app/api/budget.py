@@ -48,6 +48,22 @@ _PROJECT_TYPE_TO_CODE = {
 }
 
 _SEARCH_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
+_SEARCH_STOPWORDS = {
+    # Field-hint tokens that users often prepend (e.g., "담당자 이용호").
+    "담당자",
+    "담당",
+    "매니저",
+    "manager",
+    "pm",
+    "고객사",
+    "고객",
+    "프로젝트",
+    "프로젝트명",
+    "프로젝트코드",
+    "코드",
+    "설비",
+    "설비명",
+}
 _DEFAULT_PROJECT_SORT = "updated_desc"
 _ALLOWED_PROJECT_SORTS = {
     "updated_desc",
@@ -1607,7 +1623,8 @@ def _tokenize_search_query(query: str) -> list[str]:
             continue
         seen.add(lowered)
         tokens.append(lowered)
-    return tokens
+    cleaned = [token for token in tokens if token not in _SEARCH_STOPWORDS]
+    return cleaned or tokens
 
 
 def _project_search_score(project_payload: dict, query: str, tokens: list[str]) -> float:
@@ -1974,6 +1991,8 @@ def search_projects(
     if visibility_clause is not None:
         query_builder = query_builder.filter(visibility_clause)
 
+    candidate_limit = max(int(limit) * 20, 200)
+
     # Coarse prefilter to avoid scoring every project.
     token_conditions = []
     needle = query.strip()
@@ -1989,10 +2008,52 @@ def search_projects(
         token_conditions.append(models.BudgetProject.customer_name.ilike(f"%{token}%"))
         token_conditions.append(models.BudgetProject.installation_site.ilike(f"%{token}%"))
         token_conditions.append(models.BudgetProject.description.ilike(f"%{token}%"))
+
+    # Include manager name/email matches in candidate selection (manager is stored on the related User row).
+    user_conditions = []
+    if needle:
+        user_conditions.append(models.User.full_name.ilike(f"%{needle}%"))
+        user_conditions.append(models.User.email.ilike(f"%{needle}%"))
+    for token in tokens:
+        user_conditions.append(models.User.full_name.ilike(f"%{token}%"))
+        user_conditions.append(models.User.email.ilike(f"%{token}%"))
+    if user_conditions:
+        manager_rows = (
+            db.query(models.User.id)
+            .filter(
+                models.User.is_active.is_(True),
+                models.User.email_verified.is_(True),
+            )
+            .filter(or_(*user_conditions))
+            .limit(200)
+            .all()
+        )
+        manager_ids = {int(row[0]) for row in manager_rows if row and row[0]}
+        if manager_ids:
+            token_conditions.append(models.BudgetProject.manager_user_id.in_(sorted(manager_ids)))
+
+    # Include current-version equipment name matches in candidate selection.
+    equipment_conditions = []
+    if needle:
+        equipment_conditions.append(models.BudgetEquipment.equipment_name.ilike(f"%{needle}%"))
+    for token in tokens:
+        equipment_conditions.append(models.BudgetEquipment.equipment_name.ilike(f"%{token}%"))
+    if equipment_conditions:
+        project_rows = (
+            db.query(models.BudgetVersion.project_id)
+            .join(models.BudgetEquipment, models.BudgetEquipment.version_id == models.BudgetVersion.id)
+            .filter(models.BudgetVersion.is_current.is_(True))
+            .filter(or_(*equipment_conditions))
+            .distinct()
+            .limit(candidate_limit * 10)
+            .all()
+        )
+        equipment_project_ids = {int(row[0]) for row in project_rows if row and row[0]}
+        if equipment_project_ids:
+            token_conditions.append(models.BudgetProject.id.in_(sorted(equipment_project_ids)))
     if token_conditions:
         query_builder = query_builder.filter(or_(*token_conditions))
 
-    candidate_limit = max(int(limit) * 20, 200)
     candidates = (
         query_builder
         .order_by(models.BudgetProject.updated_at.desc(), models.BudgetProject.id.desc())

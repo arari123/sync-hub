@@ -77,6 +77,32 @@ class AgendaSearchTests(unittest.TestCase):
         self.assertEqual(score, 0.0)
         self.assertEqual(explain, {})
 
+    def test_global_search_score_supports_author_label_query(self):
+        query = '작성자 이용호'
+        tokens = _tokenize_agenda_search_query(query)
+
+        score, explain = _agenda_search_score_and_explain(
+            thread_payload={
+                "title": "점검 요청",
+                "root_title": "점검 요청",
+                "latest_title": "점검 요청",
+                "agenda_code": "AG-2026-000003",
+                "summary_plain": "",
+                "author_name": "이용호",
+            },
+            root_entry=None,
+            latest_entry=None,
+            project_name="",
+            project_code="",
+            query=query,
+            tokens=tokens,
+        )
+
+        self.assertIn('이용호', tokens)
+        self.assertNotIn('작성자', [token.lower() for token in tokens])
+        self.assertGreater(score, 0.0)
+        self.assertIn("author", explain.get("match_fields", []))
+
 
 if __name__ == '__main__':
     unittest.main()

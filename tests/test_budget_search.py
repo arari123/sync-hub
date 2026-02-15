@@ -73,6 +73,22 @@ class BudgetSearchTests(unittest.TestCase):
         score = _project_search_score(payload, "비전 검사기", tokens)
         self.assertGreater(score, 0.0)
 
+    def test_manager_label_query_is_scored(self):
+        payload = {
+            "name": "프로젝트A",
+            "description": "",
+            "code": "SIM-EQ-999",
+            "customer_name": "",
+            "manager_name": "이용호",
+        }
+
+        tokens = _tokenize_search_query("담당자 이용호")
+        self.assertIn("이용호", tokens)
+        self.assertNotIn("담당자", tokens)
+
+        score = _project_search_score(payload, "담당자 이용호", tokens)
+        self.assertGreater(score, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

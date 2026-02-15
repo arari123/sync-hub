@@ -31,6 +31,7 @@
   - `documents.py`: 문서 업로드/검색/다운로드/상세
   - `budget.py`: 프로젝트/버전/예산 상세 CRUD 및 요약
   - `agenda.py`: 안건 메타/작성/임시저장/답변/댓글/상태/재등록 payload
+  - `data_hub.py`: 임시 데이터 허브(문서 업로드/검색/AI 답변) API
   - `admin_debug.py`: 검색 디버그 API
   - `admin_dedup.py`: dedup 클러스터 관리자 API
 - `app/core/`
@@ -42,6 +43,8 @@
   - `admin_access.py`: 관리자 식별(환경변수 기반) 유틸
   - `auth_utils.py`, `auth_mailer.py`: 인증 유틸/메일 발송
   - `html_sanitizer.py`: 안건 리치 텍스트 HTML allow-list sanitize(XSS 방어)
+  - `data_hub_ai.py`: 데이터 허브 RAG 컨텍스트/프롬프트/캐시 유틸
+  - `gemini_client.py`: Gemini API(Flash) 호출 클라이언트(urllib 기반)
   - `parsing/`, `chunking/`, `dedup/`, `indexing/`: 파싱/청킹/dedup/재색인 모듈
 - `app/cli/dedup_scan.py`: dedup 배치 스캔 CLI
 - `app/ocr_worker.py`: OCR 워커 FastAPI 서비스 엔트리포인트
@@ -64,6 +67,7 @@
   - `ui/`: 공용 UI primitives (`Button`, `Input`, `Logo`)
 - `pages/`
   - `SearchResults.jsx`: 홈(`/home`) 메인 프로젝트 리스트 + 검색결과(프로젝트/문서) 화면(검색어 `q` 존재 시 검색결과 전용 UI로 전환)
+  - `DataHub.jsx`: 임시 데이터 허브(`/data-hub`) 문서 검색 + AI 답변 + 관리자 업로드
   - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 `App.jsx`에서 직접 라우트 연결 없이 레거시 리다이렉트만 유지)
   - `BudgetProjectOverview.jsx`: 프로젝트 메인(상세 요약)
   - `BudgetProjectBudget.jsx`: 예산 메인(통합요약/재료비/인건비/경비)
@@ -85,6 +89,7 @@
 ## 주요 프론트 라우트
 - `/`: `/home` 리다이렉트
 - `/home`: 메인 검색 페이지
+- `/data-hub`: 데이터 허브(임시) - PDF 업로드/검색/AI 답변
 - `/search`: `/home` 리다이렉트(레거시)
 - `/project-management`: 레거시 경로(현재 `/home` 리다이렉트)
 - `/project-management/projects/new`: 프로젝트 생성
@@ -108,6 +113,7 @@
 - 기본/헬스: `GET /`, `GET /health`, `GET /health/detail`
 - 인증: `/auth/signup`, `/auth/verify-email`, `/auth/login`, `/auth/me`, `/auth/users`, `/auth/logout`
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
+- 데이터 허브(임시): `/data-hub/permissions`, `/data-hub/documents/upload`, `/data-hub/ask`
 - 예산:
   - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
   - 일정: `GET/PUT /budget/projects/{project_id}/schedule`

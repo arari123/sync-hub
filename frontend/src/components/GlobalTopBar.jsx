@@ -110,16 +110,16 @@ export default function GlobalTopBar() {
                                                 <span className="text-xs font-semibold text-center">새 프로젝트 생성</span>
                                             </Link>
 
-                                            <button
-                                                type="button"
-                                                className="flex cursor-not-allowed flex-col items-center gap-1 rounded-xl border border-border/70 bg-card/65 p-3 text-muted-foreground/70"
-                                                title="데이터 허브는 아직 구현되지 않았습니다."
+                                            <Link
+                                                to="/data-hub"
+                                                onClick={() => setIsQuickMenuOpen(false)}
+                                                className="flex flex-col items-center gap-1 rounded-xl border border-border/70 bg-card/65 p-3 text-foreground transition-colors hover:bg-secondary"
                                             >
                                                 <span className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-muted-foreground">
                                                     <Database className="h-4 w-4" />
                                                 </span>
-                                                <span className="text-xs font-semibold text-center">데이터 허브(미구현)</span>
-                                            </button>
+                                                <span className="text-xs font-semibold text-center">데이터 허브</span>
+                                            </Link>
                                     </div>
                                 </div>
                             )}

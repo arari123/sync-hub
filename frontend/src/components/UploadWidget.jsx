@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui/Button';
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
-const ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xlsm', '.xltx', '.xltm', '.csv'];
+const DEFAULT_ALLOWED_EXTENSIONS = ['.pdf', '.xlsx', '.xlsm', '.xltx', '.xltm', '.csv'];
 
 const STATUS_META = {
     uploading: { label: '업로드 중', color: 'text-blue-500' },
@@ -19,11 +19,22 @@ function getStatusMeta(status) {
     return STATUS_META[status] || { label: status || '알 수 없음', color: 'text-gray-400' };
 }
 
-const UploadWidget = () => {
+const UploadWidget = ({
+    title = '문서 업로드',
+    description = '',
+    uploadEndpoint = '/documents/upload',
+    allowedExtensions = DEFAULT_ALLOWED_EXTENSIONS,
+    accept = '.pdf,.xlsx,.xlsm,.xltx,.xltm,.csv',
+}) => {
     const fileInputRef = useRef(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [uploadError, setUploadError] = useState('');
     const [uploadJobs, setUploadJobs] = useState([]);
+
+    const normalizedAllowedExtensions = Array.isArray(allowedExtensions) && allowedExtensions.length
+        ? allowedExtensions.map((item) => String(item || '').toLowerCase()).filter(Boolean)
+        : DEFAULT_ALLOWED_EXTENSIONS;
+    const isPdfOnly = normalizedAllowedExtensions.length === 1 && normalizedAllowedExtensions[0] === '.pdf';
 
     const updateUploadJob = (id, updater) => {
         setUploadJobs((prev) => prev.map((job) => (job.id === id ? updater(job) : job)));
@@ -33,9 +44,9 @@ const UploadWidget = () => {
         if (!file) return;
 
         const lowered = file.name.toLowerCase();
-        const isAllowed = ALLOWED_EXTENSIONS.some((extension) => lowered.endsWith(extension));
+        const isAllowed = normalizedAllowedExtensions.some((extension) => lowered.endsWith(extension));
         if (!isAllowed) {
-            setUploadError('PDF/Excel/CSV 파일만 업로드할 수 있습니다.');
+            setUploadError(isPdfOnly ? 'PDF 파일만 업로드할 수 있습니다.' : 'PDF/Excel/CSV 파일만 업로드할 수 있습니다.');
             return;
         }
 
@@ -50,7 +61,7 @@ const UploadWidget = () => {
         formData.append('file', file);
 
         try {
-            const response = await api.post('/documents/upload', formData, {
+            const response = await api.post(uploadEndpoint, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 
@@ -124,7 +135,7 @@ const UploadWidget = () => {
     return (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-sm">문서 업로드</h3>
+                <h3 className="font-semibold text-sm">{title}</h3>
             </div>
 
             <div
@@ -138,7 +149,12 @@ const UploadWidget = () => {
                 onClick={() => fileInputRef.current?.click()}
             >
                 <UploadCloud className="h-8 w-8 text-primary mb-2" />
-                <p className="text-sm text-foreground font-medium">PDF/Excel 파일을 끌어오거나 아래 버튼을 클릭하세요</p>
+                <p className="text-sm text-foreground font-medium">
+                    {isPdfOnly ? 'PDF 파일을 끌어오거나 아래 버튼을 클릭하세요' : 'PDF/Excel 파일을 끌어오거나 아래 버튼을 클릭하세요'}
+                </p>
+                {description ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                ) : null}
                 <Button
                     type="button"
                     size="sm"
@@ -148,12 +164,12 @@ const UploadWidget = () => {
                         fileInputRef.current?.click();
                     }}
                 >
-                    문서 파일 선택
+                    {isPdfOnly ? 'PDF 파일 선택' : '문서 파일 선택'}
                 </Button>
                 <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".pdf,.xlsx,.xlsm,.xltx,.xltm,.csv"
+                    accept={accept}
                     hidden
                     onChange={(e) => uploadFile(e.target.files?.[0])}
                 />

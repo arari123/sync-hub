@@ -10,6 +10,7 @@ import BudgetProjectEditor from './pages/BudgetProjectEditor';
 import AgendaList from './pages/AgendaList';
 import AgendaCreate from './pages/AgendaCreate';
 import AgendaDetail from './pages/AgendaDetail';
+import DataHub from './pages/DataHub';
 import ProjectPlaceholderPage from './pages/ProjectPlaceholderPage';
 import BudgetProjectSchedule from './pages/BudgetProjectSchedule';
 import BudgetProjectScheduleManagement from './pages/BudgetProjectScheduleManagement';
@@ -55,6 +56,7 @@ function App() {
           <Route path="/project-management/projects/:projectId/spec" element={<ProtectedRoute><ProjectPlaceholderPage title="사양 관리" description="사양 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><ProjectPlaceholderPage title="데이터 관리" description="데이터 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
+          <Route path="/data-hub" element={<ProtectedRoute><DataHub /></ProtectedRoute>} />
           <Route path="/knowledge" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />
           <Route path="/budget-management/*" element={<LegacyBudgetManagementRedirect />} />

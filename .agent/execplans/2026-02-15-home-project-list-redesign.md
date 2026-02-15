@@ -19,8 +19,8 @@
 ## 4. Requirements ↔ Test Mapping
 | REQ-ID | Test Case | Proof (Command/Output) |
 | :--- | :--- | :--- |
-| REQ-001~007 | 메인 프로젝트 카드 UI/링크/딥링크/상태 표기 동작 확인 | `docker exec -w /app synchub_frontend npm run build` |
-| REQ-001~007 | 회귀/문법/디자인 토큰/유닛 테스트 | `docker exec -w /app synchub_web bash scripts/verify_fast.sh` |
+| REQ-001~008 | 메인 프로젝트 카드 UI/링크/딥링크/상태 표기/검토 단계 타임라인 표시 확인 | `docker exec -w /app synchub_frontend npm run build` |
+| REQ-001~008 | 회귀/문법/디자인 토큰/유닛 테스트 | `docker exec -w /app synchub_web bash scripts/verify_fast.sh` |
 
 ## 5. Implementation Steps
 1. `/home` 프로젝트 카드에서 기존 `NEW UPDATE` 뱃지 블록을 제거한다.
@@ -30,8 +30,9 @@
 5. 일정 프로그레스바 라벨 오버레이, 날짜 폰트/색상, 간격을 조정한다.
 6. 프로젝트 유형 뱃지를 추가/강화한다.
 7. 파츠/AS 프로젝트가 `시작(start)` 단계일 때 상태 텍스트를 `진행 중`으로 표기하도록 로직을 보정한다.
-8. Docker에서 `verify_fast` + 프론트 `build`를 실행한다.
-9. 변경을 커밋하고 `git push` 한다.
+8. `검토(review)` 단계 프로젝트는 타임라인 프로그레스바에서 첫 단계가 활성화로 보이지 않도록 비활성화 처리한다.
+9. Docker에서 `verify_fast` + 프론트 `build`를 실행한다.
+10. 변경을 커밋하고 `git push` 한다.
 
 ## 6. Rollback Plan
 - `frontend/src/pages/SearchResults.jsx`에서 업데이트 UI를 이전 `NEW UPDATE` 뱃지 블록으로 되돌린다.

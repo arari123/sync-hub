@@ -453,6 +453,7 @@ function resolveStageStyle(project) {
 
 function resolveTimelineProgressIndex(stageKey) {
     const stage = normalizeStage(stageKey);
+    if (stage === 'review') return -1;
     if (stage === 'design') return 0;
     if (stage === 'fabrication') return 1;
     if (stage === 'installation') return 2;
@@ -463,6 +464,7 @@ function resolveTimelineProgressIndex(stageKey) {
 
 function resolveAsTimelineProgressIndex(stageKey) {
     const stage = normalizeStage(stageKey);
+    if (stage === 'review') return -1;
     if (stage === 'closure') return HOME_AS_TIMELINE.length;
     return 0;
 }

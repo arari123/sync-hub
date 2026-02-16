@@ -12,7 +12,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
-import { markAgendaThreadSeen } from '../lib/agendaSeen';
+import { markAgendaEntrySeen, markAgendaThreadSeen } from '../lib/agendaSeen';
 import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import { INPUT_COMMON_CLASS } from '../components/ui/Input';
@@ -147,6 +147,21 @@ export default function AgendaDetail() {
                 const threadId = Number(payload?.thread?.id || agendaId || 0);
                 const lastUpdatedAt = String(payload?.thread?.last_updated_at || payload?.thread?.updated_at || '').trim();
                 markAgendaThreadSeen(threadId, lastUpdatedAt);
+                const entries = [];
+                if (payload?.root_entry) entries.push(payload.root_entry);
+                if (Array.isArray(payload?.middle_entries)) entries.push(...payload.middle_entries);
+                if (payload?.latest_entry) entries.push(payload.latest_entry);
+                const dedup = new Map();
+                for (const item of entries) {
+                    const entryId = Number(item?.id || 0);
+                    if (!entryId || dedup.has(entryId)) continue;
+                    dedup.set(entryId, item);
+                }
+                dedup.forEach((entry) => {
+                    const entryId = Number(entry?.id || 0);
+                    const entryUpdatedAt = String(entry?.updated_at || '').trim();
+                    markAgendaEntrySeen(entryId, entryUpdatedAt);
+                });
             } catch (error) {
                 // ignore
             }

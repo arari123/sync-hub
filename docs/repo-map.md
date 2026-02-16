@@ -63,11 +63,11 @@
   - `ProjectPageHeader.jsx`, `ProjectContextNav.jsx`: 프로젝트 페이지 브레드크럼/서브메뉴
   - `BudgetBreadcrumb.jsx`, `BudgetSidebar.jsx`: 예산 브레드크럼/입력 트리 네비게이션
   - `agenda/RichTextEditor.jsx`: 안건 작성용 리치 텍스트 에디터
-  - `agenda/AgendaThreadCard.jsx`: 안건 목록 카드(프로젝트 라벨/미확인 강조 포함, 목록 공용)
+  - `agenda/AgendaSplitView.jsx`: 안건 아웃룩형 Split View(좌측 엔트리 리스트/우측 상세, 리스트 접기/펼치기)
   - `budget-dashboard/*Tab.jsx`: 예산 탭 UI 구성 컴포넌트
   - `ui/`: 공용 UI primitives (`Button`, `Input`, `Logo`)
 - `pages/`
-  - `SearchResults.jsx`: 홈(`/home`) 탭(내프로젝트/전체프로젝트/전체안건) + 프로젝트 리스트 + 전체안건(내 담당/내 작성) 리스트 + 검색결과 UI
+  - `SearchResults.jsx`: 홈(`/home`) 탭(내프로젝트/전체프로젝트/전체안건) + 프로젝트 리스트 + 전체안건 Split View + 검색결과 UI
   - `DataHub.jsx`: 임시 데이터 허브(`/data-hub`) 문서 검색 + AI 답변 + 관리자 업로드
   - `BudgetManagement.jsx`: 레거시 프로젝트 목록 페이지(현재 `App.jsx`에서 직접 라우트 연결 없이 레거시 리다이렉트만 유지)
   - `BudgetProjectOverview.jsx`: 프로젝트 메인(상세 요약)
@@ -76,7 +76,7 @@
   - `BudgetProjectCreate.jsx`, `BudgetProjectInfoEdit.jsx`: 프로젝트 생성/설정
   - `BudgetProjectScheduleManagement.jsx`: 프로젝트 일정 통합 조회/필터/타임라인 관리 페이지
   - `BudgetProjectSchedule.jsx`: 프로젝트 공통 일정(WBS) 작성/편집 페이지
-  - `AgendaList.jsx`, `AgendaCreate.jsx`, `AgendaDetail.jsx`: 안건 목록/작성/상세
+  - `AgendaList.jsx`, `AgendaCreate.jsx`, `AgendaDetail.jsx`: 안건 목록(Split View)/작성/상세
   - `ProjectPlaceholderPage.jsx`: 사양/데이터 관리 임시 페이지
   - `Login.jsx`, `Signup.jsx`, `VerifyEmail.jsx`: 인증 페이지
 - `lib/`
@@ -122,7 +122,7 @@
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`
 - 안건:
-  - 메타/목록/검색: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`, `GET /agenda/threads/search`, `GET /agenda/threads/my`
+  - 메타/목록/검색: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`, `GET /agenda/projects/{project_id}/entries`, `GET /agenda/entries/my`, `GET /agenda/threads/search`, `GET /agenda/threads/my`
   - 생성/수정: `POST /agenda/projects/{project_id}/threads`, `PUT /agenda/threads/{thread_id}/draft`, `POST /agenda/threads/{thread_id}/replies`
   - 상세/코멘트: `GET /agenda/threads/{thread_id}`, `GET /agenda/threads/{thread_id}/entries/{entry_id}`, `GET/POST /agenda/threads/{thread_id}/comments`
   - 상태/재등록/첨부: `/agenda/threads/{thread_id}/status`, `/agenda/threads/{thread_id}/reregister-payload`, `/agenda/attachments/{attachment_id}/download`

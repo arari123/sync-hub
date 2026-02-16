@@ -556,6 +556,49 @@ def _serialize_thread(
     }
 
 
+def _serialize_entry_list_item(
+    entry: models.AgendaEntry,
+    thread: models.AgendaThread,
+    project: Optional[models.BudgetProject],
+    user_map: dict[int, models.User],
+    first_image_by_entry_id: dict[int, str],
+) -> dict[str, Any]:
+    author = user_map.get(int(entry.created_by_user_id))
+    thumbnail_url = first_image_by_entry_id.get(int(entry.id), "")
+    if not thumbnail_url:
+        thumbnail_url = _first_image_src_from_html(entry.content_html)
+    if not thumbnail_url:
+        thumbnail_url = _DEFAULT_THUMBNAIL_IMAGE
+
+    return {
+        "entry_id": int(entry.id),
+        "thread_id": int(thread.id),
+        "project_id": int(thread.project_id),
+        "project_name": (project.name if project else "") or "",
+        "project_code": (project.code if project else "") or "",
+        "entry_kind": entry.entry_kind,
+        "thread_kind": thread.thread_kind,
+        "record_status": thread.record_status,
+        "progress_status": thread.progress_status,
+        "agenda_code": thread.agenda_code,
+        "title": entry.title or thread.title,
+        "summary_plain": _collapse_snippet_whitespace(entry.content_plain or "")[:600],
+        "author_name": _display_user_name(author),
+        "requester_name": entry.requester_name or "",
+        "requester_org": entry.requester_org or "",
+        "responder_name": entry.responder_name or "",
+        "responder_org": entry.responder_org or "",
+        "attachment_count": int(entry.attachment_count or 0),
+        "reply_count": int(thread.reply_count or 0),
+        "comment_count": int(thread.comment_count or 0),
+        "thumbnail_url": thumbnail_url,
+        "created_at": entry.created_at,
+        "published_at": entry.published_at,
+        "updated_at": entry.updated_at,
+        "thread_last_updated_at": thread.last_updated_at,
+    }
+
+
 def _remove_entry_attachments(entry_id: int, db: Session) -> None:
     attachments = db.query(models.AgendaAttachment).filter(models.AgendaAttachment.entry_id == entry_id).all()
     for item in attachments:
@@ -1890,6 +1933,252 @@ def list_my_agenda_threads(
         payload["project_name"] = (project.name if project else "") or ""
         payload["project_code"] = (project.code if project else "") or ""
         items.append(payload)
+
+    return {
+        "items": items,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+
+@router.get("/projects/{project_id}/entries")
+def list_project_agenda_entries(
+    project_id: int,
+    progress_status: str = Query(default="all"),
+    thread_kind: str = Query(default="all"),
+    include_drafts: bool = Query(default=False),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    _ = project  # keep explicit project existence/readability check
+
+    if per_page not in _ALLOWED_PER_PAGE:
+        per_page = 10
+
+    thread_query = db.query(models.AgendaThread).filter(models.AgendaThread.project_id == project_id)
+    if include_drafts:
+        thread_query = thread_query.filter(
+            or_(
+                models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED,
+                and_(
+                    models.AgendaThread.record_status == RECORD_STATUS_DRAFT,
+                    models.AgendaThread.created_by_user_id == int(user.id),
+                ),
+            )
+        )
+    else:
+        thread_query = thread_query.filter(models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED)
+
+    kind_token = str(thread_kind or "all").strip().lower()
+    if kind_token not in {"", "all"}:
+        normalized_kind = _normalize_thread_kind(kind_token)
+        thread_query = thread_query.filter(models.AgendaThread.thread_kind == normalized_kind)
+
+    status_token = str(progress_status or "all").strip().lower()
+    if status_token in {"in_progress", "진행중", "progress", "active"}:
+        thread_query = thread_query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_IN_PROGRESS)
+    elif status_token in {"completed", "완료", "done"}:
+        thread_query = thread_query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_COMPLETED)
+
+    threads = thread_query.all()
+    if not threads:
+        return {
+            "items": [],
+            "page": page,
+            "per_page": per_page,
+            "total": 0,
+            "total_pages": 0,
+        }
+
+    thread_ids = [int(item.id) for item in threads]
+    thread_map = {int(item.id): item for item in threads}
+
+    entries_query = db.query(models.AgendaEntry).filter(models.AgendaEntry.thread_id.in_(thread_ids))
+    if include_drafts:
+        entries_query = entries_query.filter(
+            or_(
+                models.AgendaEntry.record_status == RECORD_STATUS_PUBLISHED,
+                and_(
+                    models.AgendaEntry.record_status == RECORD_STATUS_DRAFT,
+                    models.AgendaEntry.created_by_user_id == int(user.id),
+                ),
+            )
+        )
+    else:
+        entries_query = entries_query.filter(models.AgendaEntry.record_status == RECORD_STATUS_PUBLISHED)
+
+    entries = entries_query.all()
+    if not entries:
+        return {
+            "items": [],
+            "page": page,
+            "per_page": per_page,
+            "total": 0,
+            "total_pages": 0,
+        }
+
+    user_ids = {int(item.created_by_user_id) for item in entries}
+    user_map = _user_map_by_ids(user_ids, db)
+
+    first_image_map = _first_image_attachment_map([int(item.id) for item in entries], db)
+
+    project_map = {int(project.id): project}
+
+    entry_rows = sorted(
+        entries,
+        key=lambda item: (
+            parse_iso(item.updated_at).timestamp() if item.updated_at else 0,
+            int(item.id),
+        ),
+        reverse=True,
+    )
+
+    total = len(entry_rows)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+    start = (page - 1) * per_page
+    end = start + per_page
+    paged_entries = entry_rows[start:end]
+
+    items = [
+        _serialize_entry_list_item(
+            entry=item,
+            thread=thread_map[int(item.thread_id)],
+            project=project_map.get(int(thread_map[int(item.thread_id)].project_id)),
+            user_map=user_map,
+            first_image_by_entry_id=first_image_map,
+        )
+        for item in paged_entries
+        if int(item.thread_id) in thread_map
+    ]
+
+    return {
+        "items": items,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+
+@router.get("/entries/my")
+def list_my_agenda_entries(
+    progress_status: str = Query(default="all"),
+    thread_kind: str = Query(default="all"),
+    include_drafts: bool = Query(default=True),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    if per_page not in _ALLOWED_PER_PAGE:
+        per_page = 10
+
+    user_id = int(user.id)
+
+    query = (
+        db.query(models.AgendaEntry, models.AgendaThread, models.BudgetProject)
+        .join(models.AgendaThread, models.AgendaThread.id == models.AgendaEntry.thread_id)
+        .join(models.BudgetProject, models.BudgetProject.id == models.AgendaThread.project_id)
+        .filter(
+            or_(
+                models.BudgetProject.manager_user_id == user_id,
+                models.AgendaEntry.created_by_user_id == user_id,
+                models.AgendaThread.created_by_user_id == user_id,
+            )
+        )
+    )
+
+    if include_drafts:
+        query = query.filter(
+            or_(
+                models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED,
+                and_(
+                    models.AgendaThread.record_status == RECORD_STATUS_DRAFT,
+                    models.AgendaThread.created_by_user_id == user_id,
+                ),
+            )
+        )
+        query = query.filter(
+            or_(
+                models.AgendaEntry.record_status == RECORD_STATUS_PUBLISHED,
+                and_(
+                    models.AgendaEntry.record_status == RECORD_STATUS_DRAFT,
+                    models.AgendaEntry.created_by_user_id == user_id,
+                ),
+            )
+        )
+    else:
+        query = query.filter(
+            models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED,
+            models.AgendaEntry.record_status == RECORD_STATUS_PUBLISHED,
+        )
+
+    kind_token = str(thread_kind or "all").strip().lower()
+    if kind_token not in {"", "all"}:
+        normalized_kind = _normalize_thread_kind(kind_token)
+        query = query.filter(models.AgendaThread.thread_kind == normalized_kind)
+
+    status_token = str(progress_status or "all").strip().lower()
+    if status_token in {"in_progress", "진행중", "progress", "active"}:
+        query = query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_IN_PROGRESS)
+    elif status_token in {"completed", "완료", "done"}:
+        query = query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_COMPLETED)
+
+    rows = query.all()
+    if not rows:
+        return {
+            "items": [],
+            "page": page,
+            "per_page": per_page,
+            "total": 0,
+            "total_pages": 0,
+        }
+
+    entries = [row[0] for row in rows]
+    user_ids = {int(item.created_by_user_id) for item in entries}
+    user_map = _user_map_by_ids(user_ids, db)
+    first_image_map = _first_image_attachment_map([int(item.id) for item in entries], db)
+
+    normalized_rows = [
+        {
+            "entry": row[0],
+            "thread": row[1],
+            "project": row[2],
+        }
+        for row in rows
+        if row and len(row) == 3 and row[0] is not None and row[1] is not None and row[2] is not None
+    ]
+
+    sorted_rows = sorted(
+        normalized_rows,
+        key=lambda item: (
+            parse_iso(item["entry"].updated_at).timestamp() if item["entry"].updated_at else 0,
+            int(item["entry"].id),
+        ),
+        reverse=True,
+    )
+
+    total = len(sorted_rows)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+    start = (page - 1) * per_page
+    end = start + per_page
+    paged_rows = sorted_rows[start:end]
+
+    items = [
+        _serialize_entry_list_item(
+            entry=row["entry"],
+            thread=row["thread"],
+            project=row["project"],
+            user_map=user_map,
+            first_image_by_entry_id=first_image_map,
+        )
+        for row in paged_rows
+    ]
 
     return {
         "items": items,

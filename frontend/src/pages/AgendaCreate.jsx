@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
-import { markAgendaThreadSeen } from '../lib/agendaSeen';
+import { markAgendaEntrySeen, markAgendaThreadSeen } from '../lib/agendaSeen';
 import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import { INPUT_COMMON_CLASS } from '../components/ui/Input';
@@ -117,6 +117,9 @@ export default function AgendaCreate() {
                 try {
                     const lastUpdatedAt = String(thread?.last_updated_at || thread?.updated_at || '').trim();
                     markAgendaThreadSeen(draftId, lastUpdatedAt);
+                    const rootEntryId = Number(root?.id || 0);
+                    const rootUpdatedAt = String(root?.updated_at || '').trim();
+                    markAgendaEntrySeen(rootEntryId, rootUpdatedAt);
                 } catch (error) {
                     // ignore
                 }

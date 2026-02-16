@@ -31,10 +31,9 @@ import {
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import GlobalSearchResultList from '../components/GlobalSearchResultList';
-import AgendaThreadCard from '../components/agenda/AgendaThreadCard';
+import AgendaSplitView from '../components/agenda/AgendaSplitView';
 import UserMenu from '../components/UserMenu';
 import { Input } from '../components/ui/Input';
-import { loadAgendaThreadSeenBaselines } from '../lib/agendaSeen';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const EQUIPMENT_STAGE_OPTIONS = [
@@ -57,7 +56,6 @@ const PROJECT_TYPE_OPTIONS = [
 ];
 const TABLE_PAGE_SIZE = 10;
 const PAGE_GROUP_SIZE = 10;
-const HOME_AGENDA_PAGE_SIZE = 10;
 const HOME_TAB_MY_PROJECTS = 'my_projects';
 const HOME_TAB_ALL_PROJECTS = 'all_projects';
 const HOME_TAB_ALL_AGENDAS = 'all_agendas';
@@ -621,17 +619,6 @@ const SearchResults = () => {
     const [projectScheduleMap, setProjectScheduleMap] = useState({});
     const [projectUpdateBaselines, setProjectUpdateBaselines] = useState(() => loadProjectUpdateBaselines());
 
-    const [homeAgendaItems, setHomeAgendaItems] = useState([]);
-    const [homeAgendaPage, setHomeAgendaPage] = useState(1);
-    const [homeAgendaTotal, setHomeAgendaTotal] = useState(0);
-    const [homeAgendaTotalPages, setHomeAgendaTotalPages] = useState(0);
-    const [homeAgendaProgressStatus, setHomeAgendaProgressStatus] = useState('all');
-    const [homeAgendaThreadKind, setHomeAgendaThreadKind] = useState('all');
-    const [homeAgendaIncludeDrafts, setHomeAgendaIncludeDrafts] = useState(true);
-    const [homeAgendaLoading, setHomeAgendaLoading] = useState(false);
-    const [homeAgendaError, setHomeAgendaError] = useState('');
-    const [agendaSeenBaselines] = useState(() => loadAgendaThreadSeenBaselines());
-
     const user = getCurrentUser();
     const quickMenuRef = useRef(null);
     const isAgendaTab = homeTab === HOME_TAB_ALL_AGENDAS;
@@ -701,62 +688,6 @@ const SearchResults = () => {
             controller.abort();
         };
     }, [hasProjectPanel]);
-
-    useEffect(() => {
-        if (!hasHomePanel) return undefined;
-        if (!isAgendaTab) return undefined;
-
-        const controller = new AbortController();
-        let active = true;
-
-        const fetchHomeAgendas = async () => {
-            setHomeAgendaLoading(true);
-            setHomeAgendaError('');
-            try {
-                const response = await api.get('/agenda/threads/my', {
-                    params: {
-                        progress_status: homeAgendaProgressStatus,
-                        thread_kind: homeAgendaThreadKind,
-                        include_drafts: homeAgendaIncludeDrafts,
-                        page: homeAgendaPage,
-                        per_page: HOME_AGENDA_PAGE_SIZE,
-                    },
-                    signal: controller.signal,
-                });
-
-                const payload = response?.data || {};
-                if (!active) return;
-                setHomeAgendaItems(Array.isArray(payload.items) ? payload.items : []);
-                setHomeAgendaTotal(Number(payload.total || 0));
-                setHomeAgendaTotalPages(Number(payload.total_pages || 0));
-            } catch (err) {
-                if (!active || err?.code === 'ERR_CANCELED') {
-                    return;
-                }
-                setHomeAgendaItems([]);
-                setHomeAgendaTotal(0);
-                setHomeAgendaTotalPages(0);
-                setHomeAgendaError(getErrorMessage(err, '안건 목록을 불러오지 못했습니다.'));
-            } finally {
-                if (!active) return;
-                setHomeAgendaLoading(false);
-            }
-        };
-
-        fetchHomeAgendas();
-
-        return () => {
-            active = false;
-            controller.abort();
-        };
-    }, [
-        hasHomePanel,
-        isAgendaTab,
-        homeAgendaIncludeDrafts,
-        homeAgendaPage,
-        homeAgendaProgressStatus,
-        homeAgendaThreadKind,
-    ]);
 
     const globalEntityResults = useMemo(() => {
         const projects = (Array.isArray(projectSearchResults) ? projectSearchResults : []).map((item) => ({
@@ -1495,7 +1426,6 @@ const SearchResults = () => {
                                         onClick={() => {
                                             setHomeTab(HOME_TAB_ALL_AGENDAS);
                                             setIsMobileFilterOpen(false);
-                                            setHomeAgendaPage(1);
                                         }}
                                         className={cn(
                                             `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
@@ -1529,13 +1459,8 @@ const SearchResults = () => {
                                         </span>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <span className="text-[11px] font-medium text-muted-foreground">
-                                            전체 {homeAgendaTotal.toLocaleString('ko-KR')}건
-                                        </span>
-                                        <span className="text-[11px] font-medium text-muted-foreground">
-                                            정렬: 최신 업데이트 순
-                                        </span>
+                                    <div className="text-[11px] font-medium text-muted-foreground">
+                                        안건 목록/상세 분할 보기
                                     </div>
                                 )}
                             </div>
@@ -1577,7 +1502,6 @@ const SearchResults = () => {
                                         onClick={() => {
                                             setHomeTab(HOME_TAB_ALL_AGENDAS);
                                             setIsMobileFilterOpen(false);
-                                            setHomeAgendaPage(1);
                                         }}
                                         className={cn(
                                             FILTER_TOGGLE_BUTTON_BASE_CLASS,
@@ -1682,80 +1606,9 @@ const SearchResults = () => {
                                         )}
                                     </>
                                 ) : (
-                                    <>
-                                        <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
-                                            {[
-                                                { value: 'all', label: '상태 전체' },
-                                                { value: 'in_progress', label: '진행 중' },
-                                                { value: 'completed', label: '완료' },
-                                            ].map((item) => {
-                                                const isActive = homeAgendaProgressStatus === item.value;
-                                                return (
-                                                    <button
-                                                        key={`home-agenda-progress-${item.value}`}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setHomeAgendaProgressStatus(item.value);
-                                                            setHomeAgendaPage(1);
-                                                        }}
-                                                        aria-pressed={isActive}
-                                                        className={cn(
-                                                            FILTER_CHIP_BASE_CLASS,
-                                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                        )}
-                                                    >
-                                                        {item.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        <div className="h-5 w-px shrink-0 bg-slate-200" />
-
-                                        <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
-                                            {[
-                                                { value: 'all', label: '유형 전체' },
-                                                { value: 'general', label: '일반 안건' },
-                                                { value: 'work_report', label: '작업보고서' },
-                                            ].map((item) => {
-                                                const isActive = homeAgendaThreadKind === item.value;
-                                                return (
-                                                    <button
-                                                        key={`home-agenda-kind-${item.value}`}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setHomeAgendaThreadKind(item.value);
-                                                            setHomeAgendaPage(1);
-                                                        }}
-                                                        aria-pressed={isActive}
-                                                        className={cn(
-                                                            FILTER_CHIP_BASE_CLASS,
-                                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                        )}
-                                                    >
-                                                        {item.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        <div className="h-5 w-px shrink-0 bg-slate-200" />
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setHomeAgendaIncludeDrafts((prev) => !prev);
-                                                setHomeAgendaPage(1);
-                                            }}
-                                            aria-pressed={homeAgendaIncludeDrafts}
-                                            className={cn(
-                                                FILTER_CHIP_BASE_CLASS,
-                                                homeAgendaIncludeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                            )}
-                                        >
-                                            임시 저장 포함
-                                        </button>
-                                    </>
+                                    <span className="text-xs font-semibold text-slate-500">
+                                        안건 목록/상세 분할 보기
+                                    </span>
                                 )}
                             </div>
 
@@ -1852,78 +1705,6 @@ const SearchResults = () => {
                                 </div>
                             )}
 
-                            {isAgendaTab && (
-                                <div className="mt-2 space-y-2 lg:hidden">
-                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                        {[
-                                            { value: 'all', label: '상태 전체' },
-                                            { value: 'in_progress', label: '진행 중' },
-                                            { value: 'completed', label: '완료' },
-                                        ].map((item) => {
-                                            const isActive = homeAgendaProgressStatus === item.value;
-                                            return (
-                                                <button
-                                                    key={`home-agenda-progress-mobile-${item.value}`}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setHomeAgendaProgressStatus(item.value);
-                                                        setHomeAgendaPage(1);
-                                                    }}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                        {[
-                                            { value: 'all', label: '유형 전체' },
-                                            { value: 'general', label: '일반 안건' },
-                                            { value: 'work_report', label: '작업보고서' },
-                                        ].map((item) => {
-                                            const isActive = homeAgendaThreadKind === item.value;
-                                            return (
-                                                <button
-                                                    key={`home-agenda-kind-mobile-${item.value}`}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setHomeAgendaThreadKind(item.value);
-                                                        setHomeAgendaPage(1);
-                                                    }}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                    )}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setHomeAgendaIncludeDrafts((prev) => !prev);
-                                            setHomeAgendaPage(1);
-                                        }}
-                                        aria-pressed={homeAgendaIncludeDrafts}
-                                        className={cn(
-                                            FILTER_CHIP_BASE_CLASS,
-                                            homeAgendaIncludeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                        )}
-                                    >
-                                        임시 저장 포함
-                                    </button>
-                                </div>
-                            )}
                         </section>
                     )}
 
@@ -2540,157 +2321,7 @@ const SearchResults = () => {
                     ) : null}
 
                     {hasHomePanel && isAgendaTab && (
-                        <section className="space-y-3">
-                            {homeAgendaError && (
-                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                                    {homeAgendaError}
-                                </div>
-                            )}
-
-                            <div className="flex items-center justify-between text-sm text-slate-500">
-                                <p>총 {homeAgendaTotal.toLocaleString('ko-KR')}건</p>
-                                <p>정렬: 최신 업데이트 순</p>
-                            </div>
-
-                            {homeAgendaLoading ? (
-                                <div className="app-surface-soft px-4 py-16 text-center">
-                                    <div className="inline-flex items-center gap-2 text-slate-500">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        데이터를 불러오는 중입니다.
-                                    </div>
-                                </div>
-                            ) : homeAgendaItems.length <= 0 ? (
-                                <div className="app-surface-soft px-4 py-16 text-center text-sm text-slate-500">
-                                    표시할 안건이 없습니다.
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {homeAgendaItems.map((item) => {
-                                        const threadId = Number(item?.id || 0);
-                                        const threadKey = threadId > 0 ? String(threadId) : '';
-                                        const baselineRaw = threadKey ? agendaSeenBaselines?.[threadKey] : null;
-                                        const lastSeenUpdatedAt = typeof baselineRaw === 'string'
-                                            ? baselineRaw
-                                            : baselineRaw && typeof baselineRaw === 'object' && typeof baselineRaw.last_seen_updated_at === 'string'
-                                                ? baselineRaw.last_seen_updated_at
-                                                : '';
-                                        const lastUpdatedAt = String(item?.last_updated_at || item?.updated_at || '').trim();
-                                        const isUnread = Boolean(lastUpdatedAt) && (!lastSeenUpdatedAt || lastUpdatedAt > lastSeenUpdatedAt);
-
-                                        return (
-                                            <AgendaThreadCard
-                                                key={`home-agenda-${item.id}`}
-                                                item={item}
-                                                showProject
-                                                isUnread={isUnread}
-                                                onClick={() => {
-                                                    const projectId = Number(item?.project_id || 0);
-                                                    if (!projectId) return;
-                                                    if (item.record_status === 'draft') {
-                                                        navigate(`/project-management/projects/${projectId}/agenda/new?draft=${item.id}`);
-                                                        return;
-                                                    }
-                                                    navigate(`/project-management/projects/${projectId}/agenda/${item.id}`);
-                                                }}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {homeAgendaTotalPages > 1 && (() => {
-                                const safePage = Math.max(1, Math.min(homeAgendaPage, homeAgendaTotalPages));
-                                const pageGroupStart = Math.floor((safePage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
-                                const pageGroupEnd = Math.min(homeAgendaTotalPages, pageGroupStart + PAGE_GROUP_SIZE - 1);
-                                const pages = Array.from(
-                                    { length: Math.max(0, pageGroupEnd - pageGroupStart + 1) },
-                                    (_, index) => pageGroupStart + index,
-                                );
-
-                                const baseButtonClass =
-                                    'inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
-                                const disabledButtonClass = 'cursor-not-allowed border-border bg-background text-muted-foreground/40';
-                                const enabledButtonClass = 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground';
-                                const pageButtonClass = (isActive) => cn(
-                                    'min-w-9 px-2 font-semibold',
-                                    isActive ? 'border-primary bg-primary text-primary-foreground' : enabledButtonClass,
-                                );
-
-                                const visibleStart = homeAgendaTotal > 0 ? (safePage - 1) * HOME_AGENDA_PAGE_SIZE + 1 : 0;
-                                const visibleEnd = Math.min(safePage * HOME_AGENDA_PAGE_SIZE, homeAgendaTotal);
-
-                                return (
-                                    <>
-                                        <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                                            <span className="text-[11px] font-semibold text-slate-500">
-                                                페이지 {safePage} / {homeAgendaTotalPages}
-                                            </span>
-                                            <div className="flex flex-wrap items-center justify-end gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setHomeAgendaPage(1)}
-                                                    disabled={safePage <= 1}
-                                                    className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
-                                                    title="맨앞"
-                                                >
-                                                    <ChevronsLeft className="h-3.5 w-3.5" />
-                                                    맨앞
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setHomeAgendaPage((prev) => Math.max(1, prev - 1))}
-                                                    disabled={safePage <= 1}
-                                                    className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
-                                                    title="이전"
-                                                >
-                                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                                    이전
-                                                </button>
-
-                                                {pages.map((page) => (
-                                                    <button
-                                                        key={`home-agenda-page-${page}`}
-                                                        type="button"
-                                                        onClick={() => setHomeAgendaPage(page)}
-                                                        aria-current={page === safePage ? 'page' : undefined}
-                                                        className={cn(baseButtonClass, pageButtonClass(page === safePage))}
-                                                    >
-                                                        {page}
-                                                    </button>
-                                                ))}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setHomeAgendaPage((prev) => Math.min(homeAgendaTotalPages, prev + 1))}
-                                                    disabled={safePage >= homeAgendaTotalPages}
-                                                    className={cn(baseButtonClass, safePage >= homeAgendaTotalPages ? disabledButtonClass : enabledButtonClass)}
-                                                    title="다음"
-                                                >
-                                                    다음
-                                                    <ChevronRight className="h-3.5 w-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setHomeAgendaPage(homeAgendaTotalPages)}
-                                                    disabled={safePage >= homeAgendaTotalPages}
-                                                    className={cn(baseButtonClass, safePage >= homeAgendaTotalPages ? disabledButtonClass : enabledButtonClass)}
-                                                    title="맨뒤"
-                                                >
-                                                    맨뒤
-                                                    <ChevronsRight className="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
-                                            <span>
-                                                안건 {visibleStart}-{visibleEnd} / 총 {homeAgendaTotal.toLocaleString('ko-KR')}건
-                                            </span>
-                                        </div>
-                                    </>
-                                );
-                            })()}
-                        </section>
+                        <AgendaSplitView mode="my" showProjectMeta />
                     )}
 
                     {hasSearchQuery && documentResults.length > 0 && (

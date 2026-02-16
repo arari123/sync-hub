@@ -1,4 +1,5 @@
 const AGENDA_THREAD_SEEN_STORAGE_KEY = 'synchub:agenda-thread-seen-baselines:v1';
+const AGENDA_ENTRY_SEEN_STORAGE_KEY = 'synchub:agenda-entry-seen-baselines:v1';
 
 export function loadAgendaThreadSeenBaselines() {
     try {
@@ -65,3 +66,60 @@ export function isAgendaThreadUnread(threadId, lastUpdatedAt) {
     return updatedAt > lastSeen;
 }
 
+export function loadAgendaEntrySeenBaselines() {
+    try {
+        const raw = window.localStorage.getItem(AGENDA_ENTRY_SEEN_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return {};
+        return parsed;
+    } catch (error) {
+        return {};
+    }
+}
+
+export function saveAgendaEntrySeenBaselines(value) {
+    try {
+        window.localStorage.setItem(AGENDA_ENTRY_SEEN_STORAGE_KEY, JSON.stringify(value || {}));
+    } catch (error) {
+        // ignore
+    }
+}
+
+export function markAgendaEntrySeen(entryId, updatedAt) {
+    const id = Number(entryId || 0);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const nextUpdatedAt = String(updatedAt || '').trim();
+    if (!nextUpdatedAt) return;
+
+    const key = String(Math.floor(id));
+    const current = loadAgendaEntrySeenBaselines();
+    const prevValue = current[key];
+    const prevUpdatedAt = typeof prevValue === 'string'
+        ? prevValue
+        : prevValue && typeof prevValue === 'object' && typeof prevValue.last_seen_updated_at === 'string'
+            ? prevValue.last_seen_updated_at
+            : '';
+    if (prevUpdatedAt && prevUpdatedAt >= nextUpdatedAt) return;
+
+    const next = { ...(current || {}), [key]: nextUpdatedAt };
+    saveAgendaEntrySeenBaselines(next);
+}
+
+export function isAgendaEntryUnread(entryId, updatedAt) {
+    const id = Number(entryId || 0);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const nextUpdatedAt = String(updatedAt || '').trim();
+    if (!nextUpdatedAt) return false;
+
+    const current = loadAgendaEntrySeenBaselines();
+    const rawValue = current[String(Math.floor(id))];
+    const seenUpdatedAt = typeof rawValue === 'string'
+        ? rawValue
+        : rawValue && typeof rawValue === 'object' && typeof rawValue.last_seen_updated_at === 'string'
+            ? rawValue.last_seen_updated_at
+            : '';
+    if (!seenUpdatedAt) return true;
+    return nextUpdatedAt > seenUpdatedAt;
+}

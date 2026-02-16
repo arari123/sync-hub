@@ -309,7 +309,9 @@ export default function DataHub() {
                             </p>
                             {isAgendaAi ? (
                                 <div className="rounded-lg border border-dashed border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground">
-                                    안건 본문(루트/최신 엔트리 및 작업보고서 섹션)을 요약했습니다.
+                                    {aiMode === 'agenda_summary'
+                                        ? '안건 본문(루트/최신 엔트리 및 작업보고서 섹션)을 요약했습니다.'
+                                        : '해당 코드로 조회되는 안건이 없거나, 열람 권한이 없습니다.'}
                                 </div>
                             ) : (
                                 <SourcesPanel sources={aiSources} onSelectDoc={handleSelectSourceDoc} />

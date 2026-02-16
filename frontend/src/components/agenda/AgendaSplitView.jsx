@@ -34,6 +34,18 @@ function entryToneClass(value) {
     return 'border-cyan-200 bg-cyan-50 text-cyan-700';
 }
 
+function progressStatusLabel(value) {
+    const status = String(value || '').toLowerCase();
+    if (status === 'completed') return '종료';
+    return '진행중';
+}
+
+function progressStatusToneClass(value) {
+    const status = String(value || '').toLowerCase();
+    if (status === 'completed') return 'border-slate-200 bg-slate-100 text-slate-600';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
 function isUnreadByBaselines(baselines, entryId, updatedAt) {
     const key = String(Number(entryId || 0));
     if (!key || key === '0') return false;
@@ -101,7 +113,10 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
                 <span className={cn('inline-flex h-5 items-center rounded-md border px-1.5 text-[10px] font-bold', entryToneClass(item?.entry_kind))}>
                     {entryKindLabel(item?.entry_kind)}
                 </span>
-                {isUnread && <span className="h-2 w-2 rounded-full bg-amber-500" aria-label="미조회" />}
+                <span className={cn('inline-flex h-5 items-center rounded-md border px-1.5 text-[10px] font-bold', progressStatusToneClass(item?.progress_status))}>
+                    {progressStatusLabel(item?.progress_status)}
+                </span>
+                {isUnread && <span className="ml-auto h-2 w-2 rounded-full bg-amber-500" aria-label="미조회" />}
             </div>
 
             <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-slate-900' : 'font-semibold text-slate-800')}>

@@ -34,6 +34,7 @@ import GlobalSearchResultList from '../components/GlobalSearchResultList';
 import AgendaSplitView from '../components/agenda/AgendaSplitView';
 import UserMenu from '../components/UserMenu';
 import { Input } from '../components/ui/Input';
+import Logo from '../components/ui/Logo';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const EQUIPMENT_STAGE_OPTIONS = [
@@ -1269,13 +1270,7 @@ const SearchResults = () => {
         <div className="app-shell min-h-screen text-foreground">
             <header className="topbar-shell h-16">
                 <div className="mx-auto flex h-full max-w-[1640px] items-center gap-3 px-4 lg:px-6">
-                    <Link to="/home" className="flex w-48 shrink-0 items-center gap-2">
-                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[11px] font-extrabold text-primary-foreground shadow-sm">S</div>
-                        <div className="leading-tight">
-                            <p className="text-sm font-extrabold tracking-tight text-foreground">Sync-Hub</p>
-                            <p className="text-[10px] font-medium text-muted-foreground">Industrial Knowledge Workspace</p>
-                        </div>
-                    </Link>
+                    <Logo variant="topbar" showSubtitle={false} className="w-48 shrink-0" />
 
                     <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0">
                         <label className="relative block">

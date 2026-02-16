@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Database, Grid2x2, Plus, Search } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '../lib/session';
 import { Input } from './ui/Input';
+import Logo from './ui/Logo';
 import UserMenu from './UserMenu';
 
 const SEARCH_PLACEHOLDER = '프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색';
@@ -54,13 +55,7 @@ export default function GlobalTopBar() {
     return (
         <header className="topbar-shell h-16">
             <div className="mx-auto flex h-full max-w-[1640px] items-center gap-3 px-4 lg:px-6">
-                <Link to="/home" className="flex w-48 shrink-0 items-center gap-2">
-                    <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[11px] font-extrabold text-primary-foreground shadow-sm">S</div>
-                    <div className="leading-tight">
-                        <p className="text-sm font-extrabold tracking-tight text-foreground">Sync-Hub</p>
-                        <p className="text-[10px] font-medium text-muted-foreground">Industrial Knowledge Workspace</p>
-                    </div>
-                </Link>
+                <Logo variant="topbar" showSubtitle={false} className="w-48 shrink-0" />
 
                 {authed ? (
                     <form onSubmit={handleSearchSubmit} className="min-w-0 flex-1">

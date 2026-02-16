@@ -535,12 +535,8 @@ const BudgetProjectOverview = () => {
                             aria-label="현재 경로"
                             className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                         >
-                            <Link to="/home" className="font-medium hover:text-primary">
-                                메인
-                            </Link>
-                            <span>/</span>
-                            <Link to="/home" className="font-medium hover:text-primary">
-                                글로벌 검색
+                            <Link to="/project-management" className="font-medium hover:text-primary">
+                                프로젝트 관리
                             </Link>
                             <span>&gt;</span>
                             <span className="font-semibold text-foreground/90" title={projectName}>

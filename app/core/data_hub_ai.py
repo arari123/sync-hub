@@ -384,7 +384,8 @@ def build_agenda_summary_prompt(agenda: dict[str, Any]) -> str:
         lines.append("")
         lines.append("entries:")
         max_entries = 6
-        for idx, entry in enumerate(entries[:max_entries], start=1):
+        display_entries = entries[:max_entries]
+        for idx, entry in enumerate(display_entries, start=1):
             kind = str(entry.get("entry_kind") or "").strip()
             entry_title = str(entry.get("title") or "").strip()
             created = str(entry.get("created_at") or "").strip()
@@ -395,7 +396,8 @@ def build_agenda_summary_prompt(agenda: dict[str, Any]) -> str:
                 header = f"{header} ({created})"
             lines.append(f"- {header}")
             if content:
-                lines.append(_truncate(content, 2200 if idx in {1, max_entries} else 900))
+                is_edge_entry = idx in {1, len(display_entries)}
+                lines.append(_truncate(content, 2200 if is_edge_entry else 900))
 
     lines.append("")
     lines.append("## SUMMARY")

@@ -269,7 +269,7 @@ const BudgetProjectOverview = () => {
 
             try {
                 const agendaResp = await api.get(`/agenda/projects/${projectId}/threads`, {
-                    params: { page: 1, per_page: 5, include_drafts: false },
+                    params: { page: 1, per_page: 3, include_drafts: false },
                 });
                 const agendaPayload = agendaResp?.data || {};
                 const agendaPool = Array.isArray(agendaPayload?.items) ? agendaPayload.items : [];
@@ -279,7 +279,7 @@ const BudgetProjectOverview = () => {
                     if (leftValue === rightValue) return 0;
                     return leftValue > rightValue ? -1 : 1;
                 });
-                setAgendaItems(sortedAgendaPool.slice(0, 5));
+                setAgendaItems(sortedAgendaPool.slice(0, 3));
                 setAgendaTotal(Number(agendaPayload?.total || 0));
                 setAgendaError('');
             } catch (agendaErr) {

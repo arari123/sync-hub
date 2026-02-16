@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    ClipboardList,
     FileClock,
     Plus,
     Search,

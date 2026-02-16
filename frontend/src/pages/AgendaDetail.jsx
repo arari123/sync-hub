@@ -8,7 +8,7 @@ import {
     Reply,
     Send,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
@@ -79,6 +79,7 @@ function EntryPanel({ entry, label, tone = 'slate' }) {
 export default function AgendaDetail() {
     const { projectId, agendaId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [project, setProject] = useState(null);
     const [detail, setDetail] = useState(null);
@@ -130,6 +131,7 @@ export default function AgendaDetail() {
         if (!latestEntry || !rootEntry) return false;
         return Number(latestEntry.id) !== Number(rootEntry.id);
     }, [latestEntry, rootEntry]);
+    const openReplyByQuery = String(searchParams.get('reply') || '') === '1';
 
     const loadDetail = async ({ keepReplyForm = false } = {}) => {
         if (!agendaId || !projectId) return;
@@ -211,6 +213,12 @@ export default function AgendaDetail() {
         loadDetail();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [agendaId, projectId]);
+
+    useEffect(() => {
+        if (!openReplyByQuery) return;
+        if (!detail?.can_reply) return;
+        setIsReplyOpen(true);
+    }, [detail?.can_reply, openReplyByQuery]);
 
     const toggleAllMiddle = () => {
         if (!middleEntries.length) return;

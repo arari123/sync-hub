@@ -5,6 +5,7 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     Paperclip,
+    Reply,
     Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -78,7 +79,11 @@ function formatDateLabel(value) {
     return text.slice(0, 16).replace('T', ' ');
 }
 
-function ListItem({ item, isSelected, isUnread, onClick }) {
+function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false }) {
+    const projectCode = String(item?.project_code || '').trim();
+    const projectName = String(item?.project_name || '').trim();
+    const projectLabel = [projectCode, projectName].filter(Boolean).join(' · ');
+
     return (
         <button
             type="button"
@@ -102,6 +107,12 @@ function ListItem({ item, isSelected, isUnread, onClick }) {
             <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-slate-900' : 'font-semibold text-slate-800')}>
                 {item?.title || '-'}
             </p>
+
+            {showProjectMeta && projectLabel && (
+                <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">
+                    {projectLabel}
+                </p>
+            )}
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
                 <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">
@@ -446,6 +457,13 @@ export default function AgendaSplitView({
         navigate(`/project-management/projects/${targetProjectId}/agenda/${targetThreadId}`);
     };
 
+    const openReplyDetail = () => {
+        const targetProjectId = Number(selectedProjectId || selectedEntry?.project_id || 0);
+        const targetThreadId = Number(selectedThreadId || 0);
+        if (!targetProjectId || !targetThreadId) return;
+        navigate(`/project-management/projects/${targetProjectId}/agenda/${targetThreadId}?reply=1`);
+    };
+
     return (
         <div className={cn('space-y-3', className)}>
             <div className={cn(
@@ -506,6 +524,7 @@ export default function AgendaSplitView({
                                                 item={item}
                                                 isSelected={isSelected}
                                                 isUnread={isUnread}
+                                                showProjectMeta={isMyMode}
                                                 onClick={() => selectItem(item)}
                                             />
                                         );
@@ -558,13 +577,24 @@ export default function AgendaSplitView({
                                     <span className="text-xs font-semibold text-slate-500">{detail.thread.agenda_code}</span>
                                     <span className="text-xs text-slate-400">업데이트 {formatDateLabel(detail.thread.last_updated_at)}</span>
 
-                                    <button
-                                        type="button"
-                                        onClick={openFullDetail}
-                                        className="ml-auto inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                    >
-                                        상세 페이지 열기
-                                    </button>
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={openReplyDetail}
+                                            disabled={!detail?.can_reply}
+                                            className="inline-flex h-8 items-center gap-1 rounded-md bg-cyan-600 px-2 text-xs font-semibold text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <Reply className="h-3.5 w-3.5" />
+                                            답변 작성
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={openFullDetail}
+                                            className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        >
+                                            상세 페이지 열기
+                                        </button>
+                                    </div>
                                 </div>
                                 <h2 className="mt-2 text-xl font-black text-slate-900">{detail.thread.root_title || detail.thread.title}</h2>
                                 <p className="mt-1 text-sm font-medium text-slate-600">

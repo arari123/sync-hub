@@ -12,6 +12,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import RichTextEditor from '../components/agenda/RichTextEditor';
 import { api, getErrorMessage } from '../lib/api';
+import { markAgendaThreadSeen } from '../lib/agendaSeen';
 import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import { INPUT_COMMON_CLASS } from '../components/ui/Input';
@@ -142,6 +143,13 @@ export default function AgendaDetail() {
             setProject(metaResponse?.data?.project || null);
             const payload = detailResponse?.data || null;
             setDetail(payload);
+            try {
+                const threadId = Number(payload?.thread?.id || agendaId || 0);
+                const lastUpdatedAt = String(payload?.thread?.last_updated_at || payload?.thread?.updated_at || '').trim();
+                markAgendaThreadSeen(threadId, lastUpdatedAt);
+            } catch (error) {
+                // ignore
+            }
 
             if (!keepReplyForm) {
                 const latest = payload?.latest_entry || {};

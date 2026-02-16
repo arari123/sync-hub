@@ -1776,6 +1776,130 @@ def list_agenda_threads(
     }
 
 
+@router.get("/threads/my")
+def list_my_agenda_threads(
+    progress_status: str = Query(default="all"),
+    thread_kind: str = Query(default="all"),
+    include_drafts: bool = Query(default=True),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """내 담당 프로젝트(프로젝트 manager) 또는 내가 작성한 안건을 최신 업데이트 순으로 반환한다.
+
+    - include_drafts=true 일 때는 "내가 작성한 draft"만 포함한다(다른 사용자의 draft는 제외).
+    """
+
+    if per_page not in _ALLOWED_PER_PAGE:
+        per_page = 10
+
+    user_id = int(user.id)
+
+    relevance_clause = or_(
+        models.BudgetProject.manager_user_id == user_id,
+        models.AgendaThread.created_by_user_id == user_id,
+    )
+
+    if include_drafts:
+        status_clause = or_(
+            models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED,
+            and_(
+                models.AgendaThread.record_status == RECORD_STATUS_DRAFT,
+                models.AgendaThread.created_by_user_id == user_id,
+            ),
+        )
+    else:
+        status_clause = models.AgendaThread.record_status == RECORD_STATUS_PUBLISHED
+
+    query = (
+        db.query(models.AgendaThread, models.BudgetProject)
+        .join(models.BudgetProject, models.BudgetProject.id == models.AgendaThread.project_id)
+        .filter(relevance_clause)
+        .filter(status_clause)
+    )
+
+    kind_token = str(thread_kind or "all").strip().lower()
+    if kind_token not in {"", "all"}:
+        normalized_kind = _normalize_thread_kind(kind_token)
+        query = query.filter(models.AgendaThread.thread_kind == normalized_kind)
+
+    status_token = str(progress_status or "all").strip().lower()
+    if status_token in {"in_progress", "진행중", "progress", "active"}:
+        query = query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_IN_PROGRESS)
+    elif status_token in {"completed", "완료", "done"}:
+        query = query.filter(models.AgendaThread.progress_status == PROGRESS_STATUS_COMPLETED)
+
+    total = int(query.order_by(None).count())
+    if total <= 0:
+        return {
+            "items": [],
+            "page": page,
+            "per_page": per_page,
+            "total": 0,
+            "total_pages": 0,
+        }
+
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 0
+    start = (page - 1) * per_page
+
+    rows = (
+        query
+        .order_by(
+            models.AgendaThread.last_updated_at.desc(),
+            models.AgendaThread.id.desc(),
+        )
+        .offset(start)
+        .limit(per_page)
+        .all()
+    )
+
+    threads = [row[0] for row in rows]
+    project_by_thread_id: dict[int, models.BudgetProject] = {}
+    for thread, project in rows:
+        if thread is None or project is None:
+            continue
+        project_by_thread_id[int(thread.id)] = project
+
+    root_entry_ids = [int(item.root_entry_id) for item in threads if item.root_entry_id]
+    latest_entry_ids = [int(item.latest_entry_id) for item in threads if item.latest_entry_id]
+    entry_ids = list({*root_entry_ids, *latest_entry_ids})
+
+    entries: list[models.AgendaEntry] = []
+    if entry_ids:
+        entries = (
+            db.query(models.AgendaEntry)
+            .filter(models.AgendaEntry.id.in_(entry_ids))
+            .all()
+        )
+    entry_map = {int(item.id): item for item in entries}
+
+    user_ids = {int(item.created_by_user_id) for item in entries}
+    user_map = _user_map_by_ids(user_ids, db)
+
+    first_image_map = _first_image_attachment_map(entry_ids, db)
+
+    items = []
+    for thread in threads:
+        thread_id = int(thread.id)
+        root_entry = entry_map.get(int(thread.root_entry_id)) if thread.root_entry_id else None
+        latest_entry = entry_map.get(int(thread.latest_entry_id)) if thread.latest_entry_id else None
+        payload = _serialize_thread(thread, root_entry, latest_entry, user_map, first_image_map)
+
+        project = project_by_thread_id.get(thread_id)
+        payload["project_name"] = (project.name if project else "") or ""
+        payload["project_code"] = (project.code if project else "") or ""
+        items.append(payload)
+
+    return {
+        "items": items,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+
 @router.get("/threads/search")
 def search_agenda_threads(
     q: str = Query(..., min_length=1, max_length=200),

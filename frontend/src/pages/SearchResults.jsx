@@ -31,8 +31,10 @@ import {
 import ResultList from '../components/ResultList';
 import DocumentDetail from '../components/DocumentDetail';
 import GlobalSearchResultList from '../components/GlobalSearchResultList';
+import AgendaThreadCard from '../components/agenda/AgendaThreadCard';
 import UserMenu from '../components/UserMenu';
 import { Input } from '../components/ui/Input';
+import { loadAgendaThreadSeenBaselines } from '../lib/agendaSeen';
 
 const PROJECT_SCOPE_PATTERN = /프로젝트코드\s*:\s*([^\s]+)/;
 const EQUIPMENT_STAGE_OPTIONS = [
@@ -55,6 +57,10 @@ const PROJECT_TYPE_OPTIONS = [
 ];
 const TABLE_PAGE_SIZE = 10;
 const PAGE_GROUP_SIZE = 10;
+const HOME_AGENDA_PAGE_SIZE = 10;
+const HOME_TAB_MY_PROJECTS = 'my_projects';
+const HOME_TAB_ALL_PROJECTS = 'all_projects';
+const HOME_TAB_ALL_AGENDAS = 'all_agendas';
 const STAGE_LABEL_MAP = Object.fromEntries(EQUIPMENT_STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
@@ -600,7 +606,7 @@ const SearchResults = () => {
     const [agendaSearchResults, setAgendaSearchResults] = useState([]);
     const [documentResults, setDocumentResults] = useState([]);
     const [selectedResult, setSelectedResult] = useState(null);
-    const [showAllProjects, setShowAllProjects] = useState(false);
+    const [homeTab, setHomeTab] = useState(HOME_TAB_MY_PROJECTS);
     const [projectPage, setProjectPage] = useState(1);
     const [projectFilters, setProjectFilters] = useState({
         stages: [],
@@ -615,8 +621,24 @@ const SearchResults = () => {
     const [projectScheduleMap, setProjectScheduleMap] = useState({});
     const [projectUpdateBaselines, setProjectUpdateBaselines] = useState(() => loadProjectUpdateBaselines());
 
+    const [homeAgendaItems, setHomeAgendaItems] = useState([]);
+    const [homeAgendaPage, setHomeAgendaPage] = useState(1);
+    const [homeAgendaTotal, setHomeAgendaTotal] = useState(0);
+    const [homeAgendaTotalPages, setHomeAgendaTotalPages] = useState(0);
+    const [homeAgendaProgressStatus, setHomeAgendaProgressStatus] = useState('all');
+    const [homeAgendaThreadKind, setHomeAgendaThreadKind] = useState('all');
+    const [homeAgendaIncludeDrafts, setHomeAgendaIncludeDrafts] = useState(true);
+    const [homeAgendaLoading, setHomeAgendaLoading] = useState(false);
+    const [homeAgendaError, setHomeAgendaError] = useState('');
+    const [agendaSeenBaselines] = useState(() => loadAgendaThreadSeenBaselines());
+
     const user = getCurrentUser();
     const quickMenuRef = useRef(null);
+    const isAgendaTab = homeTab === HOME_TAB_ALL_AGENDAS;
+    const isProjectTab = !isAgendaTab;
+    const showAllProjects = homeTab === HOME_TAB_ALL_PROJECTS;
+    const hasHomePanel = !hasSearchQuery;
+    const hasProjectPanel = hasHomePanel && isProjectTab;
 
     useEffect(() => {
         setInputQuery(query);
@@ -635,7 +657,7 @@ const SearchResults = () => {
     }, []);
 
     useEffect(() => {
-        if (hasSearchQuery) return undefined;
+        if (!hasProjectPanel) return undefined;
 
         const controller = new AbortController();
         let active = true;
@@ -678,7 +700,63 @@ const SearchResults = () => {
             active = false;
             controller.abort();
         };
-    }, [hasSearchQuery]);
+    }, [hasProjectPanel]);
+
+    useEffect(() => {
+        if (!hasHomePanel) return undefined;
+        if (!isAgendaTab) return undefined;
+
+        const controller = new AbortController();
+        let active = true;
+
+        const fetchHomeAgendas = async () => {
+            setHomeAgendaLoading(true);
+            setHomeAgendaError('');
+            try {
+                const response = await api.get('/agenda/threads/my', {
+                    params: {
+                        progress_status: homeAgendaProgressStatus,
+                        thread_kind: homeAgendaThreadKind,
+                        include_drafts: homeAgendaIncludeDrafts,
+                        page: homeAgendaPage,
+                        per_page: HOME_AGENDA_PAGE_SIZE,
+                    },
+                    signal: controller.signal,
+                });
+
+                const payload = response?.data || {};
+                if (!active) return;
+                setHomeAgendaItems(Array.isArray(payload.items) ? payload.items : []);
+                setHomeAgendaTotal(Number(payload.total || 0));
+                setHomeAgendaTotalPages(Number(payload.total_pages || 0));
+            } catch (err) {
+                if (!active || err?.code === 'ERR_CANCELED') {
+                    return;
+                }
+                setHomeAgendaItems([]);
+                setHomeAgendaTotal(0);
+                setHomeAgendaTotalPages(0);
+                setHomeAgendaError(getErrorMessage(err, '안건 목록을 불러오지 못했습니다.'));
+            } finally {
+                if (!active) return;
+                setHomeAgendaLoading(false);
+            }
+        };
+
+        fetchHomeAgendas();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [
+        hasHomePanel,
+        isAgendaTab,
+        homeAgendaIncludeDrafts,
+        homeAgendaPage,
+        homeAgendaProgressStatus,
+        homeAgendaThreadKind,
+    ]);
 
     const globalEntityResults = useMemo(() => {
         const projects = (Array.isArray(projectSearchResults) ? projectSearchResults : []).map((item) => ({
@@ -934,7 +1012,6 @@ const SearchResults = () => {
     const myProjectCount = projectPool.filter((project) => project?.is_mine !== false).length;
     const allProjectCount = projectPool.length;
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
-    const hasProjectPanel = !hasSearchQuery;
 
     useEffect(() => {
         if (!hasProjectPanel) return;
@@ -1007,7 +1084,7 @@ const SearchResults = () => {
     }, [setProjectUpdateBaselines]);
 
     useEffect(() => {
-        if (hasSearchQuery) return undefined;
+        if (!hasProjectPanel) return undefined;
         if (visibleProjectIds.length <= 0) return undefined;
 
         const pendingProjectIds = visibleProjectIds.filter((projectId) => !(projectId in projectAgendaMap));
@@ -1076,10 +1153,10 @@ const SearchResults = () => {
             active = false;
             controller.abort();
         };
-    }, [hasSearchQuery, projectAgendaMap, visibleProjectIds]);
+    }, [hasProjectPanel, projectAgendaMap, visibleProjectIds]);
 
     useEffect(() => {
-        if (hasSearchQuery) return undefined;
+        if (!hasProjectPanel) return undefined;
         if (visibleProjectIds.length <= 0) return undefined;
 
         const pendingProjectIds = visibleProjectIds.filter((projectId) => !(projectId in projectScheduleMap));
@@ -1206,7 +1283,7 @@ const SearchResults = () => {
             active = false;
             controller.abort();
         };
-    }, [hasSearchQuery, projectScheduleMap, visibleProjectIds]);
+    }, [hasProjectPanel, projectScheduleMap, visibleProjectIds]);
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
@@ -1379,36 +1456,101 @@ const SearchResults = () => {
                         </section>
                     )}
 
-                    {hasProjectPanel && (
+                    {hasHomePanel && (
                         <section className="app-surface-soft px-3 py-2">
-                            <div className="flex items-center justify-between lg:hidden">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsMobileFilterOpen((prev) => !prev)}
-                                    aria-expanded={isMobileFilterOpen}
-                                    className={cn(
-                                        'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
-                                        isMobileFilterOpen
-                                            ? 'border-primary/40 bg-primary/10 text-primary'
-                                            : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
-                                    )}
-                                >
-                                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                                    {isMobileFilterOpen ? '필터 닫기' : '필터'}
-                                </button>
-                                <span className="text-[11px] font-medium text-muted-foreground">
-                                    {showAllProjects ? `전체 ${allProjectCount}건` : `내 프로젝트 ${myProjectCount}건`}
-                                </span>
+                            <div className="space-y-2 lg:hidden">
+                                <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'w-full')}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_MY_PROJECTS);
+                                            setIsMobileFilterOpen(false);
+                                        }}
+                                        className={cn(
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                            homeTab === HOME_TAB_MY_PROJECTS
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
+                                        )}
+                                    >
+                                        내프로젝트
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_ALL_PROJECTS);
+                                            setIsMobileFilterOpen(false);
+                                        }}
+                                        className={cn(
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                            homeTab === HOME_TAB_ALL_PROJECTS
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
+                                        )}
+                                    >
+                                        전체프로젝트
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_ALL_AGENDAS);
+                                            setIsMobileFilterOpen(false);
+                                            setHomeAgendaPage(1);
+                                        }}
+                                        className={cn(
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                            homeTab === HOME_TAB_ALL_AGENDAS
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
+                                        )}
+                                    >
+                                        전체안건
+                                    </button>
+                                </div>
+
+                                {isProjectTab ? (
+                                    <div className="flex items-center justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+                                            aria-expanded={isMobileFilterOpen}
+                                            className={cn(
+                                                'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1',
+                                                isMobileFilterOpen
+                                                    ? 'border-primary/40 bg-primary/10 text-primary'
+                                                    : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'
+                                            )}
+                                        >
+                                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                                            {isMobileFilterOpen ? '필터 닫기' : '필터'}
+                                        </button>
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            {showAllProjects ? `전체 ${allProjectCount}건` : `내 프로젝트 ${myProjectCount}건`}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            전체 {homeAgendaTotal.toLocaleString('ko-KR')}건
+                                        </span>
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            정렬: 최신 업데이트 순
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="hidden lg:flex lg:min-h-8 lg:items-center lg:gap-2">
                                 <div className={FILTER_TOGGLE_GROUP_CLASS}>
                                     <button
                                         type="button"
-                                        onClick={() => setShowAllProjects(false)}
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_MY_PROJECTS);
+                                            setIsMobileFilterOpen(false);
+                                        }}
                                         className={cn(
                                             FILTER_TOGGLE_BUTTON_BASE_CLASS,
-                                            !showAllProjects
+                                            homeTab === HOME_TAB_MY_PROJECTS
                                                 ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
                                                 : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
@@ -1417,91 +1559,73 @@ const SearchResults = () => {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setShowAllProjects(true)}
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_ALL_PROJECTS);
+                                            setIsMobileFilterOpen(false);
+                                        }}
                                         className={cn(
                                             FILTER_TOGGLE_BUTTON_BASE_CLASS,
-                                            showAllProjects
+                                            homeTab === HOME_TAB_ALL_PROJECTS
                                                 ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
                                                 : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         전체프로젝트
                                     </button>
-                                </div>
-
-                                <div className="relative w-52 shrink-0">
-                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
-                                    <Input
-                                        type="text"
-                                        value={projectFilterQuery}
-                                        onChange={(event) => setProjectFilterQuery(event.target.value)}
-                                        placeholder="프로젝트 검색"
-                                        className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
-                                    />
-                                </div>
-
-                                <div className="h-5 w-px shrink-0 bg-slate-200" />
-
-                                <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
                                     <button
                                         type="button"
-                                        onClick={clearTypeFilters}
-                                        aria-pressed={projectFilters.types.length === 0}
+                                        onClick={() => {
+                                            setHomeTab(HOME_TAB_ALL_AGENDAS);
+                                            setIsMobileFilterOpen(false);
+                                            setHomeAgendaPage(1);
+                                        }}
                                         className={cn(
-                                            FILTER_CHIP_BASE_CLASS,
-                                            projectFilters.types.length === 0
-                                                ? FILTER_CHIP_ACTIVE_CLASS
-                                                : FILTER_CHIP_INACTIVE_CLASS
+                                            FILTER_TOGGLE_BUTTON_BASE_CLASS,
+                                            homeTab === HOME_TAB_ALL_AGENDAS
+                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
-                                        전체 유형 ({filteredProjects.length})
+                                        전체안건
                                     </button>
-                                    {PROJECT_TYPE_OPTIONS.map((item) => {
-                                        const isActive = projectFilters.types.includes(item.value);
-                                        return (
-                                            <button
-                                                key={item.value}
-                                                type="button"
-                                                onClick={() => toggleTypeFilter(item.value)}
-                                                aria-pressed={isActive}
-                                                className={cn(
-                                                    FILTER_CHIP_BASE_CLASS,
-                                                    isActive
-                                                        ? FILTER_CHIP_ACTIVE_CLASS
-                                                        : FILTER_CHIP_INACTIVE_CLASS
-                                                )}
-                                            >
-                                                {item.label} ({typeCounts[item.value] || 0})
-                                            </button>
-                                        );
-                                    })}
                                 </div>
 
-                                {stageFilterOptions.length > 0 && (
+                                {isProjectTab ? (
                                     <>
+                                        <div className="relative w-52 shrink-0">
+                                            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                                            <Input
+                                                type="text"
+                                                value={projectFilterQuery}
+                                                onChange={(event) => setProjectFilterQuery(event.target.value)}
+                                                placeholder="프로젝트 검색"
+                                                className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
+                                            />
+                                        </div>
+
                                         <div className="h-5 w-px shrink-0 bg-slate-200" />
 
                                         <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
                                             <button
                                                 type="button"
-                                                onClick={clearStageFilters}
-                                                aria-pressed={projectFilters.stages.length === 0}
+                                                onClick={clearTypeFilters}
+                                                aria-pressed={projectFilters.types.length === 0}
                                                 className={cn(
                                                     FILTER_CHIP_BASE_CLASS,
-                                                    projectFilters.stages.length === 0
+                                                    projectFilters.types.length === 0
                                                         ? FILTER_CHIP_ACTIVE_CLASS
                                                         : FILTER_CHIP_INACTIVE_CLASS
                                                 )}
                                             >
-                                                전체 ({stageScopeProjects.length})
+                                                전체 유형 ({filteredProjects.length})
                                             </button>
-                                            {stageFilterOptions.map((item) => {
-                                                const isActive = projectFilters.stages.includes(item.value);
+                                            {PROJECT_TYPE_OPTIONS.map((item) => {
+                                                const isActive = projectFilters.types.includes(item.value);
                                                 return (
                                                     <button
                                                         key={item.value}
                                                         type="button"
-                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        onClick={() => toggleTypeFilter(item.value)}
                                                         aria-pressed={isActive}
                                                         className={cn(
                                                             FILTER_CHIP_BASE_CLASS,
@@ -1510,116 +1634,167 @@ const SearchResults = () => {
                                                                 : FILTER_CHIP_INACTIVE_CLASS
                                                         )}
                                                     >
-                                                        {item.label} ({stageCounts[item.value] || 0})
+                                                        {item.label} ({typeCounts[item.value] || 0})
                                                     </button>
                                                 );
                                             })}
                                         </div>
+
+                                        {stageFilterOptions.length > 0 && (
+                                            <>
+                                                <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                                                <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearStageFilters}
+                                                        aria-pressed={projectFilters.stages.length === 0}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            projectFilters.stages.length === 0
+                                                                ? FILTER_CHIP_ACTIVE_CLASS
+                                                                : FILTER_CHIP_INACTIVE_CLASS
+                                                        )}
+                                                    >
+                                                        전체 ({stageScopeProjects.length})
+                                                    </button>
+                                                    {stageFilterOptions.map((item) => {
+                                                        const isActive = projectFilters.stages.includes(item.value);
+                                                        return (
+                                                            <button
+                                                                key={item.value}
+                                                                type="button"
+                                                                onClick={() => toggleStageFilter(item.value)}
+                                                                aria-pressed={isActive}
+                                                                className={cn(
+                                                                    FILTER_CHIP_BASE_CLASS,
+                                                                    isActive
+                                                                        ? FILTER_CHIP_ACTIVE_CLASS
+                                                                        : FILTER_CHIP_INACTIVE_CLASS
+                                                                )}
+                                                            >
+                                                                {item.label} ({stageCounts[item.value] || 0})
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                                            {[
+                                                { value: 'all', label: '상태 전체' },
+                                                { value: 'in_progress', label: '진행 중' },
+                                                { value: 'completed', label: '완료' },
+                                            ].map((item) => {
+                                                const isActive = homeAgendaProgressStatus === item.value;
+                                                return (
+                                                    <button
+                                                        key={`home-agenda-progress-${item.value}`}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHomeAgendaProgressStatus(item.value);
+                                                            setHomeAgendaPage(1);
+                                                        }}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                                        )}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                                        <div className="min-w-0 flex items-center gap-1 overflow-x-auto pb-0.5">
+                                            {[
+                                                { value: 'all', label: '유형 전체' },
+                                                { value: 'general', label: '일반 안건' },
+                                                { value: 'work_report', label: '작업보고서' },
+                                            ].map((item) => {
+                                                const isActive = homeAgendaThreadKind === item.value;
+                                                return (
+                                                    <button
+                                                        key={`home-agenda-kind-${item.value}`}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setHomeAgendaThreadKind(item.value);
+                                                            setHomeAgendaPage(1);
+                                                        }}
+                                                        aria-pressed={isActive}
+                                                        className={cn(
+                                                            FILTER_CHIP_BASE_CLASS,
+                                                            isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                                        )}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="h-5 w-px shrink-0 bg-slate-200" />
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setHomeAgendaIncludeDrafts((prev) => !prev);
+                                                setHomeAgendaPage(1);
+                                            }}
+                                            aria-pressed={homeAgendaIncludeDrafts}
+                                            className={cn(
+                                                FILTER_CHIP_BASE_CLASS,
+                                                homeAgendaIncludeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                            )}
+                                        >
+                                            임시 저장 포함
+                                        </button>
                                     </>
                                 )}
                             </div>
 
-                            <div className={cn('mt-2 space-y-2 lg:hidden', !isMobileFilterOpen && 'hidden')}>
-                                <div className="flex rounded-md border border-border bg-secondary/80 p-0.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAllProjects(false)}
-                                        className={cn(
-                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
-                                            !showAllProjects
-                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
-                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
-                                        )}
-                                    >
-                                        내프로젝트
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAllProjects(true)}
-                                        className={cn(
-                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
-                                            showAllProjects
-                                                ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
-                                                : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
-                                        )}
-                                    >
-                                        전체프로젝트
-                                    </button>
-                                </div>
-
-                                <div className="relative">
-                                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
-                                    <Input
-                                        type="text"
-                                        value={projectFilterQuery}
-                                        onChange={(event) => setProjectFilterQuery(event.target.value)}
-                                        placeholder="프로젝트 검색"
-                                        className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-semibold text-slate-500">유형 필터</p>
-                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                        <button
-                                            type="button"
-                                            onClick={clearTypeFilters}
-                                            aria-pressed={projectFilters.types.length === 0}
-                                            className={cn(
-                                                FILTER_CHIP_BASE_CLASS,
-                                                projectFilters.types.length === 0
-                                                    ? FILTER_CHIP_ACTIVE_CLASS
-                                                    : FILTER_CHIP_INACTIVE_CLASS
-                                            )}
-                                        >
-                                            전체 유형 ({filteredProjects.length})
-                                        </button>
-                                        {PROJECT_TYPE_OPTIONS.map((item) => {
-                                            const isActive = projectFilters.types.includes(item.value);
-                                            return (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => toggleTypeFilter(item.value)}
-                                                    aria-pressed={isActive}
-                                                    className={cn(
-                                                        FILTER_CHIP_BASE_CLASS,
-                                                        isActive
-                                                            ? FILTER_CHIP_ACTIVE_CLASS
-                                                            : FILTER_CHIP_INACTIVE_CLASS
-                                                    )}
-                                                >
-                                                    {item.label} ({typeCounts[item.value] || 0})
-                                                </button>
-                                            );
-                                        })}
+                            {isProjectTab && (
+                                <div className={cn('mt-2 space-y-2 lg:hidden', !isMobileFilterOpen && 'hidden')}>
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+                                        <Input
+                                            type="text"
+                                            value={projectFilterQuery}
+                                            onChange={(event) => setProjectFilterQuery(event.target.value)}
+                                            placeholder="프로젝트 검색"
+                                            className="h-8 w-full rounded-md bg-background px-2 pr-2 pl-7 text-xs"
+                                        />
                                     </div>
-                                </div>
 
-                                {stageFilterOptions.length > 0 && (
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-semibold text-slate-500">단계 필터</p>
+                                        <p className="text-[10px] font-semibold text-slate-500">유형 필터</p>
                                         <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
                                             <button
                                                 type="button"
-                                                onClick={clearStageFilters}
-                                                aria-pressed={projectFilters.stages.length === 0}
+                                                onClick={clearTypeFilters}
+                                                aria-pressed={projectFilters.types.length === 0}
                                                 className={cn(
                                                     FILTER_CHIP_BASE_CLASS,
-                                                    projectFilters.stages.length === 0
+                                                    projectFilters.types.length === 0
                                                         ? FILTER_CHIP_ACTIVE_CLASS
                                                         : FILTER_CHIP_INACTIVE_CLASS
                                                 )}
                                             >
-                                                전체 ({stageScopeProjects.length})
+                                                전체 유형 ({filteredProjects.length})
                                             </button>
-                                            {stageFilterOptions.map((item) => {
-                                                const isActive = projectFilters.stages.includes(item.value);
+                                            {PROJECT_TYPE_OPTIONS.map((item) => {
+                                                const isActive = projectFilters.types.includes(item.value);
                                                 return (
                                                     <button
                                                         key={item.value}
                                                         type="button"
-                                                        onClick={() => toggleStageFilter(item.value)}
+                                                        onClick={() => toggleTypeFilter(item.value)}
                                                         aria-pressed={isActive}
                                                         className={cn(
                                                             FILTER_CHIP_BASE_CLASS,
@@ -1628,14 +1803,127 @@ const SearchResults = () => {
                                                                 : FILTER_CHIP_INACTIVE_CLASS
                                                         )}
                                                     >
-                                                        {item.label} ({stageCounts[item.value] || 0})
+                                                        {item.label} ({typeCounts[item.value] || 0})
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     </div>
-                                )}
-                            </div>
+
+                                    {stageFilterOptions.length > 0 && (
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-semibold text-slate-500">단계 필터</p>
+                                            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={clearStageFilters}
+                                                    aria-pressed={projectFilters.stages.length === 0}
+                                                    className={cn(
+                                                        FILTER_CHIP_BASE_CLASS,
+                                                        projectFilters.stages.length === 0
+                                                            ? FILTER_CHIP_ACTIVE_CLASS
+                                                            : FILTER_CHIP_INACTIVE_CLASS
+                                                    )}
+                                                >
+                                                    전체 ({stageScopeProjects.length})
+                                                </button>
+                                                {stageFilterOptions.map((item) => {
+                                                    const isActive = projectFilters.stages.includes(item.value);
+                                                    return (
+                                                        <button
+                                                            key={item.value}
+                                                            type="button"
+                                                            onClick={() => toggleStageFilter(item.value)}
+                                                            aria-pressed={isActive}
+                                                            className={cn(
+                                                                FILTER_CHIP_BASE_CLASS,
+                                                                isActive
+                                                                    ? FILTER_CHIP_ACTIVE_CLASS
+                                                                    : FILTER_CHIP_INACTIVE_CLASS
+                                                            )}
+                                                        >
+                                                            {item.label} ({stageCounts[item.value] || 0})
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {isAgendaTab && (
+                                <div className="mt-2 space-y-2 lg:hidden">
+                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                                        {[
+                                            { value: 'all', label: '상태 전체' },
+                                            { value: 'in_progress', label: '진행 중' },
+                                            { value: 'completed', label: '완료' },
+                                        ].map((item) => {
+                                            const isActive = homeAgendaProgressStatus === item.value;
+                                            return (
+                                                <button
+                                                    key={`home-agenda-progress-mobile-${item.value}`}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setHomeAgendaProgressStatus(item.value);
+                                                        setHomeAgendaPage(1);
+                                                    }}
+                                                    aria-pressed={isActive}
+                                                    className={cn(
+                                                        FILTER_CHIP_BASE_CLASS,
+                                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                                    )}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                                        {[
+                                            { value: 'all', label: '유형 전체' },
+                                            { value: 'general', label: '일반 안건' },
+                                            { value: 'work_report', label: '작업보고서' },
+                                        ].map((item) => {
+                                            const isActive = homeAgendaThreadKind === item.value;
+                                            return (
+                                                <button
+                                                    key={`home-agenda-kind-mobile-${item.value}`}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setHomeAgendaThreadKind(item.value);
+                                                        setHomeAgendaPage(1);
+                                                    }}
+                                                    aria-pressed={isActive}
+                                                    className={cn(
+                                                        FILTER_CHIP_BASE_CLASS,
+                                                        isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                                    )}
+                                                >
+                                                    {item.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setHomeAgendaIncludeDrafts((prev) => !prev);
+                                            setHomeAgendaPage(1);
+                                        }}
+                                        aria-pressed={homeAgendaIncludeDrafts}
+                                        className={cn(
+                                            FILTER_CHIP_BASE_CLASS,
+                                            homeAgendaIncludeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
+                                        )}
+                                    >
+                                        임시 저장 포함
+                                    </button>
+                                </div>
+                            )}
                         </section>
                     )}
 
@@ -2250,6 +2538,160 @@ const SearchResults = () => {
                             </div>
                         </section>
                     ) : null}
+
+                    {hasHomePanel && isAgendaTab && (
+                        <section className="space-y-3">
+                            {homeAgendaError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                                    {homeAgendaError}
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-sm text-slate-500">
+                                <p>총 {homeAgendaTotal.toLocaleString('ko-KR')}건</p>
+                                <p>정렬: 최신 업데이트 순</p>
+                            </div>
+
+                            {homeAgendaLoading ? (
+                                <div className="app-surface-soft px-4 py-16 text-center">
+                                    <div className="inline-flex items-center gap-2 text-slate-500">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        데이터를 불러오는 중입니다.
+                                    </div>
+                                </div>
+                            ) : homeAgendaItems.length <= 0 ? (
+                                <div className="app-surface-soft px-4 py-16 text-center text-sm text-slate-500">
+                                    표시할 안건이 없습니다.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {homeAgendaItems.map((item) => {
+                                        const threadId = Number(item?.id || 0);
+                                        const threadKey = threadId > 0 ? String(threadId) : '';
+                                        const baselineRaw = threadKey ? agendaSeenBaselines?.[threadKey] : null;
+                                        const lastSeenUpdatedAt = typeof baselineRaw === 'string'
+                                            ? baselineRaw
+                                            : baselineRaw && typeof baselineRaw === 'object' && typeof baselineRaw.last_seen_updated_at === 'string'
+                                                ? baselineRaw.last_seen_updated_at
+                                                : '';
+                                        const lastUpdatedAt = String(item?.last_updated_at || item?.updated_at || '').trim();
+                                        const isUnread = Boolean(lastUpdatedAt) && (!lastSeenUpdatedAt || lastUpdatedAt > lastSeenUpdatedAt);
+
+                                        return (
+                                            <AgendaThreadCard
+                                                key={`home-agenda-${item.id}`}
+                                                item={item}
+                                                showProject
+                                                isUnread={isUnread}
+                                                onClick={() => {
+                                                    const projectId = Number(item?.project_id || 0);
+                                                    if (!projectId) return;
+                                                    if (item.record_status === 'draft') {
+                                                        navigate(`/project-management/projects/${projectId}/agenda/new?draft=${item.id}`);
+                                                        return;
+                                                    }
+                                                    navigate(`/project-management/projects/${projectId}/agenda/${item.id}`);
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {homeAgendaTotalPages > 1 && (() => {
+                                const safePage = Math.max(1, Math.min(homeAgendaPage, homeAgendaTotalPages));
+                                const pageGroupStart = Math.floor((safePage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
+                                const pageGroupEnd = Math.min(homeAgendaTotalPages, pageGroupStart + PAGE_GROUP_SIZE - 1);
+                                const pages = Array.from(
+                                    { length: Math.max(0, pageGroupEnd - pageGroupStart + 1) },
+                                    (_, index) => pageGroupStart + index,
+                                );
+
+                                const baseButtonClass =
+                                    'inline-flex h-8 items-center justify-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
+                                const disabledButtonClass = 'cursor-not-allowed border-border bg-background text-muted-foreground/40';
+                                const enabledButtonClass = 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground';
+                                const pageButtonClass = (isActive) => cn(
+                                    'min-w-9 px-2 font-semibold',
+                                    isActive ? 'border-primary bg-primary text-primary-foreground' : enabledButtonClass,
+                                );
+
+                                const visibleStart = homeAgendaTotal > 0 ? (safePage - 1) * HOME_AGENDA_PAGE_SIZE + 1 : 0;
+                                const visibleEnd = Math.min(safePage * HOME_AGENDA_PAGE_SIZE, homeAgendaTotal);
+
+                                return (
+                                    <>
+                                        <div className="app-surface-soft flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                            <span className="text-[11px] font-semibold text-slate-500">
+                                                페이지 {safePage} / {homeAgendaTotalPages}
+                                            </span>
+                                            <div className="flex flex-wrap items-center justify-end gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setHomeAgendaPage(1)}
+                                                    disabled={safePage <= 1}
+                                                    className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                                    title="맨앞"
+                                                >
+                                                    <ChevronsLeft className="h-3.5 w-3.5" />
+                                                    맨앞
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setHomeAgendaPage((prev) => Math.max(1, prev - 1))}
+                                                    disabled={safePage <= 1}
+                                                    className={cn(baseButtonClass, safePage <= 1 ? disabledButtonClass : enabledButtonClass)}
+                                                    title="이전"
+                                                >
+                                                    <ChevronLeft className="h-3.5 w-3.5" />
+                                                    이전
+                                                </button>
+
+                                                {pages.map((page) => (
+                                                    <button
+                                                        key={`home-agenda-page-${page}`}
+                                                        type="button"
+                                                        onClick={() => setHomeAgendaPage(page)}
+                                                        aria-current={page === safePage ? 'page' : undefined}
+                                                        className={cn(baseButtonClass, pageButtonClass(page === safePage))}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                ))}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setHomeAgendaPage((prev) => Math.min(homeAgendaTotalPages, prev + 1))}
+                                                    disabled={safePage >= homeAgendaTotalPages}
+                                                    className={cn(baseButtonClass, safePage >= homeAgendaTotalPages ? disabledButtonClass : enabledButtonClass)}
+                                                    title="다음"
+                                                >
+                                                    다음
+                                                    <ChevronRight className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setHomeAgendaPage(homeAgendaTotalPages)}
+                                                    disabled={safePage >= homeAgendaTotalPages}
+                                                    className={cn(baseButtonClass, safePage >= homeAgendaTotalPages ? disabledButtonClass : enabledButtonClass)}
+                                                    title="맨뒤"
+                                                >
+                                                    맨뒤
+                                                    <ChevronsRight className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
+                                            <span>
+                                                안건 {visibleStart}-{visibleEnd} / 총 {homeAgendaTotal.toLocaleString('ko-KR')}건
+                                            </span>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                        </section>
+                    )}
 
                     {hasSearchQuery && documentResults.length > 0 && (
                         <section className="rounded-2xl border border-border bg-card p-4">

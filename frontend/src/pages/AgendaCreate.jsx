@@ -435,7 +435,7 @@ export default function AgendaCreate() {
                 projectCode={project.code || ''}
                 pageLabel="안건 작성"
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: '안건 관리', to: `/project-management/projects/${project.id}/agenda` },
                     { label: '안건 작성' },

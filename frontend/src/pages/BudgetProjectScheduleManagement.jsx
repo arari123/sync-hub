@@ -430,7 +430,7 @@ export default function BudgetProjectScheduleManagement() {
                     projectCode={project.code || ''}
                     pageLabel="일정 관리"
                     breadcrumbItems={[
-                        { label: '프로젝트 관리', to: '/project-management' },
+                        { label: '메인 페이지', to: '/project-management' },
                         { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                         { label: '일정 관리' },
                     ]}
@@ -471,7 +471,7 @@ export default function BudgetProjectScheduleManagement() {
                 projectCode={project.code || ''}
                 pageLabel="일정 관리"
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: '일정 관리' },
                 ]}

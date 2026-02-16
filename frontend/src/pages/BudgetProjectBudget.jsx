@@ -1491,7 +1491,7 @@ const BudgetProjectBudget = () => {
                             className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                         >
                             <Link to="/project-management" className="font-medium hover:text-primary">
-                                프로젝트 관리
+                                메인 페이지
                             </Link>
                             <span>&gt;</span>
                             <span className="font-semibold text-foreground/90" title={projectName}>
@@ -1525,7 +1525,7 @@ const BudgetProjectBudget = () => {
                                 data-active={isIssueActive}
                                 className="nav-pill"
                             >
-                                이슈 관리
+                                안건 관리
                             </Link>
                             <Link
                                 to={scheduleManagementPath}

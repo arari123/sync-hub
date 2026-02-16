@@ -299,7 +299,7 @@ const BudgetProjectInfoEdit = () => {
                     pageLabel="프로젝트 정보 수정"
                     canEdit={project.can_edit}
                     breadcrumbItems={[
-                        { label: '프로젝트 관리', to: '/project-management' },
+                        { label: '메인 페이지', to: '/project-management' },
                         { label: project.name || '프로젝트', to: baseProjectPath },
                         { label: '상세 정보 수정' },
                     ]}
@@ -323,7 +323,7 @@ const BudgetProjectInfoEdit = () => {
                 pageLabel="프로젝트 정보 수정"
                 canEdit={project.can_edit}
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project.name || '프로젝트', to: baseProjectPath },
                     { label: '상세 정보 수정' },
                 ]}

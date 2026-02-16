@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 const MENU_ITEMS = [
     { key: 'overview', label: '프로젝트 메인', subPath: '' },
     { key: 'budget', label: '예산 메인', subPath: '/budget' },
-    { key: 'issue', label: '이슈 관리', subPath: '/agenda' },
+    { key: 'issue', label: '안건 관리', subPath: '/agenda' },
     { key: 'scheduleManagement', label: '일정 관리', subPath: '/schedule' },
     { key: 'spec', label: '사양 관리', subPath: '/spec' },
     { key: 'data', label: '데이터 관리', subPath: '/data' },

@@ -454,7 +454,7 @@ export default function AgendaDetail() {
                 projectCode={project?.code || ''}
                 pageLabel="안건 상세"
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project?.name || '프로젝트', to: `/project-management/projects/${projectId}` },
                     { label: '안건 관리', to: `/project-management/projects/${projectId}/agenda` },
                     { label: thread.agenda_code || `안건 #${agendaId}` },

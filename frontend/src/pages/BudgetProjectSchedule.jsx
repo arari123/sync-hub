@@ -764,7 +764,7 @@ const BudgetProjectSchedule = () => {
                     pageLabel="일정 작성"
                     canEdit={false}
                     breadcrumbItems={[
-                        { label: '프로젝트 관리', to: '/project-management' },
+                        { label: '메인 페이지', to: '/project-management' },
                         { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                         { label: '일정 관리', to: `/project-management/projects/${project.id}/schedule` },
                         { label: '일정 작성' },
@@ -955,7 +955,7 @@ const BudgetProjectSchedule = () => {
                 pageLabel="일정 작성"
                 canEdit={canEdit}
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: '일정 관리', to: `/project-management/projects/${project.id}/schedule` },
                     { label: '일정 작성' },

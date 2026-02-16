@@ -45,7 +45,7 @@ const ProjectPlaceholderPage = ({ title = '준비 중', description = '이 페�
                 pageLabel={title}
                 canEdit={project.can_edit}
                 breadcrumbItems={[
-                    { label: '프로젝트 관리', to: '/project-management' },
+                    { label: '메인 페이지', to: '/project-management' },
                     { label: project.name || '프로젝트', to: `/project-management/projects/${project.id}` },
                     { label: title },
                 ]}

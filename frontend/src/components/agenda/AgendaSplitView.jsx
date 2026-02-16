@@ -324,9 +324,10 @@ export default function AgendaSplitView({
                 setHasMore(false);
                 setListError(getErrorMessage(error, '안건 목록을 불러오지 못했습니다.'));
             } finally {
-                if (!active) return;
                 if (page === 1) {
-                    setIsListLoading(false);
+                    if (active) {
+                        setIsListLoading(false);
+                    }
                 } else {
                     setIsLoadingMore(false);
                     loadMoreLockRef.current = false;

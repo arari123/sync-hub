@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
+    Loader2,
     MessageCircle,
     PanelLeftClose,
     PanelLeftOpen,
     Paperclip,
+    Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api, getErrorMessage } from '../../lib/api';
@@ -20,13 +18,6 @@ import { downloadFromApi } from '../../lib/download';
 import { cn } from '../../lib/utils';
 
 const PER_PAGE = 10;
-const PAGE_GROUP_SIZE = 10;
-
-const FILTER_CHIP_BASE_CLASS =
-    'inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1';
-const FILTER_CHIP_ACTIVE_CLASS = 'border-primary bg-primary text-primary-foreground shadow-sm';
-const FILTER_CHIP_INACTIVE_CLASS =
-    'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground';
 
 function entryKindLabel(value) {
     const kind = String(value || '').toLowerCase();
@@ -47,12 +38,14 @@ function isUnreadByBaselines(baselines, entryId, updatedAt) {
     if (!key || key === '0') return false;
     const nextUpdatedAt = String(updatedAt || '').trim();
     if (!nextUpdatedAt) return false;
+
     const raw = baselines?.[key];
     const seenUpdatedAt = typeof raw === 'string'
         ? raw
         : raw && typeof raw === 'object' && typeof raw.last_seen_updated_at === 'string'
             ? raw.last_seen_updated_at
             : '';
+
     if (!seenUpdatedAt) return true;
     return nextUpdatedAt > seenUpdatedAt;
 }
@@ -75,16 +68,17 @@ function collectThreadEntries(detail) {
         if (!key) return;
         dedup.set(key, entry);
     });
+
     return Array.from(dedup.values());
 }
 
-function ListItem({ item, isSelected, isUnread, showProjectMeta, onClick }) {
-    const projectName = String(item?.project_name || '').trim();
-    const projectCode = String(item?.project_code || '').trim();
-    const projectLabel = projectName || projectCode
-        ? `${projectName || '프로젝트'}${projectCode ? ` · ${projectCode}` : ''}`
-        : '';
+function formatDateLabel(value) {
+    const text = String(value || '').trim();
+    if (!text) return '-';
+    return text.slice(0, 16).replace('T', ' ');
+}
 
+function ListItem({ item, isSelected, isUnread, onClick }) {
     return (
         <button
             type="button"
@@ -102,37 +96,29 @@ function ListItem({ item, isSelected, isUnread, showProjectMeta, onClick }) {
                 <span className={cn('inline-flex h-5 items-center rounded-md border px-1.5 text-[10px] font-bold', entryToneClass(item?.entry_kind))}>
                     {entryKindLabel(item?.entry_kind)}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-400">{item?.agenda_code}</span>
-                {isUnread && (
-                    <span className="ml-auto inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-100 px-2 text-[10px] font-bold text-amber-700">
-                        미조회
-                    </span>
-                )}
+                {isUnread && <span className="h-2 w-2 rounded-full bg-amber-500" aria-label="미조회" />}
             </div>
 
             <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-slate-900' : 'font-semibold text-slate-800')}>
                 {item?.title || '-'}
             </p>
 
-            {showProjectMeta && projectLabel && (
-                <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">
-                    {projectLabel}
-                </p>
-            )}
-
-            <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">
-                {item?.summary_plain || '본문 요약이 없습니다.'}
-            </p>
-
-            <p className="mt-1 text-[10px] text-slate-400">
-                {item?.author_name || '-'} · {String(item?.updated_at || '').slice(0, 16).replace('T', ' ')}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">
+                    {item?.author_name || '-'}
+                </span>
+                <span className="text-slate-300">|</span>
+                <span className="font-mono tracking-[0.03em] text-slate-500">
+                    {formatDateLabel(item?.created_at)}
+                </span>
+            </div>
         </button>
     );
 }
 
 function EntryBodyPanel({ entry, label, tone = 'slate' }) {
     if (!entry) return null;
+
     const toneClass = tone === 'cyan'
         ? 'border-cyan-200 bg-cyan-50/30'
         : tone === 'amber'
@@ -147,7 +133,7 @@ function EntryBodyPanel({ entry, label, tone = 'slate' }) {
                         {label}
                     </span>
                 )}
-                <span className="text-[11px] text-slate-500">{entry.created_at?.slice(0, 16).replace('T', ' ')}</span>
+                <span className="text-[11px] text-slate-500">{formatDateLabel(entry.created_at)}</span>
             </div>
 
             <h3 className="text-lg font-bold text-slate-900">{entry.title}</h3>
@@ -189,7 +175,6 @@ function EntryBodyPanel({ entry, label, tone = 'slate' }) {
 export default function AgendaSplitView({
     mode = 'project',
     projectId = '',
-    showProjectMeta = false,
     className = '',
 }) {
     const navigate = useNavigate();
@@ -199,11 +184,13 @@ export default function AgendaSplitView({
     const [items, setItems] = useState([]);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
-    const [progressStatus, setProgressStatus] = useState('all');
-    const [threadKind, setThreadKind] = useState('all');
-    const [includeDrafts, setIncludeDrafts] = useState(isMyMode);
+    const [hasMore, setHasMore] = useState(true);
+
+    const [searchInput, setSearchInput] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
     const [isListLoading, setIsListLoading] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [listError, setListError] = useState('');
     const [isListCollapsed, setIsListCollapsed] = useState(false);
 
@@ -217,6 +204,11 @@ export default function AgendaSplitView({
 
     const [entrySeenBaselines, setEntrySeenBaselines] = useState(() => loadAgendaEntrySeenBaselines());
 
+    const listScrollRef = useRef(null);
+    const sentinelRef = useRef(null);
+    const loadMoreLockRef = useRef(false);
+
+    const includeDrafts = isMyMode;
     const listApiPath = isMyMode
         ? '/agenda/entries/my'
         : normalizedProjectId > 0
@@ -224,48 +216,134 @@ export default function AgendaSplitView({
             : '';
 
     useEffect(() => {
+        const timerId = window.setTimeout(() => {
+            setSearchQuery(String(searchInput || '').trim());
+        }, 250);
+        return () => window.clearTimeout(timerId);
+    }, [searchInput]);
+
+    useEffect(() => {
+        setItems([]);
+        setPage(1);
+        setTotal(0);
+        setHasMore(true);
+        setListError('');
+        loadMoreLockRef.current = false;
+        if (listScrollRef.current) {
+            listScrollRef.current.scrollTop = 0;
+        }
+    }, [listApiPath, searchQuery]);
+
+    useEffect(() => {
         if (!listApiPath) return undefined;
+
         const controller = new AbortController();
         let active = true;
 
         const fetchList = async () => {
-            setIsListLoading(true);
+            if (page === 1) {
+                setIsListLoading(true);
+            } else {
+                setIsLoadingMore(true);
+                loadMoreLockRef.current = true;
+            }
             setListError('');
+
             try {
                 const response = await api.get(listApiPath, {
                     params: {
-                        progress_status: progressStatus,
-                        thread_kind: threadKind,
+                        q: searchQuery,
                         include_drafts: includeDrafts,
                         page,
                         per_page: PER_PAGE,
                     },
                     signal: controller.signal,
                 });
+
                 const payload = response?.data || {};
+                const nextPageItems = Array.isArray(payload.items) ? payload.items : [];
+                const totalCount = Number(payload.total || 0);
+
                 if (!active) return;
-                const nextItems = Array.isArray(payload.items) ? payload.items : [];
-                setItems(nextItems);
-                setTotal(Number(payload.total || 0));
-                setTotalPages(Number(payload.total_pages || 0));
+
+                setTotal(totalCount);
+
+                if (page === 1) {
+                    setItems(nextPageItems);
+                    setHasMore(nextPageItems.length < totalCount);
+                } else {
+                    setItems((prev) => {
+                        const mergedMap = new Map();
+                        for (const item of prev) {
+                            const key = Number(item?.entry_id || 0);
+                            if (!key) continue;
+                            mergedMap.set(key, item);
+                        }
+                        for (const item of nextPageItems) {
+                            const key = Number(item?.entry_id || 0);
+                            if (!key) continue;
+                            mergedMap.set(key, item);
+                        }
+                        const merged = Array.from(mergedMap.values());
+                        setHasMore(merged.length < totalCount);
+                        return merged;
+                    });
+                }
             } catch (error) {
                 if (!active || error?.code === 'ERR_CANCELED') return;
-                setItems([]);
-                setTotal(0);
-                setTotalPages(0);
+                if (page === 1) {
+                    setItems([]);
+                    setTotal(0);
+                }
+                setHasMore(false);
                 setListError(getErrorMessage(error, '안건 목록을 불러오지 못했습니다.'));
             } finally {
                 if (!active) return;
-                setIsListLoading(false);
+                if (page === 1) {
+                    setIsListLoading(false);
+                } else {
+                    setIsLoadingMore(false);
+                    loadMoreLockRef.current = false;
+                }
             }
         };
 
         fetchList();
+
         return () => {
             active = false;
             controller.abort();
         };
-    }, [includeDrafts, listApiPath, page, progressStatus, threadKind]);
+    }, [includeDrafts, listApiPath, page, searchQuery]);
+
+    useEffect(() => {
+        const rootElement = listScrollRef.current;
+        const sentinelElement = sentinelRef.current;
+
+        if (!rootElement || !sentinelElement) return undefined;
+        if (!hasMore || isListLoading || isLoadingMore || items.length <= 0) return undefined;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const first = entries[0];
+                if (!first?.isIntersecting) return;
+                if (loadMoreLockRef.current) return;
+                loadMoreLockRef.current = true;
+                setPage((prev) => prev + 1);
+            },
+            {
+                root: rootElement,
+                rootMargin: '120px 0px 120px 0px',
+                threshold: 0.01,
+            },
+        );
+
+        observer.observe(sentinelElement);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [hasMore, isListLoading, isLoadingMore, items.length]);
 
     useEffect(() => {
         if (items.length <= 0) {
@@ -275,17 +353,19 @@ export default function AgendaSplitView({
             setDetail(null);
             return;
         }
-        const exists = items.some((item) => Number(item.entry_id || 0) === Number(selectedEntryId || 0));
+
+        const exists = items.some((item) => Number(item?.entry_id || 0) === Number(selectedEntryId || 0));
         if (exists) return;
 
         const first = items[0];
-        setSelectedThreadId(Number(first.thread_id || 0));
-        setSelectedEntryId(Number(first.entry_id || 0));
-        setSelectedProjectId(Number(first.project_id || 0));
+        setSelectedThreadId(Number(first?.thread_id || 0));
+        setSelectedEntryId(Number(first?.entry_id || 0));
+        setSelectedProjectId(Number(first?.project_id || 0));
     }, [items, selectedEntryId]);
 
     useEffect(() => {
         if (!selectedThreadId) return undefined;
+
         const controller = new AbortController();
         let active = true;
 
@@ -307,6 +387,7 @@ export default function AgendaSplitView({
         };
 
         fetchDetail();
+
         return () => {
             active = false;
             controller.abort();
@@ -317,12 +398,14 @@ export default function AgendaSplitView({
         const nextThreadId = Number(item?.thread_id || 0);
         const nextEntryId = Number(item?.entry_id || 0);
         const nextProjectId = Number(item?.project_id || 0);
+
         setSelectedThreadId(nextThreadId);
         setSelectedEntryId(nextEntryId);
         setSelectedProjectId(nextProjectId);
 
         const updatedAt = String(item?.updated_at || '').trim();
         markAgendaEntrySeen(nextEntryId, updatedAt);
+
         setEntrySeenBaselines((prev) => {
             const key = String(nextEntryId);
             const prevValue = prev?.[key];
@@ -340,7 +423,7 @@ export default function AgendaSplitView({
 
     const selectedEntry = useMemo(() => {
         const entries = collectThreadEntries(detail);
-        const match = entries.find((entry) => Number(entry.id || 0) === Number(selectedEntryId || 0));
+        const match = entries.find((entry) => Number(entry?.id || 0) === Number(selectedEntryId || 0));
         if (match) return match;
         return entries[0] || null;
     }, [detail, selectedEntryId]);
@@ -350,18 +433,11 @@ export default function AgendaSplitView({
         ? Number(selectedEntry.id || 0) === Number(rootEntry.id || 0)
         : false;
 
-    const safePage = Math.max(1, Math.min(page, Math.max(totalPages, 1)));
-    const pageGroupStart = Math.floor((safePage - 1) / PAGE_GROUP_SIZE) * PAGE_GROUP_SIZE + 1;
-    const pageGroupEnd = Math.min(Math.max(totalPages, 1), pageGroupStart + PAGE_GROUP_SIZE - 1);
-    const pageNumbers = Array.from(
-        { length: Math.max(0, pageGroupEnd - pageGroupStart + 1) },
-        (_, index) => pageGroupStart + index,
-    );
-
     const openFullDetail = () => {
         const targetProjectId = Number(selectedProjectId || selectedEntry?.project_id || 0);
         const targetThreadId = Number(selectedThreadId || 0);
         if (!targetProjectId || !targetThreadId) return;
+
         const recordStatus = String(detail?.thread?.record_status || '').trim();
         if (recordStatus === 'draft') {
             navigate(`/project-management/projects/${targetProjectId}/agenda/new?draft=${targetThreadId}`);
@@ -373,13 +449,13 @@ export default function AgendaSplitView({
     return (
         <div className={cn('space-y-3', className)}>
             <div className={cn(
-                'grid gap-3',
+                'grid gap-3 xl:h-[calc(100vh-12rem)]',
                 isListCollapsed
                     ? 'grid-cols-[52px_minmax(0,1fr)]'
                     : 'grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)]',
             )}
             >
-                <section className="min-h-0 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <section className="min-h-0 rounded-xl border border-slate-200 bg-white shadow-sm h-full flex flex-col">
                     <div className={cn('border-b border-slate-200 p-2', isListCollapsed && 'flex h-full items-start justify-center border-b-0')}>
                         <button
                             type="button"
@@ -393,79 +469,21 @@ export default function AgendaSplitView({
 
                     {!isListCollapsed && (
                         <>
-                            <div className="space-y-2 border-b border-slate-200 p-2">
-                                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                    {[
-                                        { value: 'all', label: '상태 전체' },
-                                        { value: 'in_progress', label: '진행 중' },
-                                        { value: 'completed', label: '완료' },
-                                    ].map((item) => {
-                                        const isActive = progressStatus === item.value;
-                                        return (
-                                            <button
-                                                key={`split-progress-${item.value}`}
-                                                type="button"
-                                                onClick={() => {
-                                                    setProgressStatus(item.value);
-                                                    setPage(1);
-                                                }}
-                                                aria-pressed={isActive}
-                                                className={cn(
-                                                    FILTER_CHIP_BASE_CLASS,
-                                                    isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                )}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                                    {[
-                                        { value: 'all', label: '유형 전체' },
-                                        { value: 'general', label: '일반 안건' },
-                                        { value: 'work_report', label: '작업보고서' },
-                                    ].map((item) => {
-                                        const isActive = threadKind === item.value;
-                                        return (
-                                            <button
-                                                key={`split-kind-${item.value}`}
-                                                type="button"
-                                                onClick={() => {
-                                                    setThreadKind(item.value);
-                                                    setPage(1);
-                                                }}
-                                                aria-pressed={isActive}
-                                                className={cn(
-                                                    FILTER_CHIP_BASE_CLASS,
-                                                    isActive ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                                )}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIncludeDrafts((prev) => !prev);
-                                        setPage(1);
-                                    }}
-                                    aria-pressed={includeDrafts}
-                                    className={cn(
-                                        FILTER_CHIP_BASE_CLASS,
-                                        includeDrafts ? FILTER_CHIP_ACTIVE_CLASS : FILTER_CHIP_INACTIVE_CLASS,
-                                    )}
-                                >
-                                    임시 저장 포함
-                                </button>
+                            <div className="border-b border-slate-200 p-2">
+                                <label className="relative block">
+                                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={searchInput}
+                                        onChange={(event) => setSearchInput(event.target.value)}
+                                        placeholder="안건 검색"
+                                        className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 pl-7 text-xs text-slate-700 outline-none transition focus:border-cyan-400"
+                                    />
+                                </label>
                             </div>
 
-                            <div className="max-h-[calc(100vh-18rem)] space-y-2 overflow-auto p-2">
-                                {isListLoading ? (
+                            <div ref={listScrollRef} className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
+                                {isListLoading && items.length <= 0 ? (
                                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-10 text-center text-sm text-slate-500">
                                         목록을 불러오는 중...
                                     </div>
@@ -488,95 +506,30 @@ export default function AgendaSplitView({
                                                 item={item}
                                                 isSelected={isSelected}
                                                 isUnread={isUnread}
-                                                showProjectMeta={showProjectMeta}
                                                 onClick={() => selectItem(item)}
                                             />
                                         );
                                     })
                                 )}
-                            </div>
 
-                            <div className="border-t border-slate-200 p-2">
-                                <div className="mb-2 text-[11px] font-semibold text-slate-500">
-                                    안건 {total > 0 ? (safePage - 1) * PER_PAGE + 1 : 0}-{Math.min(safePage * PER_PAGE, total)} / 총 {total.toLocaleString('ko-KR')}건
-                                </div>
-                                {totalPages > 1 && (
-                                    <div className="flex flex-wrap items-center gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage(1)}
-                                            disabled={safePage <= 1}
-                                            className={cn(
-                                                'inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                                safePage <= 1
-                                                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                                            )}
-                                        >
-                                            <ChevronsLeft className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                                            disabled={safePage <= 1}
-                                            className={cn(
-                                                'inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                                safePage <= 1
-                                                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                                            )}
-                                        >
-                                            <ChevronLeft className="h-3.5 w-3.5" />
-                                        </button>
-                                        {pageNumbers.map((pageNo) => (
-                                            <button
-                                                key={`split-page-${pageNo}`}
-                                                type="button"
-                                                onClick={() => setPage(pageNo)}
-                                                className={cn(
-                                                    'inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                                    pageNo === safePage
-                                                        ? 'border-primary bg-primary text-primary-foreground'
-                                                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                                                )}
-                                            >
-                                                {pageNo}
-                                            </button>
-                                        ))}
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                                            disabled={safePage >= totalPages}
-                                            className={cn(
-                                                'inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                                safePage >= totalPages
-                                                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                                            )}
-                                        >
-                                            <ChevronRight className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPage(totalPages)}
-                                            disabled={safePage >= totalPages}
-                                            className={cn(
-                                                'inline-flex h-8 items-center justify-center rounded-md border px-2 text-xs font-semibold',
-                                                safePage >= totalPages
-                                                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-                                            )}
-                                        >
-                                            <ChevronsRight className="h-3.5 w-3.5" />
-                                        </button>
+                                {isLoadingMore && (
+                                    <div className="flex items-center justify-center py-2 text-xs text-slate-500">
+                                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                        더 불러오는 중...
                                     </div>
                                 )}
+
+                                {hasMore && <div ref={sentinelRef} className="h-6" />}
+                            </div>
+
+                            <div className="border-t border-slate-200 p-2 text-[11px] font-semibold text-slate-500">
+                                표시 {items.length.toLocaleString('ko-KR')} / 총 {total.toLocaleString('ko-KR')}
                             </div>
                         </>
                     )}
                 </section>
 
-                <section className="min-h-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <section className="min-h-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm h-full overflow-auto">
                     {isDetailLoading ? (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-12 text-center text-sm text-slate-500">
                             상세를 불러오는 중...
@@ -603,7 +556,7 @@ export default function AgendaSplitView({
                                         {detail.thread.progress_status === 'in_progress' ? '진행 중' : '완료'}
                                     </span>
                                     <span className="text-xs font-semibold text-slate-500">{detail.thread.agenda_code}</span>
-                                    <span className="text-xs text-slate-400">업데이트 {detail.thread.last_updated_at?.slice(0, 16).replace('T', ' ')}</span>
+                                    <span className="text-xs text-slate-400">업데이트 {formatDateLabel(detail.thread.last_updated_at)}</span>
 
                                     <button
                                         type="button"
@@ -642,7 +595,7 @@ export default function AgendaSplitView({
                                         <div key={`comment-${comment.id}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
                                             <div className="mb-1 flex items-center justify-between gap-2">
                                                 <p className="text-xs font-semibold text-slate-700">{comment.author_name}</p>
-                                                <p className="text-[11px] text-slate-400">{comment.created_at?.slice(0, 16).replace('T', ' ')}</p>
+                                                <p className="text-[11px] text-slate-400">{formatDateLabel(comment.created_at)}</p>
                                             </div>
                                             <p className="whitespace-pre-wrap break-words text-xs text-slate-700">{comment.body}</p>
                                         </div>
@@ -656,4 +609,3 @@ export default function AgendaSplitView({
         </div>
     );
 }
-

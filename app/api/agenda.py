@@ -599,6 +599,47 @@ def _serialize_entry_list_item(
     }
 
 
+def _matches_entry_list_query(
+    *,
+    query_text: str,
+    query_tokens: list[str],
+    entry: models.AgendaEntry,
+    thread: models.AgendaThread,
+    project: Optional[models.BudgetProject],
+    author_name: str,
+) -> bool:
+    normalized_query = str(query_text or "").strip().lower()
+    if not normalized_query:
+        return True
+
+    token_lowers = [str(token).strip().lower() for token in query_tokens if str(token).strip()]
+
+    haystack = " ".join(
+        part
+        for part in (
+            entry.title or "",
+            thread.title or "",
+            thread.agenda_code or "",
+            entry.requester_name or "",
+            entry.requester_org or "",
+            entry.responder_name or "",
+            entry.responder_org or "",
+            author_name or "",
+            (project.name if project else "") or "",
+            (project.code if project else "") or "",
+        )
+        if str(part).strip()
+    ).lower()
+
+    if not haystack:
+        return False
+    if normalized_query in haystack:
+        return True
+    if not token_lowers:
+        return False
+    return all(token in haystack for token in token_lowers)
+
+
 def _remove_entry_attachments(entry_id: int, db: Session) -> None:
     attachments = db.query(models.AgendaAttachment).filter(models.AgendaAttachment.entry_id == entry_id).all()
     for item in attachments:
@@ -1948,6 +1989,7 @@ def list_project_agenda_entries(
     project_id: int,
     progress_status: str = Query(default="all"),
     thread_kind: str = Query(default="all"),
+    q: str = Query(default="", max_length=200),
     include_drafts: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=10, ge=1, le=50),
@@ -2029,8 +2071,29 @@ def list_project_agenda_entries(
 
     project_map = {int(project.id): project}
 
+    query_text = str(q or "").strip()
+    query_tokens = _sanitize_query_tokens(query_text)
+    filtered_entries = entries
+    if query_text:
+        filtered_entries = []
+        for entry in entries:
+            thread = thread_map.get(int(entry.thread_id))
+            if not thread:
+                continue
+            author = user_map.get(int(entry.created_by_user_id))
+            author_name = _display_user_name(author)
+            if _matches_entry_list_query(
+                query_text=query_text,
+                query_tokens=query_tokens,
+                entry=entry,
+                thread=thread,
+                project=project,
+                author_name=author_name,
+            ):
+                filtered_entries.append(entry)
+
     entry_rows = sorted(
-        entries,
+        filtered_entries,
         key=lambda item: (
             parse_iso(item.updated_at).timestamp() if item.updated_at else 0,
             int(item.id),
@@ -2069,6 +2132,7 @@ def list_project_agenda_entries(
 def list_my_agenda_entries(
     progress_status: str = Query(default="all"),
     thread_kind: str = Query(default="all"),
+    q: str = Query(default="", max_length=200),
     include_drafts: bool = Query(default=True),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=10, ge=1, le=50),
@@ -2153,6 +2217,22 @@ def list_my_agenda_entries(
         for row in rows
         if row and len(row) == 3 and row[0] is not None and row[1] is not None and row[2] is not None
     ]
+
+    query_text = str(q or "").strip()
+    query_tokens = _sanitize_query_tokens(query_text)
+    if query_text:
+        normalized_rows = [
+            row
+            for row in normalized_rows
+            if _matches_entry_list_query(
+                query_text=query_text,
+                query_tokens=query_tokens,
+                entry=row["entry"],
+                thread=row["thread"],
+                project=row["project"],
+                author_name=_display_user_name(user_map.get(int(row["entry"].created_by_user_id))),
+            )
+        ]
 
     sorted_rows = sorted(
         normalized_rows,

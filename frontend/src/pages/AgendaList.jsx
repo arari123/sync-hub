@@ -58,7 +58,6 @@ export default function AgendaList() {
             <AgendaSplitView
                 mode="project"
                 projectId={projectId}
-                showProjectMeta={false}
             />
         </div>
     );

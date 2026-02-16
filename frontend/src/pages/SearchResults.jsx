@@ -2321,7 +2321,7 @@ const SearchResults = () => {
                     ) : null}
 
                     {hasHomePanel && isAgendaTab && (
-                        <AgendaSplitView mode="my" showProjectMeta />
+                        <AgendaSplitView mode="my" />
                     )}
 
                     {hasSearchQuery && documentResults.length > 0 && (

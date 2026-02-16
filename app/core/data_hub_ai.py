@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 
 _QUERY_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*|[가-힣]+")
+_AGENDA_CODE_RE = re.compile(r"^AG-\d{4}-\d{6}$", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]+>")
 _MULTI_SPACE_RE = re.compile(r"[ \t]+")
 _MULTI_NEWLINE_RE = re.compile(r"\n{3,}")
@@ -17,6 +18,13 @@ _MULTI_NEWLINE_RE = re.compile(r"\n{3,}")
 
 def normalize_query(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "").strip())
+
+
+def is_agenda_code(value: str) -> bool:
+    token = normalize_query(value)
+    if not token:
+        return False
+    return bool(_AGENDA_CODE_RE.match(token))
 
 
 def tokenize_query(query: str) -> list[str]:
@@ -212,6 +220,185 @@ def build_answer_prompt(query: str, contexts: list[RagContextItem]) -> str:
             lines.append(item.excerpt)
             lines.append("")
     lines.append("## ANSWER")
+    return "\n".join(lines).strip() + "\n"
+
+
+def build_agenda_summary_prompt(agenda: dict[str, Any]) -> str:
+    """Build a prompt for summarizing an agenda thread by code.
+
+    This prompt is used in the temporary Data Hub feature when the query exactly
+    matches an agenda code (e.g., AG-2026-000123).
+    """
+
+    def _truncate(text: str, max_chars: int) -> str:
+        value = _clean_text(text)
+        if max_chars <= 0:
+            return value
+        if len(value) <= max_chars:
+            return value
+        return value[:max_chars].rstrip() + "..."
+
+    agenda_code = str(agenda.get("agenda_code") or "").strip()
+    title = str(agenda.get("title") or "").strip()
+    project_name = str(agenda.get("project_name") or "").strip()
+    project_code = str(agenda.get("project_code") or "").strip()
+    thread_kind = str(agenda.get("thread_kind") or "").strip()
+    progress_status = str(agenda.get("progress_status") or "").strip()
+    record_status = str(agenda.get("record_status") or "").strip()
+    requester_name = str(agenda.get("requester_name") or "").strip()
+    requester_org = str(agenda.get("requester_org") or "").strip()
+    responder_name = str(agenda.get("responder_name") or "").strip()
+    responder_org = str(agenda.get("responder_org") or "").strip()
+    created_at = str(agenda.get("created_at") or "").strip()
+    last_updated_at = str(agenda.get("last_updated_at") or "").strip()
+
+    entries_raw = agenda.get("entries") or []
+    entries: list[dict[str, Any]] = []
+    if isinstance(entries_raw, list):
+        for item in entries_raw:
+            if isinstance(item, dict):
+                entries.append(item)
+
+    report_payload = agenda.get("report_payload") or {}
+    if not isinstance(report_payload, dict):
+        report_payload = {}
+
+    lines: list[str] = []
+    lines.append("당신은 설비 유지보수/프로젝트 안건을 빠르게 요약하는 비서입니다.")
+    lines.append("아래 AGENDA_DATA만 근거로 요약하세요. 없는 정보는 추측하지 말고 '확인 불가'라고 표시하세요.")
+    lines.append("답변은 한국어로, 불필요한 서론 없이 짧고 실무적으로 작성하세요.")
+    lines.append("가능하면 현상/원인/조치(임시/최종)/작업일/장소/대상 설비/투입 인력/사용 부품/현재 상태/후속 액션을 포함하세요.")
+    lines.append("")
+    lines.append("출력 형식")
+    lines.append("요약: (1~2문장)")
+    lines.append("- 현상: ...")
+    lines.append("- 원인: ...")
+    lines.append("- 조치(임시): ...")
+    lines.append("- 조치(최종): ...")
+    lines.append("- 작업일/장소: ...")
+    lines.append("- 대상 설비: ...")
+    lines.append("- 인력/시간: ...")
+    lines.append("- 사용 부품: ...")
+    lines.append("- 진행 상태: ...")
+    lines.append("- 후속 액션: ...")
+    lines.append("")
+    lines.append("## AGENDA_DATA")
+    if agenda_code:
+        lines.append(f"agenda_code: {agenda_code}")
+    if title:
+        lines.append(f"title: {title}")
+    if project_name or project_code:
+        lines.append(f"project: {project_code} {project_name}".strip())
+    if thread_kind:
+        lines.append(f"thread_kind: {thread_kind}")
+    if record_status:
+        lines.append(f"record_status: {record_status}")
+    if progress_status:
+        lines.append(f"progress_status: {progress_status}")
+    if requester_name or requester_org:
+        lines.append(f"requester: {requester_name} {requester_org}".strip())
+    if responder_name or responder_org:
+        lines.append(f"responder: {responder_name} {responder_org}".strip())
+    if created_at:
+        lines.append(f"created_at: {created_at}")
+    if last_updated_at:
+        lines.append(f"last_updated_at: {last_updated_at}")
+
+    if report_payload:
+        lines.append("")
+        lines.append("work_report_payload:")
+        work_date_start = str(report_payload.get("work_date_start") or "").strip()
+        work_date_end = str(report_payload.get("work_date_end") or "").strip()
+        work_location = str(report_payload.get("work_location") or "").strip()
+        if work_date_start or work_date_end:
+            label = work_date_start
+            if work_date_end and work_date_end != work_date_start:
+                label = f"{work_date_start} ~ {work_date_end}".strip()
+            lines.append(f"- work_date: {label}".strip())
+        if work_location:
+            lines.append(f"- work_location: {_truncate(work_location, 240)}")
+
+        target_equipments = report_payload.get("target_equipments") or []
+        if isinstance(target_equipments, list):
+            equipments = [str(item).strip() for item in target_equipments if str(item).strip()]
+            if equipments:
+                joined = ", ".join(equipments[:10])
+                suffix = " ..." if len(equipments) > 10 else ""
+                lines.append(f"- target_equipments: {joined}{suffix}")
+
+        sections = report_payload.get("report_sections") or {}
+        if isinstance(sections, dict):
+            symptom = str(sections.get("symptom") or "").strip()
+            cause = str(sections.get("cause") or "").strip()
+            interim_action = str(sections.get("interim_action") or "").strip()
+            final_action = str(sections.get("final_action") or "").strip()
+            if symptom:
+                lines.append(f"- symptom: {_truncate(symptom, 1400)}")
+            if cause:
+                lines.append(f"- cause: {_truncate(cause, 1400)}")
+            if interim_action:
+                lines.append(f"- interim_action: {_truncate(interim_action, 1400)}")
+            if final_action:
+                lines.append(f"- final_action: {_truncate(final_action, 1400)}")
+
+        workers = report_payload.get("workers") or []
+        if isinstance(workers, list) and workers:
+            lines.append("- workers:")
+            for worker in workers[:12]:
+                if not isinstance(worker, dict):
+                    continue
+                name = str(worker.get("worker_name") or "").strip()
+                if not name:
+                    continue
+                aff = str(worker.get("worker_affiliation") or "").strip()
+                hours = worker.get("work_hours")
+                hours_text = ""
+                try:
+                    hours_text = f"{float(hours):g}h" if hours is not None else ""
+                except Exception:  # noqa: BLE001
+                    hours_text = ""
+                extra = " ".join(part for part in (aff, hours_text) if part).strip()
+                lines.append(f"  - {name}{(' (' + extra + ')') if extra else ''}")
+
+        parts = report_payload.get("parts") or []
+        if isinstance(parts, list) and parts:
+            lines.append("- parts:")
+            for part in parts[:16]:
+                if not isinstance(part, dict):
+                    continue
+                part_name = str(part.get("part_name") or "").strip()
+                if not part_name:
+                    continue
+                manu = str(part.get("manufacturer") or "").strip()
+                model = str(part.get("model_name") or "").strip()
+                qty = part.get("quantity")
+                qty_text = ""
+                try:
+                    qty_text = f"x{float(qty):g}" if qty is not None else ""
+                except Exception:  # noqa: BLE001
+                    qty_text = ""
+                bits = [bit for bit in (part_name, manu, model, qty_text) if bit]
+                lines.append(f"  - {' '.join(bits)}")
+
+    if entries:
+        lines.append("")
+        lines.append("entries:")
+        max_entries = 6
+        for idx, entry in enumerate(entries[:max_entries], start=1):
+            kind = str(entry.get("entry_kind") or "").strip()
+            entry_title = str(entry.get("title") or "").strip()
+            created = str(entry.get("created_at") or "").strip()
+            content = str(entry.get("content") or "").strip()
+            header_bits = [bit for bit in (kind, entry_title) if bit]
+            header = " · ".join(header_bits) if header_bits else f"entry-{idx}"
+            if created:
+                header = f"{header} ({created})"
+            lines.append(f"- {header}")
+            if content:
+                lines.append(_truncate(content, 2200 if idx in {1, max_entries} else 900))
+
+    lines.append("")
+    lines.append("## SUMMARY")
     return "\n".join(lines).strip() + "\n"
 
 

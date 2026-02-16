@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Bot, Database, Loader2, Search, Sparkles } from 'lucide-react';
 import { api, getErrorMessage } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -59,6 +60,8 @@ export default function DataHub() {
 
     const [isSearching, setIsSearching] = useState(false);
     const [isAsking, setIsAsking] = useState(false);
+    const [aiMode, setAiMode] = useState('');
+    const [aiAgenda, setAiAgenda] = useState(null);
     const [aiAnswer, setAiAnswer] = useState('');
     const [aiSources, setAiSources] = useState([]);
     const [aiUsage, setAiUsage] = useState(null);
@@ -86,6 +89,8 @@ export default function DataHub() {
     const runSearch = async (nextQuery) => {
         const normalized = String(nextQuery || '').trim();
         setError('');
+        setAiMode('');
+        setAiAgenda(null);
         setAiAnswer('');
         setAiSources([]);
         setAiUsage(null);
@@ -156,6 +161,8 @@ export default function DataHub() {
             const response = await api.post('/data-hub/ask', {
                 q: searchQuery,
             });
+            setAiMode(String(response.data?.mode || ''));
+            setAiAgenda(response.data?.agenda && typeof response.data.agenda === 'object' ? response.data.agenda : null);
             setAiAnswer(String(response.data?.answer || ''));
             setAiSources(Array.isArray(response.data?.sources) ? response.data.sources : []);
             setAiUsage(response.data?.usage || null);
@@ -171,6 +178,8 @@ export default function DataHub() {
         const match = results.find((item) => item.doc_id === docId);
         if (match) setSelectedResult(match);
     };
+
+    const isAgendaAi = String(aiMode || '').startsWith('agenda');
 
     return (
         <div className="space-y-4">
@@ -258,6 +267,30 @@ export default function DataHub() {
                         <span className="text-[11px] text-muted-foreground">{aiCacheHit ? '캐시됨' : ''}</span>
                     </div>
                     <div className="space-y-4 p-4">
+                        {isAgendaAi ? (
+                            <div className="rounded-lg border border-border bg-background p-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-extrabold text-foreground">
+                                            {aiMode === 'agenda_summary' ? '안건 요약' : '안건 코드 조회'}
+                                        </p>
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            {aiAgenda?.agenda_code ? aiAgenda.agenda_code : ''}
+                                            {aiAgenda?.title ? ` · ${aiAgenda.title}` : ''}
+                                        </p>
+                                    </div>
+                                    {aiAgenda?.project_id && aiAgenda?.thread_id ? (
+                                        <Link
+                                            to={`/project-management/projects/${aiAgenda.project_id}/agenda/${aiAgenda.thread_id}`}
+                                            className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary"
+                                        >
+                                            안건 열기
+                                        </Link>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div className="rounded-lg border border-border bg-background p-3">
                             {aiAnswer ? (
                                 <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">
@@ -271,8 +304,16 @@ export default function DataHub() {
                         </div>
 
                         <div className="space-y-2">
-                            <p className="text-xs font-semibold text-muted-foreground">근거(문서/페이지)</p>
-                            <SourcesPanel sources={aiSources} onSelectDoc={handleSelectSourceDoc} />
+                            <p className="text-xs font-semibold text-muted-foreground">
+                                {isAgendaAi ? '근거(안건)' : '근거(문서/페이지)'}
+                            </p>
+                            {isAgendaAi ? (
+                                <div className="rounded-lg border border-dashed border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground">
+                                    안건 본문(루트/최신 엔트리 및 작업보고서 섹션)을 요약했습니다.
+                                </div>
+                            ) : (
+                                <SourcesPanel sources={aiSources} onSelectDoc={handleSelectSourceDoc} />
+                            )}
                         </div>
                     </div>
                 </div>

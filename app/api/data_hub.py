@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import models
 from ..core.admin_access import is_admin_user
 from ..core.data_hub_ai import (
     TTLCache,
+    build_agenda_summary_prompt,
     build_answer_prompt,
     build_rag_context,
     contexts_fingerprint,
+    is_agenda_code,
     normalize_query,
 )
 from ..core.gemini_client import GeminiClient
@@ -90,9 +95,166 @@ async def upload_data_hub_document(
     return await upload_document_impl(file=file, db=db)
 
 
+def _can_read_agenda_thread(thread: models.AgendaThread, user: models.User) -> bool:
+    if (thread.record_status or "").strip().lower() == "published":
+        return True
+    return int(thread.created_by_user_id) == int(user.id)
+
+
+def _agenda_not_found_response(query: str) -> dict[str, Any]:
+    code = normalize_query(query)
+    return {
+        "mode": "agenda_not_found",
+        "agenda": {
+            "agenda_code": code,
+        }
+        if code
+        else None,
+        "answer": "해당 안건 코드를 찾지 못했습니다. 코드가 정확한지 확인해 주세요.",
+        "sources": [],
+        "cache_hit": False,
+        "usage": {},
+    }
+
+
+def _ask_agenda_summary(query: str, *, db: Session, user: models.User) -> dict[str, Any]:
+    normalized = normalize_query(query)
+    if not normalized:
+        return _agenda_not_found_response(query)
+
+    thread = (
+        db.query(models.AgendaThread)
+        .filter(func.lower(models.AgendaThread.agenda_code) == normalized.lower())
+        .first()
+    )
+    if not thread or not _can_read_agenda_thread(thread, user):
+        return _agenda_not_found_response(normalized)
+
+    project = (
+        db.query(models.BudgetProject)
+        .filter(models.BudgetProject.id == int(thread.project_id))
+        .first()
+    )
+
+    entries = (
+        db.query(models.AgendaEntry)
+        .filter(models.AgendaEntry.thread_id == int(thread.id))
+        .order_by(models.AgendaEntry.created_at.asc(), models.AgendaEntry.id.asc())
+        .all()
+    )
+    if not entries:
+        return _agenda_not_found_response(normalized)
+
+    root_entry = None
+    for entry in entries:
+        if (entry.entry_kind or "").strip().lower() == "root":
+            root_entry = entry
+            break
+    if root_entry is None:
+        root_entry = entries[0]
+
+    latest_entry = entries[-1]
+    middle_entries = [
+        entry
+        for entry in entries
+        if int(entry.id) not in {int(root_entry.id), int(latest_entry.id)}
+    ]
+    selected_middle = middle_entries[-4:]
+
+    selected_entries = [root_entry, *selected_middle]
+    if int(latest_entry.id) != int(root_entry.id):
+        selected_entries.append(latest_entry)
+
+    report_payload: dict[str, Any] = {}
+    if thread.report_payload_json:
+        try:
+            parsed = json.loads(thread.report_payload_json)
+            if isinstance(parsed, dict):
+                report_payload = parsed
+        except Exception:  # noqa: BLE001
+            report_payload = {}
+
+    agenda_prompt_payload: dict[str, Any] = {
+        "agenda_code": thread.agenda_code,
+        "title": thread.title,
+        "thread_kind": thread.thread_kind,
+        "record_status": thread.record_status,
+        "progress_status": thread.progress_status,
+        "project_name": project.name if project else "",
+        "project_code": project.code if project else "",
+        "requester_name": thread.requester_name or "",
+        "requester_org": thread.requester_org or "",
+        "responder_name": thread.responder_name or "",
+        "responder_org": thread.responder_org or "",
+        "created_at": thread.created_at,
+        "last_updated_at": thread.last_updated_at,
+        "entries": [
+            {
+                "entry_kind": entry.entry_kind,
+                "title": entry.title,
+                "content": entry.content_plain or entry.content_html or "",
+                "created_at": entry.created_at,
+            }
+            for entry in selected_entries
+        ],
+        "report_payload": report_payload,
+    }
+
+    fp_payload = {
+        "mode": "agenda_summary",
+        "thread_id": int(thread.id),
+        "agenda_code": thread.agenda_code,
+        "last_updated_at": str(thread.last_updated_at or ""),
+        "model": GEMINI_MODEL,
+        "max_out": int(GEMINI_MAX_OUTPUT_TOKENS),
+        "prompt": "agenda_v1",
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(fp_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    cached = _answer_cache.get(fingerprint)
+    if isinstance(cached, dict):
+        return {
+            **cached,
+            "cache_hit": True,
+        }
+
+    prompt = build_agenda_summary_prompt(agenda_prompt_payload)
+    client = _gemini_client()
+    try:
+        result = client.generate(
+            prompt=prompt,
+            max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
+            temperature=0.2,
+            top_p=0.95,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    response = {
+        "mode": "agenda_summary",
+        "agenda": {
+            "thread_id": int(thread.id),
+            "project_id": int(thread.project_id),
+            "agenda_code": thread.agenda_code,
+            "title": thread.title,
+            "thread_kind": thread.thread_kind,
+            "progress_status": thread.progress_status,
+            "last_updated_at": thread.last_updated_at,
+        },
+        "answer": result.text or "AI 요약을 생성하지 못했습니다.",
+        "sources": [],
+        "usage": result.usage,
+        "cache_hit": False,
+    }
+    _answer_cache.set(fingerprint, response)
+    return response
+
+
 @router.post("/ask")
 def ask_data_hub(
     payload: DataHubAskPayload,
+    db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
     # Keep auth barrier explicit (page is temporary but still should be protected).
@@ -101,6 +263,10 @@ def ask_data_hub(
     query = normalize_query(payload.q)
     if not query:
         raise HTTPException(status_code=400, detail="q is required")
+
+    # 0) Agenda code shortcut: summarize agenda content only when exact code matches.
+    if is_agenda_code(query):
+        return _ask_agenda_summary(query, db=db, user=user)
 
     # 1) Retrieve candidate chunks from ES (keyword + optional vector).
     query_vector = []

@@ -1338,11 +1338,7 @@ const SearchResults = () => {
                         aria-label="현재 경로"
                         className="min-w-0 flex items-center gap-1.5 text-sm text-muted-foreground"
                     >
-                        <Link to="/home" className="font-medium hover:text-primary">
-                            메인
-                        </Link>
-                        <span>/</span>
-                        <span className="font-semibold text-foreground/90">글로벌 검색</span>
+                        <span className="font-semibold text-foreground/90">메인 페이지</span>
                     </nav>
                 </div>
             </div>

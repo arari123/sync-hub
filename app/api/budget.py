@@ -29,6 +29,7 @@ from ..core.budget_logic import (
     summarize_costs,
     to_number,
 )
+from ..core.vector_store import vector_store
 from .auth import get_current_user
 from ..database import get_db
 
@@ -124,6 +125,7 @@ _PROJECT_COVER_MIME_TO_EXTENSION = {
     "image/gif": ".gif",
 }
 _PROJECT_COVER_FILENAME_PATTERN = re.compile(r"^[a-f0-9]{32}\.(?:png|jpe?g|webp|gif)$")
+_UPLOADS_ROOT_ABS = os.path.abspath("uploads")
 
 
 def _project_cover_upload_dir_abs() -> str:
@@ -175,6 +177,56 @@ def _delete_project_cover_file_if_unreferenced(cover_image_url: str) -> None:
         os.remove(file_path)
     except Exception:  # noqa: BLE001
         pass
+
+
+def _is_path_under_uploads(file_path: str) -> bool:
+    abs_path = os.path.abspath(file_path or "")
+    if not abs_path:
+        return False
+    try:
+        common = os.path.commonpath([abs_path, _UPLOADS_ROOT_ABS])
+    except ValueError:
+        return False
+    return common == _UPLOADS_ROOT_ABS
+
+
+def _remove_file_if_under_uploads(file_path: str) -> None:
+    if not file_path:
+        return
+    if not _is_path_under_uploads(file_path):
+        return
+    if not os.path.isfile(file_path):
+        return
+    try:
+        os.remove(file_path)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _collect_project_ids_for_deletion(root_project_id: int, db: Session) -> list[int]:
+    pending = [int(root_project_id)]
+    ordered: list[int] = []
+    seen: set[int] = set()
+
+    while pending:
+        project_id = int(pending.pop(0))
+        if project_id in seen:
+            continue
+        seen.add(project_id)
+        ordered.append(project_id)
+
+        child_ids = [
+            int(item.id)
+            for item in (
+                db.query(models.BudgetProject.id)
+                .filter(models.BudgetProject.parent_project_id == project_id)
+                .order_by(models.BudgetProject.id.asc())
+                .all()
+            )
+        ]
+        pending.extend(child_ids)
+
+    return ordered
 
 
 def _store_project_cover_image(file: UploadFile) -> tuple[str, int]:
@@ -2588,103 +2640,216 @@ def delete_project(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    project = _get_project_or_404(project_id, db)
-    _require_project_edit_permission(project, user)
+    root_project = _get_project_or_404(project_id, db)
+    _require_project_edit_permission(root_project, user)
 
-    child_project_count = (
+    project_ids = _collect_project_ids_for_deletion(int(root_project.id), db)
+    projects = (
         db.query(models.BudgetProject)
-        .filter(models.BudgetProject.parent_project_id == project.id)
-        .count()
+        .filter(models.BudgetProject.id.in_(project_ids))
+        .order_by(models.BudgetProject.id.asc())
+        .all()
     )
-    if child_project_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="하위 AS 프로젝트가 존재하여 삭제할 수 없습니다.",
-        )
+    project_by_id = {int(item.id): item for item in projects}
 
-    agenda_thread_count = (
-        db.query(models.AgendaThread)
-        .filter(models.AgendaThread.project_id == project.id)
-        .count()
-    )
-    agenda_entry_count = (
-        db.query(models.AgendaEntry)
-        .filter(models.AgendaEntry.project_id == project.id)
-        .count()
-    )
-    agenda_attachment_count = (
-        db.query(models.AgendaAttachment)
-        .filter(models.AgendaAttachment.project_id == project.id)
-        .count()
-    )
-    agenda_comment_count = (
-        db.query(models.AgendaComment)
-        .filter(models.AgendaComment.project_id == project.id)
-        .count()
-    )
-    if any(
-        count > 0
-        for count in (
-            agenda_thread_count,
-            agenda_entry_count,
-            agenda_attachment_count,
-            agenda_comment_count,
-        )
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="안건 데이터가 존재하여 삭제할 수 없습니다.",
-        )
+    for item in projects:
+        _require_project_edit_permission(item, user)
 
-    cover_image_url = (project.cover_image_url or "").strip()
-    has_shared_cover_image = False
-    if cover_image_url:
-        has_shared_cover_image = (
+    cover_urls = {
+        (item.cover_image_url or "").strip()
+        for item in projects
+        if (item.cover_image_url or "").strip()
+    }
+    removable_cover_urls = {
+        cover_url
+        for cover_url in cover_urls
+        if (
             db.query(models.BudgetProject)
             .filter(
-                models.BudgetProject.id != project.id,
-                models.BudgetProject.cover_image_url == cover_image_url,
+                ~models.BudgetProject.id.in_(project_ids),
+                models.BudgetProject.cover_image_url == cover_url,
             )
             .count()
-            > 0
+            == 0
         )
+    }
+
+    agenda_attachments = (
+        db.query(models.AgendaAttachment)
+        .filter(models.AgendaAttachment.project_id.in_(project_ids))
+        .all()
+    )
+    for attachment in agenda_attachments:
+        _remove_file_if_under_uploads(attachment.file_path or "")
+
+    (
+        db.query(models.AgendaComment)
+        .filter(models.AgendaComment.project_id.in_(project_ids))
+        .delete(synchronize_session=False)
+    )
+    (
+        db.query(models.AgendaThread)
+        .filter(models.AgendaThread.project_id.in_(project_ids))
+        .update(
+            {
+                models.AgendaThread.root_entry_id: None,
+                models.AgendaThread.latest_entry_id: None,
+                models.AgendaThread.source_thread_id: None,
+            },
+            synchronize_session=False,
+        )
+    )
+    (
+        db.query(models.AgendaAttachment)
+        .filter(models.AgendaAttachment.project_id.in_(project_ids))
+        .delete(synchronize_session=False)
+    )
+    (
+        db.query(models.AgendaEntry)
+        .filter(models.AgendaEntry.project_id.in_(project_ids))
+        .delete(synchronize_session=False)
+    )
+    (
+        db.query(models.AgendaThread)
+        .filter(models.AgendaThread.project_id.in_(project_ids))
+        .delete(synchronize_session=False)
+    )
 
     version_ids = [
         int(item.id)
         for item in (
             db.query(models.BudgetVersion.id)
-            .filter(models.BudgetVersion.project_id == project.id)
+            .filter(models.BudgetVersion.project_id.in_(project_ids))
             .all()
         )
     ]
-
     if version_ids:
         (
             db.query(models.BudgetEquipment)
             .filter(models.BudgetEquipment.version_id.in_(version_ids))
             .delete(synchronize_session=False)
         )
-
     (
         db.query(models.BudgetVersion)
-        .filter(models.BudgetVersion.project_id == project.id)
+        .filter(models.BudgetVersion.project_id.in_(project_ids))
         .delete(synchronize_session=False)
     )
-    (
-        db.query(models.Document)
-        .filter(models.Document.project_id == project.id)
-        .update({models.Document.project_id: None}, synchronize_session=False)
-    )
 
-    db.delete(project)
+    documents = (
+        db.query(models.Document)
+        .filter(models.Document.project_id.in_(project_ids))
+        .all()
+    )
+    document_ids = [int(item.id) for item in documents]
+    for item in documents:
+        if item.file_path:
+            _remove_file_if_under_uploads(item.file_path)
+
+    if document_ids:
+        for doc_id in document_ids:
+            try:
+                vector_store.delete_document(doc_id)
+            except Exception:  # noqa: BLE001
+                pass
+
+        affected_cluster_ids = set()
+        for cluster_id, in (
+            db.query(models.DedupClusterMember.cluster_id)
+            .filter(models.DedupClusterMember.doc_id.in_(document_ids))
+            .distinct()
+            .all()
+        ):
+            if cluster_id is not None:
+                affected_cluster_ids.add(int(cluster_id))
+        for cluster_id, in (
+            db.query(models.Document.dedup_cluster_id)
+            .filter(models.Document.id.in_(document_ids))
+            .distinct()
+            .all()
+        ):
+            if cluster_id is not None:
+                affected_cluster_ids.add(int(cluster_id))
+
+        (
+            db.query(models.DedupAuditLog)
+            .filter(models.DedupAuditLog.doc_id.in_(document_ids))
+            .delete(synchronize_session=False)
+        )
+        (
+            db.query(models.DedupClusterMember)
+            .filter(models.DedupClusterMember.doc_id.in_(document_ids))
+            .delete(synchronize_session=False)
+        )
+        (
+            db.query(models.Document)
+            .filter(models.Document.id.in_(document_ids))
+            .delete(synchronize_session=False)
+        )
+
+        for cluster_id in sorted(affected_cluster_ids):
+            members = (
+                db.query(models.DedupClusterMember)
+                .filter(models.DedupClusterMember.cluster_id == cluster_id)
+                .order_by(models.DedupClusterMember.is_primary.desc(), models.DedupClusterMember.doc_id.asc())
+                .all()
+            )
+            cluster = db.query(models.DedupCluster).filter(models.DedupCluster.id == cluster_id).first()
+            if cluster is None:
+                continue
+
+            if not members:
+                (
+                    db.query(models.DedupAuditLog)
+                    .filter(models.DedupAuditLog.cluster_id == cluster_id)
+                    .delete(synchronize_session=False)
+                )
+                (
+                    db.query(models.Document)
+                    .filter(models.Document.dedup_cluster_id == cluster_id)
+                    .update(
+                        {
+                            models.Document.dedup_cluster_id: None,
+                            models.Document.dedup_primary_doc_id: None,
+                            models.Document.dedup_status: "unique",
+                        },
+                        synchronize_session=False,
+                    )
+                )
+                db.delete(cluster)
+                continue
+
+            primary_doc_id = int(members[0].doc_id)
+            cluster.primary_doc_id = primary_doc_id
+            cluster.updated_at = to_iso(utcnow())
+            for index, member in enumerate(members):
+                member.is_primary = index == 0
+            (
+                db.query(models.Document)
+                .filter(models.Document.dedup_cluster_id == cluster_id)
+                .update(
+                    {
+                        models.Document.dedup_primary_doc_id: primary_doc_id,
+                        models.Document.dedup_status: "duplicate",
+                    },
+                    synchronize_session=False,
+                )
+            )
+
+    for target_project_id in reversed(project_ids):
+        item = project_by_id.get(int(target_project_id))
+        if item is None:
+            continue
+        db.delete(item)
+
     db.commit()
 
-    if cover_image_url and not has_shared_cover_image:
-        _delete_project_cover_file_if_unreferenced(cover_image_url)
+    for cover_url in sorted(removable_cover_urls):
+        _delete_project_cover_file_if_unreferenced(cover_url)
 
     return {
-        "message": "프로젝트가 삭제되었습니다.",
+        "message": "프로젝트 및 연관 데이터가 완전 삭제되었습니다.",
         "project_id": int(project_id),
+        "deleted_project_ids": [int(item) for item in project_ids],
     }
 
 

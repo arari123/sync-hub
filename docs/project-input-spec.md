@@ -206,6 +206,26 @@ AS 프로젝트 추가 규칙:
 - `executed_amount`
 - `memo`
 
+### 6.6 예산 엑셀 업로드/다운로드 입력 규칙
+
+신규 API:
+- `GET /budget/versions/{version_id}/export-excel`
+- `POST /budget/versions/{version_id}/import-excel` (`multipart/form-data`, field=`file`)
+
+엑셀 구성:
+- 시트: `요약`, `재료비`, `인건비`, `경비`, `_meta(hidden)`
+- 수식 셀: 잠금 + 시트 보호 적용
+- 템플릿 변경 검증: 시트명/헤더/수식/보호 상태/메타 서명 엄격 검증
+
+업로드 반영 정책:
+- 현재 정책은 **집행 데이터만 반영**
+- 반영 대상: `execution_material_items`, `execution_labor_items`, `execution_expense_items`
+- 예산 구조/예산값(`material_items/labor_items/expense_items`)은 업로드로 변경되지 않음
+
+검증 실패 시 오류 메시지:
+- `시트명!셀주소` 형태로 반환
+- 예: `재료비!I5: 예산금액 수식이 변경되었습니다.`
+
 ## 7. `budget_settings` 입력 키
 
 `budget_settings`는 자유형 `dict`이며, 현재 프론트/백엔드에서 사용하는 주요 키는 아래와 같다.

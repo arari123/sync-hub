@@ -10,7 +10,7 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, exists, func, or_
 from sqlalchemy.orm import Session
@@ -28,6 +28,11 @@ from ..core.budget_logic import (
     summarize_executed_costs_from_detail,
     summarize_costs,
     to_number,
+)
+from ..core.budget_excel import (
+    BudgetExcelValidationError,
+    build_budget_excel_bytes,
+    parse_budget_excel_execution_import,
 )
 from ..core.vector_store import vector_store
 from .auth import get_current_user
@@ -116,6 +121,7 @@ _SCHEDULE_ROOT_GROUP_IDS = {
 }
 _PROJECT_COVER_UPLOAD_DIR = os.getenv("PROJECT_COVER_UPLOAD_DIR", "uploads/project-covers")
 _PROJECT_COVER_MAX_BYTES = max(1, int(os.getenv("PROJECT_COVER_MAX_BYTES", str(5 * 1024 * 1024))))
+_BUDGET_EXCEL_MAX_BYTES = max(1, int(os.getenv("BUDGET_EXCEL_MAX_BYTES", str(10 * 1024 * 1024))))
 _PROJECT_COVER_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 _PROJECT_COVER_MIME_TO_EXTENSION = {
     "image/png": ".png",
@@ -3284,6 +3290,98 @@ def upsert_version_details(
     db.commit()
     db.refresh(version)
     return get_version_details(version_id=version.id, db=db, user=user)
+
+
+@router.get("/versions/{version_id}/export-excel")
+def export_version_excel(
+    version_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    version = _get_version_or_404(version_id, db)
+    project = _get_project_or_404(version.project_id, db)
+    detail_payload = parse_detail_payload(version.budget_detail_json or "")
+    excel_bytes = build_budget_excel_bytes(project=project, version=version, detail_payload=detail_payload)
+
+    project_code = (project.code or f"project-{int(project.id)}").strip() or f"project-{int(project.id)}"
+    sanitized_project_code = re.sub(r"[^A-Za-z0-9._-]+", "-", project_code).strip("-") or f"project-{int(project.id)}"
+    revision_no = int(version.revision_no or 0)
+    revision_suffix = f"-r{revision_no}" if revision_no > 0 else ""
+    filename = f"budget_{sanitized_project_code}_v{int(version.version_no or 0)}{revision_suffix}.xlsx"
+    encoded_filename = quote(filename)
+    content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": content_disposition},
+    )
+
+
+@router.post("/versions/{version_id}/import-excel")
+async def import_version_excel(
+    version_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    version = _get_version_or_404(version_id, db)
+    project = _require_version_edit_permission(version, user, db)
+
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(".xlsx"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="엑셀 업로드는 .xlsx 파일만 지원됩니다.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="업로드된 파일이 비어 있습니다.")
+    if len(file_bytes) > _BUDGET_EXCEL_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"엑셀 파일은 최대 {_BUDGET_EXCEL_MAX_BYTES} bytes 까지 업로드할 수 있습니다.",
+        )
+
+    try:
+        parsed = parse_budget_excel_execution_import(file_bytes)
+    except BudgetExcelValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.to_detail()) from exc
+
+    updated_counts = dict(parsed.get("updated_counts") or {})
+    has_execution_rows = any(int(updated_counts.get(key, 0)) > 0 for key in ("material", "labor", "expense"))
+    current_stage = _effective_stage_for_project(project, version)
+    if current_stage == _REVIEW_STAGE and has_execution_rows:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="검토 단계에서는 집행금액을 업로드할 수 없습니다. 단계 전환 후 다시 시도해 주세요.",
+        )
+
+    existing_detail = parse_detail_payload(version.budget_detail_json or "")
+    next_detail = {
+        **existing_detail,
+        "execution_material_items": list(parsed.get("execution_material_items") or []),
+        "execution_labor_items": list(parsed.get("execution_labor_items") or []),
+        "execution_expense_items": list(parsed.get("execution_expense_items") or []),
+    }
+
+    try:
+        payload = BudgetDetailPayload(**next_detail)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"엑셀 집행 데이터 형식이 올바르지 않습니다: {exc}",
+        ) from exc
+
+    result = upsert_version_details(version_id=version.id, payload=payload, db=db, user=user)
+    if isinstance(result, dict):
+        result["message"] = "엑셀 집행 내역이 반영되었습니다."
+        result["updated_counts"] = {
+            "material": int(updated_counts.get("material", 0)),
+            "labor": int(updated_counts.get("labor", 0)),
+            "expense": int(updated_counts.get("expense", 0)),
+        }
+    return result
 
 
 @router.get("/projects/{project_id}/summary")

@@ -1,6 +1,6 @@
 # Sync-Hub Repository Map
 
-- 업데이트 기준: 2026-02-16
+- 업데이트 기준: 2026-02-18
 
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
@@ -40,6 +40,7 @@
   - `document_summary.py`: 문서 유형 분류/요약
   - `ocr.py`: OCR 워커 헬스체크/연동
   - `budget_logic.py`: 예산 집계/정규화 로직
+  - `budget_excel.py`: 예산 엑셀 템플릿 생성/엄격 검증/집행 파싱
   - `admin_access.py`: 관리자 식별(환경변수 기반) 유틸
   - `auth_utils.py`, `auth_mailer.py`: 인증 유틸/메일 발송
   - `html_sanitizer.py`: 안건 리치 텍스트 HTML allow-list sanitize(XSS 방어)
@@ -122,6 +123,7 @@
   - 일정: `GET/PUT /budget/projects/{project_id}/schedule`
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`
+  - 엑셀: `GET /budget/versions/{version_id}/export-excel`, `POST /budget/versions/{version_id}/import-excel`
 - 안건:
   - 메타/목록/검색: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`, `GET /agenda/projects/{project_id}/entries`, `GET /agenda/entries/my`, `GET /agenda/threads/search`, `GET /agenda/threads/my`
   - 생성/수정: `POST /agenda/projects/{project_id}/threads`, `PUT /agenda/threads/{thread_id}/draft`, `POST /agenda/threads/{thread_id}/replies`

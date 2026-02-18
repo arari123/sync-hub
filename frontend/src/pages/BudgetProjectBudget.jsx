@@ -5,15 +5,18 @@ import {
     Calculator,
     ChevronDown,
     ChevronRight,
+    Download,
     Loader2,
     Receipt,
     Scale,
+    Upload,
     Users,
     Wallet,
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { api, getErrorMessage } from '../lib/api';
 import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
+import { downloadFromApi } from '../lib/download';
 import { cn } from '../lib/utils';
 import GlobalTopBar from '../components/GlobalTopBar';
 import BudgetProjectEditor from './BudgetProjectEditor';
@@ -1052,11 +1055,14 @@ const BudgetProjectBudget = () => {
     const { projectId } = useParams();
     const location = useLocation();
     const [project, setProject] = useState(null);
-    const [, setVersion] = useState(null);
+    const [version, setVersion] = useState(null);
     const [equipments, setEquipments] = useState([]);
     const [details, setDetails] = useState(EMPTY_DETAILS);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [excelNotice, setExcelNotice] = useState('');
+    const [isExcelUploading, setIsExcelUploading] = useState(false);
+    const excelUploadInputRef = useRef(null);
 
     const detailSearchQuery = '';
     const [selectedPhases, setSelectedPhases] = useState([...PHASES]);
@@ -1119,6 +1125,7 @@ const BudgetProjectBudget = () => {
             setVersion(currentVersion);
 
             if (!currentVersion?.id) {
+                setVersion(null);
                 setEquipments([]);
                 setDetails(EMPTY_DETAILS);
                 return;
@@ -1140,6 +1147,45 @@ const BudgetProjectBudget = () => {
             }
         }
     }, [projectId]);
+
+    const handleExcelDownload = useCallback(async () => {
+        if (!version?.id) return;
+        setError('');
+        try {
+            await downloadFromApi(`/budget/versions/${version.id}/export-excel`);
+        } catch (err) {
+            setError(getErrorMessage(err, '엑셀 파일 다운로드에 실패했습니다.'));
+        }
+    }, [version?.id]);
+
+    const handleExcelUpload = useCallback(async (file) => {
+        if (!file || !version?.id) return;
+        setError('');
+        setExcelNotice('');
+        setIsExcelUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await api.post(`/budget/versions/${version.id}/import-excel`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            const counts = response?.data?.updated_counts || {};
+            setExcelNotice(
+                `엑셀 업로드 완료: 재료비 ${Number(counts.material || 0)}건, 인건비 ${Number(counts.labor || 0)}건, 경비 ${Number(counts.expense || 0)}건 반영`
+            );
+            await loadBudgetData({ background: true });
+        } catch (err) {
+            setError(getErrorMessage(err, '엑셀 업로드에 실패했습니다.'));
+        } finally {
+            setIsExcelUploading(false);
+        }
+    }, [loadBudgetData, version?.id]);
+
+    const handleExcelFileChange = useCallback(async (event) => {
+        const file = event?.target?.files?.[0];
+        if (event?.target) event.target.value = '';
+        await handleExcelUpload(file);
+    }, [handleExcelUpload]);
 
     useEffect(() => {
         loadBudgetData();
@@ -1566,6 +1612,11 @@ const BudgetProjectBudget = () => {
                         {error}
                     </div>
                 )}
+                {excelNotice && (
+                    <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        {excelNotice}
+                    </div>
+                )}
 
                 <section className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
                     <article className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -1654,6 +1705,13 @@ const BudgetProjectBudget = () => {
                             })}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
+                            <input
+                                ref={excelUploadInputRef}
+                                type="file"
+                                accept=".xlsx"
+                                className="hidden"
+                                onChange={handleExcelFileChange}
+                            />
                             <button
                                 type="button"
                                 onClick={() => setIsInputMode((prev) => !prev)}
@@ -1666,6 +1724,34 @@ const BudgetProjectBudget = () => {
                                 )}
                             >
                                 입력 모드
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleExcelDownload}
+                                disabled={!version?.id || isExcelUploading}
+                                className={cn(
+                                    'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors',
+                                    !version?.id || isExcelUploading
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                )}
+                            >
+                                <Download className="h-3.5 w-3.5" />
+                                엑셀 다운로드
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => excelUploadInputRef.current?.click()}
+                                disabled={!version?.id || isExcelUploading}
+                                className={cn(
+                                    'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors',
+                                    !version?.id || isExcelUploading
+                                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                                        : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                )}
+                            >
+                                <Upload className="h-3.5 w-3.5" />
+                                {isExcelUploading ? '업로드 중...' : '엑셀 업로드'}
                             </button>
                             <button
                                 type="button"

@@ -136,7 +136,7 @@ export function endDateFromDuration(startYmd, durationDays, weekendMode) {
 function cloneGroup(group) {
     return {
         id: String(group?.id || '').trim(),
-        name: String(group?.name || '').trim(),
+        name: String(group?.name || ''),
         stage: normalizeStage(group?.stage),
         parent_group_id: group?.parent_group_id ? String(group.parent_group_id).trim() : null,
         sort_order: Math.max(0, Math.floor(toNumber(group?.sort_order, 0))),
@@ -148,7 +148,7 @@ function cloneRow(row) {
     return {
         id: String(row?.id || '').trim(),
         kind: String(row?.kind || '').trim().toLowerCase() === 'event' ? 'event' : 'task',
-        name: String(row?.name || '').trim(),
+        name: String(row?.name || ''),
         stage: normalizeStage(row?.stage),
         parent_group_id: String(row?.parent_group_id || '').trim(),
         sort_order: Math.max(0, Math.floor(toNumber(row?.sort_order, 0))),
@@ -252,7 +252,7 @@ export function normalizeSchedulePayload(raw) {
         const stage = normalizeStage(cloned.stage);
         cloned.stage = stage;
         cloned.id = ensureUniqueId(cloned.id, `group-${stage}`, usedGroupIds, index + 1);
-        cloned.name = cloned.name || '그룹';
+        cloned.name = cloned.name.trim() ? cloned.name : '그룹';
         customGroups.push(cloned);
     });
 

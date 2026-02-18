@@ -1872,7 +1872,7 @@ const SearchResults = () => {
 	                                                </div>
 	                                            )}
 	                                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-	                                                <div className="flex min-w-0 gap-3">
+	                                                <div className="flex h-full min-w-0 gap-3">
                                                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                                                         {coverImage ? (
                                                             <img
@@ -1887,94 +1887,96 @@ const SearchResults = () => {
                                                         )}
                                                     </div>
 
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                                            <span className="truncate text-[10px] font-mono tracking-wider text-slate-400">
-                                                                {project.code || '코드 없음'}
-                                                            </span>
-                                                            <div className="flex shrink-0 items-center gap-1.5">
-                                                                <span
-                                                                    className={cn(
-                                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow-sm',
-                                                                        typeBadgeMeta.className
-                                                                    )}
-                                                                >
-                                                                    <typeBadgeMeta.Icon className="h-3.5 w-3.5" />
-                                                                    <span>{typeBadgeMeta.label}</span>
-                                                                </span>
-                                                                {isAsProject && parentProject?.id && (
-                                                                    <Link
-                                                                        to={`/project-management/projects/${parentProject.id}`}
-                                                                        title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
-                                                                        className="inline-flex max-w-[170px] items-center gap-1 rounded-full border border-slate-200 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-white"
-                                                                    >
-                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                                                                        <span className="truncate">
-                                                                            {parentProjectCode && (
-                                                                                <span className="font-mono">{parentProjectCode}</span>
-                                                                            )}
-                                                                            {parentProjectCode && parentProjectName && (
-                                                                                <span className="px-1 text-slate-300">·</span>
-                                                                            )}
-                                                                            <span>{parentProjectName || (!parentProjectCode ? '소속 설비' : '')}</span>
-                                                                        </span>
-                                                                    </Link>
-                                                                )}
-                                                                <span className={cn(
-                                                                    'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
-                                                                    stageStyle.badgeClass
-                                                                )}
-                                                                >
-                                                                    {resolveProjectStatusLabel(project)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+	                                                    <div className="min-w-0 flex flex-1 flex-col">
+	                                                        <div>
+	                                                            <div className="mb-1 flex items-center justify-between gap-2">
+	                                                                <span className="truncate text-[10px] font-mono tracking-wider text-slate-400">
+	                                                                    {project.code || '코드 없음'}
+	                                                                </span>
+	                                                                <div className="flex shrink-0 items-center gap-1.5">
+	                                                                    <span
+	                                                                        className={cn(
+	                                                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow-sm',
+	                                                                            typeBadgeMeta.className
+	                                                                        )}
+	                                                                    >
+	                                                                        <typeBadgeMeta.Icon className="h-3.5 w-3.5" />
+	                                                                        <span>{typeBadgeMeta.label}</span>
+	                                                                    </span>
+	                                                                    {isAsProject && parentProject?.id && (
+	                                                                        <Link
+	                                                                            to={`/project-management/projects/${parentProject.id}`}
+	                                                                            title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
+	                                                                            className="inline-flex max-w-[170px] items-center gap-1 rounded-full border border-slate-200 bg-white/70 px-2 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-white"
+	                                                                        >
+	                                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+	                                                                            <span className="truncate">
+	                                                                                {parentProjectCode && (
+	                                                                                    <span className="font-mono">{parentProjectCode}</span>
+	                                                                                )}
+	                                                                                {parentProjectCode && parentProjectName && (
+	                                                                                    <span className="px-1 text-slate-300">·</span>
+	                                                                                )}
+	                                                                                <span>{parentProjectName || (!parentProjectCode ? '소속 설비' : '')}</span>
+	                                                                            </span>
+	                                                                        </Link>
+	                                                                    )}
+	                                                                    <span className={cn(
+	                                                                        'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+	                                                                        stageStyle.badgeClass
+	                                                                    )}
+	                                                                    >
+	                                                                        {resolveProjectStatusLabel(project)}
+	                                                                    </span>
+	                                                                </div>
+	                                                            </div>
 
-                                                        <Link
-                                                            to={`/project-management/projects/${project.id}`}
-                                                            className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-slate-900 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-700"
-                                                        >
-                                                            {project.name || '이름 없는 프로젝트'}
-                                                        </Link>
+	                                                            <Link
+	                                                                to={`/project-management/projects/${project.id}`}
+	                                                                className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-slate-900 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-700"
+	                                                            >
+	                                                                {project.name || '이름 없는 프로젝트'}
+	                                                            </Link>
 
-                                                        <p
-                                                            className={cn(
-                                                                'text-[11px] leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
-                                                                projectOverview ? 'text-slate-700' : 'text-slate-400'
-                                                            )}
-                                                            title={projectOverview || '프로젝트 개요가 없습니다.'}
-                                                        >
-                                                            {projectOverview || '프로젝트 개요가 없습니다.'}
-                                                        </p>
+	                                                            <p
+	                                                                className={cn(
+	                                                                    'min-h-[2.4rem] text-[11px] leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
+	                                                                    projectOverview ? 'text-slate-700' : 'text-slate-400'
+	                                                                )}
+	                                                                title={projectOverview || '프로젝트 개요가 없습니다.'}
+	                                                            >
+	                                                                {projectOverview || '프로젝트 개요가 없습니다.'}
+	                                                            </p>
+	                                                        </div>
 
-                                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                            <span
-                                                                title={project.customer_name || ''}
-                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
-                                                            >
-                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">고객사</span>
-                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.customer_name || '-'}</span>
-                                                            </span>
-                                                            <span
-                                                                title={project.installation_site || ''}
-                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
-                                                            >
-                                                                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">설치장소</span>
-                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.installation_site || '-'}</span>
-                                                            </span>
-                                                            <span
-                                                                title={project.manager_name || ''}
-                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
-                                                            >
-                                                                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">담당자</span>
-                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.manager_name || '미지정'}</span>
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
+	                                                        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+	                                                            <span
+	                                                                title={project.customer_name || ''}
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+	                                                            >
+	                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+	                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">고객사</span>
+	                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.customer_name || '-'}</span>
+	                                                            </span>
+	                                                            <span
+	                                                                title={project.installation_site || ''}
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+	                                                            >
+	                                                                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+	                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">설치장소</span>
+	                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.installation_site || '-'}</span>
+	                                                            </span>
+	                                                            <span
+	                                                                title={project.manager_name || ''}
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white/75 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm"
+	                                                            >
+	                                                                <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+	                                                                <span className="shrink-0 text-[10px] font-bold text-slate-500">담당자</span>
+	                                                                <span className="min-w-0 truncate font-semibold text-slate-800">{project.manager_name || '미지정'}</span>
+	                                                            </span>
+	                                                        </div>
+	                                                    </div>
+	                                                </div>
 
                                                 <div className="border-t border-slate-200 pt-2 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
                                                     <Link

@@ -149,6 +149,34 @@ def _project_cover_public_url(stored_filename: str) -> str:
     return f"/budget/project-covers/{stored_filename}"
 
 
+def _project_cover_storage_path_from_url(cover_image_url: str) -> str:
+    raw_url = (cover_image_url or "").strip()
+    prefix = "/budget/project-covers/"
+    if not raw_url.startswith(prefix):
+        return ""
+    filename = raw_url[len(prefix):].split("?", 1)[0].strip().lower()
+    if not _is_safe_project_cover_filename(filename):
+        return ""
+
+    upload_dir_abs = _project_cover_upload_dir_abs()
+    file_path = os.path.abspath(os.path.join(upload_dir_abs, filename))
+    if os.path.commonpath([file_path, upload_dir_abs]) != upload_dir_abs:
+        return ""
+    return file_path
+
+
+def _delete_project_cover_file_if_unreferenced(cover_image_url: str) -> None:
+    file_path = _project_cover_storage_path_from_url(cover_image_url)
+    if not file_path:
+        return
+    if not os.path.isfile(file_path):
+        return
+    try:
+        os.remove(file_path)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _store_project_cover_image(file: UploadFile) -> tuple[str, int]:
     extension = _resolve_project_cover_extension(file.content_type or "", file.filename or "")
     if not extension:
@@ -2552,6 +2580,112 @@ def update_project(
         db.refresh(project)
 
     return _serialize_project(project, db, user=user)
+
+
+@router.delete("/projects/{project_id}")
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    _require_project_edit_permission(project, user)
+
+    child_project_count = (
+        db.query(models.BudgetProject)
+        .filter(models.BudgetProject.parent_project_id == project.id)
+        .count()
+    )
+    if child_project_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="하위 AS 프로젝트가 존재하여 삭제할 수 없습니다.",
+        )
+
+    agenda_thread_count = (
+        db.query(models.AgendaThread)
+        .filter(models.AgendaThread.project_id == project.id)
+        .count()
+    )
+    agenda_entry_count = (
+        db.query(models.AgendaEntry)
+        .filter(models.AgendaEntry.project_id == project.id)
+        .count()
+    )
+    agenda_attachment_count = (
+        db.query(models.AgendaAttachment)
+        .filter(models.AgendaAttachment.project_id == project.id)
+        .count()
+    )
+    agenda_comment_count = (
+        db.query(models.AgendaComment)
+        .filter(models.AgendaComment.project_id == project.id)
+        .count()
+    )
+    if any(
+        count > 0
+        for count in (
+            agenda_thread_count,
+            agenda_entry_count,
+            agenda_attachment_count,
+            agenda_comment_count,
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="안건 데이터가 존재하여 삭제할 수 없습니다.",
+        )
+
+    cover_image_url = (project.cover_image_url or "").strip()
+    has_shared_cover_image = False
+    if cover_image_url:
+        has_shared_cover_image = (
+            db.query(models.BudgetProject)
+            .filter(
+                models.BudgetProject.id != project.id,
+                models.BudgetProject.cover_image_url == cover_image_url,
+            )
+            .count()
+            > 0
+        )
+
+    version_ids = [
+        int(item.id)
+        for item in (
+            db.query(models.BudgetVersion.id)
+            .filter(models.BudgetVersion.project_id == project.id)
+            .all()
+        )
+    ]
+
+    if version_ids:
+        (
+            db.query(models.BudgetEquipment)
+            .filter(models.BudgetEquipment.version_id.in_(version_ids))
+            .delete(synchronize_session=False)
+        )
+
+    (
+        db.query(models.BudgetVersion)
+        .filter(models.BudgetVersion.project_id == project.id)
+        .delete(synchronize_session=False)
+    )
+    (
+        db.query(models.Document)
+        .filter(models.Document.project_id == project.id)
+        .update({models.Document.project_id: None}, synchronize_session=False)
+    )
+
+    db.delete(project)
+    db.commit()
+
+    if cover_image_url and not has_shared_cover_image:
+        _delete_project_cover_file_if_unreferenced(cover_image_url)
+
+    return {
+        "message": "프로젝트가 삭제되었습니다.",
+        "project_id": int(project_id),
+    }
 
 
 @router.get("/projects/{project_id}/schedule")

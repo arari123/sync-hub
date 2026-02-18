@@ -117,7 +117,7 @@
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
 - 데이터 허브(임시): `/data-hub/permissions`, `/data-hub/documents/upload`, `/data-hub/ask`
 - 예산:
-  - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
+  - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT/DELETE /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
   - 프로젝트 커버: `POST /budget/project-covers/upload`, `GET /budget/project-covers/{stored_filename}`
   - 일정: `GET/PUT /budget/projects/{project_id}/schedule`
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`

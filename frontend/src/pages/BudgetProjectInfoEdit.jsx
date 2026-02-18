@@ -66,8 +66,10 @@ const BudgetProjectInfoEdit = () => {
     const [equipmentProjectError, setEquipmentProjectError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState('');
     const [saveError, setSaveError] = useState('');
+    const [deleteError, setDeleteError] = useState('');
 
     useEffect(() => {
         const load = async () => {
@@ -281,6 +283,26 @@ const BudgetProjectInfoEdit = () => {
         }
     };
 
+    const removeProject = async () => {
+        if (!project?.id || isDeleting) return;
+        const projectName = (project.name || '').trim() || `#${project.id}`;
+        const shouldDelete = window.confirm(
+            `'${projectName}' 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
+        );
+        if (!shouldDelete) return;
+
+        setDeleteError('');
+        setIsDeleting(true);
+        try {
+            await api.delete(`/budget/projects/${project.id}`);
+            navigate('/project-management');
+        } catch (err) {
+            setDeleteError(getErrorMessage(err, '프로젝트 삭제에 실패했습니다.'));
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     if (isLoading) {
         return <p className="text-sm text-muted-foreground">불러오는 중...</p>;
     }
@@ -339,6 +361,11 @@ const BudgetProjectInfoEdit = () => {
                 {saveError && (
                     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                         {saveError}
+                    </div>
+                )}
+                {deleteError && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                        {deleteError}
                     </div>
                 )}
 
@@ -551,12 +578,23 @@ const BudgetProjectInfoEdit = () => {
                 </Field>
 
                 <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mr-auto border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                        onClick={removeProject}
+                        isLoading={isDeleting}
+                        disabled={isSaving}
+                    >
+                        프로젝트 삭제
+                    </Button>
                     <Link to={baseProjectPath}>
-                        <Button type="button" variant="outline" size="sm" disabled={isSaving}>
+                        <Button type="button" variant="outline" size="sm" disabled={isSaving || isDeleting}>
                             취소
                         </Button>
                     </Link>
-                    <Button type="submit" size="sm" isLoading={isSaving}>
+                    <Button type="submit" size="sm" isLoading={isSaving} disabled={isDeleting}>
                         저장
                     </Button>
                 </div>

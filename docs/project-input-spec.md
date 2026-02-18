@@ -74,6 +74,15 @@ AS 프로젝트 추가 규칙:
 | `cover_image_url` | string | N | 최대 500자 |
 | `manager_user_id` | integer | N | `>= 1`, 활성/이메일 인증 사용자 |
 
+### 3.2 프로젝트 삭제 (`DELETE /budget/projects/{project_id}`)
+
+- 수정 권한(`can_edit`)이 있는 사용자만 삭제할 수 있다.
+- 삭제 시 프로젝트에 연결된 예산 버전/설비 데이터는 함께 정리된다.
+- 프로젝트에 연결된 문서(`documents.project_id`)는 `null`로 분리된다.
+- 아래 조건에서는 삭제가 차단된다.
+  - 하위 AS 프로젝트가 존재하는 경우
+  - 안건 데이터(스레드/엔트리/첨부/댓글)가 존재하는 경우
+
 ## 4. 버전/리비전 관련 입력
 
 ### 4.1 버전 생성 (`POST /budget/projects/{project_id}/versions`)

@@ -26,6 +26,7 @@
 | `installation_site` | string | N | `null` | 최대 180자 | 설치 장소 |
 | `business_trip_distance_km` | number | N | `0` | `>= 0` | 출장 거리(km, 편도) |
 | `manager_user_id` | integer | N | 현재 로그인 사용자 | `>= 1`, 활성/이메일 인증 사용자만 가능 | 담당자 |
+| `cover_image_url` | string | N | `null` | 최대 500자 | 프로젝트 커버 이미지 URL(`POST /budget/project-covers/upload` 결과값 권장) |
 
 생성 시 유효성 규칙:
 - `code`가 비어있지 않으면 중복 불가
@@ -36,6 +37,12 @@
 
 AS 프로젝트 추가 규칙:
 - `customer_name`, `installation_site`가 비어있으면 서버에서 소속 설비 프로젝트 값을 자동으로 채운다.
+
+프로젝트 커버 이미지 파일 업로드:
+- 업로드: `POST /budget/project-covers/upload` (`multipart/form-data`, 필드명 `file`)
+- 허용 포맷: PNG/JPG/WEBP/GIF
+- 크기 제한: 기본 5MB (`PROJECT_COVER_MAX_BYTES`로 조정 가능)
+- 조회 URL: `GET /budget/project-covers/{stored_filename}` (생성/수정의 `cover_image_url`로 사용)
 
 ### 2.2 UI 전용 입력(설비 프로젝트)
 

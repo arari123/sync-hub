@@ -69,6 +69,7 @@ const BudgetProjectCreate = () => {
 
     const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
     const [coverFileName, setCoverFileName] = useState('');
+    const [coverFile, setCoverFile] = useState(null);
     const [equipmentMode, setEquipmentMode] = useState('registered');
     const [clientContacts, setClientContacts] = useState([emptyContact()]);
 
@@ -203,12 +204,35 @@ const BudgetProjectCreate = () => {
     const onCoverFileChange = (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        const mimeType = String(file.type || '').toLowerCase();
+        if (!mimeType.startsWith('image/')) {
+            if (coverPreviewUrl) {
+                URL.revokeObjectURL(coverPreviewUrl);
+            }
+            setCoverPreviewUrl('');
+            setCoverFile(null);
+            setCoverFileName('');
+            setError('이미지 파일만 업로드할 수 있습니다.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            if (coverPreviewUrl) {
+                URL.revokeObjectURL(coverPreviewUrl);
+            }
+            setCoverPreviewUrl('');
+            setCoverFile(null);
+            setCoverFileName('');
+            setError('프로젝트 이미지는 최대 5MB까지 업로드할 수 있습니다.');
+            return;
+        }
         if (coverPreviewUrl) {
             URL.revokeObjectURL(coverPreviewUrl);
         }
         const previewUrl = URL.createObjectURL(file);
+        setError('');
         setCoverPreviewUrl(previewUrl);
         setCoverFileName(file.name || '');
+        setCoverFile(file);
     };
 
     useEffect(() => {
@@ -259,6 +283,19 @@ const BudgetProjectCreate = () => {
         setError('');
         setIsSubmitting(true);
         try {
+            let coverImageUrl = '';
+            if (coverFile) {
+                const formData = new FormData();
+                formData.append('file', coverFile);
+                const coverUploadResponse = await api.post('/budget/project-covers/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                coverImageUrl = String(coverUploadResponse?.data?.cover_image_url || '').trim();
+                if (!coverImageUrl) {
+                    throw new Error('cover_image_upload_failed');
+                }
+            }
+
             const created = await api.post('/budget/projects', {
                 name: name.trim(),
                 code: code.trim(),
@@ -269,6 +306,7 @@ const BudgetProjectCreate = () => {
                 installation_site: installationSite.trim(),
                 business_trip_distance_km: Number(String(businessTripDistanceKm || '0').replace(/,/g, '')) || 0,
                 manager_user_id: Number(managerUserId),
+                cover_image_url: coverImageUrl || undefined,
             });
             const projectId = created?.data?.id;
             if (!projectId) {

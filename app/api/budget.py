@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
 import re
+import uuid
 from datetime import date, timedelta
 from typing import Any, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, exists, func, or_
 from sqlalchemy.orm import Session
@@ -110,6 +113,87 @@ _SCHEDULE_ROOT_GROUP_IDS = {
     stage: f"stage-{stage}"
     for stage in _SCHEDULE_STAGE_ORDER
 }
+_PROJECT_COVER_UPLOAD_DIR = os.getenv("PROJECT_COVER_UPLOAD_DIR", "uploads/project-covers")
+_PROJECT_COVER_MAX_BYTES = max(1, int(os.getenv("PROJECT_COVER_MAX_BYTES", str(5 * 1024 * 1024))))
+_PROJECT_COVER_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+_PROJECT_COVER_MIME_TO_EXTENSION = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+_PROJECT_COVER_FILENAME_PATTERN = re.compile(r"^[a-f0-9]{32}\.(?:png|jpe?g|webp|gif)$")
+
+
+def _project_cover_upload_dir_abs() -> str:
+    return os.path.abspath(_PROJECT_COVER_UPLOAD_DIR)
+
+
+def _resolve_project_cover_extension(content_type: str, filename: str) -> str:
+    mime_token = (content_type or "").split(";", 1)[0].strip().lower()
+    if mime_token in _PROJECT_COVER_MIME_TO_EXTENSION:
+        return _PROJECT_COVER_MIME_TO_EXTENSION[mime_token]
+
+    file_ext = os.path.splitext((filename or "").strip())[1].lower()
+    if file_ext in _PROJECT_COVER_ALLOWED_EXTENSIONS:
+        return file_ext
+    return ""
+
+
+def _is_safe_project_cover_filename(stored_filename: str) -> bool:
+    return bool(_PROJECT_COVER_FILENAME_PATTERN.fullmatch((stored_filename or "").strip().lower()))
+
+
+def _project_cover_public_url(stored_filename: str) -> str:
+    return f"/budget/project-covers/{stored_filename}"
+
+
+def _store_project_cover_image(file: UploadFile) -> tuple[str, int]:
+    extension = _resolve_project_cover_extension(file.content_type or "", file.filename or "")
+    if not extension:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PNG/JPG/WEBP/GIF image files are allowed.",
+        )
+
+    upload_dir_abs = _project_cover_upload_dir_abs()
+    os.makedirs(upload_dir_abs, exist_ok=True)
+
+    stored_filename = f"{uuid.uuid4().hex}{extension}"
+    file_path = os.path.abspath(os.path.join(upload_dir_abs, stored_filename))
+    if os.path.commonpath([file_path, upload_dir_abs]) != upload_dir_abs:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid cover upload path.")
+
+    copied_size = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                copied_size += len(chunk)
+                if copied_size > _PROJECT_COVER_MAX_BYTES:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"Cover image is too large. Max size is {_PROJECT_COVER_MAX_BYTES} bytes.",
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
+    except Exception as exc:  # noqa: BLE001
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to store cover image: {exc}") from exc
+    finally:
+        try:
+            file.file.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    return stored_filename, copied_size
 
 
 def _budget_settings_lock_signature(settings: Any) -> tuple:
@@ -189,6 +273,7 @@ class BudgetProjectCreate(BaseModel):
     installation_site: Optional[str] = Field(default=None, max_length=180)
     business_trip_distance_km: Optional[float] = Field(default=0, ge=0)
     manager_user_id: Optional[int] = Field(default=None, ge=1)
+    cover_image_url: Optional[str] = Field(default=None, max_length=500)
 
 
 class BudgetProjectUpdate(BaseModel):
@@ -2267,6 +2352,7 @@ def create_project(
 
     customer_name = (payload.customer_name or "").strip() or None
     installation_site = (payload.installation_site or "").strip() or None
+    cover_image_url = (payload.cover_image_url or "").strip() or None
     if project_type == "as" and parent_project is not None:
         if not customer_name:
             customer_name = (parent_project.customer_name or "").strip() or None
@@ -2283,6 +2369,7 @@ def create_project(
         customer_name=customer_name,
         installation_site=installation_site,
         business_trip_distance_km=to_number(payload.business_trip_distance_km),
+        cover_image_url=cover_image_url,
         created_by_user_id=int(user.id),
         manager_user_id=manager_user_id,
         current_stage="review",
@@ -2293,6 +2380,40 @@ def create_project(
     db.commit()
     db.refresh(project)
     return _serialize_project(project, db, user=user)
+
+
+@router.post("/project-covers/upload")
+async def upload_project_cover_image(
+    file: UploadFile = File(...),
+    _: models.User = Depends(get_current_user),
+):
+    stored_filename, stored_size = _store_project_cover_image(file)
+    return {
+        "cover_image_url": _project_cover_public_url(stored_filename),
+        "stored_filename": stored_filename,
+        "size": int(stored_size),
+    }
+
+
+@router.get("/project-covers/{stored_filename}")
+def get_project_cover_image(stored_filename: str):
+    normalized_name = (stored_filename or "").strip().lower()
+    if not _is_safe_project_cover_filename(normalized_name):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover image not found.")
+
+    upload_dir_abs = _project_cover_upload_dir_abs()
+    file_path = os.path.abspath(os.path.join(upload_dir_abs, normalized_name))
+    if os.path.commonpath([file_path, upload_dir_abs]) != upload_dir_abs:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover image not found.")
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover image not found.")
+
+    mime_type, _ = mimetypes.guess_type(file_path)
+    return FileResponse(
+        file_path,
+        media_type=mime_type or "application/octet-stream",
+        headers={"Cache-Control": "public, max-age=604800"},
+    )
 
 
 @router.put("/projects/{project_id}")

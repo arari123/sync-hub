@@ -90,7 +90,7 @@ _ADMIN_IDENTIFIERS = {
     for token in _RAW_ADMIN_IDENTIFIERS.split(",")
     if token.strip()
 }
-_EXECUTION_ONLY_STAGES = {"fabrication", "installation", "warranty", "closure"}
+_EXECUTION_ONLY_STAGES = {"design", "fabrication", "installation", "warranty", "closure"}
 _REVIEW_STAGE = "review"
 _SCHEDULE_SCHEMA_VERSION = "wbs.v1"
 _SCHEDULE_STAGE_ORDER = ("design", "fabrication", "installation")
@@ -3039,7 +3039,7 @@ def create_revision(
     if current_stage in _EXECUTION_ONLY_STAGES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="제작/설치/워런티/종료 단계에서는 예산 리비전을 생성할 수 없습니다. 집행금액만 입력해 주세요.",
+            detail="설계/제작/설치/워런티/종료 단계에서는 예산 리비전을 생성할 수 없습니다. 집행금액만 입력해 주세요.",
         )
     if source.status != "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only confirmed version can create revision.")
@@ -3146,7 +3146,7 @@ def replace_equipments(
     if current_stage in _EXECUTION_ONLY_STAGES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="제작/설치/워런티/종료 단계에서는 예산(설비/항목)을 수정할 수 없습니다. 집행금액만 입력해 주세요.",
+            detail="설계/제작/설치/워런티/종료 단계에서는 예산(설비/항목)을 수정할 수 없습니다. 집행금액만 입력해 주세요.",
         )
     if version.status == "confirmed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Confirmed version cannot be edited.")

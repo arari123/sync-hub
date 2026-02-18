@@ -7,7 +7,7 @@ import BudgetSidebar from '../components/BudgetSidebar';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { cn } from '../lib/utils';
 
-const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty', 'closure']);
+const EXECUTION_STAGES = new Set(['design', 'fabrication', 'installation', 'warranty', 'closure']);
 
 const SECTION_META = {
     material: { label: '재료비', budgetKey: 'material_items', executionKey: 'execution_material_items' },

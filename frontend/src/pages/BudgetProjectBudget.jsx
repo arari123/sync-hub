@@ -18,7 +18,7 @@ import { cn } from '../lib/utils';
 import GlobalTopBar from '../components/GlobalTopBar';
 import BudgetProjectEditor from './BudgetProjectEditor';
 
-const EXECUTION_STAGES = new Set(['fabrication', 'installation', 'warranty']);
+const EXECUTION_STAGES = new Set(['design', 'fabrication', 'installation', 'warranty', 'closure']);
 const PHASES = ['fabrication', 'installation'];
 const PHASE_LABEL = {
     fabrication: '제작',
@@ -2208,7 +2208,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
 const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, onLiveDetailsChange }) => {
     const total = summarizeBudgetExecution(rows);
     const remaining = total.budget - total.execution;
-    const defaultUnitViewMode = currentStage === 'review' ? 'budget' : 'execution';
+    const defaultUnitViewMode = EXECUTION_STAGES.has(normalizeStage(currentStage)) ? 'execution' : 'budget';
     const [unitViewMode, setUnitViewMode] = useState(defaultUnitViewMode);
 
     useEffect(() => {

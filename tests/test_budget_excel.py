@@ -135,6 +135,20 @@ class BudgetExcelTests(unittest.TestCase):
 
         self.assertIn("시트 보호", str(raised.exception))
 
+    def test_parse_allows_equivalent_summary_formula_notation(self):
+        workbook = load_workbook(BytesIO(self._build_bytes()), data_only=False)
+
+        # Equivalent formulas that may be rewritten by office apps / locale settings.
+        workbook[SUMMARY_SHEET]["B5"] = "='재료비'!$B$2"
+        workbook[SUMMARY_SHEET]["C5"] = "='재료비'!$D$2"
+        workbook[SUMMARY_SHEET]["E5"] = "=IFERROR(C5/B5;0.0)"
+        workbook[SUMMARY_SHEET]["E8"] = "=@IFERROR(C8/B8;0)"
+
+        parsed = parse_budget_excel_execution_import(self._save_workbook(workbook))
+        self.assertEqual(parsed["updated_counts"]["material"], 0)
+        self.assertEqual(parsed["updated_counts"]["labor"], 0)
+        self.assertEqual(parsed["updated_counts"]["expense"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

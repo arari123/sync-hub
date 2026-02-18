@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from io import BytesIO
 from typing import Any
 
@@ -128,7 +129,17 @@ def _safe_formula(value: Any) -> str:
     text = str(value).strip()
     if not text:
         return ""
-    return text.replace(" ", "").upper()
+    text = text.upper().replace(" ", "")
+    if text.startswith("="):
+        text = text[1:]
+    # Normalize locale/editor differences while keeping formula intent strict.
+    text = text.replace(";", ",")
+    text = text.replace("$", "")
+    text = text.replace("'", "")
+    text = text.replace("_XLFN.", "")
+    text = text.replace("@", "")
+    text = re.sub(r"(?<=[,(])(-?\d+)\.0(?=[,)])", r"\1", text)
+    return text
 
 
 def _template_signature() -> str:

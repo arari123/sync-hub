@@ -87,6 +87,37 @@ for env in containers[0].get("env") or []:
 PY
 }
 
+get_current_env_secret() {
+  local var_name="$1"
+  if [[ -z "${CURRENT_SERVICE_JSON}" ]]; then
+    return 0
+  fi
+  printf '%s' "${CURRENT_SERVICE_JSON}" | python3 - "${var_name}" <<'PY'
+import json
+import sys
+
+target = sys.argv[1]
+try:
+    payload = json.load(sys.stdin)
+except Exception:  # noqa: BLE001
+    raise SystemExit(0)
+
+containers = (((payload.get("spec") or {}).get("template") or {}).get("spec") or {}).get("containers") or []
+if not containers:
+    raise SystemExit(0)
+
+for env in containers[0].get("env") or []:
+    if env.get("name") != target:
+        continue
+    value_from = env.get("valueFrom") or {}
+    secret_ref = value_from.get("secretKeyRef") or {}
+    secret_name = secret_ref.get("name")
+    if secret_name:
+        print(str(secret_name))
+        break
+PY
+}
+
 get_current_annotation() {
   local annotation_key="$1"
   if [[ -z "${CURRENT_SERVICE_JSON}" ]]; then
@@ -113,15 +144,18 @@ FIREBASE_SITE="${FIREBASE_SITE:-${PROJECT_ID}}"
 FRONTEND_BASE_URL="${AUTH_FRONTEND_BASE_URL:-https://${FIREBASE_SITE}.web.app}"
 CORS_ALLOW_ORIGINS="${CORS_ALLOW_ORIGINS:-https://${FIREBASE_SITE}.web.app,https://${FIREBASE_SITE}.firebaseapp.com}"
 CURRENT_DATABASE_URL="$(get_current_env_var DATABASE_URL)"
+CURRENT_DATABASE_URL_SECRET="$(get_current_env_secret DATABASE_URL)"
 CURRENT_AUTH_ALLOWED_EMAIL_DOMAINS="$(get_current_env_var AUTH_ALLOWED_EMAIL_DOMAINS)"
 CURRENT_CLOUD_SQL_INSTANCE_CONNECTION="$(get_current_annotation run.googleapis.com/cloudsql-instances)"
 
 DATABASE_URL_INPUT="${DATABASE_URL:-}"
+DATABASE_URL_SECRET_NAME_INPUT="${DATABASE_URL_SECRET_NAME:-}"
 AUTH_ALLOWED_EMAIL_DOMAINS_INPUT="${AUTH_ALLOWED_EMAIL_DOMAINS:-}"
 CLOUD_SQL_INSTANCE_CONNECTION_INPUT="${CLOUD_SQL_INSTANCE_CONNECTION:-}"
 ALLOW_EPHEMERAL_DATABASE="${ALLOW_EPHEMERAL_DATABASE:-false}"
 
 DATABASE_URL="${DATABASE_URL_INPUT:-${CURRENT_DATABASE_URL:-}}"
+DATABASE_URL_SECRET_NAME="${DATABASE_URL_SECRET_NAME_INPUT:-${CURRENT_DATABASE_URL_SECRET:-}}"
 ES_HOST="${ES_HOST:-http://localhost:9200}"
 OCR_WORKER_URL="${OCR_WORKER_URL:-http://localhost:8100/ocr}"
 OCR_TIMEOUT_SECONDS="${OCR_TIMEOUT_SECONDS:-30}"
@@ -129,20 +163,33 @@ AUTH_ALLOWED_EMAIL_DOMAINS="${AUTH_ALLOWED_EMAIL_DOMAINS_INPUT:-${CURRENT_AUTH_A
 AUTH_EMAIL_DEBUG_LINK="${AUTH_EMAIL_DEBUG_LINK:-true}"
 CLOUD_SQL_INSTANCE_CONNECTION="${CLOUD_SQL_INSTANCE_CONNECTION_INPUT:-${CURRENT_CLOUD_SQL_INSTANCE_CONNECTION:-}}"
 
-if [[ -z "${DATABASE_URL}" ]]; then
-  echo "[ERROR] DATABASE_URL is required."
-  echo "[ACTION] Set DATABASE_URL to a persistent DB (recommended: Cloud SQL PostgreSQL)."
+if [[ -z "${DATABASE_URL_SECRET_NAME}" && -z "${DATABASE_URL}" ]]; then
+  echo "[ERROR] DATABASE_URL source is required."
+  echo "[ACTION] Set DATABASE_URL_SECRET_NAME (recommended) or DATABASE_URL."
+  echo "[EXAMPLE] DATABASE_URL_SECRET_NAME=sync-hub-database-url bash scripts/deploy_backend_cloudrun.sh"
   echo "[EXAMPLE] DATABASE_URL='postgresql+psycopg2://<user>:<pass>@/<db>?host=/cloudsql/<project>:<region>:<instance>' bash scripts/deploy_backend_cloudrun.sh"
   exit 3
 fi
 
-if [[ "${DATABASE_URL}" == sqlite:////tmp/* && "${ALLOW_EPHEMERAL_DATABASE}" != "true" ]]; then
+if [[ -z "${DATABASE_URL_SECRET_NAME}" && "${DATABASE_URL}" == sqlite:////tmp/* && "${ALLOW_EPHEMERAL_DATABASE}" != "true" ]]; then
   echo "[ERROR] Refusing ephemeral DATABASE_URL (${DATABASE_URL})."
-  echo "[ACTION] Use a persistent DB URL. To force ephemeral mode explicitly, set ALLOW_EPHEMERAL_DATABASE=true."
+  echo "[ACTION] Use DATABASE_URL_SECRET_NAME (recommended) or a persistent DATABASE_URL."
+  echo "[ACTION] To force ephemeral mode explicitly, set ALLOW_EPHEMERAL_DATABASE=true."
   exit 4
 fi
 
-ENV_VARS_ARG="^##^DATABASE_URL=${DATABASE_URL}##ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
+if [[ -n "${DATABASE_URL_SECRET_NAME}" ]]; then
+  if ! "${GCLOUD_BIN}" secrets describe "${DATABASE_URL_SECRET_NAME}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
+    echo "[ERROR] Secret not found: ${DATABASE_URL_SECRET_NAME}"
+    echo "[ACTION] Create the secret and add a DATABASE_URL value as latest version."
+    exit 5
+  fi
+fi
+
+ENV_VARS_ARG="^##^ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
+if [[ -z "${DATABASE_URL_SECRET_NAME}" ]]; then
+  ENV_VARS_ARG="^##^DATABASE_URL=${DATABASE_URL}##ES_HOST=${ES_HOST}##OCR_WORKER_URL=${OCR_WORKER_URL}##OCR_TIMEOUT_SECONDS=${OCR_TIMEOUT_SECONDS}##CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}##AUTH_FRONTEND_BASE_URL=${FRONTEND_BASE_URL}##AUTH_ALLOWED_EMAIL_DOMAINS=${AUTH_ALLOWED_EMAIL_DOMAINS}##AUTH_EMAIL_DEBUG_LINK=${AUTH_EMAIL_DEBUG_LINK}"
+fi
 
 BILLING_ENABLED="$("${GCLOUD_BIN}" beta billing projects describe "${PROJECT_ID}" --format='value(billingEnabled)' 2>/dev/null || echo false)"
 if [[ "${BILLING_ENABLED}" != "True" && "${BILLING_ENABLED}" != "true" ]]; then
@@ -166,8 +213,14 @@ echo "[INFO] Region: ${REGION}"
 echo "[INFO] Service: ${SERVICE_NAME}"
 echo "[INFO] Active account: ${ACTIVE_ACCOUNT}"
 echo "[INFO] Deploy mode: ${DEPLOY_MODE}"
-if [[ -z "${DATABASE_URL_INPUT}" && -n "${CURRENT_DATABASE_URL}" ]]; then
+if [[ -z "${DATABASE_URL_INPUT}" && -n "${CURRENT_DATABASE_URL}" && -z "${DATABASE_URL_SECRET_NAME}" ]]; then
   echo "[INFO] DATABASE_URL not provided; reusing current Cloud Run value."
+fi
+if [[ -z "${DATABASE_URL_SECRET_NAME_INPUT}" && -n "${CURRENT_DATABASE_URL_SECRET}" ]]; then
+  echo "[INFO] DATABASE_URL_SECRET_NAME not provided; reusing current Cloud Run secret reference."
+fi
+if [[ -n "${DATABASE_URL_SECRET_NAME}" ]]; then
+  echo "[INFO] DATABASE_URL source: Secret Manager (${DATABASE_URL_SECRET_NAME})"
 fi
 if [[ -z "${AUTH_ALLOWED_EMAIL_DOMAINS_INPUT}" && -n "${CURRENT_AUTH_ALLOWED_EMAIL_DOMAINS}" ]]; then
   echo "[INFO] AUTH_ALLOWED_EMAIL_DOMAINS not provided; reusing current Cloud Run value."
@@ -195,6 +248,9 @@ DEPLOY_ARGS=(
   --max-instances "${CLOUD_RUN_MAX_INSTANCES}"
   "--set-env-vars=${ENV_VARS_ARG}"
 )
+if [[ -n "${DATABASE_URL_SECRET_NAME}" ]]; then
+  DEPLOY_ARGS+=("--set-secrets=DATABASE_URL=${DATABASE_URL_SECRET_NAME}:latest")
+fi
 
 if [[ "${ALLOW_UNAUTHENTICATED}" == "true" ]]; then
   DEPLOY_ARGS+=(--allow-unauthenticated)

@@ -24,7 +24,8 @@ bash scripts/deploy_backend_cloudrun.sh
 - `CLOUD_RUN_SERVICE=sync-hub-backend`
 - `GCP_REGION=asia-northeast3`
 - `DEPLOY_MODE=image` (로컬 Docker build/push 후 Cloud Run 배포)
-- `DATABASE_URL`: 현재 Cloud Run 서비스의 `DATABASE_URL`을 우선 재사용. 값이 없으면 배포를 중단한다.
+- `DATABASE_URL_SECRET_NAME`: 현재 Cloud Run 서비스의 `DATABASE_URL` secret 참조를 우선 재사용
+- `DATABASE_URL`: secret 참조가 없을 때만 현재 Cloud Run 서비스 값을 재사용
 - `AUTH_ALLOWED_EMAIL_DOMAINS`: 현재 Cloud Run 서비스 값을 우선 재사용, 없을 때만 `gmail.com` 사용
 - `CLOUD_SQL_INSTANCE_CONNECTION`: 현재 Cloud Run의 Cloud SQL 바인딩을 우선 재사용
 - `CORS_ALLOW_ORIGINS=https://<site>.web.app,https://<site>.firebaseapp.com`
@@ -32,12 +33,25 @@ bash scripts/deploy_backend_cloudrun.sh
 안전장치:
 - 기본적으로 `/tmp` 기반 SQLite(`sqlite:////tmp/...`)는 배포 시 차단된다.
 - 반드시 임시 모드가 필요하면 `ALLOW_EPHEMERAL_DATABASE=true`를 명시해야 한다(운영 비권장).
+- `DATABASE_URL_SECRET_NAME`이 설정되면 Cloud Run `--set-secrets`로 배포하며, `DATABASE_URL` 평문 전달보다 우선한다.
+
+Secret Manager 준비 예시:
+
+```bash
+gcloud services enable secretmanager.googleapis.com
+gcloud secrets create sync-hub-database-url --replication-policy=automatic
+printf '%s' 'postgresql+psycopg2://<user>:<pass>@/<db>?host=/cloudsql/<project>:<region>:<instance>' \
+  | gcloud secrets versions add sync-hub-database-url --data-file=-
+gcloud secrets add-iam-policy-binding sync-hub-database-url \
+  --member='serviceAccount:<cloud-run-service-account>' \
+  --role='roles/secretmanager.secretAccessor'
+```
 
 옵션 예시:
 
 ```bash
 CLOUD_SQL_INSTANCE_CONNECTION='<project>:<region>:<instance>' \
-DATABASE_URL='postgresql+psycopg2://<user>:<pass>@/<db>?host=/cloudsql/<project>:<region>:<instance>' \
+DATABASE_URL_SECRET_NAME='sync-hub-database-url' \
 AUTH_ALLOWED_EMAIL_DOMAINS='gmail.com,company.com' \
 bash scripts/deploy_backend_cloudrun.sh
 ```

@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "sync-hub-yonghol-20260214",
+    "site": "sync-hub-49298",
     "public": "frontend/dist",
     "ignore": [
       "firebase.json",

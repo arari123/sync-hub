@@ -10,6 +10,14 @@ import UploadWidget from '../components/UploadWidget';
 
 const PAGE_SIZE = 10;
 
+function hasUsageMetrics(value) {
+    if (!value || typeof value !== 'object') return false;
+    const prompt = value.promptTokenCount;
+    const output = value.candidatesTokenCount;
+    const total = value.totalTokenCount;
+    return [prompt, output, total].some((item) => Number.isFinite(Number(item)));
+}
+
 function formatPageLabel(page) {
     if (typeof page !== 'number' || !Number.isFinite(page)) return '-';
     return `p.${page}`;
@@ -165,7 +173,7 @@ export default function DataHub() {
             setAiAgenda(response.data?.agenda && typeof response.data.agenda === 'object' ? response.data.agenda : null);
             setAiAnswer(String(response.data?.answer || ''));
             setAiSources(Array.isArray(response.data?.sources) ? response.data.sources : []);
-            setAiUsage(response.data?.usage || null);
+            setAiUsage(hasUsageMetrics(response.data?.usage) ? response.data.usage : null);
             setAiCacheHit(!!response.data?.cache_hit);
         } catch (err) {
             setError(getErrorMessage(err, 'AI 답변을 생성하지 못했습니다.'));
@@ -301,6 +309,11 @@ export default function DataHub() {
                                     검색 후 <span className="font-semibold text-foreground">AI 답변 생성</span>을 누르면, 검색 결과를 근거로 답변을 생성합니다.
                                 </p>
                             )}
+                            {aiMode === 'rag_no_context' ? (
+                                <p className="mt-2 text-[11px] text-muted-foreground">
+                                    근거 문서가 없어 AI 모델 호출을 생략했습니다. 문서를 업로드하거나 검색어를 더 구체화해 주세요.
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="space-y-2">

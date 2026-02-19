@@ -117,7 +117,7 @@ def _agenda_not_found_response(query: str) -> dict[str, Any]:
         "answer": "해당 안건 코드를 찾지 못했습니다. 코드가 정확한지 확인해 주세요.",
         "sources": [],
         "cache_hit": False,
-        "usage": {},
+        "usage": None,
     }
 
 
@@ -309,10 +309,11 @@ def ask_data_hub(
 
     if not contexts:
         return {
+            "mode": "rag_no_context",
             "answer": "관련 근거를 찾지 못했습니다. 검색어를 더 구체화해 주세요.",
             "sources": [],
             "cache_hit": False,
-            "usage": {},
+            "usage": None,
         }
 
     prompt = build_answer_prompt(query, contexts)
@@ -339,6 +340,7 @@ def ask_data_hub(
     ]
 
     response = {
+        "mode": "rag_answer",
         "answer": result.text or "AI 답변을 생성하지 못했습니다.",
         "sources": sources,
         "usage": result.usage,

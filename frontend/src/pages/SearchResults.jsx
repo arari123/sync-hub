@@ -18,7 +18,7 @@ import {
     User,
     Wrench,
 } from 'lucide-react';
-import { api, getErrorMessage } from '../lib/api';
+import { api, getErrorMessage, resolveApiAssetUrl } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 import { cn } from '../lib/utils';
 import {
@@ -1750,7 +1750,7 @@ const SearchResults = () => {
 	                                    const stageStyle = resolveStageStyle(project);
 	                                    const budget = resolveBudgetSnapshot(project);
 	                                    const projectOverview = String(project?.description || '').trim();
-	                                    const coverImage = project.cover_image_display_url || project.cover_image_fallback_url || '';
+	                                    const coverImage = resolveApiAssetUrl(project.cover_image_display_url || project.cover_image_fallback_url || '');
 	                                    const warrantyFallbackStart = createdAtYmd;
 	                                    const warrantyStart = String(scheduleStages?.warranty?.start || '').trim() || warrantyFallbackStart;
 	                                    const warrantyEnd = String(scheduleStages?.warranty?.end || '').trim()

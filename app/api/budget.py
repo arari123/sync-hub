@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import date, timedelta
 from typing import Any, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
@@ -131,6 +131,7 @@ _PROJECT_COVER_MIME_TO_EXTENSION = {
     "image/gif": ".gif",
 }
 _PROJECT_COVER_FILENAME_PATTERN = re.compile(r"^[a-f0-9]{32}\.(?:png|jpe?g|webp|gif)$")
+_PROJECT_COVER_ROUTE_PREFIX = "/budget/project-covers/"
 _UPLOADS_ROOT_ABS = os.path.abspath("uploads")
 
 
@@ -154,15 +155,72 @@ def _is_safe_project_cover_filename(stored_filename: str) -> bool:
 
 
 def _project_cover_public_url(stored_filename: str) -> str:
-    return f"/budget/project-covers/{stored_filename}"
+    return f"{_PROJECT_COVER_ROUTE_PREFIX}{stored_filename}"
+
+
+def _normalize_project_cover_public_url(raw_url: str) -> str:
+    raw = (raw_url or "").strip()
+    if not raw:
+        return ""
+
+    if raw.startswith(("http://", "https://")):
+        try:
+            parsed = urlparse(raw)
+            raw = parsed.path or ""
+            if parsed.query:
+                raw = f"{raw}?{parsed.query}"
+        except Exception:  # noqa: BLE001
+            return ""
+
+    if not raw.startswith(_PROJECT_COVER_ROUTE_PREFIX):
+        return ""
+
+    filename = raw[len(_PROJECT_COVER_ROUTE_PREFIX):].split("?", 1)[0].split("#", 1)[0].strip().lower()
+    if not _is_safe_project_cover_filename(filename):
+        return ""
+    return _project_cover_public_url(filename)
+
+
+def _normalize_project_cover_input_url(raw_url: str) -> str:
+    raw = (raw_url or "").strip()
+    if not raw:
+        return ""
+
+    lowered = raw.lower()
+    if lowered.startswith("data:image/"):
+        return raw
+
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        parsed = urlparse(raw)
+        if (parsed.path or "").startswith(_PROJECT_COVER_ROUTE_PREFIX):
+            return _normalize_project_cover_public_url(raw)
+        return raw
+
+    if raw.startswith(_PROJECT_COVER_ROUTE_PREFIX):
+        return _normalize_project_cover_public_url(raw)
+
+    return ""
+
+
+def _resolve_project_cover_urls(project: models.BudgetProject) -> tuple[str, str, str]:
+    custom_cover_image_url = _normalize_project_cover_input_url(project.cover_image_url or "")
+    generated_cover_image_url = _build_generated_cover_image(project)
+    cover_display_url = custom_cover_image_url or generated_cover_image_url
+
+    normalized_local_cover = _normalize_project_cover_public_url(custom_cover_image_url)
+    if normalized_local_cover:
+        file_path = _project_cover_storage_path_from_url(normalized_local_cover)
+        if not file_path or not os.path.isfile(file_path):
+            cover_display_url = generated_cover_image_url
+
+    return custom_cover_image_url, generated_cover_image_url, cover_display_url
 
 
 def _project_cover_storage_path_from_url(cover_image_url: str) -> str:
-    raw_url = (cover_image_url or "").strip()
-    prefix = "/budget/project-covers/"
-    if not raw_url.startswith(prefix):
+    normalized_url = _normalize_project_cover_public_url(cover_image_url)
+    if not normalized_url:
         return ""
-    filename = raw_url[len(prefix):].split("?", 1)[0].strip().lower()
+    filename = normalized_url[len(_PROJECT_COVER_ROUTE_PREFIX):].split("?", 1)[0].strip().lower()
     if not _is_safe_project_cover_filename(filename):
         return ""
 
@@ -1583,8 +1641,7 @@ def _serialize_projects_bulk(
         if project.created_by_user_id is not None:
             owner = user_map.get(int(project.created_by_user_id))
         manager_name = _user_display_name(manager, empty_label="담당자 미지정")
-        custom_cover_image_url = (project.cover_image_url or "").strip()
-        generated_cover_image_url = _build_generated_cover_image(project)
+        custom_cover_image_url, generated_cover_image_url, cover_display_url = _resolve_project_cover_urls(project)
         custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
         summary_milestones = custom_milestones or _build_default_milestones(project)
         parent_project_id = int(project.parent_project_id) if project.parent_project_id is not None else None
@@ -1606,7 +1663,7 @@ def _serialize_projects_bulk(
                 "business_trip_distance_km": to_number(project.business_trip_distance_km),
                 "cover_image_url": custom_cover_image_url,
                 "cover_image_fallback_url": generated_cover_image_url,
-                "cover_image_display_url": custom_cover_image_url or generated_cover_image_url,
+                "cover_image_display_url": cover_display_url,
                 "summary_milestones": summary_milestones,
                 "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
                 "current_stage": project.current_stage,
@@ -1739,8 +1796,7 @@ def _serialize_project(
     manager = _project_manager(project, db)
     owner = _project_owner(project, db)
     manager_name = _user_display_name(manager, empty_label="담당자 미지정")
-    custom_cover_image_url = (project.cover_image_url or "").strip()
-    generated_cover_image_url = _build_generated_cover_image(project)
+    custom_cover_image_url, generated_cover_image_url, cover_display_url = _resolve_project_cover_urls(project)
     custom_milestones = _parse_custom_milestones(project.summary_milestones_json)
     summary_milestones = custom_milestones or _build_default_milestones(project)
 
@@ -1779,7 +1835,7 @@ def _serialize_project(
         "business_trip_distance_km": to_number(project.business_trip_distance_km),
         "cover_image_url": custom_cover_image_url,
         "cover_image_fallback_url": generated_cover_image_url,
-        "cover_image_display_url": custom_cover_image_url or generated_cover_image_url,
+        "cover_image_display_url": cover_display_url,
         "summary_milestones": summary_milestones,
         "schedule_detail_note": "상세 일정 작성은 추후 구현 예정입니다.",
         "current_stage": project.current_stage,
@@ -2438,7 +2494,7 @@ def create_project(
 
     customer_name = (payload.customer_name or "").strip() or None
     installation_site = (payload.installation_site or "").strip() or None
-    cover_image_url = (payload.cover_image_url or "").strip() or None
+    cover_image_url = _normalize_project_cover_input_url(payload.cover_image_url or "") or None
     if project_type == "as" and parent_project is not None:
         if not customer_name:
             customer_name = (parent_project.customer_name or "").strip() or None
@@ -2592,7 +2648,7 @@ def update_project(
             changed = True
 
     if "cover_image_url" in fields_set:
-        cover_image_url = (payload.cover_image_url or "").strip() or None
+        cover_image_url = _normalize_project_cover_input_url(payload.cover_image_url or "") or None
         if cover_image_url != (project.cover_image_url or None):
             project.cover_image_url = cover_image_url
             changed = True

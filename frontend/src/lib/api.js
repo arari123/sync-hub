@@ -40,3 +40,16 @@ api.interceptors.response.use(
 export function getErrorMessage(error, fallbackMessage) {
     return error?.response?.data?.detail || fallbackMessage;
 }
+
+export function resolveApiAssetUrl(assetUrl) {
+    const raw = String(assetUrl || '').trim();
+    if (!raw) return '';
+    if (/^(data:|blob:|https?:\/\/)/i.test(raw)) return raw;
+
+    const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
+    try {
+        return new URL(normalizedPath, `${API_BASE_URL}/`).toString();
+    } catch (_error) {
+        return normalizedPath;
+    }
+}

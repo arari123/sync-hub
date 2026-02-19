@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import {
     Loader2,
 } from 'lucide-react';
-import { api, getErrorMessage } from '../lib/api';
+import { api, getErrorMessage, resolveApiAssetUrl } from '../lib/api';
 import { subscribeBudgetDataUpdated } from '../lib/budgetSync';
 import { cn } from '../lib/utils';
 import {
@@ -354,9 +354,9 @@ const BudgetProjectOverview = () => {
     const isPartsProject = projectTypeKey === 'parts';
     const useStartEndTimeline = isAsProject || isPartsProject;
     const parentProject = project?.parent_project || null;
-    const coverImageUrl = String(
+    const coverImageUrl = resolveApiAssetUrl(
         project?.cover_image_display_url || project?.cover_image_fallback_url || project?.cover_image_url || ''
-    ).trim();
+    );
 
     const executionRate = ratio(spentTotal, confirmedTotal);
     const materialRate = ratio(spentMaterial, Math.max(confirmedMaterial, 1));

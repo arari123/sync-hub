@@ -19,6 +19,7 @@
 - `scripts/`: 검증/유틸 스크립트
 - `uploads/`: 런타임 업로드 파일(문서/안건 첨부)
 - `reports/`: OCR/리포트 산출물
+  - `reports/generated/2026-02-19-executive/`: 경영진 보고용 PPT 생성 산출물(컨텍스트/스크린샷/PPTX)
 - `.agent/execplans/`: 작업 실행 계획 문서
 - `.firebase/`: Firebase 로컬 상태/캐시 파일
 
@@ -145,6 +146,9 @@
 - 디자인 토큰 린트: `scripts/lint_frontend_design_tokens.py`
 - 예산 목업 데이터 초기화: `scripts/reset_and_seed_budget_mock_data.py`
 - 데모 데이터 초기화/생성(프로젝트/안건/예산/일정): `scripts/reset_and_seed_demo_data.py`
+- 경영진 보고 컨텍스트 추출: `scripts/export_exec_report_context.py`
+- 웹페이지 자동 캡처(Playwright): `scripts/capture_frontend_screenshots.mjs`
+- 경영진 보고 PPT 생성: `scripts/generate_executive_report_ppt.py`
 - 안건 본문 장문화(로컬 데모 데이터): `scripts/expand_agenda_bodies.py`
 - 검색 E2E 스모크: `scripts/search_e2e_smoke.py`
 - OCR 품질/비교 리포트: `scripts/generate_ocr_quality_report.py`, `scripts/generate_ocr_comparison_report.py`

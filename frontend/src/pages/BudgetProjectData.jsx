@@ -827,26 +827,28 @@ export default function BudgetProjectData() {
                                         </div>
                                     </div>
 
-                                    <div className="w-full rounded-xl border border-border bg-background p-3.5">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-xs font-bold text-foreground">코멘트</p>
+                                    <div className="flex h-[96px] min-h-0 w-full flex-col rounded-xl border border-border bg-background p-2.5">
+                                        <div className="mb-1 flex items-center justify-between">
+                                            <p className="text-[11px] font-bold text-foreground">코멘트</p>
                                             <span className="text-[10px] font-semibold text-rose-600">필수</span>
                                         </div>
-                                        <textarea
-                                            value={uploadComment}
-                                            onChange={(event) => setUploadComment(event.target.value)}
-                                            className="mt-2 h-24 w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-xs text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
-                                            placeholder="업로드 목적이나 참고사항을 입력해 주세요."
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleUploadSubmit}
-                                            disabled={isUploading}
-                                            className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-                                            업로드
-                                        </button>
+                                        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_92px] gap-2">
+                                            <textarea
+                                                value={uploadComment}
+                                                onChange={(event) => setUploadComment(event.target.value)}
+                                                className="h-full w-full resize-none rounded-md border border-input bg-card px-2 py-1.5 text-[11px] text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
+                                                placeholder="업로드 코멘트 입력"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleUploadSubmit}
+                                                disabled={isUploading}
+                                                className="inline-flex h-full items-center justify-center gap-1.5 rounded-md border border-primary/80 bg-primary px-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
+                                                업로드
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

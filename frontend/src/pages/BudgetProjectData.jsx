@@ -711,7 +711,7 @@ export default function BudgetProjectData() {
             )}
 
             <section className="flex flex-col gap-4 lg:flex-row">
-                <aside className="rounded-2xl border border-border bg-card p-3 lg:w-80 lg:shrink-0 lg:self-start">
+                <aside className="rounded-2xl border border-border bg-card p-3 lg:w-72 lg:shrink-0 lg:self-start">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
                             <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>

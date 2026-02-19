@@ -121,6 +121,7 @@
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
   - `/documents/search` 응답에 문서 소속 `project_id`, `project_code`, `project_name` 포함
 - 데이터 허브(임시): `/data-hub/permissions`, `/data-hub/documents/upload`, `/data-hub/ask`
+  - 호스팅 경로 충돌 회피용 별칭: `/api/data-hub/permissions`, `/api/data-hub/documents/upload`, `/api/data-hub/ask`
 - 예산:
   - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT/DELETE /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
   - 프로젝트 커버: `POST /budget/project-covers/upload`, `GET /budget/project-covers/{stored_filename}`

@@ -73,7 +73,7 @@ export default function DataHub() {
     useEffect(() => {
         const loadPermissions = async () => {
             try {
-                const response = await api.get('/data-hub/permissions');
+                const response = await api.get('/api/data-hub/permissions');
                 setPermissions({
                     can_upload: !!response.data?.can_upload,
                     can_use_ai: !!response.data?.can_use_ai,
@@ -158,7 +158,7 @@ export default function DataHub() {
         setIsAsking(true);
         setError('');
         try {
-            const response = await api.post('/data-hub/ask', {
+            const response = await api.post('/api/data-hub/ask', {
                 q: searchQuery,
             });
             setAiMode(String(response.data?.mode || ''));
@@ -323,7 +323,7 @@ export default function DataHub() {
                 {permissions.can_upload ? (
                     <UploadWidget
                         title="데이터 허브 PDF 업로드"
-                        uploadEndpoint="/data-hub/documents/upload"
+                        uploadEndpoint="/api/data-hub/documents/upload"
                         allowedExtensions={['.pdf']}
                         accept=".pdf,application/pdf"
                         description="텍스트 PDF(카탈로그/데이터시트/메뉴얼)를 업로드하면 자동으로 인덱싱됩니다."

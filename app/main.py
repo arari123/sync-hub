@@ -45,6 +45,10 @@ app.include_router(auth.router)
 app.include_router(budget.router)
 app.include_router(agenda.router)
 app.include_router(data_hub.router)
+# NOTE:
+# - Hosting routes `/api/**` to backend, while `/data-hub` is a frontend page route.
+# - Expose Data Hub API under `/api/data-hub/**` as well to avoid route collision on hosting.
+app.include_router(data_hub.router, prefix="/api")
 app.include_router(project_data.router)
 app.include_router(admin_debug.router)
 app.include_router(admin_dedup.router)

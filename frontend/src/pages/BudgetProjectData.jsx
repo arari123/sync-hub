@@ -690,7 +690,7 @@ export default function BudgetProjectData() {
     }
 
     return (
-        <div className="space-y-5">
+        <div className="w-full space-y-5">
             <ProjectPageHeader
                 projectId={project?.id || projectId}
                 projectName={project?.name || '프로젝트'}
@@ -710,8 +710,8 @@ export default function BudgetProjectData() {
                 </div>
             )}
 
-            <section className="flex flex-col gap-4 lg:flex-row">
-                <aside className="rounded-2xl border border-border bg-card p-3 lg:w-72 lg:shrink-0 lg:self-start">
+            <section className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+                <aside className="rounded-2xl border border-border bg-card p-3">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
                             <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>
@@ -758,10 +758,9 @@ export default function BudgetProjectData() {
                     )}
                 </aside>
 
-                <div className="rounded-2xl border border-border bg-card lg:min-w-0 lg:flex-1">
+                <div className="rounded-2xl border border-border bg-card min-w-0">
                     <div className="border-b border-border p-4">
-                        <div className="overflow-x-auto">
-                            <div className="flex min-w-[860px] items-stretch gap-4">
+                        <div className="grid grid-cols-[minmax(0,1fr)_320px] items-stretch gap-4">
                             <div
                                 className={cn(
                                     'min-w-0 flex-1 rounded-xl border-2 border-dashed p-4 transition-colors',
@@ -840,13 +839,12 @@ export default function BudgetProjectData() {
                                     업로드
                                 </button>
                             </div>
-                            </div>
                         </div>
                     </div>
 
                     <div className="border-b border-border px-4 py-3">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                            <form className="flex w-full max-w-[640px] items-center gap-2" onSubmit={handleSearchSubmit}>
+                            <form className="flex w-full items-center gap-2 lg:max-w-[760px]" onSubmit={handleSearchSubmit}>
                                 <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
                                     <span className="inline-flex h-full w-9 shrink-0 items-center justify-center border-r border-border/70 text-muted-foreground">
                                         <Search className="h-4 w-4" />
@@ -881,7 +879,7 @@ export default function BudgetProjectData() {
                     </div>
 
                     <div className="overflow-hidden">
-                        <div className="grid grid-cols-[minmax(260px,1fr)_160px_170px_44px] border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold text-muted-foreground">
+                        <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold text-muted-foreground">
                             <span>파일</span>
                             <span>업로드한 사람</span>
                             <span>업로드 날짜</span>
@@ -907,7 +905,7 @@ export default function BudgetProjectData() {
                                             className="border-b border-border/70 px-4 py-2.5 text-xs text-foreground transition-colors hover:bg-secondary/40"
                                             onContextMenu={(event) => openFileContextMenu(event, item)}
                                         >
-                                            <div className="grid grid-cols-[minmax(260px,1fr)_160px_170px_44px] items-center">
+                                            <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] items-center">
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <FileIcon className={cn('h-4 w-4 shrink-0', fileIconClassName)} />
@@ -943,7 +941,7 @@ export default function BudgetProjectData() {
                                                 </div>
                                             </div>
 
-                                            <div className="mt-1.5 grid grid-cols-[minmax(260px,1fr)_160px_170px_44px]">
+                                            <div className="mt-1.5 grid grid-cols-[minmax(220px,1fr)_140px_150px_44px]">
                                                 <div className="min-w-0 pl-6 text-[11px] text-muted-foreground">
                                                     <p className="truncate">
                                                         코멘트: {String(item?.upload_comment || '').trim() || '-'}

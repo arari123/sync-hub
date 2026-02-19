@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import random
 import sys
 import uuid
@@ -27,7 +28,18 @@ from app import models
 from app.api import budget as budget_api
 from app.core.auth_utils import to_iso, utcnow
 from app.core.budget_logic import aggregate_equipment_costs_from_detail, detail_payload_to_json
+from app.core.document_summary import classify_document_types, serialize_document_types
 from app.database import SessionLocal, ensure_runtime_schema
+
+try:
+    from openpyxl import Workbook
+except Exception:  # noqa: BLE001
+    Workbook = None
+
+try:
+    from pypdf import PdfWriter
+except Exception:  # noqa: BLE001
+    PdfWriter = None
 
 
 @dataclass(frozen=True)
@@ -39,6 +51,89 @@ class ProjectPlan:
     description: str
     customer_name: str
     installation_site: str
+
+
+UPLOAD_DOCUMENTS_DIR = ROOT_DIR / "uploads" / "documents"
+
+
+def _slugify_text(value: str, fallback: str = "seed") -> str:
+    normalized = "".join(ch if (ch.isalnum() or ch in {"-", "_"}) else "-" for ch in str(value or "").strip())
+    normalized = "-".join(token for token in normalized.split("-") if token)
+    return normalized[:48] if normalized else fallback
+
+
+def _build_agenda_reply_body(
+    *,
+    rng: random.Random,
+    project_name: str,
+    agenda_title: str,
+    reply_no: int,
+) -> tuple[str, str]:
+    response_pool = [
+        "현장 재현 조건을 표준화해서 동일 조건 3회 검증 후 결과를 공유드리겠습니다.",
+        "알람 로그/센서 신호를 분리 수집해 원인 범위를 축소하겠습니다.",
+        "기구/전장/제어 항목을 구분해 단계별 체크리스트로 점검하겠습니다.",
+        "임시 조치 적용 후 안정화 추이를 모니터링하고 상수화 여부를 판단하겠습니다.",
+    ]
+    owner_pool = ["생산기술", "설비팀", "제어팀", "품질팀", "현장지원"]
+    due_days = rng.randint(1, 7)
+
+    lines = [
+        f"[답변 #{reply_no:02d}] {agenda_title}",
+        f"프로젝트: {project_name}",
+        f"조치 내용: {rng.choice(response_pool)}",
+        f"담당 조직: {rng.choice(owner_pool)}",
+        f"완료 예정: {due_days}일 이내",
+        f"추가 메모: {uuid.uuid4().hex[:8]}",
+    ]
+    plain = "\n".join(lines).strip()
+    rich = "<p>" + "<br/>".join(html.escape(line) for line in lines) + "</p>"
+    return plain, rich
+
+
+def _build_comment_body(*, rng: random.Random) -> str:
+    comments = [
+        "재현 로그 확인했습니다. 동일 증상 1건 추가 확인 필요합니다.",
+        "현장 작업 시간대(야간) 기준으로도 동일 동작 여부 확인 바랍니다.",
+        "임시 조치 적용 후 품질 지표(불량률/처리량) 공유 부탁드립니다.",
+        "작업 허가 및 안전 체크리스트 반영 후 진행 부탁드립니다.",
+        "협력사 부품 대체안 검토 결과도 함께 업데이트 바랍니다.",
+    ]
+    return f"{rng.choice(comments)} (ref:{uuid.uuid4().hex[:6]})"
+
+
+def _create_seed_pdf(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if PdfWriter is not None:
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        with path.open("wb") as file_obj:
+            writer.write(file_obj)
+        return
+
+    path.write_bytes(
+        b"%PDF-1.1\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+    )
+
+
+def _create_seed_xlsx(path: Path, *, title: str, project_code: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if Workbook is not None:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Summary"
+        sheet["A1"] = "Project Code"
+        sheet["B1"] = project_code
+        sheet["A2"] = "Title"
+        sheet["B2"] = title
+        sheet["A3"] = "Generated At"
+        sheet["B3"] = to_iso(utcnow())
+        workbook.save(path)
+        return
+
+    # openpyxl가 없으면 최소 포맷 검증용 샘플을 복사한다.
+    fallback = ROOT_DIR / "uploads" / "excel_report_01_hanbit_ljx8200.xlsx"
+    path.write_bytes(fallback.read_bytes())
 
 
 def _iso_from_date(day: date, *, hour: int = 9, minute: int = 0) -> str:
@@ -397,6 +492,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-count", type=int, default=30)
     parser.add_argument("--agendas-per-project", type=int, default=20)
+    parser.add_argument("--replies-per-thread", type=int, default=2)
+    parser.add_argument("--comments-per-thread", type=int, default=2)
+    parser.add_argument("--files-per-project", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260215)
     args = parser.parse_args()
 
@@ -425,6 +523,7 @@ def main() -> None:
                     agenda_attachments,
                     agenda_entries,
                     agenda_threads,
+                    document_folders,
                     budget_equipments,
                     budget_versions,
                     documents,
@@ -620,6 +719,11 @@ def main() -> None:
 
         created_equipment_project_ids: list[int] = []
         created_project_ids: list[int] = []
+        created_reply_entries = 0
+        created_comments = 0
+        created_folders = 0
+        created_documents = 0
+        UPLOAD_DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
         for plan in plans:
             kind = plan.project_type
@@ -719,8 +823,100 @@ def main() -> None:
                         sort_order=sort_order,
                         created_at=now_iso,
                         updated_at=now_iso,
+                        )
+                )
+
+            # Project data folders + demo files (pdf/xlsx)
+            folder_now_iso = to_iso(utcnow() - timedelta(days=rng.randint(0, 120)))
+            root_folder = models.DocumentFolder(
+                project_id=int(project.id),
+                parent_folder_id=None,
+                name="기본 폴더",
+                sort_order=0,
+                is_system_root=True,
+                created_by_user_id=int(creator.id),
+                created_at=folder_now_iso,
+                updated_at=folder_now_iso,
+            )
+            session.add(root_folder)
+            session.flush()
+            created_folders += 1
+
+            folder_names = ["설계자료", "회의록", "검수자료"]
+            child_folders: list[models.DocumentFolder] = []
+            for folder_index, folder_name in enumerate(folder_names, start=1):
+                child = models.DocumentFolder(
+                    project_id=int(project.id),
+                    parent_folder_id=int(root_folder.id),
+                    name=folder_name,
+                    sort_order=folder_index,
+                    is_system_root=False,
+                    created_by_user_id=int(creator.id),
+                    created_at=folder_now_iso,
+                    updated_at=folder_now_iso,
+                )
+                session.add(child)
+                child_folders.append(child)
+                created_folders += 1
+            session.flush()
+
+            files_per_project = max(2, int(args.files_per_project))
+            for file_index in range(files_per_project):
+                extension = ".pdf" if file_index % 2 == 0 else ".xlsx"
+                folder_target = child_folders[file_index % len(child_folders)] if child_folders else root_folder
+                folder_label = folder_target.name or "자료"
+                public_filename = f"{_slugify_text(plan.code)}_{_slugify_text(folder_label)}_{file_index + 1:02d}{extension}"
+                stored_filename = f"seed-{_slugify_text(plan.code)}-{uuid.uuid4().hex[:12]}{extension}"
+                relative_path = Path("uploads") / "documents" / stored_filename
+                absolute_path = ROOT_DIR / relative_path
+
+                if extension == ".pdf":
+                    _create_seed_pdf(absolute_path)
+                else:
+                    _create_seed_xlsx(
+                        absolute_path,
+                        title=f"{plan.name} {folder_label} 리포트",
+                        project_code=plan.code,
+                    )
+
+                doc_created_at = to_iso(utcnow() - timedelta(days=rng.randint(0, 120), hours=rng.randint(0, 12)))
+                content_text = "\n".join(
+                    [
+                        f"프로젝트 코드: {plan.code}",
+                        f"프로젝트 명: {plan.name}",
+                        f"자료 구분: {folder_label}",
+                        f"단계: {stage}",
+                        "데모 데이터 문서 본문입니다.",
+                    ]
+                )
+                doc_comment = rng.choice(
+                    [
+                        "초안 검토본입니다.",
+                        "고객 공유 전 내부 검토 필요.",
+                        "최종 승인본 업데이트 예정.",
+                        "현장 피드백 반영본입니다.",
+                    ]
+                )
+                doc_types = classify_document_types(public_filename, content_text)
+
+                session.add(
+                    models.Document(
+                        filename=public_filename,
+                        file_path=str(relative_path).replace(os.sep, "/"),
+                        status="completed",
+                        content_text=content_text,
+                        document_types=serialize_document_types(doc_types),
+                        ai_title=f"{plan.name} {folder_label} 자료",
+                        ai_summary_short=f"{plan.code} · {folder_label} 관련 데모 문서",
+                        created_at=doc_created_at,
+                        updated_at=doc_created_at,
+                        project_id=int(project.id),
+                        folder_id=int(folder_target.id),
+                        uploaded_by_user_id=int(creator.id),
+                        upload_comment=doc_comment,
                     )
                 )
+                created_documents += 1
 
             # Agenda threads + root entries.
             for agenda_index in range(int(args.agendas_per_project)):
@@ -789,11 +985,74 @@ def main() -> None:
                 session.add(root_entry)
                 session.flush()
 
+                try:
+                    base_dt = datetime.fromisoformat(str(thread_now))
+                except Exception:  # noqa: BLE001
+                    base_dt = utcnow()
+                if base_dt.tzinfo is None:
+                    base_dt = base_dt.replace(tzinfo=timezone.utc)
+
+                latest_entry_id = int(root_entry.id)
+                latest_dt = base_dt
+
+                replies_per_thread = max(0, int(args.replies_per_thread))
+                for reply_index in range(replies_per_thread):
+                    reply_dt = base_dt + timedelta(hours=reply_index + 1)
+                    reply_iso = to_iso(reply_dt)
+                    reply_plain, reply_html = _build_agenda_reply_body(
+                        rng=rng,
+                        project_name=plan.name,
+                        agenda_title=thread.title,
+                        reply_no=reply_index + 1,
+                    )
+                    reply_entry = models.AgendaEntry(
+                        thread_id=int(thread.id),
+                        project_id=int(project.id),
+                        parent_entry_id=int(root_entry.id),
+                        entry_kind="reply",
+                        record_status="published",
+                        created_by_user_id=int(creator.id),
+                        title=f"{thread.title} 답변 {reply_index + 1:02d}",
+                        content_html=reply_html,
+                        content_plain=reply_plain,
+                        requester_name=requester_name,
+                        requester_org=thread.requester_org,
+                        responder_name=responder_name,
+                        responder_org=thread.responder_org,
+                        entry_payload_json=json.dumps({}, ensure_ascii=False),
+                        attachment_count=0,
+                        created_at=reply_iso,
+                        published_at=reply_iso,
+                        updated_at=reply_iso,
+                    )
+                    session.add(reply_entry)
+                    session.flush()
+                    latest_entry_id = int(reply_entry.id)
+                    latest_dt = max(latest_dt, reply_dt)
+                    created_reply_entries += 1
+
+                comments_per_thread = max(0, int(args.comments_per_thread))
+                for comment_index in range(comments_per_thread):
+                    comment_dt = base_dt + timedelta(hours=replies_per_thread + comment_index + 1)
+                    comment_iso = to_iso(comment_dt)
+                    comment = models.AgendaComment(
+                        project_id=int(project.id),
+                        thread_id=int(thread.id),
+                        created_by_user_id=int(creator.id),
+                        body=_build_comment_body(rng=rng),
+                        created_at=comment_iso,
+                    )
+                    session.add(comment)
+                    latest_dt = max(latest_dt, comment_dt)
+                    created_comments += 1
+
                 thread.root_entry_id = int(root_entry.id)
-                thread.latest_entry_id = int(root_entry.id)
-                thread.reply_count = 0
-                thread.comment_count = 0
+                thread.latest_entry_id = latest_entry_id
+                thread.reply_count = replies_per_thread
+                thread.comment_count = comments_per_thread
                 thread.attachment_count = 0
+                thread.last_updated_at = to_iso(latest_dt)
+                thread.updated_at = to_iso(latest_dt)
 
         # Link AS projects to equipment parents (required business rule).
         if created_equipment_project_ids:
@@ -815,10 +1074,15 @@ def main() -> None:
         entry_total = _count(models.AgendaEntry)
         version_total = _count(models.BudgetVersion)
         equipment_total = _count(models.BudgetEquipment)
+        folder_total = _count(models.DocumentFolder)
+        document_total = _count(models.Document)
+        comment_total = _count(models.AgendaComment)
 
         print(f"[seed] projects={project_total}")
         print(f"[seed] agendas={agenda_total} (threads), entries={entry_total}")
+        print(f"[seed] replies={created_reply_entries}, comments={created_comments} (db:{comment_total})")
         print(f"[seed] versions={version_total}, equipments={equipment_total}")
+        print(f"[seed] data folders={folder_total}, documents={document_total} (created:{created_documents})")
         print(f"[seed] creator_user_id={int(creator.id)}")
     finally:
         session.close()

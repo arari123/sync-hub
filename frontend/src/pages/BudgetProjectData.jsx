@@ -810,18 +810,15 @@ export default function BudgetProjectData() {
                                             </div>
                                         </div>
                                         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                            <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
-                                                파일 선택
-                                                <input
+                                        <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
+                                            파일 선택
+                                            <input
                                                     type="file"
                                                     hidden
                                                     accept={ALLOWED_EXTENSIONS.join(',')}
                                                     onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
                                                 />
                                             </label>
-                                            <span className="rounded-md border border-border/80 bg-card/80 px-2 py-1 text-[11px] text-muted-foreground">
-                                                업로드 위치: {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
-                                            </span>
                                         </div>
                                     </div>
 
@@ -883,6 +880,12 @@ export default function BudgetProjectData() {
                                     <span>{isSearchMode ? `검색 결과 ${totalFiles}건` : `폴더 파일 ${totalFiles}건`}</span>
                                     <span>페이지 {filePage}/{totalPages}</span>
                                 </div>
+                            </div>
+                            <div className="mt-2.5 flex items-center gap-2 rounded-md border border-border/80 bg-card/70 px-3 py-2">
+                                <Folder className="h-4 w-4 text-primary" />
+                                <p className="min-w-0 truncate text-sm font-semibold text-foreground">
+                                    업로드 위치: {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
+                                </p>
                             </div>
                         </div>
 

@@ -2717,7 +2717,6 @@ def delete_project(
         .order_by(models.BudgetProject.id.asc())
         .all()
     )
-    project_by_id = {int(item.id): item for item in projects}
 
     for item in projects:
         _require_project_edit_permission(item, user)
@@ -2801,6 +2800,15 @@ def delete_project(
         .filter(models.BudgetVersion.project_id.in_(project_ids))
         .delete(synchronize_session=False)
     )
+
+    folder_ids = [
+        int(item.id)
+        for item in (
+            db.query(models.DocumentFolder.id)
+            .filter(models.DocumentFolder.project_id.in_(project_ids))
+            .all()
+        )
+    ]
 
     documents = (
         db.query(models.Document)
@@ -2902,11 +2910,34 @@ def delete_project(
                 )
             )
 
-    for target_project_id in reversed(project_ids):
-        item = project_by_id.get(int(target_project_id))
-        if item is None:
-            continue
-        db.delete(item)
+    if folder_ids:
+        (
+            db.query(models.DocumentFolder)
+            .filter(models.DocumentFolder.id.in_(folder_ids))
+            .update(
+                {models.DocumentFolder.parent_folder_id: None},
+                synchronize_session=False,
+            )
+        )
+        (
+            db.query(models.DocumentFolder)
+            .filter(models.DocumentFolder.id.in_(folder_ids))
+            .delete(synchronize_session=False)
+        )
+
+    (
+        db.query(models.BudgetProject)
+        .filter(models.BudgetProject.parent_project_id.in_(project_ids))
+        .update(
+            {models.BudgetProject.parent_project_id: None},
+            synchronize_session=False,
+        )
+    )
+    (
+        db.query(models.BudgetProject)
+        .filter(models.BudgetProject.id.in_(project_ids))
+        .delete(synchronize_session=False)
+    )
 
     db.commit()
 

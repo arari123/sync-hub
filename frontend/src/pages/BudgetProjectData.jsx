@@ -102,15 +102,6 @@ function normalizeFilename(filename) {
     return String(filename || '').trim();
 }
 
-function statusLabel(status) {
-    const value = String(status || '').trim().toLowerCase();
-    if (value === 'completed') return '완료';
-    if (value === 'processing') return '처리 중';
-    if (value === 'pending') return '대기';
-    if (value === 'failed') return '실패';
-    return value || '알 수 없음';
-}
-
 const MenuActionButton = ({ label, onClick, danger = false, icon = null, disabled = false }) => (
     <button
         type="button"
@@ -719,8 +710,8 @@ export default function BudgetProjectData() {
                 </div>
             )}
 
-            <section className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-                <aside className="rounded-2xl border border-border bg-card p-3">
+            <section className="flex flex-col gap-4 lg:flex-row">
+                <aside className="rounded-2xl border border-border bg-card p-3 lg:w-80 lg:shrink-0 lg:self-start">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
                             <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>
@@ -755,7 +746,7 @@ export default function BudgetProjectData() {
                             폴더를 불러오는 중입니다.
                         </div>
                     ) : (
-                        <div className="max-h-[680px] space-y-1 overflow-auto pr-1">
+                        <div className="max-h-[680px] space-y-1 overflow-auto pr-1 lg:max-h-[72vh]">
                             {folderTree.length ? (
                                 folderTree.map((node) => renderFolderNode(node, 0))
                             ) : (
@@ -767,13 +758,13 @@ export default function BudgetProjectData() {
                     )}
                 </aside>
 
-                <div className="rounded-2xl border border-border bg-card">
+                <div className="rounded-2xl border border-border bg-card lg:min-w-0 lg:flex-1">
                     <div className="border-b border-border p-4">
                         <div className="overflow-x-auto">
-                            <div className="grid min-w-[780px] grid-cols-[minmax(0,1fr)_320px] gap-4">
+                            <div className="flex min-w-[860px] items-stretch gap-4">
                             <div
                                 className={cn(
-                                    'rounded-xl border-2 border-dashed p-4 transition-colors',
+                                    'min-w-0 flex-1 rounded-xl border-2 border-dashed p-4 transition-colors',
                                     dragOverUpload ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'
                                 )}
                                 onDragOver={(event) => {
@@ -831,7 +822,7 @@ export default function BudgetProjectData() {
                                 </div>
                             </div>
 
-                            <div className="rounded-xl border border-border bg-background p-3">
+                            <div className="w-[320px] shrink-0 rounded-xl border border-border bg-background p-3">
                                 <p className="text-xs font-bold text-foreground">코멘트 (필수)</p>
                                 <textarea
                                     value={uploadComment}
@@ -856,13 +847,15 @@ export default function BudgetProjectData() {
                     <div className="border-b border-border px-4 py-3">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <form className="flex w-full max-w-[640px] items-center gap-2" onSubmit={handleSearchSubmit}>
-                                <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card px-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
-                                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
+                                    <span className="inline-flex h-full w-9 shrink-0 items-center justify-center border-r border-border/70 text-muted-foreground">
+                                        <Search className="h-4 w-4" />
+                                    </span>
                                     <input
                                         value={queryInput}
                                         onChange={(event) => setQueryInput(event.target.value)}
                                         placeholder="프로젝트 자료실 검색 (단어 매칭)"
-                                        className="h-full w-full border-0 bg-transparent px-2 text-sm text-foreground focus:outline-none"
+                                        className="h-full w-full border-0 bg-transparent px-2.5 text-sm text-foreground focus:outline-none"
                                     />
                                 </label>
                                 <button
@@ -955,24 +948,6 @@ export default function BudgetProjectData() {
                                                     <p className="truncate">
                                                         코멘트: {String(item?.upload_comment || '').trim() || '-'}
                                                     </p>
-                                                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                                                        <span>상태: {statusLabel(item?.status)}</span>
-                                                        {isSearchMode && (
-                                                            <span>폴더: {item?.folder_name || ROOT_FOLDER_LABEL}</span>
-                                                        )}
-                                                    </div>
-                                                    {searchQuery && Array.isArray(item?.matched_terms) && item.matched_terms.length > 0 && (
-                                                        <div className="mt-1 flex flex-wrap gap-1">
-                                                            {item.matched_terms.slice(0, 5).map((term) => (
-                                                                <span
-                                                                    key={`${item.doc_id}-${term}`}
-                                                                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                                                >
-                                                                    {term}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>

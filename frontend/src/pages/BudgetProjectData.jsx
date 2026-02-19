@@ -211,14 +211,17 @@ export default function BudgetProjectData() {
         }
     }, [projectId]);
 
-    const loadFiles = useCallback(async ({ folderId, query, page }) => {
+    const loadFiles = useCallback(async ({ folderId, query, page, silent = false }) => {
         if (!projectId) return;
         const normalizedFolderId = Number(folderId || 0);
         const normalizedQuery = String(query || '').trim();
         const normalizedPage = Math.max(1, Number(page || 1));
+        const isSilent = Boolean(silent);
         if (!normalizedFolderId) return;
 
-        setIsFileLoading(true);
+        if (!isSilent) {
+            setIsFileLoading(true);
+        }
         try {
             const params = {
                 folder_id: normalizedFolderId,
@@ -237,16 +240,20 @@ export default function BudgetProjectData() {
             setTotalFiles(Number(payload?.total || 0));
             setIsSearchMode(Boolean(payload?.search_mode));
         } catch (err) {
-            setError(getErrorMessage(err, '파일 목록을 불러오지 못했습니다.'));
+            if (!isSilent) {
+                setError(getErrorMessage(err, '파일 목록을 불러오지 못했습니다.'));
+            }
         } finally {
-            setIsFileLoading(false);
+            if (!isSilent) {
+                setIsFileLoading(false);
+            }
         }
     }, [projectId]);
 
-    const refreshCurrentFiles = useCallback(async ({ page = filePage, folderId = null } = {}) => {
+    const refreshCurrentFiles = useCallback(async ({ page = filePage, folderId = null, silent = false } = {}) => {
         const nextFolderId = Number(folderId || selectedFolderIdRef.current || rootFolderId || 0);
         if (!nextFolderId) return;
-        await loadFiles({ folderId: nextFolderId, query: searchQuery, page });
+        await loadFiles({ folderId: nextFolderId, query: searchQuery, page, silent });
     }, [filePage, loadFiles, rootFolderId, searchQuery]);
 
     useEffect(() => {
@@ -286,6 +293,7 @@ export default function BudgetProjectData() {
                 folderId: activeFolderId,
                 query: searchQuery,
                 page: filePage,
+                silent: true,
             });
         }, POLLING_INTERVAL_MS);
         return () => window.clearInterval(interval);

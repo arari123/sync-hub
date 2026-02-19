@@ -8,6 +8,7 @@ import uuid
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -470,6 +471,112 @@ def _apply_cluster_diversity(reranked_hits: list[dict], limit: int) -> list[dict
     return filtered
 
 
+def build_db_fallback_search_hits(
+    *,
+    db: Session,
+    query: str,
+    top_k: int,
+    project_id: int | None = None,
+) -> list[dict]:
+    """Return ES-like hits from DB when vector index is unavailable/empty."""
+    normalized_query = str(query or "").strip()
+    if not normalized_query:
+        return []
+
+    tokens = _tokenize_query(normalized_query)
+    search_terms = [normalized_query, *tokens[:8]]
+
+    conditions = []
+    for term in search_terms:
+        needle = str(term or "").strip()
+        if len(needle) < 2:
+            continue
+        pattern = f"%{needle}%"
+        conditions.extend(
+            [
+                models.Document.filename.ilike(pattern),
+                models.Document.ai_title.ilike(pattern),
+                models.Document.ai_summary_short.ilike(pattern),
+                models.Document.content_text.ilike(pattern),
+            ]
+        )
+
+    candidate_limit = max(int(top_k) * 6, 120)
+    query_builder = db.query(models.Document).filter(models.Document.status == "completed")
+    if project_id is not None:
+        query_builder = query_builder.filter(models.Document.project_id == int(project_id))
+    if conditions:
+        query_builder = query_builder.filter(or_(*conditions))
+
+    documents = (
+        query_builder
+        .order_by(models.Document.updated_at.desc(), models.Document.id.desc())
+        .limit(candidate_limit)
+        .all()
+    )
+
+    query_lower = normalized_query.lower()
+    fallback_hits: list[dict] = []
+    for doc in documents:
+        filename = _clean_display_text(doc.filename or "")
+        title = _clean_display_text(doc.ai_title or "")
+        summary = _clean_display_text(doc.ai_summary_short or "")
+        content = _clean_display_text(doc.content_text or "")
+        haystack = "\n".join(part for part in (filename, title, summary, content) if part).lower()
+        if not haystack:
+            continue
+
+        phrase_hits = haystack.count(query_lower) if query_lower else 0
+        matched_terms = [token for token in tokens if token.lower() in haystack]
+        token_frequency = sum(haystack.count(token.lower()) for token in tokens)
+        if phrase_hits == 0 and not matched_terms:
+            continue
+
+        score = (
+            phrase_hits * 2.2
+            + len(matched_terms) * 1.1
+            + min(token_frequency, 12) * 0.15
+            + (0.8 if query_lower and query_lower in title.lower() else 0.0)
+            + (0.6 if query_lower and query_lower in filename.lower() else 0.0)
+        )
+
+        fallback_hits.append(
+            {
+                "_id": f"db:{int(doc.id)}:0",
+                "_score": score,
+                "_source": {
+                    "doc_id": int(doc.id),
+                    "project_id": int(doc.project_id) if doc.project_id is not None else None,
+                    "chunk_id": 0,
+                    "chunk_index": 0,
+                    "page": None,
+                    "chunk_type": "document",
+                    "section_title": "",
+                    "quality_score": 0.0,
+                    "table_cell_refs": "",
+                    "table_layout": "",
+                    "chunk_schema_version": "db_fallback_v1",
+                    "embedding_model_name": "",
+                    "embedding_model_version": "",
+                    "dedup_status": doc.dedup_status or "unique",
+                    "dedup_primary_doc_id": doc.dedup_primary_doc_id,
+                    "dedup_cluster_id": doc.dedup_cluster_id,
+                    "dedup_is_primary": True,
+                    "document_types": parse_document_types(doc.document_types),
+                    "ai_title": title,
+                    "ai_summary_short": summary,
+                    "filename": filename,
+                    "content": content,
+                    "raw_text": content,
+                    "embedding": [],
+                },
+            }
+        )
+
+    fallback_hits.sort(key=lambda item: float(item.get("_score") or 0.0), reverse=True)
+    return fallback_hits[: max(1, int(top_k))]
+
+
 async def upload_document_impl(
     *,
     file: UploadFile,
@@ -625,6 +732,13 @@ def search_documents(
     results = vector_store.search(query, query_vector, top_k=candidate_limit)
     
     hits = results.get("hits", {}).get("hits", [])
+    if not hits:
+        hits = build_db_fallback_search_hits(
+            db=db,
+            query=query,
+            top_k=candidate_limit,
+            project_id=project_id,
+        )
     reranked_hits = _rerank_hits(hits, query)
     reranked_hits = _apply_cluster_diversity(reranked_hits, limit=max(candidate_limit, end_index))
 

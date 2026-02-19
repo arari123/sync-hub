@@ -26,7 +26,7 @@ from ..core.pipeline import EMBEDDING_BACKEND, model
 from ..core.vector_store import vector_store
 from ..database import get_db
 from .auth import get_current_admin_user, get_current_user
-from .documents import upload_document_impl
+from .documents import build_db_fallback_search_hits, upload_document_impl
 
 
 router = APIRouter(prefix="/data-hub", tags=["data-hub"])
@@ -285,6 +285,13 @@ def ask_data_hub(
     candidate_k = max(int(payload.top_k) * 6, 30)
     debug_payload = vector_store.debug_search(query, query_vector, top_k=candidate_k)
     fused_hits = debug_payload.get("fused_hits", []) or []
+    if not fused_hits:
+        fused_hits = build_db_fallback_search_hits(
+            db=db,
+            query=query,
+            top_k=candidate_k,
+            project_id=None,
+        )
 
     contexts = build_rag_context(
         fused_hits,

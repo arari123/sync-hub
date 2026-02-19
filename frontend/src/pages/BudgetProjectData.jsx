@@ -710,8 +710,8 @@ export default function BudgetProjectData() {
                 </div>
             )}
 
-            <section className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-                <aside className="rounded-2xl border border-border bg-card p-3">
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                <aside className="rounded-2xl border border-border bg-card p-3 md:col-span-3 lg:col-span-2">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
                             <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>
@@ -758,7 +758,7 @@ export default function BudgetProjectData() {
                     )}
                 </aside>
 
-                <div className="rounded-2xl border border-border bg-card min-w-0">
+                <div className="rounded-2xl border border-border bg-card min-w-0 md:col-span-9 lg:col-span-10">
                     <div className="border-b border-border p-4">
                         <div className="grid grid-cols-[minmax(0,1fr)_320px] items-stretch gap-4">
                             <div

@@ -1,7 +1,9 @@
 import unittest
 from types import SimpleNamespace
 
-from app.api.budget import _is_admin_user, _is_project_visible_to_user
+from fastapi import HTTPException
+
+from app.api.budget import _is_admin_user, _project_can_edit, _is_project_visible_to_user, _require_project_edit_permission
 
 
 class BudgetVisibilityTests(unittest.TestCase):
@@ -32,6 +34,14 @@ class BudgetVisibilityTests(unittest.TestCase):
         )
         self.assertTrue(visible)
 
+    def test_admin_can_edit_even_if_not_manager(self):
+        project = self._project(manager_user_id=999, current_stage='review')
+        self.assertTrue(_project_can_edit(project, self._user(user_id=2, email='admin@example.com')))
+
+    def test_admin_bypasses_require_project_edit_permission(self):
+        project = self._project(manager_user_id=999, current_stage='review')
+        _require_project_edit_permission(project, self._user(user_id=2, email='admin@example.com'))
+
     def test_non_admin_cannot_view_review_draft_if_not_manager(self):
         project = self._project(manager_user_id=999, current_stage='review')
         visible = _is_project_visible_to_user(
@@ -40,6 +50,11 @@ class BudgetVisibilityTests(unittest.TestCase):
             user=self._user(user_id=2, email='pm@example.com'),
         )
         self.assertFalse(visible)
+
+    def test_non_admin_require_project_edit_permission_raises(self):
+        project = self._project(manager_user_id=999, current_stage='review')
+        with self.assertRaises(HTTPException):
+            _require_project_edit_permission(project, self._user(user_id=2, email='pm@example.com'))
 
 
 if __name__ == '__main__':

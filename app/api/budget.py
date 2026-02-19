@@ -1384,6 +1384,8 @@ def _sort_project_payloads(projects: list[dict], sort_by: str) -> list[dict]:
 def _project_can_edit(project: models.BudgetProject, user: Optional[models.User]) -> bool:
     if not user:
         return False
+    if _is_admin_user(user):
+        return True
     manager_user_id = _project_manager_user_id(project)
     if manager_user_id is None:
         return True
@@ -1687,6 +1689,9 @@ def _serialize_projects_bulk(
 
 
 def _require_project_edit_permission(project: models.BudgetProject, user: models.User) -> None:
+    if _is_admin_user(user):
+        return
+
     if project.created_by_user_id is None:
         project.created_by_user_id = int(user.id)
     if project.manager_user_id is None:

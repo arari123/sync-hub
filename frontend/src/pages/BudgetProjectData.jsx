@@ -710,7 +710,8 @@ export default function BudgetProjectData() {
                 </div>
             )}
 
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-[240px_minmax(0,1fr)]">
+            <section className="overflow-x-auto">
+                <div className="grid min-w-[1200px] grid-cols-[240px_minmax(0,1fr)] items-start gap-4">
                 <aside className="rounded-2xl border border-border bg-card p-3">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
@@ -982,6 +983,7 @@ export default function BudgetProjectData() {
                             </button>
                         </div>
                     </div>
+                </div>
                 </div>
             </section>
 

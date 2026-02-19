@@ -3,6 +3,7 @@ import {
     ArrowRightLeft,
     ChevronDown,
     ChevronRight,
+    DraftingCompass,
     Download,
     Edit3,
     File,
@@ -14,6 +15,7 @@ import {
     FolderPlus,
     Loader2,
     MoreHorizontal,
+    Presentation,
     Search,
     Trash2,
     UploadCloud,
@@ -67,18 +69,27 @@ function formatDateTime(value) {
     }).format(parsed);
 }
 
-function resolveFileIcon(extension) {
+function resolveFileVisual(extension) {
     const ext = String(extension || '').trim().toLowerCase();
+    if (['.ppt', '.pptx'].includes(ext)) {
+        return { Icon: Presentation, className: 'text-orange-500' };
+    }
     if (['.xlsx', '.xlsm', '.xltx', '.xltm', '.csv'].includes(ext)) {
-        return FileSpreadsheet;
+        return { Icon: FileSpreadsheet, className: 'text-emerald-600' };
+    }
+    if (['.dwg', '.dxf'].includes(ext)) {
+        return { Icon: DraftingCompass, className: 'text-amber-600' };
     }
     if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) {
-        return FileArchive;
+        return { Icon: FileArchive, className: 'text-violet-600' };
     }
     if (ext === '.pdf') {
-        return FileText;
+        return { Icon: FileText, className: 'text-rose-600' };
     }
-    return File;
+    if (['.doc', '.docx'].includes(ext)) {
+        return { Icon: FileText, className: 'text-sky-600' };
+    }
+    return { Icon: File, className: 'text-muted-foreground' };
 }
 
 function isAllowedFile(file) {
@@ -708,7 +719,7 @@ export default function BudgetProjectData() {
                 </div>
             )}
 
-            <section className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <section className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
                 <aside className="rounded-2xl border border-border bg-card p-3">
                     <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
                         <div className="min-w-0">
@@ -758,7 +769,8 @@ export default function BudgetProjectData() {
 
                 <div className="rounded-2xl border border-border bg-card">
                     <div className="border-b border-border p-4">
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div className="overflow-x-auto">
+                            <div className="grid min-w-[780px] grid-cols-[minmax(0,1fr)_320px] gap-4">
                             <div
                                 className={cn(
                                     'rounded-xl border-2 border-dashed p-4 transition-colors',
@@ -837,19 +849,20 @@ export default function BudgetProjectData() {
                                     업로드
                                 </button>
                             </div>
+                            </div>
                         </div>
                     </div>
 
                     <div className="border-b border-border px-4 py-3">
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                             <form className="flex w-full max-w-[640px] items-center gap-2" onSubmit={handleSearchSubmit}>
-                                <label className="relative block flex-1">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card px-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
+                                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
                                     <input
                                         value={queryInput}
                                         onChange={(event) => setQueryInput(event.target.value)}
                                         placeholder="프로젝트 자료실 검색 (단어 매칭)"
-                                        className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-3 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
+                                        className="h-full w-full border-0 bg-transparent px-2 text-sm text-foreground focus:outline-none"
                                     />
                                 </label>
                                 <button
@@ -894,69 +907,73 @@ export default function BudgetProjectData() {
                         ) : (
                             <div>
                                 {files.map((item) => {
-                                    const FileIcon = resolveFileIcon(item?.extension);
+                                    const { Icon: FileIcon, className: fileIconClassName } = resolveFileVisual(item?.extension);
                                     return (
                                         <div
                                             key={item.doc_id}
-                                            className="grid grid-cols-[minmax(260px,1fr)_160px_170px_44px] items-center border-b border-border/70 px-4 py-2.5 text-xs text-foreground transition-colors hover:bg-secondary/40"
+                                            className="border-b border-border/70 px-4 py-2.5 text-xs text-foreground transition-colors hover:bg-secondary/40"
                                             onContextMenu={(event) => openFileContextMenu(event, item)}
                                         >
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <div className="grid grid-cols-[minmax(260px,1fr)_160px_170px_44px] items-center">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileIcon className={cn('h-4 w-4 shrink-0', fileIconClassName)} />
+                                                        <button
+                                                            type="button"
+                                                            className="truncate text-left text-[13px] font-semibold text-foreground hover:underline"
+                                                            onClick={() => handleDownloadFile(item)}
+                                                            title="파일 다운로드"
+                                                        >
+                                                            {item.filename || `문서 ${item.doc_id}`}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            onClick={() => handleDownloadFile(item)}
+                                                            title="다운로드"
+                                                        >
+                                                            <Download className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <span className="truncate text-[12px]">{item?.uploaded_by_name || '-'}</span>
+                                                <span className="text-[12px] text-muted-foreground">{formatDateTime(item?.created_at)}</span>
+                                                <div className="flex justify-end">
                                                     <button
                                                         type="button"
-                                                        className="truncate text-left text-[13px] font-semibold text-foreground hover:underline"
-                                                        onClick={() => handleDownloadFile(item)}
-                                                        title="파일 다운로드"
+                                                        className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        onClick={(event) => openContextMenuFromButton(event, 'file', item)}
+                                                        aria-label="파일 메뉴"
                                                     >
-                                                        {item.filename || `문서 ${item.doc_id}`}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                        onClick={() => handleDownloadFile(item)}
-                                                        title="다운로드"
-                                                    >
-                                                        <Download className="h-3.5 w-3.5" />
+                                                        <MoreHorizontal className="h-4 w-4" />
                                                     </button>
                                                 </div>
-                                                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                                    <span>상태: {statusLabel(item?.status)}</span>
-                                                    <span>확장자: {item?.extension || '-'}</span>
-                                                    {isSearchMode && (
-                                                        <span>폴더: {item?.folder_name || ROOT_FOLDER_LABEL}</span>
+                                            </div>
+
+                                            <div className="mt-1.5 grid grid-cols-[minmax(260px,1fr)_160px_170px_44px]">
+                                                <div className="min-w-0 pl-6 text-[11px] text-muted-foreground">
+                                                    <p className="truncate">
+                                                        코멘트: {String(item?.upload_comment || '').trim() || '-'}
+                                                    </p>
+                                                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                                        <span>상태: {statusLabel(item?.status)}</span>
+                                                        {isSearchMode && (
+                                                            <span>폴더: {item?.folder_name || ROOT_FOLDER_LABEL}</span>
+                                                        )}
+                                                    </div>
+                                                    {searchQuery && Array.isArray(item?.matched_terms) && item.matched_terms.length > 0 && (
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {item.matched_terms.slice(0, 5).map((term) => (
+                                                                <span
+                                                                    key={`${item.doc_id}-${term}`}
+                                                                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                                                >
+                                                                    {term}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {item?.upload_comment ? (
-                                                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                                        코멘트: {item.upload_comment}
-                                                    </p>
-                                                ) : null}
-                                                {searchQuery && Array.isArray(item?.matched_terms) && item.matched_terms.length > 0 && (
-                                                    <div className="mt-1 flex flex-wrap gap-1">
-                                                        {item.matched_terms.slice(0, 5).map((term) => (
-                                                            <span
-                                                                key={`${item.doc_id}-${term}`}
-                                                                className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                                                            >
-                                                                {term}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <span className="truncate text-[12px]">{item?.uploaded_by_name || '-'}</span>
-                                            <span className="text-[12px] text-muted-foreground">{formatDateTime(item?.created_at)}</span>
-                                            <div className="flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                    onClick={(event) => openContextMenuFromButton(event, 'file', item)}
-                                                    aria-label="파일 메뉴"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </button>
                                             </div>
                                         </div>
                                     );

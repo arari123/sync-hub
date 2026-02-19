@@ -31,6 +31,23 @@
 - 따라서 로그인 세션(localStorage)은 포트별로 분리된다.
 - 운영 확인 기준 URL은 `http://localhost:8000`으로 통일한다.
 
+## 프론트 반영 검증 체크리스트(재발 방지)
+- UI 검증 URL은 반드시 `http://localhost:8000` 기준으로 확인한다.
+  - `http://localhost:8001`은 API 서버이며, 화면 확인 대상이 아니다.
+- 데이터 관리 페이지 확인 경로:
+  - `http://localhost:8000/project-management/projects/{projectId}/data`
+- 코드 수정 후 브라우저 강력 새로고침(`Ctrl+Shift+R`) 전에 런타임 반영 여부를 먼저 확인한다.
+  - 예시: `curl -s http://localhost:8000/src/pages/BudgetProjectData.jsx | rg "BudgetProjectData|min-w-\\[1200px\\]"`
+- 반영이 의심될 때는 아래 순서로 고정 점검한다.
+  1. `bash scripts/start_localhost.sh`
+  2. `docker restart synchub_frontend`
+  3. `curl -s http://localhost:8000 | head -n 20`으로 Vite HTML 응답 확인
+  4. `curl -s http://localhost:8001`이 API JSON(`Welcome to Sync-Hub API`)인지 확인
+- 데이터 관리 페이지 레이아웃 회귀 기준:
+  - 폴더 트리는 좌측 패널에 유지되어야 한다.
+  - 우측 파일 패널은 우측에 유지되어야 한다.
+  - 좁은 뷰포트에서는 상하 전환 대신 가로 스크롤로 동작해야 한다.
+
 ## 수동 복구(자동 복구로 해결되지 않을 때)
 1. 웹 관련 컨테이너 중지:
    - `docker-compose stop web frontend`

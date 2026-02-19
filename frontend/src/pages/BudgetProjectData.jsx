@@ -762,10 +762,10 @@ export default function BudgetProjectData() {
                     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card min-w-0">
                         <div className="border-b border-border p-4">
                             <div className="overflow-x-auto">
-                                <div className="grid min-w-[860px] grid-cols-[minmax(0,3fr)_minmax(360px,4fr)] items-stretch gap-4">
+                                <div className="grid min-w-[860px] grid-cols-[minmax(0,3fr)_minmax(360px,4fr)] items-start gap-4">
                                     <div
                                         className={cn(
-                                            'min-w-0 rounded-xl border-2 border-dashed px-3 py-2.5 transition-colors',
+                                            'min-w-0 h-[96px] rounded-xl border-2 border-dashed px-3 py-2 transition-colors',
                                             dragOverUpload ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'
                                         )}
                                         onDragOver={(event) => {
@@ -780,45 +780,50 @@ export default function BudgetProjectData() {
                                             if (nextFile) setUploadFile(nextFile);
                                         }}
                                     >
-                                        <div className="flex items-start gap-2.5">
-                                            <div className="mt-0.5 rounded-md bg-primary/10 p-1.5 text-primary">
-                                                <UploadCloud className="h-4 w-4" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-1.5">
-                                                    <p className="text-[13px] font-bold leading-none text-foreground">파일 업로드</p>
-                                                    <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                                        {ALLOWED_EXTENSIONS.join(', ')}
-                                                    </span>
+                                        <div className="flex h-full items-center justify-between gap-2.5">
+                                            <div className="min-w-0 flex items-center gap-2.5">
+                                                <div className="rounded-md bg-primary/10 p-1.5 text-primary">
+                                                    <UploadCloud className="h-4 w-4" />
                                                 </div>
-                                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                                    드래그 앤 드롭 또는 파일 선택으로 업로드하세요.
-                                                </p>
-                                                {uploadFile && (
-                                                    <div className="mt-2 flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5 text-xs">
-                                                        <span className="truncate pr-2">{uploadFile.name}</span>
-                                                        <button
-                                                            type="button"
-                                                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                            onClick={() => setUploadFile(null)}
-                                                            aria-label="선택 파일 제거"
-                                                        >
-                                                            <X className="h-3.5 w-3.5" />
-                                                        </button>
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <p className="text-[13px] font-bold leading-none text-foreground">파일 업로드</p>
+                                                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                                            {ALLOWED_EXTENSIONS.join(', ')}
+                                                        </span>
                                                     </div>
-                                                )}
+                                                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                                                        드래그 앤 드롭 또는 파일 선택
+                                                    </p>
+                                                    {uploadFile && (
+                                                        <p className="mt-0.5 truncate text-[11px] font-semibold text-foreground">
+                                                            {uploadFile.name}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                        <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
-                                            파일 선택
-                                            <input
-                                                    type="file"
-                                                    hidden
-                                                    accept={ALLOWED_EXTENSIONS.join(',')}
-                                                    onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-                                                />
-                                            </label>
+
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                {uploadFile && (
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex h-7 w-7 items-center justify-center rounded border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        onClick={() => setUploadFile(null)}
+                                                        aria-label="선택 파일 제거"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                                <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
+                                                    파일 선택
+                                                    <input
+                                                        type="file"
+                                                        hidden
+                                                        accept={ALLOWED_EXTENSIONS.join(',')}
+                                                        onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                                                    />
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
 

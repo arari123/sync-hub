@@ -711,279 +711,284 @@ export default function BudgetProjectData() {
             )}
 
             <section className="overflow-x-auto">
-                <div className="grid min-w-[1200px] grid-cols-[240px_minmax(0,1fr)] items-start gap-4">
-                <aside className="rounded-2xl border border-border bg-card p-3">
-                    <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
-                        <div className="min-w-0">
-                            <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>
-                            <p className="truncate text-[11px] text-muted-foreground">
-                                현재 선택: {selectedFolder?.name || ROOT_FOLDER_LABEL}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                                onClick={() => handleCreateFolder()}
-                                title="선택 폴더 하위 폴더 만들기"
-                            >
-                                <FolderPlus className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                onClick={() => handleDeleteFolder(selectedFolder)}
-                                title="선택 폴더 삭제"
-                                disabled={!selectedFolder || Boolean(selectedFolder?.is_system_root)}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {isFolderLoading ? (
-                        <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-8 text-xs text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            폴더를 불러오는 중입니다.
-                        </div>
-                    ) : (
-                        <div className="max-h-[680px] space-y-1 overflow-auto pr-1 lg:max-h-[72vh]">
-                            {folderTree.length ? (
-                                folderTree.map((node) => renderFolderNode(node, 0))
-                            ) : (
-                                <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-xs text-muted-foreground">
-                                    폴더가 없습니다.
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </aside>
-
-                <div className="rounded-2xl border border-border bg-card min-w-0">
-                    <div className="border-b border-border p-4">
-                        <div className="overflow-x-auto">
-                            <div className="grid min-w-[720px] grid-cols-[minmax(0,1fr)_minmax(260px,320px)] items-stretch gap-4">
-                                <div
-                                    className={cn(
-                                        'min-w-0 flex-1 rounded-xl border-2 border-dashed p-4 transition-colors',
-                                        dragOverUpload ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'
-                                    )}
-                                    onDragOver={(event) => {
-                                        event.preventDefault();
-                                        setDragOverUpload(true);
-                                    }}
-                                    onDragLeave={() => setDragOverUpload(false)}
-                                    onDrop={(event) => {
-                                        event.preventDefault();
-                                        setDragOverUpload(false);
-                                        const nextFile = event.dataTransfer?.files?.[0];
-                                        if (nextFile) setUploadFile(nextFile);
-                                    }}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">
-                                            <UploadCloud className="h-4 w-4" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold text-foreground">파일 업로드</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                파일을 드래그하거나 선택해서 업로드하세요.
-                                            </p>
-                                            <p className="mt-1 text-[11px] text-muted-foreground">
-                                                허용 형식: {ALLOWED_EXTENSIONS.join(', ')}
-                                            </p>
-                                            {uploadFile && (
-                                                <div className="mt-2 flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5 text-xs">
-                                                    <span className="truncate pr-2">{uploadFile.name}</span>
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                        onClick={() => setUploadFile(null)}
-                                                        aria-label="선택 파일 제거"
-                                                    >
-                                                        <X className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
-                                            파일 선택
-                                            <input
-                                                type="file"
-                                                hidden
-                                                accept={ALLOWED_EXTENSIONS.join(',')}
-                                                onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-                                            />
-                                        </label>
-                                        <span className="text-[11px] text-muted-foreground">
-                                            업로드 위치: {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="w-full rounded-xl border border-border bg-background p-3">
-                                    <p className="text-xs font-bold text-foreground">코멘트 (필수)</p>
-                                    <textarea
-                                        value={uploadComment}
-                                        onChange={(event) => setUploadComment(event.target.value)}
-                                        className="mt-2 h-28 w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-xs text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
-                                        placeholder="업로드 목적이나 참고사항을 입력해 주세요."
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleUploadSubmit}
-                                        disabled={isUploading}
-                                        className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-                                        업로드
-                                    </button>
-                                </div>
+                <div className="grid min-w-[1240px] grid-cols-[260px_minmax(0,1fr)] items-stretch gap-4">
+                    <aside className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card p-3">
+                        <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+                            <div className="min-w-0">
+                                <p className="text-xs font-extrabold tracking-tight text-foreground">폴더 트리</p>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                    현재 선택: {selectedFolder?.name || ROOT_FOLDER_LABEL}
+                                </p>
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="border-b border-border px-4 py-3">
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                            <form className="flex w-full items-center gap-2 lg:max-w-[760px]" onSubmit={handleSearchSubmit}>
-                                <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
-                                    <span className="inline-flex h-full w-9 shrink-0 items-center justify-center border-r border-border/70 text-muted-foreground">
-                                        <Search className="h-4 w-4" />
-                                    </span>
-                                    <input
-                                        value={queryInput}
-                                        onChange={(event) => setQueryInput(event.target.value)}
-                                        placeholder="프로젝트 자료실 검색 (단어 매칭)"
-                                        className="h-full w-full border-0 bg-transparent px-2.5 text-sm text-foreground focus:outline-none"
-                                    />
-                                </label>
+                            <div className="flex items-center gap-1">
                                 <button
-                                    type="submit"
-                                    className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+                                    type="button"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                    onClick={() => handleCreateFolder()}
+                                    title="선택 폴더 하위 폴더 만들기"
                                 >
-                                    검색
+                                    <FolderPlus className="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={clearSearch}
-                                    className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                    onClick={() => handleDeleteFolder(selectedFolder)}
+                                    title="선택 폴더 삭제"
+                                    disabled={!selectedFolder || Boolean(selectedFolder?.is_system_root)}
                                 >
-                                    초기화
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
-                            </form>
-
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span>{isSearchMode ? `검색 결과 ${totalFiles}건` : `폴더 파일 ${totalFiles}건`}</span>
-                                <span>페이지 {filePage}/{totalPages}</span>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="overflow-x-auto">
-                        <div className="min-w-[680px]">
-                            <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold text-muted-foreground">
-                                <span>파일</span>
-                                <span>업로드한 사람</span>
-                                <span>업로드 날짜</span>
-                                <span className="text-right">메뉴</span>
+                        {isFolderLoading ? (
+                            <div className="flex min-h-[180px] flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-8 text-xs text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                폴더를 불러오는 중입니다.
                             </div>
+                        ) : (
+                            <div className="min-h-0 flex-1 space-y-1 overflow-auto pr-1">
+                                {folderTree.length ? (
+                                    folderTree.map((node) => renderFolderNode(node, 0))
+                                ) : (
+                                    <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-xs text-muted-foreground">
+                                        폴더가 없습니다.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </aside>
 
-                            {isFileLoading ? (
-                                <div className="flex items-center justify-center gap-2 px-4 py-14 text-sm text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    파일 목록을 불러오는 중입니다.
+                    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border bg-card min-w-0">
+                        <div className="border-b border-border p-4">
+                            <div className="overflow-x-auto">
+                                <div className="grid min-w-[860px] grid-cols-[minmax(0,3fr)_minmax(360px,4fr)] items-stretch gap-4">
+                                    <div
+                                        className={cn(
+                                            'min-w-0 rounded-xl border-2 border-dashed px-3 py-2.5 transition-colors',
+                                            dragOverUpload ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'
+                                        )}
+                                        onDragOver={(event) => {
+                                            event.preventDefault();
+                                            setDragOverUpload(true);
+                                        }}
+                                        onDragLeave={() => setDragOverUpload(false)}
+                                        onDrop={(event) => {
+                                            event.preventDefault();
+                                            setDragOverUpload(false);
+                                            const nextFile = event.dataTransfer?.files?.[0];
+                                            if (nextFile) setUploadFile(nextFile);
+                                        }}
+                                    >
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="mt-0.5 rounded-md bg-primary/10 p-1.5 text-primary">
+                                                <UploadCloud className="h-4 w-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <p className="text-[13px] font-bold leading-none text-foreground">파일 업로드</p>
+                                                    <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                                        {ALLOWED_EXTENSIONS.join(', ')}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                                    드래그 앤 드롭 또는 파일 선택으로 업로드하세요.
+                                                </p>
+                                                {uploadFile && (
+                                                    <div className="mt-2 flex items-center justify-between rounded-md border border-border bg-card px-2 py-1.5 text-xs">
+                                                        <span className="truncate pr-2">{uploadFile.name}</span>
+                                                        <button
+                                                            type="button"
+                                                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            onClick={() => setUploadFile(null)}
+                                                            aria-label="선택 파일 제거"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                            <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary">
+                                                파일 선택
+                                                <input
+                                                    type="file"
+                                                    hidden
+                                                    accept={ALLOWED_EXTENSIONS.join(',')}
+                                                    onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                                                />
+                                            </label>
+                                            <span className="rounded-md border border-border/80 bg-card/80 px-2 py-1 text-[11px] text-muted-foreground">
+                                                업로드 위치: {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full rounded-xl border border-border bg-background p-3.5">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs font-bold text-foreground">코멘트</p>
+                                            <span className="text-[10px] font-semibold text-rose-600">필수</span>
+                                        </div>
+                                        <textarea
+                                            value={uploadComment}
+                                            onChange={(event) => setUploadComment(event.target.value)}
+                                            className="mt-2 h-24 w-full resize-none rounded-md border border-input bg-card px-3 py-2 text-xs text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
+                                            placeholder="업로드 목적이나 참고사항을 입력해 주세요."
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleUploadSubmit}
+                                            disabled={isUploading}
+                                            className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-primary/80 bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                                            업로드
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : files.length === 0 ? (
-                                <div className="px-4 py-14 text-center text-sm text-muted-foreground">
-                                    {searchQuery ? '검색 결과가 없습니다.' : '이 폴더에는 파일이 없습니다.'}
+                            </div>
+                        </div>
+
+                        <div className="border-b border-border px-4 py-3">
+                            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                                <form className="flex w-full items-center gap-2 lg:max-w-[760px]" onSubmit={handleSearchSubmit}>
+                                    <label className="flex h-9 flex-1 items-center rounded-md border border-input bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring/30">
+                                        <span className="inline-flex h-full w-9 shrink-0 items-center justify-center border-r border-border/70 text-muted-foreground">
+                                            <Search className="h-4 w-4" />
+                                        </span>
+                                        <input
+                                            value={queryInput}
+                                            onChange={(event) => setQueryInput(event.target.value)}
+                                            placeholder="프로젝트 자료실 검색 (단어 매칭)"
+                                            className="h-full w-full border-0 bg-transparent px-2.5 text-sm text-foreground focus:outline-none"
+                                        />
+                                    </label>
+                                    <button
+                                        type="submit"
+                                        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+                                    >
+                                        검색
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                    >
+                                        초기화
+                                    </button>
+                                </form>
+
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{isSearchMode ? `검색 결과 ${totalFiles}건` : `폴더 파일 ${totalFiles}건`}</span>
+                                    <span>페이지 {filePage}/{totalPages}</span>
                                 </div>
-                            ) : (
-                                <div>
-                                    {files.map((item) => {
-                                        const { Icon: FileIcon, className: fileIconClassName } = resolveFileVisual(item?.extension);
-                                        return (
-                                            <div
-                                                key={item.doc_id}
-                                                className="border-b border-border/70 px-4 py-2.5 text-xs text-foreground transition-colors hover:bg-secondary/40"
-                                                onContextMenu={(event) => openFileContextMenu(event, item)}
-                                            >
-                                                <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] items-center">
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <FileIcon className={cn('h-4 w-4 shrink-0', fileIconClassName)} />
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <div className="min-w-[680px]">
+                                <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold text-muted-foreground">
+                                    <span>파일</span>
+                                    <span>업로드한 사람</span>
+                                    <span>업로드 날짜</span>
+                                    <span className="text-right">메뉴</span>
+                                </div>
+
+                                {isFileLoading ? (
+                                    <div className="flex items-center justify-center gap-2 px-4 py-14 text-sm text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        파일 목록을 불러오는 중입니다.
+                                    </div>
+                                ) : files.length === 0 ? (
+                                    <div className="px-4 py-14 text-center text-sm text-muted-foreground">
+                                        {searchQuery ? '검색 결과가 없습니다.' : '이 폴더에는 파일이 없습니다.'}
+                                    </div>
+                                ) : (
+                                    <div>
+                                        {files.map((item) => {
+                                            const { Icon: FileIcon, className: fileIconClassName } = resolveFileVisual(item?.extension);
+                                            return (
+                                                <div
+                                                    key={item.doc_id}
+                                                    className="border-b border-border/70 px-4 py-2.5 text-xs text-foreground transition-colors hover:bg-secondary/40"
+                                                    onContextMenu={(event) => openFileContextMenu(event, item)}
+                                                >
+                                                    <div className="grid grid-cols-[minmax(220px,1fr)_140px_150px_44px] items-center">
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <FileIcon className={cn('h-4 w-4 shrink-0', fileIconClassName)} />
+                                                                <button
+                                                                    type="button"
+                                                                    className="truncate text-left text-[13px] font-semibold text-foreground hover:underline"
+                                                                    onClick={() => handleDownloadFile(item)}
+                                                                    title="파일 다운로드"
+                                                                >
+                                                                    {item.filename || `문서 ${item.doc_id}`}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                                    onClick={() => handleDownloadFile(item)}
+                                                                    title="다운로드"
+                                                                >
+                                                                    <Download className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <span className="truncate text-[12px]">{item?.uploaded_by_name || '-'}</span>
+                                                        <span className="text-[12px] text-muted-foreground">{formatDateTime(item?.created_at)}</span>
+                                                        <div className="flex justify-end">
                                                             <button
                                                                 type="button"
-                                                                className="truncate text-left text-[13px] font-semibold text-foreground hover:underline"
-                                                                onClick={() => handleDownloadFile(item)}
-                                                                title="파일 다운로드"
+                                                                className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                onClick={(event) => openContextMenuFromButton(event, 'file', item)}
+                                                                aria-label="파일 메뉴"
                                                             >
-                                                                {item.filename || `문서 ${item.doc_id}`}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                                onClick={() => handleDownloadFile(item)}
-                                                                title="다운로드"
-                                                            >
-                                                                <Download className="h-3.5 w-3.5" />
+                                                                <MoreHorizontal className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <span className="truncate text-[12px]">{item?.uploaded_by_name || '-'}</span>
-                                                    <span className="text-[12px] text-muted-foreground">{formatDateTime(item?.created_at)}</span>
-                                                    <div className="flex justify-end">
-                                                        <button
-                                                            type="button"
-                                                            className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                            onClick={(event) => openContextMenuFromButton(event, 'file', item)}
-                                                            aria-label="파일 메뉴"
-                                                        >
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </button>
+
+                                                    <div className="mt-1.5 grid grid-cols-[minmax(220px,1fr)_140px_150px_44px]">
+                                                        <div className="min-w-0 pl-6 text-[11px] text-muted-foreground">
+                                                            <p className="truncate">
+                                                                코멘트: {String(item?.upload_comment || '').trim() || '-'}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-                                                <div className="mt-1.5 grid grid-cols-[minmax(220px,1fr)_140px_150px_44px]">
-                                                    <div className="min-w-0 pl-6 text-[11px] text-muted-foreground">
-                                                        <p className="truncate">
-                                                            코멘트: {String(item?.upload_comment || '').trim() || '-'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs">
+                            <span className="text-muted-foreground">
+                                {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setFilePage((prev) => Math.max(1, prev - 1))}
+                                    disabled={filePage <= 1 || isFileLoading}
+                                    className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    이전
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFilePage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={filePage >= totalPages || isFileLoading}
+                                    className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    다음
+                                </button>
+                            </div>
                         </div>
                     </div>
-
-                    <div className="flex items-center justify-between border-t border-border px-4 py-3 text-xs">
-                        <span className="text-muted-foreground">
-                            {selectedFolder?.pathLabel || selectedFolder?.name || ROOT_FOLDER_LABEL}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setFilePage((prev) => Math.max(1, prev - 1))}
-                                disabled={filePage <= 1 || isFileLoading}
-                                className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                이전
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setFilePage((prev) => Math.min(totalPages, prev + 1))}
-                                disabled={filePage >= totalPages || isFileLoading}
-                                className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-semibold text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                다음
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 </div>
             </section>
 

@@ -26,7 +26,7 @@ from ..core.pipeline import EMBEDDING_BACKEND, model
 from ..core.vector_store import vector_store
 from ..database import get_db
 from .auth import get_current_admin_user, get_current_user
-from .documents import upload_document as upload_document_impl
+from .documents import upload_document_impl
 
 
 router = APIRouter(prefix="/data-hub", tags=["data-hub"])
@@ -87,12 +87,16 @@ def get_permissions(user: models.User = Depends(get_current_user)) -> dict[str, 
 async def upload_data_hub_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_admin_user),
+    user: models.User = Depends(get_current_admin_user),
 ):
     filename = (file.filename or "").strip().lower()
     if not filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-    return await upload_document_impl(file=file, db=db)
+    return await upload_document_impl(
+        file=file,
+        db=db,
+        uploaded_by_user_id=int(user.id),
+    )
 
 
 def _can_read_agenda_thread(thread: models.AgendaThread, user: models.User) -> bool:

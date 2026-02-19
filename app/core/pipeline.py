@@ -450,6 +450,7 @@ def _index_chunks(doc, chunk_records: Sequence[ChunkRecord]) -> None:
         )
         vector_store.index_document(
             doc_id=doc.id,
+            project_id=doc.project_id,
             filename=doc.filename,
             document_types=parse_document_types(getattr(doc, "document_types", "")),
             ai_title=doc.ai_title or "",

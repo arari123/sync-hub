@@ -24,6 +24,21 @@ _DOCUMENT_COLUMN_SPECS = {
     "ai_title": "VARCHAR(255)",
     "ai_summary_short": "VARCHAR(512)",
     "project_id": "INTEGER",
+    "folder_id": "INTEGER",
+    "uploaded_by_user_id": "INTEGER",
+    "upload_comment": "VARCHAR(500)",
+    "updated_at": "VARCHAR(64)",
+}
+
+_DOCUMENT_FOLDER_COLUMN_SPECS = {
+    "project_id": "INTEGER NOT NULL",
+    "parent_folder_id": "INTEGER",
+    "name": "VARCHAR(180) NOT NULL DEFAULT '기본 폴더'",
+    "sort_order": "INTEGER NOT NULL DEFAULT 0",
+    "is_system_root": "BOOLEAN NOT NULL DEFAULT false",
+    "created_by_user_id": "INTEGER",
+    "created_at": "VARCHAR(64) NOT NULL DEFAULT ''",
+    "updated_at": "VARCHAR(64) NOT NULL DEFAULT ''",
 }
 
 _BUDGET_VERSION_COLUMN_SPECS = {
@@ -99,6 +114,41 @@ def ensure_runtime_schema() -> None:
                 connection,
                 "CREATE INDEX IF NOT EXISTS idx_documents_project_id ON documents (project_id)",
             )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents (folder_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by_user_id ON documents (uploaded_by_user_id)",
+            )
+
+        if "document_folders" in table_names:
+            existing_columns = {column["name"] for column in inspector.get_columns("document_folders")}
+            for column_name, column_spec in _DOCUMENT_FOLDER_COLUMN_SPECS.items():
+                if column_name in existing_columns:
+                    continue
+                _run_schema_statement(
+                    connection,
+                    f"ALTER TABLE document_folders ADD COLUMN {column_name} {column_spec}",
+                )
+
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_document_folders_project_id ON document_folders (project_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_document_folders_parent_folder_id ON document_folders (parent_folder_id)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_document_folders_sort_order ON document_folders (sort_order)",
+            )
+            _run_schema_statement(
+                connection,
+                "CREATE INDEX IF NOT EXISTS idx_document_folders_is_system_root ON document_folders (is_system_root)",
+            )
 
         if "budget_versions" in table_names:
             existing_columns = {column["name"] for column in inspector.get_columns("budget_versions")}
@@ -138,6 +188,7 @@ def ensure_runtime_schema() -> None:
 
     # Data migrations that rely on the schema above (safe/idempotent).
     _ensure_as_project_parent_links()
+    _ensure_project_root_document_folders()
 
 
 def _infer_parent_project_code(as_code: str) -> str:
@@ -259,6 +310,62 @@ def _ensure_as_project_parent_links() -> None:
     except Exception as exc:  # noqa: BLE001
         session.rollback()
         print(f"[database] AS project parenting migration skipped: {exc}")
+    finally:
+        session.close()
+
+
+def _ensure_project_root_document_folders() -> None:
+    """Ensure each project has a system root folder for project data room."""
+    from . import models
+    from .core.auth_utils import to_iso, utcnow
+
+    session = SessionLocal()
+    try:
+        project_ids = [
+            int(project_id)
+            for project_id, in session.query(models.BudgetProject.id).all()
+        ]
+        if not project_ids:
+            return
+
+        root_folder_project_ids = {
+            int(project_id)
+            for project_id, in (
+                session.query(models.DocumentFolder.project_id)
+                .filter(models.DocumentFolder.is_system_root.is_(True))
+                .distinct()
+                .all()
+            )
+            if project_id is not None
+        }
+
+        missing_project_ids = [
+            int(project_id)
+            for project_id in project_ids
+            if int(project_id) not in root_folder_project_ids
+        ]
+        if not missing_project_ids:
+            return
+
+        now_iso = to_iso(utcnow())
+        for project_id in missing_project_ids:
+            session.add(
+                models.DocumentFolder(
+                    project_id=int(project_id),
+                    parent_folder_id=None,
+                    name="기본 폴더",
+                    sort_order=0,
+                    is_system_root=True,
+                    created_by_user_id=None,
+                    created_at=now_iso,
+                    updated_at=now_iso,
+                )
+            )
+
+        session.commit()
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        print(f"[database] project root folder migration skipped: {exc}")
     finally:
         session.close()
 

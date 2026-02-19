@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import { FileText, FileSearch, Hash, Tag } from 'lucide-react';
+import { Building2, FileText, FileSearch, Hash, Tag } from 'lucide-react';
 
 const DOCUMENT_TYPE_LABELS = {
     equipment_failure_report: '설비 장애 조치보고서',
@@ -88,6 +88,8 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                 const visibleDocumentTypes = documentTypes.length ? documentTypes : ['unclassified'];
                 const isFailureReport = visibleDocumentTypes.includes('equipment_failure_report');
                 const failureSummary = isFailureReport ? parseFailureReportSummary(summaryText) : null;
+                const projectName = String(result?.project_name || '').trim();
+                const projectCode = String(result?.project_code || '').trim();
 
                 return (
                     <div
@@ -144,6 +146,12 @@ const ResultList = ({ results, query, selectedResult, onSelect }) => {
                                     <Hash className="h-3 w-3" />
                                     문서 ID: {result.doc_id}
                                 </span>
+                                {(projectCode || projectName) && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                                        <Building2 className="h-3 w-3" />
+                                        {projectCode && projectName ? `${projectCode} · ${projectName}` : projectCode || projectName}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

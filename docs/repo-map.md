@@ -1,6 +1,6 @@
 # Sync-Hub Repository Map
 
-- 업데이트 기준: 2026-02-18
+- 업데이트 기준: 2026-02-19
 
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
@@ -32,6 +32,7 @@
   - `budget.py`: 프로젝트/버전/예산 상세 CRUD 및 요약
   - `agenda.py`: 안건 메타/작성/임시저장/답변/댓글/상태/재등록 payload
   - `data_hub.py`: 임시 데이터 허브(문서 업로드/검색/AI 답변) API
+  - `project_data.py`: 프로젝트 자료실(폴더 트리/파일 업로드/검색/이동/삭제) API
   - `admin_debug.py`: 검색 디버그 API
   - `admin_dedup.py`: dedup 클러스터 관리자 API
 - `app/core/`
@@ -77,8 +78,9 @@
   - `BudgetProjectCreate.jsx`, `BudgetProjectInfoEdit.jsx`: 프로젝트 생성/설정
   - `BudgetProjectScheduleManagement.jsx`: 프로젝트 일정 통합 조회/필터/타임라인 관리 페이지
   - `BudgetProjectSchedule.jsx`: 프로젝트 공통 일정(WBS) 작성/편집 페이지
+  - `BudgetProjectData.jsx`: 프로젝트 자료실(폴더 트리/업로드/파일 리스트/프로젝트 전용 검색)
   - `AgendaList.jsx`, `AgendaCreate.jsx`, `AgendaDetail.jsx`: 안건 목록(Split View)/작성/상세
-  - `ProjectPlaceholderPage.jsx`: 사양/데이터 관리 임시 페이지
+  - `ProjectPlaceholderPage.jsx`: 사양 관리 임시 페이지
   - `Login.jsx`, `Signup.jsx`, `VerifyEmail.jsx`: 인증 페이지
 - `lib/`
   - `api.js`: API 호출 래퍼
@@ -108,7 +110,7 @@
 - `/project-management/projects/:projectId/schedule`: 일정 관리(통합 조회)
 - `/project-management/projects/:projectId/schedule/write`: 일정 작성(WBS 편집)
 - `/project-management/projects/:projectId/spec`: 사양(임시)
-- `/project-management/projects/:projectId/data`: 데이터 관리(임시)
+- `/project-management/projects/:projectId/data`: 프로젝트 자료실(폴더/업로드/파일 검색/관리)
 - `/knowledge`, `/settings`: `/home` 리다이렉트
 - `/budget-management/*`: `/project-management/*` 리다이렉트(레거시)
 
@@ -116,6 +118,7 @@
 - 기본/헬스: `GET /`, `GET /health`, `GET /health/detail`
 - 인증: `/auth/signup`, `/auth/verify-email`, `/auth/login`, `/auth/me`, `/auth/users`, `/auth/logout`
 - 문서: `/documents/upload`, `/documents/search`, `/documents/{doc_id}`, `/documents/{doc_id}/download`
+  - `/documents/search` 응답에 문서 소속 `project_id`, `project_code`, `project_name` 포함
 - 데이터 허브(임시): `/data-hub/permissions`, `/data-hub/documents/upload`, `/data-hub/ask`
 - 예산:
   - 프로젝트: `GET /budget/projects`, `GET /budget/projects/search`(매칭 이유/스니펫 포함), `POST /budget/projects`, `GET/PUT/DELETE /budget/projects/{project_id}`, `GET /budget/projects/{project_id}/summary`
@@ -124,6 +127,7 @@
   - 버전: `/budget/projects/{project_id}/versions`, `/budget/versions/{version_id}/confirm`, `/budget/versions/{version_id}/confirm-cancel`, `/budget/versions/{version_id}/revision`
   - 상세: `GET/PUT /budget/versions/{version_id}/equipments`, `GET/PUT /budget/versions/{version_id}/details`
   - 엑셀: `GET /budget/versions/{version_id}/export-excel`, `POST /budget/versions/{version_id}/import-excel`
+  - 프로젝트 자료실: `GET /budget/projects/{project_id}/data/folders`, `POST /budget/projects/{project_id}/data/folders`, `PATCH/DELETE /budget/projects/{project_id}/data/folders/{folder_id}`, `GET /budget/projects/{project_id}/data/files`, `POST /budget/projects/{project_id}/data/files/upload`, `PATCH/DELETE /budget/projects/{project_id}/data/files/{doc_id}`
 - 안건:
   - 메타/목록/검색: `/agenda/projects/{project_id}/meta`, `/agenda/projects/{project_id}/threads`, `/agenda/projects/{project_id}/drafts`, `GET /agenda/projects/{project_id}/entries`, `GET /agenda/entries/my`, `GET /agenda/threads/search`, `GET /agenda/threads/my`
   - 생성/수정: `POST /agenda/projects/{project_id}/threads`, `PUT /agenda/threads/{thread_id}/draft`, `POST /agenda/threads/{thread_id}/replies`

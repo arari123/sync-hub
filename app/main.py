@@ -7,7 +7,7 @@ from . import models
 from .core.ocr import get_ocr_worker_health
 from .core.vector_store import vector_store
 from .database import engine, ensure_runtime_schema
-from .api import admin_debug, admin_dedup, agenda, auth, budget, data_hub, documents
+from .api import admin_debug, admin_dedup, agenda, auth, budget, data_hub, documents, project_data
 
 # Create tables / keep runtime schema compatibility (idempotent).
 ensure_runtime_schema()
@@ -45,6 +45,7 @@ app.include_router(auth.router)
 app.include_router(budget.router)
 app.include_router(agenda.router)
 app.include_router(data_hub.router)
+app.include_router(project_data.router)
 app.include_router(admin_debug.router)
 app.include_router(admin_dedup.router)
 

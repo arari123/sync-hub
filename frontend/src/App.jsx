@@ -14,6 +14,7 @@ import DataHub from './pages/DataHub';
 import ProjectPlaceholderPage from './pages/ProjectPlaceholderPage';
 import BudgetProjectSchedule from './pages/BudgetProjectSchedule';
 import BudgetProjectScheduleManagement from './pages/BudgetProjectScheduleManagement';
+import BudgetProjectData from './pages/BudgetProjectData';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
@@ -54,7 +55,7 @@ function App() {
           <Route path="/project-management/projects/:projectId/schedule" element={<ProtectedRoute><BudgetProjectScheduleManagement /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/schedule/write" element={<ProtectedRoute><BudgetProjectSchedule /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/spec" element={<ProtectedRoute><ProjectPlaceholderPage title="사양 관리" description="사양 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
-          <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><ProjectPlaceholderPage title="데이터 관리" description="데이터 관리 화면은 다음 단계에서 구현될 예정입니다." /></ProtectedRoute>} />
+          <Route path="/project-management/projects/:projectId/data" element={<ProtectedRoute><BudgetProjectData /></ProtectedRoute>} />
           <Route path="/project-management/projects/:projectId/edit/:section" element={<ProtectedRoute><BudgetProjectEditor /></ProtectedRoute>} />
           <Route path="/data-hub" element={<ProtectedRoute><DataHub /></ProtectedRoute>} />
           <Route path="/knowledge" element={<ProtectedRoute><Navigate to="/home" replace /></ProtectedRoute>} />

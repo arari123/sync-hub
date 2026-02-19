@@ -6,7 +6,7 @@ import shutil
 import threading
 import uuid
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -470,18 +470,51 @@ def _apply_cluster_diversity(reranked_hits: list[dict], limit: int) -> list[dict
     return filtered
 
 
-@router.post("/upload")
-async def upload_document(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
+async def upload_document_impl(
+    *,
+    file: UploadFile,
+    db: Session,
+    project_id: int | None = None,
+    folder_id: int | None = None,
+    upload_comment: str | None = None,
+    uploaded_by_user_id: int | None = None,
+) -> dict:
     filename = _safe_original_filename(file.filename or "")
     ext = os.path.splitext(filename)[1].lower()
     if not filename or ext not in SUPPORTED_UPLOAD_EXTENSIONS:
         allowed = ", ".join(sorted(SUPPORTED_UPLOAD_EXTENSIONS))
         raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
 
-    # Save file
+    normalized_project_id = int(project_id) if project_id is not None else None
+    normalized_folder_id = int(folder_id) if folder_id is not None else None
+    normalized_comment = str(upload_comment or "").strip() or None
+    normalized_uploaded_by_user_id = int(uploaded_by_user_id) if uploaded_by_user_id is not None else None
+
+    folder = None
+    if normalized_folder_id is not None:
+        folder = (
+            db.query(models.DocumentFolder)
+            .filter(models.DocumentFolder.id == normalized_folder_id)
+            .first()
+        )
+        if folder is None:
+            raise HTTPException(status_code=404, detail="Folder not found.")
+        if normalized_project_id is not None and int(folder.project_id) != normalized_project_id:
+            raise HTTPException(status_code=400, detail="Folder does not belong to the project.")
+        normalized_project_id = int(folder.project_id)
+
+    if normalized_project_id is not None:
+        project = (
+            db.query(models.BudgetProject)
+            .filter(models.BudgetProject.id == normalized_project_id)
+            .first()
+        )
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found.")
+
+    if folder is not None and normalized_project_id is not None and int(folder.project_id) != normalized_project_id:
+        raise HTTPException(status_code=400, detail="Folder does not belong to the project.")
+
     file_path = ""
     try:
         for _ in range(3):
@@ -512,13 +545,18 @@ async def upload_document(
             except Exception:  # noqa: BLE001
                 pass
         raise HTTPException(status_code=500, detail=f"Failed to store upload: {exc}")
-    
-    # Create DB record
+
+    now_iso = to_iso(utcnow())
     db_doc = models.Document(
         filename=filename,
         file_path=file_path,
         status="pending",
-        created_at=to_iso(utcnow()),
+        created_at=now_iso,
+        updated_at=now_iso,
+        project_id=normalized_project_id,
+        folder_id=normalized_folder_id,
+        uploaded_by_user_id=normalized_uploaded_by_user_id,
+        upload_comment=normalized_comment,
     )
     file_hash, _, _ = compute_document_hashes(file_path=file_path, clean_text="")
     if file_hash:
@@ -528,14 +566,32 @@ async def upload_document(
     db.commit()
     db.refresh(db_doc)
 
-    # Trigger async processing in dedicated thread so API worker stays responsive.
     _start_document_pipeline_async(db_doc.id)
-
     return {"id": db_doc.id, "status": "pending"}
+
+
+@router.post("/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    project_id: int | None = Form(default=None),
+    folder_id: int | None = Form(default=None),
+    comment: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    return await upload_document_impl(
+        file=file,
+        db=db,
+        project_id=project_id,
+        folder_id=folder_id,
+        upload_comment=comment,
+        uploaded_by_user_id=int(user.id),
+    )
 
 @router.get("/search")
 def search_documents(
     q: str,
+    project_id: int | None = None,
     page: int = 1,
     page_size: int = 10,
     limit: int | None = None,
@@ -570,19 +626,46 @@ def search_documents(
     
     hits = results.get("hits", {}).get("hits", [])
     reranked_hits = _rerank_hits(hits, query)
-    reranked_hits = _apply_cluster_diversity(reranked_hits, limit=end_index)
-    total = len(reranked_hits)
-    paged_hits = reranked_hits[start_index:end_index]
+    reranked_hits = _apply_cluster_diversity(reranked_hits, limit=max(candidate_limit, end_index))
 
     doc_ids = {
         result.get("hit", {}).get("_source", {}).get("doc_id")
-        for result in paged_hits
+        for result in reranked_hits
     }
     doc_ids = {doc_id for doc_id in doc_ids if isinstance(doc_id, int)}
     document_map = {}
     if doc_ids:
         docs = db.query(models.Document).filter(models.Document.id.in_(doc_ids)).all()
         document_map = {item.id: item for item in docs}
+
+    if project_id is not None:
+        normalized_project_id = int(project_id)
+        reranked_hits = [
+            result
+            for result in reranked_hits
+            if (
+                (doc := document_map.get(result.get("hit", {}).get("_source", {}).get("doc_id")))
+                and doc.project_id is not None
+                and int(doc.project_id) == normalized_project_id
+            )
+        ]
+
+    total = len(reranked_hits)
+    paged_hits = reranked_hits[start_index:end_index]
+
+    project_ids = {
+        int(doc.project_id)
+        for doc in document_map.values()
+        if doc.project_id is not None
+    }
+    project_map = {}
+    if project_ids:
+        projects = (
+            db.query(models.BudgetProject)
+            .filter(models.BudgetProject.id.in_(sorted(project_ids)))
+            .all()
+        )
+        project_map = {int(item.id): item for item in projects}
 
     output = []
     has_doc_type_updates = False
@@ -647,6 +730,17 @@ def search_documents(
             "match_points": result["matched_terms"],
             "score": result["rerank_score"],
             "raw_score": result["raw_score"],
+            "project_id": int(db_doc.project_id) if db_doc and db_doc.project_id is not None else None,
+            "project_code": (
+                (project_map.get(int(db_doc.project_id)).code or "")
+                if db_doc and db_doc.project_id is not None and int(db_doc.project_id) in project_map
+                else ""
+            ),
+            "project_name": (
+                (project_map.get(int(db_doc.project_id)).name or "")
+                if db_doc and db_doc.project_id is not None and int(db_doc.project_id) in project_map
+                else ""
+            ),
         })
 
     if has_doc_type_updates:
@@ -688,7 +782,11 @@ def get_document_status(doc_id: int, db: Session = Depends(get_db)):
         "filename": doc.filename,
         "status": doc.status,
         "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
         "project_id": int(doc.project_id) if doc.project_id else None,
+        "folder_id": int(doc.folder_id) if doc.folder_id else None,
+        "uploaded_by_user_id": int(doc.uploaded_by_user_id) if doc.uploaded_by_user_id else None,
+        "upload_comment": doc.upload_comment or "",
         "document_types": doc.document_types,
         "ai_title": doc.ai_title,
         "ai_summary_short": doc.ai_summary_short,

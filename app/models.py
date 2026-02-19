@@ -15,13 +15,31 @@ class Document(Base):
     ai_title = Column(String, nullable=True)
     ai_summary_short = Column(String, nullable=True)
     created_at = Column(String)
+    updated_at = Column(String, nullable=True, index=True)
     project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=True, index=True)
+    folder_id = Column(Integer, ForeignKey("document_folders.id"), nullable=True, index=True)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    upload_comment = Column(String(500), nullable=True)
 
     file_sha256 = Column(String(64), nullable=True, index=True)
     normalized_text_sha256 = Column(String(64), nullable=True, index=True)
     dedup_status = Column(String, default="unique", index=True)
     dedup_primary_doc_id = Column(Integer, nullable=True, index=True)
     dedup_cluster_id = Column(Integer, ForeignKey("dedup_clusters.id"), nullable=True, index=True)
+
+
+class DocumentFolder(Base):
+    __tablename__ = "document_folders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("budget_projects.id"), nullable=False, index=True)
+    parent_folder_id = Column(Integer, ForeignKey("document_folders.id"), nullable=True, index=True)
+    name = Column(String(180), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0, index=True)
+    is_system_root = Column(Boolean, nullable=False, default=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    created_at = Column(String, nullable=False, index=True)
+    updated_at = Column(String, nullable=False, index=True)
 
 
 class DedupCluster(Base):

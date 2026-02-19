@@ -163,6 +163,7 @@ class VectorStore:
             "mappings": {
                 "properties": {
                     "doc_id": {"type": "integer"},
+                    "project_id": {"type": "integer"},
                     "chunk_id": {"type": "integer"},
                     "chunk_index": {"type": "integer"},
                     "page": {"type": "integer"},
@@ -229,6 +230,7 @@ class VectorStore:
     def index_document(
         self,
         doc_id,
+        project_id,
         filename,
         document_types,
         ai_title,
@@ -255,6 +257,7 @@ class VectorStore:
         chunk_key = f"{doc_id}:{chunk_id}"
         doc = {
             "doc_id": doc_id,
+            "project_id": project_id,
             "chunk_id": chunk_id,
             "chunk_index": chunk_id if chunk_index is None else chunk_index,
             "page": page,

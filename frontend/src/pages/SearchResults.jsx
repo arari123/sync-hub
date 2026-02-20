@@ -33,7 +33,6 @@ import DocumentDetail from '../components/DocumentDetail';
 import GlobalSearchResultList from '../components/GlobalSearchResultList';
 import AgendaSplitView from '../components/agenda/AgendaSplitView';
 import UserMenu from '../components/UserMenu';
-import ThemeToggleButton from '../components/ThemeToggleButton';
 import { Input } from '../components/ui/Input';
 import Logo from '../components/ui/Logo';
 
@@ -1286,7 +1285,7 @@ const SearchResults = () => {
                         </label>
                     </form>
 
-                    <div className="w-52 shrink-0 flex items-center justify-end gap-2">
+                    <div className="w-40 shrink-0 flex items-center justify-end gap-2">
                         <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-primary">
                             <Bell className="h-4 w-4" />
                         </button>
@@ -1328,7 +1327,6 @@ const SearchResults = () => {
                                 </div>
                             )}
                         </div>
-                        <ThemeToggleButton />
                         <UserMenu user={user} />
                     </div>
                 </div>

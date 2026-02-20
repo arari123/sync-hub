@@ -65,6 +65,7 @@ const BUDGET_TAB_ITEMS = [
     { key: 'expense', label: '경비', icon: Receipt },
 ];
 const BUDGET_TAB_KEYS = new Set(BUDGET_TAB_ITEMS.map((item) => item.key));
+const INPUT_BUDGET_TAB_KEYS = new Set(['material', 'labor', 'expense']);
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 const EMPTY_DETAILS = {
@@ -1073,6 +1074,7 @@ const BudgetProjectBudget = () => {
     const [isTreeExpanded, setIsTreeExpanded] = useState(true);
     const [activeBudgetTab, setActiveBudgetTab] = useState(() => resolveBudgetTabFromSearch(location.search) || 'summary');
     const [isInputMode, setIsInputMode] = useState(false);
+    const [inputEditorSection, setInputEditorSection] = useState('material');
     const pendingScrollTopRef = useRef(null);
 
     const handleBudgetTabChange = (nextTab) => {
@@ -1102,6 +1104,11 @@ const BudgetProjectBudget = () => {
         if (!requestedTab) return;
         setActiveBudgetTab((prev) => (prev === requestedTab ? prev : requestedTab));
     }, [location.search]);
+
+    useEffect(() => {
+        if (!INPUT_BUDGET_TAB_KEYS.has(activeBudgetTab)) return;
+        setInputEditorSection(activeBudgetTab);
+    }, [activeBudgetTab]);
 
     const loadBudgetData = useCallback(async ({ background = false } = {}) => {
         if (!projectId) return;
@@ -1764,6 +1771,18 @@ const BudgetProjectBudget = () => {
                     </div>
                 </nav>
 
+                {isInputMode && (
+                    <section className={cn('rounded-xl border border-slate-200 bg-white shadow-lg', activeBudgetTab === 'summary' && 'hidden')}>
+                        <div className="p-4">
+                            <BudgetProjectEditor
+                                embedded
+                                forceSection={inputEditorSection}
+                                onLiveDetailsChange={handleEditorLiveDetailsChange}
+                            />
+                        </div>
+                    </section>
+                )}
+
                 {activeBudgetTab === 'summary' && (
                     <SummaryTabContent
                         summaryView={summaryView}
@@ -1771,29 +1790,29 @@ const BudgetProjectBudget = () => {
                     />
                 )}
 
-                {activeBudgetTab === 'material' && (
+                {activeBudgetTab === 'material' && !isInputMode && (
                     <MaterialTabContent
                         rows={materialRows}
                         executionItems={details?.execution_material_items || []}
                         currentStage={normalizeStage(project?.current_stage || '')}
-                        isInputMode={isInputMode}
-                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                        isInputMode={false}
+                        onLiveDetailsChange={null}
                     />
                 )}
 
-                {activeBudgetTab === 'labor' && (
+                {activeBudgetTab === 'labor' && !isInputMode && (
                     <LaborTabContent
                         rows={laborRows}
-                        isInputMode={isInputMode}
-                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                        isInputMode={false}
+                        onLiveDetailsChange={null}
                     />
                 )}
 
-                {activeBudgetTab === 'expense' && (
+                {activeBudgetTab === 'expense' && !isInputMode && (
                     <ExpenseTabContent
                         rows={expenseRows}
-                        isInputMode={isInputMode}
-                        onLiveDetailsChange={handleEditorLiveDetailsChange}
+                        isInputMode={false}
+                        onLiveDetailsChange={null}
                     />
                 )}
             </main>

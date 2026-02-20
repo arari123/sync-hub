@@ -213,6 +213,48 @@ function normalizeLocationType(value) {
     return 'domestic';
 }
 
+function buildDefaultExecutionExpenseTemplates({
+    phase = 'fabrication',
+    locale = 'domestic',
+    expenseType = '자체',
+} = {}) {
+    const normalizedPhase = phase === 'installation' ? 'installation' : 'fabrication';
+    const normalizedLocale = normalizeLocationType(locale);
+    const normalizedExpenseType = normalizeExpenseType(expenseType);
+    const templates = [
+        { expense_name: '프로젝트 운영비', basis: '프로젝트 운영 집행', auto_formula: AUTO_EXPENSE_FORMULAS.PROJECT_OPERATION },
+        { expense_name: '소모품비', basis: '소모품 집행', auto_formula: AUTO_EXPENSE_FORMULAS.CONSUMABLES },
+        { expense_name: '공구비', basis: '공구 집행', auto_formula: AUTO_EXPENSE_FORMULAS.TOOLS },
+    ];
+
+    if (normalizedPhase === 'fabrication' || normalizedLocale === 'domestic') {
+        templates.push(
+            { expense_name: '출장비', basis: '국내 출장 집행', auto_formula: AUTO_EXPENSE_FORMULAS.TRIP },
+            { expense_name: '숙박비', basis: '국내 숙박 집행', auto_formula: AUTO_EXPENSE_FORMULAS.LODGING },
+            { expense_name: '국내 교통비', basis: '국내 교통 집행', auto_formula: AUTO_EXPENSE_FORMULAS.DOMESTIC_TRANSPORT },
+        );
+    } else {
+        templates.push(
+            { expense_name: '출장비', basis: '해외 출장 집행', auto_formula: AUTO_EXPENSE_FORMULAS.TRIP },
+            { expense_name: '숙박비', basis: '해외 숙박 집행', auto_formula: AUTO_EXPENSE_FORMULAS.LODGING },
+            { expense_name: '해외 교통비', basis: '해외 교통 집행', auto_formula: AUTO_EXPENSE_FORMULAS.OVERSEAS_TRANSPORT },
+            { expense_name: '항공료', basis: '항공 집행', auto_formula: AUTO_EXPENSE_FORMULAS.AIRFARE },
+        );
+    }
+
+    templates.push(
+        { expense_name: '현지인원채용 비용', basis: '현지 인원 채용 집행', auto_formula: AUTO_EXPENSE_FORMULAS.LOCAL_HIRE },
+        { expense_name: '도비 비용', basis: '도비 집행', auto_formula: AUTO_EXPENSE_FORMULAS.DOBI },
+        { expense_name: '기타 비용', basis: '기타 집행', auto_formula: AUTO_EXPENSE_FORMULAS.OTHER },
+    );
+
+    return templates.map((item) => ({
+        ...item,
+        phase: normalizedPhase,
+        expense_type: normalizedExpenseType,
+    }));
+}
+
 function buildMaterialUnitScopeKey(equipmentName, phase, unitName) {
     const normalizedEquipment = normalizeEquipmentName(equipmentName) || COMMON_EQUIPMENT_NAME;
     const normalizedPhase = phase === 'installation' ? 'installation' : 'fabrication';
@@ -1418,7 +1460,12 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
         const normalizedStaffingType = staffingType === '외주' ? '외주' : '자체';
         if (!targetDepartment || !activeEquipmentName || activePhaseFilter === 'all') return;
         setDetails((prev) => {
-            const source = [...(prev.labor_items || [])];
+            const targetKey = activeMode === 'execution'
+                ? SECTION_META.labor.executionKey
+                : SECTION_META.labor.budgetKey;
+            const rowBuilder = activeMode === 'execution' ? buildEmptyExecutionRow : buildEmptyBudgetRow;
+            const rowEmptyFn = activeMode === 'execution' ? isExecutionRowEmpty : isBudgetRowEmpty;
+            const source = [...(prev[targetKey] || [])];
             const phaseRows = source
                 .filter((row) => (row.phase || 'fabrication') === currentPhase)
                 .filter((row) => normalizeEquipmentName(row?.equipment_name) === activeEquipmentName)
@@ -1432,20 +1479,24 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
                 : targetDepartment;
 
             const newRow = {
-                ...buildEmptyBudgetRow('labor', currentPhase),
+                ...rowBuilder('labor', currentPhase),
                 equipment_name: activeEquipmentName,
                 task_name: nextDepartmentName,
                 staffing_type: normalizedStaffingType,
-                unit: normalizedStaffingType === '외주' ? 'D' : 'H',
-                location_type: currentPhase === 'installation'
-                    ? projectInstallationInfo.locale
-                    : 'domestic',
+                ...(activeMode === 'budget'
+                    ? {
+                        unit: normalizedStaffingType === '외주' ? 'D' : 'H',
+                        location_type: currentPhase === 'installation'
+                            ? projectInstallationInfo.locale
+                            : 'domestic',
+                    }
+                    : {}),
             };
             const firstEmptyIndex = source.findIndex(
                 (row) => (
                     (row.phase || 'fabrication') === currentPhase
                     && normalizeEquipmentName(row?.equipment_name) === activeEquipmentName
-                    && isBudgetRowEmpty(row, 'labor')
+                    && rowEmptyFn(row, 'labor')
                 ),
             );
             if (firstEmptyIndex >= 0) {
@@ -1456,7 +1507,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
 
             return {
                 ...prev,
-                labor_items: source,
+                [targetKey]: source,
             };
         });
     };
@@ -1819,6 +1870,99 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             return { key: columnKey, direction: 'asc' };
         });
     };
+
+    useEffect(() => {
+        if (activeMode !== 'execution') return;
+        if (isEquipmentProject && !equipmentNames.length) return;
+
+        setDetails((prev) => {
+            const executionRows = Array.isArray(prev.execution_expense_items)
+                ? [...prev.execution_expense_items]
+                : [];
+            const budgetRows = Array.isArray(prev.expense_items) ? prev.expense_items : [];
+            const targetEquipmentNames = isEquipmentProject
+                ? uniqueEquipmentNames(equipmentNames)
+                : [COMMON_EQUIPMENT_NAME];
+            if (!targetEquipmentNames.length) return prev;
+
+            const phases = ['fabrication', 'installation'];
+            let changed = false;
+
+            const matchesScope = (row, equipmentName, phase, expenseType) => {
+                const rowEquipmentName = normalizeEquipmentName(row?.equipment_name) || COMMON_EQUIPMENT_NAME;
+                const rowPhase = (row?.phase || 'fabrication') === 'installation' ? 'installation' : 'fabrication';
+                const rowExpenseType = normalizeExpenseType(row?.expense_type);
+                return (
+                    rowEquipmentName === equipmentName
+                    && rowPhase === phase
+                    && rowExpenseType === expenseType
+                );
+            };
+
+            targetEquipmentNames.forEach((equipmentNameRaw) => {
+                const equipmentName = normalizeEquipmentName(equipmentNameRaw) || COMMON_EQUIPMENT_NAME;
+                phases.forEach((phase) => {
+                    const locale = phase === 'installation'
+                        ? projectInstallationInfo.locale
+                        : 'domestic';
+
+                    EXPENSE_TYPE_OPTIONS.forEach((expenseTypeRaw) => {
+                        const expenseType = normalizeExpenseType(expenseTypeRaw);
+                        const scopeRows = executionRows.filter((row) => (
+                            matchesScope(row, equipmentName, phase, expenseType)
+                        ));
+                        const existingKeys = new Set(
+                            scopeRows
+                                .map((row) => resolveExpenseAutoFormula(row) || String(row?.expense_name || '').trim())
+                                .filter(Boolean),
+                        );
+
+                        const templateRowsFromBudget = budgetRows
+                            .filter((row) => (
+                                matchesScope(row, equipmentName, phase, expenseType)
+                                && String(row?.expense_name || '').trim()
+                            ))
+                            .map((row) => ({
+                                expense_name: String(row?.expense_name || '').trim(),
+                                basis: String(row?.basis || '').trim(),
+                                auto_formula: resolveExpenseAutoFormula(row),
+                                phase,
+                                expense_type: expenseType,
+                            }));
+
+                        const templateRows = templateRowsFromBudget.length > 0
+                            ? templateRowsFromBudget
+                            : buildDefaultExecutionExpenseTemplates({ phase, locale, expenseType });
+
+                        templateRows.forEach((template) => {
+                            const key = resolveExpenseAutoFormula(template) || String(template?.expense_name || '').trim();
+                            if (!key || existingKeys.has(key)) return;
+                            existingKeys.add(key);
+                            changed = true;
+                            executionRows.push({
+                                ...buildEmptyExecutionRow('expense', phase),
+                                equipment_name: equipmentName,
+                                expense_type: expenseType,
+                                expense_name: String(template?.expense_name || '').trim(),
+                                basis: String(template?.basis || '').trim(),
+                            });
+                        });
+                    });
+                });
+            });
+
+            if (!changed) return prev;
+            return {
+                ...prev,
+                execution_expense_items: executionRows,
+            };
+        });
+    }, [
+        activeMode,
+        equipmentNames,
+        isEquipmentProject,
+        projectInstallationInfo.locale,
+    ]);
 
     const updateRow = (index, key, value) => {
         setDetails((prev) => {
@@ -2464,7 +2608,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
                                 </div>
                             )}
 
-                            {activeMode === 'budget' && section === 'labor' && (
+                            {section === 'labor' && (
                                 <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200 flex-wrap">
                                     <span className="px-2 text-[10px] font-black text-slate-500 uppercase">자체</span>
                                     {(budgetSettings.labor_departments || DEFAULT_LABOR_DEPARTMENTS).map((department) => (
@@ -2494,7 +2638,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
                                 </div>
                             )}
 
-                            {activeMode === 'budget' && section === 'labor' && !canAppendLaborDepartment && (
+                            {section === 'labor' && !canAppendLaborDepartment && (
                                 <div className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black text-amber-700 w-fit">
                                     인건비 항목 추가는 사이드바에서 제작 또는 설치 단계를 선택한 뒤 가능합니다.
                                 </div>
@@ -2937,6 +3081,12 @@ const ExcelTable = ({
         const column = columns[colIndex];
         const isCellEditable = editable && column && !isCellLocked(rowIndex, colIndex, column, rows[rowIndex]);
         const isPrintableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+        const isComposingInput = Boolean(
+            event.isComposing
+            || event.nativeEvent?.isComposing
+            || event.key === 'Process'
+            || event.keyCode === 229
+        );
         const isEditingCurrentCell = isEditing(rowIndex, colIndex);
 
         if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
@@ -2973,6 +3123,8 @@ const ExcelTable = ({
                 return;
             }
             if (!['Enter', 'Tab'].includes(event.key)) return;
+        } else if (isCellEditable && !column?.options && isComposingInput) {
+            return;
         } else if (event.key === 'F2' && isCellEditable) {
             event.preventDefault();
             startEditingCell(rowIndex, colIndex);
@@ -3379,7 +3531,7 @@ const ExcelTable = ({
                                                 if (!isEditing(rowIndex, colIndex)) return;
                                                 stopEditingCell();
                                             }}
-                                            readOnly={!isCellEditable || !isEditing(rowIndex, colIndex)}
+                                            readOnly={!isCellEditable}
                                         />
                                         {isActive && isCellEditable && (
                                             <button

@@ -43,6 +43,8 @@ AS 프로젝트 추가 규칙:
 - 허용 포맷: PNG/JPG/WEBP/GIF
 - 크기 제한: 기본 5MB (`PROJECT_COVER_MAX_BYTES`로 조정 가능)
 - 조회 URL: `GET /budget/project-covers/{stored_filename}` (생성/수정의 `cover_image_url`로 사용)
+- 서버는 `cover_image_url` 입력 시 `/budget/project-covers/...` 뿐 아니라 `/uploads/project-covers/...` 형태도 정규화해 내부 URL로 저장한다.
+- 프론트 UI(`BudgetProjectCreate`, `BudgetProjectInfoEdit`)는 URL 직접 입력 대신 파일 업로드로만 대표 이미지를 변경한다.
 
 ### 2.2 UI 전용 입력(설비 프로젝트)
 
@@ -53,6 +55,19 @@ AS 프로젝트 추가 규칙:
 | `equipmentInput` | string | Y(`equipment`일 때) | 쉼표/줄바꿈 기준 분리, trim, 중복 제거 |
 
 이 값은 서버에 직접 전달되지 않고, 버전 생성 후 `PUT /versions/{id}/equipments`의 `items[].equipment_name`으로 변환되어 저장된다.
+
+### 2.3 UI 전용 입력(대표 이미지)
+
+`BudgetProjectCreate`, `BudgetProjectInfoEdit`는 대표 이미지를 **파일 선택 후 업로드**하는 방식으로 동작한다.
+
+| field(UI) | type | 필수 | 규칙 |
+|---|---|---|---|
+| `coverFile` | File | N | `image/*`만 허용, 최대 5MB |
+
+처리 순서:
+1. 파일 선택
+2. `POST /budget/project-covers/upload`로 업로드
+3. 응답 `cover_image_url`을 `POST/PUT /budget/projects...`에 전달
 
 ## 3. 프로젝트 수정 입력
 

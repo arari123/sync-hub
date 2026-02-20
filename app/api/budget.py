@@ -158,6 +158,37 @@ def _project_cover_public_url(stored_filename: str) -> str:
     return f"{_PROJECT_COVER_ROUTE_PREFIX}{stored_filename}"
 
 
+def _extract_project_cover_filename(path_value: str) -> str:
+    raw_path = (path_value or "").strip()
+    if not raw_path:
+        return ""
+
+    normalized_path = raw_path if raw_path.startswith("/") else f"/{raw_path}"
+    path_without_query = normalized_path.split("?", 1)[0].split("#", 1)[0].strip()
+    if not path_without_query:
+        return ""
+
+    prefix_candidates = {
+        _PROJECT_COVER_ROUTE_PREFIX,
+        f"/{_PROJECT_COVER_UPLOAD_DIR.strip('/')}/",
+        "/uploads/project-covers/",
+    }
+    for prefix in prefix_candidates:
+        if not prefix or not path_without_query.startswith(prefix):
+            continue
+        filename = path_without_query[len(prefix):].split("/", 1)[0].strip().lower()
+        if _is_safe_project_cover_filename(filename):
+            return filename
+        return ""
+
+    bare_filename = path_without_query.strip("/").lower()
+    if "/" in bare_filename:
+        return ""
+    if _is_safe_project_cover_filename(bare_filename):
+        return bare_filename
+    return ""
+
+
 def _normalize_project_cover_public_url(raw_url: str) -> str:
     raw = (raw_url or "").strip()
     if not raw:
@@ -167,16 +198,11 @@ def _normalize_project_cover_public_url(raw_url: str) -> str:
         try:
             parsed = urlparse(raw)
             raw = parsed.path or ""
-            if parsed.query:
-                raw = f"{raw}?{parsed.query}"
         except Exception:  # noqa: BLE001
             return ""
 
-    if not raw.startswith(_PROJECT_COVER_ROUTE_PREFIX):
-        return ""
-
-    filename = raw[len(_PROJECT_COVER_ROUTE_PREFIX):].split("?", 1)[0].split("#", 1)[0].strip().lower()
-    if not _is_safe_project_cover_filename(filename):
+    filename = _extract_project_cover_filename(raw)
+    if not filename:
         return ""
     return _project_cover_public_url(filename)
 
@@ -191,13 +217,14 @@ def _normalize_project_cover_input_url(raw_url: str) -> str:
         return raw
 
     if lowered.startswith("http://") or lowered.startswith("https://"):
-        parsed = urlparse(raw)
-        if (parsed.path or "").startswith(_PROJECT_COVER_ROUTE_PREFIX):
-            return _normalize_project_cover_public_url(raw)
+        normalized_local = _normalize_project_cover_public_url(raw)
+        if normalized_local:
+            return normalized_local
         return raw
 
-    if raw.startswith(_PROJECT_COVER_ROUTE_PREFIX):
-        return _normalize_project_cover_public_url(raw)
+    normalized_local = _normalize_project_cover_public_url(raw)
+    if normalized_local:
+        return normalized_local
 
     return ""
 
@@ -2572,11 +2599,13 @@ def update_project(
 ):
     project = _get_project_or_404(project_id, db)
     _require_project_edit_permission(project, user)
+    previous_cover_image_url = (project.cover_image_url or "").strip()
     fields_set = payload.model_fields_set
     if not fields_set:
         return _serialize_project(project, db, user=user)
 
     changed = False
+    cover_image_changed = False
 
     if "name" in fields_set and payload.name is not None:
         name = (payload.name or "").strip()
@@ -2657,6 +2686,7 @@ def update_project(
         if cover_image_url != (project.cover_image_url or None):
             project.cover_image_url = cover_image_url
             changed = True
+            cover_image_changed = True
 
     if "manager_user_id" in fields_set and payload.manager_user_id is not None:
         manager_user_id = int(payload.manager_user_id)
@@ -2697,6 +2727,8 @@ def update_project(
         project.updated_at = to_iso(utcnow())
         db.commit()
         db.refresh(project)
+        if cover_image_changed and previous_cover_image_url:
+            _delete_project_cover_file_if_unreferenced(previous_cover_image_url)
 
     return _serialize_project(project, db, user=user)
 

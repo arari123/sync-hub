@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
-import { api, getErrorMessage } from '../lib/api';
+import { api, getErrorMessage, resolveApiAssetUrl } from '../lib/api';
 import ProjectPageHeader from '../components/ProjectPageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -69,7 +69,11 @@ const BudgetProjectInfoEdit = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState('');
     const [saveError, setSaveError] = useState('');
+    const [coverError, setCoverError] = useState('');
     const [deleteError, setDeleteError] = useState('');
+    const [coverFile, setCoverFile] = useState(null);
+    const [coverFileName, setCoverFileName] = useState('');
+    const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
 
     useEffect(() => {
         const load = async () => {
@@ -90,6 +94,12 @@ const BudgetProjectInfoEdit = () => {
                 setVersion(currentVersion);
 
                 if (currentProject) {
+                    const existingCoverUrl = resolveApiAssetUrl(
+                        currentProject.cover_image_display_url
+                        || currentProject.cover_image_fallback_url
+                        || currentProject.cover_image_url
+                        || ''
+                    );
                     setEditForm({
                         name: currentProject.name || '',
                         code: currentProject.code || '',
@@ -103,6 +113,10 @@ const BudgetProjectInfoEdit = () => {
                         description: currentProject.description || '',
                         cover_image_url: currentProject.cover_image_url || '',
                     });
+                    setCoverPreviewUrl(existingCoverUrl);
+                    setCoverFile(null);
+                    setCoverFileName('');
+                    setCoverError('');
                 }
 
                 if (currentVersion?.id) {
@@ -215,6 +229,41 @@ const BudgetProjectInfoEdit = () => {
         }));
     };
 
+    useEffect(() => () => {
+        if (coverPreviewUrl && coverPreviewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(coverPreviewUrl);
+        }
+    }, [coverPreviewUrl]);
+
+    const onCoverFileChange = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const mimeType = String(file.type || '').toLowerCase();
+        if (!mimeType.startsWith('image/')) {
+            setCoverError('이미지 파일만 업로드할 수 있습니다.');
+            setCoverFile(null);
+            setCoverFileName('');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setCoverError('대표 이미지는 최대 5MB까지 업로드할 수 있습니다.');
+            setCoverFile(null);
+            setCoverFileName('');
+            return;
+        }
+
+        setCoverError('');
+        setCoverFile(file);
+        setCoverFileName(file.name || '');
+        setCoverPreviewUrl((prev) => {
+            if (prev && prev.startsWith('blob:')) {
+                URL.revokeObjectURL(prev);
+            }
+            return URL.createObjectURL(file);
+        });
+    };
+
     const appendEquipmentNames = (rawValue) => {
         const parsed = parseEquipmentNames(rawValue);
         if (!parsed.length) return;
@@ -250,8 +299,22 @@ const BudgetProjectInfoEdit = () => {
         }
 
         setSaveError('');
+        setCoverError('');
         setIsSaving(true);
         try {
+            let coverImageUrl = (editForm.cover_image_url || '').trim();
+            if (coverFile) {
+                const formData = new FormData();
+                formData.append('file', coverFile);
+                const coverUploadResponse = await api.post('/budget/project-covers/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                coverImageUrl = String(coverUploadResponse?.data?.cover_image_url || '').trim();
+                if (!coverImageUrl) {
+                    throw new Error('cover_image_upload_failed');
+                }
+            }
+
             await api.put(`/budget/projects/${project.id}`, {
                 name,
                 code: (editForm.code || '').trim(),
@@ -263,7 +326,7 @@ const BudgetProjectInfoEdit = () => {
                 business_trip_distance_km: toNumber(editForm.business_trip_distance_km),
                 manager_user_id: editForm.manager_user_id ? Number(editForm.manager_user_id) : undefined,
                 description: (editForm.description || '').trim(),
-                cover_image_url: (editForm.cover_image_url || '').trim(),
+                cover_image_url: coverImageUrl || undefined,
             });
 
             if (version?.id) {
@@ -568,13 +631,36 @@ const BudgetProjectInfoEdit = () => {
                     />
                 </Field>
 
-                <Field label="대표 이미지 URL">
-                    <Input
-                        className="h-9 w-full"
-                        placeholder="비워두면 자동 생성 이미지 사용"
-                        value={editForm.cover_image_url}
-                        onChange={(event) => updateField('cover_image_url', event.target.value)}
-                    />
+                <Field label="대표 이미지">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[180px_1fr]">
+                        <label className="group relative flex aspect-square w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 transition hover:bg-slate-100">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                onChange={onCoverFileChange}
+                            />
+                            {coverPreviewUrl ? (
+                                <img src={coverPreviewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
+                            ) : (
+                                <div className="p-3 text-center">
+                                    <p className="text-xs font-semibold text-slate-600">이미지 업로드</p>
+                                    <p className="mt-1 text-[11px] text-slate-400">JPG/PNG/WEBP/GIF · 최대 5MB</p>
+                                </div>
+                            )}
+                        </label>
+                        <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p className="text-xs font-semibold text-slate-700">
+                                {coverFileName ? `선택 파일: ${coverFileName}` : '새 이미지를 선택하면 대표 이미지가 교체됩니다.'}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                                대표 이미지를 선택하지 않으면 기존 이미지(또는 자동 생성 이미지)를 유지합니다.
+                            </p>
+                            {coverError && (
+                                <p className="text-[11px] font-semibold text-rose-600">{coverError}</p>
+                            )}
+                        </div>
+                    </div>
                 </Field>
 
                 <div className="flex items-center justify-end gap-2 pt-1">

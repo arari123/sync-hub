@@ -33,6 +33,18 @@ class BudgetCoverUploadTests(unittest.TestCase):
         )
         self.assertEqual(normalized, "/budget/project-covers/9f9ea38148b64d7aa723b69e22e7f5c7.png")
 
+    def test_normalize_project_cover_input_url_from_uploads_path(self):
+        normalized = budget_api._normalize_project_cover_input_url(
+            "/uploads/project-covers/9f9ea38148b64d7aa723b69e22e7f5c7.png"
+        )
+        self.assertEqual(normalized, "/budget/project-covers/9f9ea38148b64d7aa723b69e22e7f5c7.png")
+
+    def test_normalize_project_cover_input_url_from_absolute_uploads_url(self):
+        normalized = budget_api._normalize_project_cover_input_url(
+            "https://example.com/uploads/project-covers/9f9ea38148b64d7aa723b69e22e7f5c7.png?download=1"
+        )
+        self.assertEqual(normalized, "/budget/project-covers/9f9ea38148b64d7aa723b69e22e7f5c7.png")
+
     def test_normalize_project_cover_input_url_rejects_local_file_path(self):
         normalized = budget_api._normalize_project_cover_input_url("/home/user/Desktop/cover.png")
         self.assertEqual(normalized, "")

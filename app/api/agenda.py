@@ -93,10 +93,10 @@ class AgendaPartPayload(BaseModel):
 
 
 class AgendaReportSectionsPayload(BaseModel):
-    symptom: str = Field(default="", max_length=4000)
-    cause: str = Field(default="", max_length=4000)
-    interim_action: str = Field(default="", max_length=4000)
-    final_action: str = Field(default="", max_length=4000)
+    symptom: str = Field(default="", max_length=300000)
+    cause: str = Field(default="", max_length=300000)
+    interim_action: str = Field(default="", max_length=300000)
+    final_action: str = Field(default="", max_length=300000)
 
 
 class AgendaThreadCreatePayload(BaseModel):
@@ -203,6 +203,60 @@ def _normalize_text(value: Optional[str], *, max_length: int = 0) -> str:
     return text
 
 
+def _normalize_report_section_html(value: Optional[str]) -> str:
+    raw = _normalize_text(value, max_length=300000)
+    if not raw:
+        return ""
+    sanitized = sanitize_rich_text_html(raw)
+    return _normalize_text(sanitized, max_length=300000)
+
+
+def _report_section_plain_text(value: Any) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(value, dict):
+        html_candidate = _normalize_text(value.get("html"), max_length=300000)
+        plain_candidate = _normalize_text(value.get("plain"), max_length=4000)
+    else:
+        html_candidate = _normalize_text(value, max_length=300000)
+        plain_candidate = ""
+
+    extracted = _extract_plain_text_from_html(html_candidate)
+    if extracted:
+        return _normalize_text(extracted, max_length=4000)
+    if plain_candidate:
+        return _normalize_text(plain_candidate, max_length=4000)
+    return ""
+
+
+def _report_section_plain_from_payload(report_sections: dict[str, Any], key: str) -> str:
+    if not isinstance(report_sections, dict):
+        return ""
+    stored_plain = _normalize_text(report_sections.get(f"{key}_plain"), max_length=4000)
+    if stored_plain:
+        return stored_plain
+    return _report_section_plain_text(report_sections.get(key))
+
+
+def _work_report_summary_plain(report_payload: dict[str, Any]) -> str:
+    sections = report_payload.get("report_sections") if isinstance(report_payload, dict) else {}
+    if not isinstance(sections, dict):
+        return ""
+
+    lines = []
+    for key, label in (
+        ("symptom", "현상"),
+        ("cause", "원인"),
+        ("interim_action", "조치사항(중간)"),
+        ("final_action", "조치사항(최종)"),
+    ):
+        plain = _report_section_plain_from_payload(sections, key)
+        if plain:
+            lines.append(f"{label}: {plain}")
+    return _normalize_text("\n".join(lines), max_length=1200)
+
+
 def _extract_plain_text_from_html(raw_html: Optional[str]) -> str:
     unescaped = html.unescape(str(raw_html or ""))
     without_tags = _TAG_RE.sub(" ", unescaped)
@@ -280,11 +334,19 @@ def _normalize_report_payload(
         seen.add(key)
         target_equipments.append(name)
 
+    symptom_html = _normalize_report_section_html(payload.report_sections.symptom)
+    cause_html = _normalize_report_section_html(payload.report_sections.cause)
+    interim_action_html = _normalize_report_section_html(payload.report_sections.interim_action)
+    final_action_html = _normalize_report_section_html(payload.report_sections.final_action)
     report_sections = {
-        "symptom": _normalize_text(payload.report_sections.symptom, max_length=4000),
-        "cause": _normalize_text(payload.report_sections.cause, max_length=4000),
-        "interim_action": _normalize_text(payload.report_sections.interim_action, max_length=4000),
-        "final_action": _normalize_text(payload.report_sections.final_action, max_length=4000),
+        "symptom": symptom_html,
+        "cause": cause_html,
+        "interim_action": interim_action_html,
+        "final_action": final_action_html,
+        "symptom_plain": _report_section_plain_text(symptom_html),
+        "cause_plain": _report_section_plain_text(cause_html),
+        "interim_action_plain": _report_section_plain_text(interim_action_html),
+        "final_action_plain": _report_section_plain_text(final_action_html),
     }
 
     return {
@@ -509,12 +571,16 @@ def _serialize_thread(
     root_summary_plain = ""
     if root_entry and root_entry.content_plain:
         root_summary_plain = _collapse_snippet_whitespace(root_entry.content_plain)
+    if not root_summary_plain and thread.thread_kind == THREAD_KIND_WORK_REPORT:
+        root_summary_plain = _collapse_snippet_whitespace(_work_report_summary_plain(root_payload))
     if not root_summary_plain:
         root_summary_plain = _collapse_snippet_whitespace(thread.summary_plain or "")
 
     latest_summary_plain = ""
     if latest_entry and latest_entry.content_plain:
         latest_summary_plain = _collapse_snippet_whitespace(latest_entry.content_plain)
+    if not latest_summary_plain and thread.thread_kind == THREAD_KIND_WORK_REPORT:
+        latest_summary_plain = _collapse_snippet_whitespace(_work_report_summary_plain(latest_payload))
     if not latest_summary_plain:
         latest_summary_plain = _collapse_snippet_whitespace(thread.summary_plain or "")
 
@@ -1301,15 +1367,21 @@ async def create_agenda_thread(
     elif not content_plain:
         content_plain = ""
 
-    report_payload = {}
+    report_payload: dict[str, Any] = {}
+    work_report_summary_plain = ""
     if thread_kind == THREAD_KIND_WORK_REPORT:
         report_payload = _normalize_report_payload(parsed, project, user)
+        work_report_summary_plain = _work_report_summary_plain(report_payload)
+        if not content_plain and work_report_summary_plain:
+            content_plain = work_report_summary_plain
         if save_mode == RECORD_STATUS_PUBLISHED:
             sections = report_payload.get("report_sections") or {}
-            if not _normalize_text(sections.get("symptom"), max_length=4000):
+            if not _report_section_plain_from_payload(sections, "symptom"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="작업보고서의 현상은 필수입니다.")
-            if not _normalize_text(sections.get("final_action"), max_length=4000):
+            if not _report_section_plain_from_payload(sections, "final_action"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="작업보고서의 최종 조치사항은 필수입니다.")
+
+    thread_summary_plain = work_report_summary_plain or content_plain
 
     thread = models.AgendaThread(
         project_id=project_id,
@@ -1320,7 +1392,7 @@ async def create_agenda_thread(
         created_by_user_id=int(user.id),
         source_thread_id=parsed.source_thread_id,
         title=parsed.title.strip(),
-        summary_plain=content_plain[:1200],
+        summary_plain=thread_summary_plain[:1200],
         requester_name=requester_name or None,
         requester_org=requester_org or None,
         responder_name=responder_name or None,
@@ -1452,15 +1524,21 @@ async def update_draft_thread(
     elif not content_plain:
         content_plain = ""
 
-    report_payload = {}
+    report_payload: dict[str, Any] = {}
+    work_report_summary_plain = ""
     if thread_kind == THREAD_KIND_WORK_REPORT:
         report_payload = _normalize_report_payload(parsed, project, user)
+        work_report_summary_plain = _work_report_summary_plain(report_payload)
+        if not content_plain and work_report_summary_plain:
+            content_plain = work_report_summary_plain
         if save_mode == RECORD_STATUS_PUBLISHED:
             sections = report_payload.get("report_sections") or {}
-            if not _normalize_text(sections.get("symptom"), max_length=4000):
+            if not _report_section_plain_from_payload(sections, "symptom"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="작업보고서의 현상은 필수입니다.")
-            if not _normalize_text(sections.get("final_action"), max_length=4000):
+            if not _report_section_plain_from_payload(sections, "final_action"):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="작업보고서의 최종 조치사항은 필수입니다.")
+
+    thread_summary_plain = work_report_summary_plain or content_plain
 
     attachment_count = int(root_entry.attachment_count or 0)
     if files:
@@ -1488,7 +1566,7 @@ async def update_draft_thread(
 
     thread.thread_kind = thread_kind
     thread.title = parsed.title.strip()
-    thread.summary_plain = content_plain[:1200]
+    thread.summary_plain = thread_summary_plain[:1200]
     thread.requester_name = requester_name or None
     thread.requester_org = requester_org or None
     thread.responder_name = responder_name or None
@@ -1556,10 +1634,16 @@ async def create_agenda_reply(
     elif not content_plain:
         content_plain = ""
 
-    entry_payload = {}
+    entry_payload: dict[str, Any] = {}
+    work_report_summary_plain = ""
     if thread.thread_kind == THREAD_KIND_WORK_REPORT:
         project = _get_project_or_404(int(thread.project_id), db)
         entry_payload = _normalize_report_payload(parsed, project, user)
+        work_report_summary_plain = _work_report_summary_plain(entry_payload)
+        if not content_plain and work_report_summary_plain:
+            content_plain = work_report_summary_plain
+
+    thread_summary_plain = work_report_summary_plain or content_plain
 
     entry = models.AgendaEntry(
         thread_id=int(thread.id),
@@ -1597,7 +1681,7 @@ async def create_agenda_reply(
 
     thread.latest_entry_id = int(entry.id)
     thread.title = (thread.title or "").strip() or parsed.title.strip()
-    thread.summary_plain = content_plain[:1200]
+    thread.summary_plain = thread_summary_plain[:1200]
     thread.responder_name = responder_name or None
     thread.responder_org = responder_org or None
     _update_thread_counters_and_timestamps(thread, now_iso=now_iso, db=db)

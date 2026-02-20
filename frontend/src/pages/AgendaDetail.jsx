@@ -22,7 +22,66 @@ function numberValue(value, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function EntryPanel({ entry, label, tone = 'slate' }) {
+function stripHtmlText(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (typeof window === 'undefined') {
+        return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    const node = document.createElement('div');
+    node.innerHTML = raw;
+    return (node.textContent || node.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function resolveReportSection(reportSections, key) {
+    const sections = reportSections && typeof reportSections === 'object' ? reportSections : {};
+    const storedPlain = String(sections?.[`${key}_plain`] || '').trim();
+    const rawValue = sections?.[key];
+
+    if (rawValue && typeof rawValue === 'object') {
+        const htmlValue = String(rawValue?.html || '').trim();
+        const plainValue = String(rawValue?.plain || '').trim();
+        return {
+            html: htmlValue,
+            plain: plainValue || storedPlain || stripHtmlText(htmlValue),
+        };
+    }
+
+    const htmlValue = String(rawValue || '').trim();
+    return {
+        html: htmlValue,
+        plain: storedPlain || stripHtmlText(htmlValue),
+    };
+}
+
+function WorkReportSectionsPanel({ reportSections }) {
+    const sectionItems = [
+        { key: 'symptom', label: '현상' },
+        { key: 'cause', label: '원인' },
+        { key: 'interim_action', label: '조치사항 (중간)' },
+        { key: 'final_action', label: '조치사항 (최종)' },
+    ];
+
+    return (
+        <div className="mt-4 grid grid-cols-1 gap-3">
+            {sectionItems.map((item) => {
+                const section = resolveReportSection(reportSections, item.key);
+                return (
+                    <section key={`report-section-${item.key}`} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <h4 className="text-xs font-black text-slate-700">{item.label}</h4>
+                        <div className="prose prose-slate mt-2 max-w-none rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                            {section.html
+                                ? <div dangerouslySetInnerHTML={{ __html: section.html }} />
+                                : <p className="whitespace-pre-wrap text-sm text-slate-600">{section.plain || '-'}</p>}
+                        </div>
+                    </section>
+                );
+            })}
+        </div>
+    );
+}
+
+function EntryPanel({ entry, label, tone = 'slate', threadKind = '' }) {
     if (!entry) return null;
 
     const toneClass = tone === 'cyan'
@@ -51,11 +110,15 @@ function EntryPanel({ entry, label, tone = 'slate' }) {
                 <p><span className="font-semibold text-slate-500">첨부</span> {entry.attachment_count || 0}건</p>
             </div>
 
-            <div className="prose mt-4 max-w-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
-                {entry.content_html
-                    ? <div dangerouslySetInnerHTML={{ __html: entry.content_html }} />
-                    : <p>{entry.content_plain || '-'}</p>}
-            </div>
+            {threadKind === 'work_report' ? (
+                <WorkReportSectionsPanel reportSections={entry?.payload?.report_sections} />
+            ) : (
+                <div className="prose mt-4 max-w-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
+                    {entry.content_html
+                        ? <div dangerouslySetInnerHTML={{ __html: entry.content_html }} />
+                        : <p>{entry.content_plain || '-'}</p>}
+                </div>
+            )}
 
             {(entry.attachments || []).length > 0 && (
                 <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -192,10 +255,10 @@ export default function AgendaDetail() {
                         ? latestPayload.parts
                         : [{ part_name: '', manufacturer: '', model_name: '', quantity: 1 }],
                     report_sections: {
-                        symptom: latestPayload.report_sections?.symptom || '',
-                        cause: latestPayload.report_sections?.cause || '',
-                        interim_action: latestPayload.report_sections?.interim_action || '',
-                        final_action: latestPayload.report_sections?.final_action || '',
+                        symptom: resolveReportSection(latestPayload.report_sections, 'symptom').html,
+                        cause: resolveReportSection(latestPayload.report_sections, 'cause').html,
+                        interim_action: resolveReportSection(latestPayload.report_sections, 'interim_action').html,
+                        final_action: resolveReportSection(latestPayload.report_sections, 'final_action').html,
                     },
                     content_html: '',
                     content_plain: '',
@@ -386,11 +449,13 @@ export default function AgendaDetail() {
         }
 
         if (isWorkReport) {
-            if (!replyForm.report_sections.symptom.trim()) {
+            const symptomPlain = stripHtmlText(replyForm.report_sections.symptom);
+            const finalActionPlain = stripHtmlText(replyForm.report_sections.final_action);
+            if (!symptomPlain) {
                 setError('작업보고서 답변의 현상은 필수입니다.');
                 return;
             }
-            if (!replyForm.report_sections.final_action.trim()) {
+            if (!finalActionPlain) {
                 setError('작업보고서 답변의 최종 조치사항은 필수입니다.');
                 return;
             }
@@ -399,8 +464,8 @@ export default function AgendaDetail() {
         const payload = {
             entry_kind: isWorkReport ? 'additional_work' : 'reply',
             title,
-            content_html: replyForm.content_html,
-            content_plain: replyForm.content_plain,
+            content_html: isWorkReport ? '' : replyForm.content_html,
+            content_plain: isWorkReport ? '' : replyForm.content_plain,
             requester_name: replyForm.requester_name,
             requester_org: replyForm.requester_org,
             responder_name: replyForm.responder_name,
@@ -641,36 +706,58 @@ export default function AgendaDetail() {
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-                                <label className="space-y-1">
+                            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                <div className="space-y-1">
                                     <span className="text-xs font-semibold text-slate-600">현상 (필수)</span>
-                                    <textarea value={replyForm.report_sections.symptom} onChange={(event) => setReplyReportSection('symptom', event.target.value)} className={`${inputClass} min-h-[100px]`} />
-                                </label>
-                                <label className="space-y-1">
+                                    <RichTextEditor
+                                        value={replyForm.report_sections.symptom}
+                                        onChange={(htmlValue) => setReplyReportSection('symptom', htmlValue)}
+                                        placeholder="현상을 입력하세요."
+                                        minHeight={180}
+                                    />
+                                </div>
+                                <div className="space-y-1">
                                     <span className="text-xs font-semibold text-slate-600">원인</span>
-                                    <textarea value={replyForm.report_sections.cause} onChange={(event) => setReplyReportSection('cause', event.target.value)} className={`${inputClass} min-h-[100px]`} />
-                                </label>
-                                <label className="space-y-1">
+                                    <RichTextEditor
+                                        value={replyForm.report_sections.cause}
+                                        onChange={(htmlValue) => setReplyReportSection('cause', htmlValue)}
+                                        placeholder="원인을 입력하세요."
+                                        minHeight={180}
+                                    />
+                                </div>
+                                <div className="space-y-1">
                                     <span className="text-xs font-semibold text-slate-600">조치사항 (중간)</span>
-                                    <textarea value={replyForm.report_sections.interim_action} onChange={(event) => setReplyReportSection('interim_action', event.target.value)} className={`${inputClass} min-h-[100px]`} />
-                                </label>
-                                <label className="space-y-1">
+                                    <RichTextEditor
+                                        value={replyForm.report_sections.interim_action}
+                                        onChange={(htmlValue) => setReplyReportSection('interim_action', htmlValue)}
+                                        placeholder="중간 조치사항을 입력하세요."
+                                        minHeight={180}
+                                    />
+                                </div>
+                                <div className="space-y-1">
                                     <span className="text-xs font-semibold text-slate-600">조치사항 (최종, 필수)</span>
-                                    <textarea value={replyForm.report_sections.final_action} onChange={(event) => setReplyReportSection('final_action', event.target.value)} className={`${inputClass} min-h-[100px]`} />
-                                </label>
+                                    <RichTextEditor
+                                        value={replyForm.report_sections.final_action}
+                                        onChange={(htmlValue) => setReplyReportSection('final_action', htmlValue)}
+                                        placeholder="최종 조치사항을 입력하세요."
+                                        minHeight={180}
+                                    />
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    <RichTextEditor
-                        value={replyForm.content_html}
-                        onChange={(htmlValue, plainValue) => {
-                            setReplyField('content_html', htmlValue);
-                            setReplyField('content_plain', plainValue);
-                        }}
-                        placeholder="답변 내용을 입력하세요."
-                        minHeight={220}
-                    />
+                    {!isWorkReport && (
+                        <RichTextEditor
+                            value={replyForm.content_html}
+                            onChange={(htmlValue, plainValue) => {
+                                setReplyField('content_html', htmlValue);
+                                setReplyField('content_plain', plainValue);
+                            }}
+                            placeholder="답변 내용을 입력하세요."
+                            minHeight={220}
+                        />
+                    )}
 
                     <div className="space-y-2">
                         <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
@@ -712,7 +799,7 @@ export default function AgendaDetail() {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="space-y-4">
                     {latestIsDistinct && (
-                        <EntryPanel entry={latestEntry} label="최신 답변" tone="cyan" />
+                        <EntryPanel entry={latestEntry} label="최신 답변" tone="cyan" threadKind={thread.thread_kind} />
                     )}
 
                     {middleEntries.length > 0 && (
@@ -745,7 +832,7 @@ export default function AgendaDetail() {
                                         </button>
                                         {isExpanded && (
                                             <div className="mt-2">
-                                                <EntryPanel entry={entry} tone="amber" />
+                                                <EntryPanel entry={entry} tone="amber" threadKind={thread.thread_kind} />
                                             </div>
                                         )}
                                     </div>
@@ -754,7 +841,7 @@ export default function AgendaDetail() {
                         </section>
                     )}
 
-                    <EntryPanel entry={rootEntry} label="최초 등록 안건" tone="slate" />
+                    <EntryPanel entry={rootEntry} label="최초 등록 안건" tone="slate" threadKind={thread.thread_kind} />
                 </div>
 
                 <aside className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-4 xl:h-fit">

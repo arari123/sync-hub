@@ -91,6 +91,65 @@ function formatDateLabel(value) {
     return text.slice(0, 16).replace('T', ' ');
 }
 
+function stripHtmlText(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (typeof window === 'undefined') {
+        return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    const node = document.createElement('div');
+    node.innerHTML = raw;
+    return (node.textContent || node.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+function resolveReportSection(reportSections, key) {
+    const sections = reportSections && typeof reportSections === 'object' ? reportSections : {};
+    const storedPlain = String(sections?.[`${key}_plain`] || '').trim();
+    const rawValue = sections?.[key];
+
+    if (rawValue && typeof rawValue === 'object') {
+        const htmlValue = String(rawValue?.html || '').trim();
+        const plainValue = String(rawValue?.plain || '').trim();
+        return {
+            html: htmlValue,
+            plain: plainValue || storedPlain || stripHtmlText(htmlValue),
+        };
+    }
+
+    const htmlValue = String(rawValue || '').trim();
+    return {
+        html: htmlValue,
+        plain: storedPlain || stripHtmlText(htmlValue),
+    };
+}
+
+function WorkReportSectionsPanel({ reportSections }) {
+    const sectionItems = [
+        { key: 'symptom', label: '현상' },
+        { key: 'cause', label: '원인' },
+        { key: 'interim_action', label: '조치사항 (중간)' },
+        { key: 'final_action', label: '조치사항 (최종)' },
+    ];
+
+    return (
+        <div className="mt-4 grid grid-cols-1 gap-3">
+            {sectionItems.map((item) => {
+                const section = resolveReportSection(reportSections, item.key);
+                return (
+                    <section key={`report-section-${item.key}`} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <h4 className="text-xs font-black text-slate-700">{item.label}</h4>
+                        <div className="prose prose-slate mt-2 max-w-none rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                            {section.html
+                                ? <div dangerouslySetInnerHTML={{ __html: section.html }} />
+                                : <p className="whitespace-pre-wrap text-sm text-slate-600">{section.plain || '-'}</p>}
+                        </div>
+                    </section>
+                );
+            })}
+        </div>
+    );
+}
+
 function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false }) {
     const projectCode = String(item?.project_code || '').trim();
     const projectName = String(item?.project_name || '').trim();
@@ -142,7 +201,7 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
     );
 }
 
-function EntryBodyPanel({ entry, label, tone = 'slate' }) {
+function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
     if (!entry) return null;
 
     const toneClass = tone === 'cyan'
@@ -171,11 +230,15 @@ function EntryBodyPanel({ entry, label, tone = 'slate' }) {
                 <p><span className="font-semibold text-slate-500">첨부</span> {entry.attachment_count || 0}건</p>
             </div>
 
-            <div className="prose mt-4 max-w-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
-                {entry.content_html
-                    ? <div dangerouslySetInnerHTML={{ __html: entry.content_html }} />
-                    : <p>{entry.content_plain || '-'}</p>}
-            </div>
+            {threadKind === 'work_report' ? (
+                <WorkReportSectionsPanel reportSections={entry?.payload?.report_sections} />
+            ) : (
+                <div className="prose mt-4 max-w-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
+                    {entry.content_html
+                        ? <div dangerouslySetInnerHTML={{ __html: entry.content_html }} />
+                        : <p>{entry.content_plain || '-'}</p>}
+                </div>
+            )}
 
             {(entry.attachments || []).length > 0 && (
                 <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -227,6 +290,9 @@ export default function AgendaSplitView({
     const [detail, setDetail] = useState(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState('');
+    const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
+    const [statusNotice, setStatusNotice] = useState('');
+    const [statusError, setStatusError] = useState('');
 
     const [entrySeenBaselines, setEntrySeenBaselines] = useState(() => loadAgendaEntrySeenBaselines());
 
@@ -391,6 +457,11 @@ export default function AgendaSplitView({
     }, [items, selectedEntryId]);
 
     useEffect(() => {
+        setStatusNotice('');
+        setStatusError('');
+    }, [selectedThreadId]);
+
+    useEffect(() => {
         if (!selectedThreadId) return undefined;
 
         const controller = new AbortController();
@@ -478,6 +549,41 @@ export default function AgendaSplitView({
         const targetThreadId = Number(selectedThreadId || 0);
         if (!targetProjectId || !targetThreadId) return;
         navigate(`/project-management/projects/${targetProjectId}/agenda/${targetThreadId}?reply=1`);
+    };
+
+    const handleStatusToggle = async () => {
+        if (!detail?.thread || !detail?.can_change_status) return;
+
+        const threadId = Number(detail.thread.id || 0);
+        if (!threadId) return;
+
+        const nextStatus = detail.thread.progress_status === 'in_progress' ? 'completed' : 'in_progress';
+        setIsStatusSubmitting(true);
+        setStatusNotice('');
+        setStatusError('');
+        try {
+            await api.patch(`/agenda/threads/${threadId}/status`, { progress_status: nextStatus });
+            setDetail((prev) => {
+                if (!prev?.thread) return prev;
+                return {
+                    ...prev,
+                    thread: {
+                        ...prev.thread,
+                        progress_status: nextStatus,
+                    },
+                };
+            });
+            setItems((prev) => prev.map((item) => (
+                Number(item?.thread_id || 0) === threadId
+                    ? { ...item, progress_status: nextStatus }
+                    : item
+            )));
+            setStatusNotice(nextStatus === 'completed' ? '완료 상태로 변경되었습니다.' : '진행 중 상태로 변경되었습니다.');
+        } catch (error) {
+            setStatusError(getErrorMessage(error, '안건 상태를 변경하지 못했습니다.'));
+        } finally {
+            setIsStatusSubmitting(false);
+        }
     };
 
     return (
@@ -594,6 +700,16 @@ export default function AgendaSplitView({
                                     <span className="text-xs text-slate-400">업데이트 {formatDateLabel(detail.thread.last_updated_at)}</span>
 
                                     <div className="ml-auto flex items-center gap-2">
+                                        {detail?.can_change_status && (
+                                            <button
+                                                type="button"
+                                                onClick={handleStatusToggle}
+                                                disabled={isStatusSubmitting}
+                                                className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {detail.thread.progress_status === 'in_progress' ? '완료 처리' : '진행 중 복귀'}
+                                            </button>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={openReplyDetail}
@@ -618,14 +734,31 @@ export default function AgendaSplitView({
                                 </p>
                             </section>
 
+                            {statusError && (
+                                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                                    {statusError}
+                                </div>
+                            )}
+                            {statusNotice && (
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                                    {statusNotice}
+                                </div>
+                            )}
+
                             <EntryBodyPanel
                                 entry={selectedEntry}
                                 tone={selectedIsRoot ? 'slate' : 'cyan'}
                                 label={selectedIsRoot ? '최초 등록 안건' : '선택한 답변 안건'}
+                                threadKind={detail?.thread?.thread_kind || ''}
                             />
 
                             {!selectedIsRoot && rootEntry && (
-                                <EntryBodyPanel entry={rootEntry} tone="slate" label="최초 등록 안건" />
+                                <EntryBodyPanel
+                                    entry={rootEntry}
+                                    tone="slate"
+                                    label="최초 등록 안건"
+                                    threadKind={detail?.thread?.thread_kind || ''}
+                                />
                             )}
 
                             <aside className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">

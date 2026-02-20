@@ -66,11 +66,13 @@ const STATUS_FILTER_OPTIONS = [
     { value: 'in_progress', label: '진행 중' },
     { value: 'completed', label: '완료' },
 ];
-const MILESTONE_BASE_ROW_HEIGHT_PX = 48;
+const MILESTONE_ROW_HEIGHT_NO_EVENTS_PX = 44;
+const MILESTONE_BASE_ROW_HEIGHT_PX = 56;
 const MILESTONE_EVENT_LANE_HEIGHT_PX = 18;
-const MILESTONE_EVENT_LABEL_MIN_WIDTH_PERCENT = 10;
-const MILESTONE_EVENT_LABEL_MAX_WIDTH_PERCENT = 26;
-const MILESTONE_EVENT_LABEL_GAP_PERCENT = 0.45;
+const MILESTONE_EVENT_LABEL_MIN_WIDTH_PX = 96;
+const MILESTONE_EVENT_LABEL_MAX_WIDTH_PX = 320;
+const MILESTONE_EVENT_LABEL_GAP_PX = 10;
+const MILESTONE_CHART_MIN_WIDTH_PX = 320;
 
 function formatDateLabel(value) {
     const text = String(value || '').trim();
@@ -83,12 +85,6 @@ function formatRangeLabel(startValue, endValue) {
     const end = formatDateLabel(endValue);
     if (start === '-' && end === '-') return '-';
     return `${start} ~ ${end}`;
-}
-
-function formatMonthDay(value) {
-    const text = String(value || '').trim();
-    if (!text || text.length < 10) return '-';
-    return `${text.slice(5, 7)}/${text.slice(8, 10)}`;
 }
 
 function resolveStatus(row, today) {
@@ -217,27 +213,46 @@ function estimateEventNameVisualLength(value) {
     ), 0);
 }
 
-function estimateMilestoneLabelWidthPercent(eventName) {
-    const visualLength = estimateEventNameVisualLength(eventName);
-    const estimated = 6 + (visualLength * 1.05);
+function estimateMilestoneLabelWidthPx(dateValue, eventName) {
+    const dateText = formatDateLabel(dateValue);
+    const dateVisualLength = estimateEventNameVisualLength(dateText);
+    const nameVisualLength = estimateEventNameVisualLength(eventName);
+    const dateChipWidth = 10 + (dateVisualLength * 5.4);
+    const nameWidth = Math.max(12, nameVisualLength * 6.2);
+    const estimated = 16 + dateChipWidth + 6 + nameWidth;
     return Math.min(
-        MILESTONE_EVENT_LABEL_MAX_WIDTH_PERCENT,
-        Math.max(MILESTONE_EVENT_LABEL_MIN_WIDTH_PERCENT, estimated),
+        MILESTONE_EVENT_LABEL_MAX_WIDTH_PX,
+        Math.max(MILESTONE_EVENT_LABEL_MIN_WIDTH_PX, estimated),
     );
 }
 
-function resolveMilestoneLabelWindow(position, widthPercent) {
+function resolveMilestoneLabelWindowPx(positionPx, widthPx, chartWidthPx) {
     const safeWidth = Math.min(
-        MILESTONE_EVENT_LABEL_MAX_WIDTH_PERCENT,
-        Math.max(MILESTONE_EVENT_LABEL_MIN_WIDTH_PERCENT, widthPercent),
+        MILESTONE_EVENT_LABEL_MAX_WIDTH_PX,
+        Math.max(MILESTONE_EVENT_LABEL_MIN_WIDTH_PX, widthPx),
     );
-    const maxStart = Math.max(0, 100 - safeWidth);
-    const start = Math.min(maxStart, Math.max(0, position - (safeWidth / 2)));
-    return { start, width: safeWidth };
+    const maxStart = Math.max(0, chartWidthPx - safeWidth);
+    const startPx = Math.min(maxStart, Math.max(0, positionPx - (safeWidth / 2)));
+    return { startPx, widthPx: safeWidth };
 }
 
-function layoutMilestoneEvents(rows, bounds) {
-    const laneRightEdges = [];
+function layoutMilestoneEvents(rows, bounds, chartWidthPx) {
+    if (!Number.isFinite(chartWidthPx) || chartWidthPx <= 0) return [];
+
+    const topLaneRightEdges = [];
+    const bottomLaneRightEdges = [];
+    let previousWindow = null;
+
+    const findLane = (laneRightEdges, startPx) => {
+        let lane = 0;
+        while (
+            lane < laneRightEdges.length
+            && startPx <= (laneRightEdges[lane] + MILESTONE_EVENT_LABEL_GAP_PX)
+        ) {
+            lane += 1;
+        }
+        return lane;
+    };
 
     return rows
         .map((row) => {
@@ -245,39 +260,63 @@ function layoutMilestoneEvents(rows, bounds) {
             const safePosition = clampPercent(rawPos);
             if (safePosition === null) return null;
 
-            const labelWidthPercent = estimateMilestoneLabelWidthPercent(row.name || '이벤트');
-            const { start: labelStart, width: labelWidth } = resolveMilestoneLabelWindow(
-                safePosition,
-                labelWidthPercent,
+            const anchorPx = (safePosition / 100) * chartWidthPx;
+            const labelWidthPx = estimateMilestoneLabelWidthPx(row.start_date, row.name || '이벤트');
+            const window = resolveMilestoneLabelWindowPx(
+                anchorPx,
+                labelWidthPx,
+                chartWidthPx,
             );
 
-            let lane = 0;
-            while (
-                lane < laneRightEdges.length
-                && labelStart < (laneRightEdges[lane] + MILESTONE_EVENT_LABEL_GAP_PERCENT)
-            ) {
-                lane += 1;
-            }
-            laneRightEdges[lane] = labelStart + labelWidth;
+            const isCloseToPrevious = previousWindow
+                ? window.startPx <= (previousWindow.endPx + MILESTONE_EVENT_LABEL_GAP_PX)
+                : false;
 
-            return {
+            const preferredPlacement = isCloseToPrevious
+                ? (previousWindow?.placement === 'top' ? 'bottom' : 'top')
+                : 'top';
+            const oppositePlacement = preferredPlacement === 'top' ? 'bottom' : 'top';
+
+            const preferredLaneRightEdges = preferredPlacement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
+            const oppositeLaneRightEdges = oppositePlacement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
+
+            let placement = preferredPlacement;
+            let lane = findLane(preferredLaneRightEdges, window.startPx);
+
+            if (lane > 0) {
+                const oppositeLane = findLane(oppositeLaneRightEdges, window.startPx);
+                if (oppositeLane < lane) {
+                    placement = oppositePlacement;
+                    lane = oppositeLane;
+                }
+            }
+
+            const laneRightEdges = placement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
+            laneRightEdges[lane] = window.startPx + window.widthPx;
+
+            const event = {
                 id: row.id,
                 name: row.name || '이벤트',
                 date: row.start_date,
                 lane,
+                placement,
                 position: safePosition,
-                label_start: labelStart,
-                label_width: labelWidth,
             };
+
+            previousWindow = {
+                placement,
+                endPx: window.startPx + window.widthPx,
+            };
+
+            return event;
         })
         .filter(Boolean);
 }
 
-function resolveMilestoneRowHeight(summary, showEvents) {
-    const laneCount = showEvents
-        ? Math.max(1, Number(summary?.event_lane_count || 1))
-        : 1;
-    return MILESTONE_BASE_ROW_HEIGHT_PX + (Math.max(0, laneCount - 1) * MILESTONE_EVENT_LANE_HEIGHT_PX);
+function resolveMilestoneRowHeight(laneDepth, showEvents) {
+    if (!showEvents) return MILESTONE_ROW_HEIGHT_NO_EVENTS_PX;
+    const safeLaneDepth = Math.max(1, Number(laneDepth || 1));
+    return MILESTONE_BASE_ROW_HEIGHT_PX + ((safeLaneDepth - 1) * MILESTONE_EVENT_LANE_HEIGHT_PX * 2);
 }
 
 export default function BudgetProjectScheduleManagement() {
@@ -298,7 +337,9 @@ export default function BudgetProjectScheduleManagement() {
 
     const milestoneScrollRef = useRef(null);
     const ganttScrollRef = useRef(null);
+    const milestoneChartAreaRef = useRef(null);
     const isSyncingScrollRef = useRef(false);
+    const [milestoneChartWidth, setMilestoneChartWidth] = useState(640);
 
     useEffect(() => {
         const loadSchedule = async () => {
@@ -383,6 +424,32 @@ export default function BudgetProjectScheduleManagement() {
             : []
     ), [chartBounds, schedule.weekend_mode]);
     const todayLinePos = useMemo(() => getTodayLinePosition(chartBounds, today), [chartBounds, today]);
+
+    useEffect(() => {
+        const chartEl = milestoneChartAreaRef.current;
+        if (!chartEl) return undefined;
+
+        const updateWidth = () => {
+            const nextWidth = Math.max(MILESTONE_CHART_MIN_WIDTH_PX, Math.floor(chartEl.clientWidth || 0));
+            setMilestoneChartWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+        };
+
+        updateWidth();
+
+        if (typeof ResizeObserver === 'function') {
+            const observer = new ResizeObserver(() => updateWidth());
+            observer.observe(chartEl);
+            return () => observer.disconnect();
+        }
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', updateWidth);
+            return () => window.removeEventListener('resize', updateWidth);
+        }
+
+        return undefined;
+    }, [chartBounds]);
+
     const stageSummaries = useMemo(() => {
         if (!chartBounds) return [];
 
@@ -415,10 +482,17 @@ export default function BudgetProjectScheduleManagement() {
                     if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
                     return a.name.localeCompare(b.name, 'ko-KR');
                 });
-            const events = layoutMilestoneEvents(eventRows, chartBounds);
-            const eventLaneCount = events.reduce((maxLane, event) => (
-                Math.max(maxLane, event.lane + 1)
-            ), 1);
+            const events = layoutMilestoneEvents(eventRows, chartBounds, milestoneChartWidth);
+            const topLaneCount = events.reduce((maxLane, event) => (
+                event.placement === 'top'
+                    ? Math.max(maxLane, event.lane + 1)
+                    : maxLane
+            ), 0);
+            const bottomLaneCount = events.reduce((maxLane, event) => (
+                event.placement === 'bottom'
+                    ? Math.max(maxLane, event.lane + 1)
+                    : maxLane
+            ), 0);
 
             return {
                 stage,
@@ -428,10 +502,11 @@ export default function BudgetProjectScheduleManagement() {
                 position,
                 task_count: tasks.length,
                 events,
-                event_lane_count: eventLaneCount,
+                top_lane_count: topLaneCount,
+                bottom_lane_count: bottomLaneCount,
             };
         });
-    }, [chartBounds, scopedRows]);
+    }, [chartBounds, scopedRows, milestoneChartWidth]);
 
     const resetFilters = () => {
         setSearchText('');
@@ -468,6 +543,12 @@ export default function BudgetProjectScheduleManagement() {
     const handleGanttScroll = () => syncHorizontalScroll('gantt');
 
     const showMilestoneEvents = kindFilter !== 'task';
+    const milestoneLaneDepth = showMilestoneEvents
+        ? stageSummaries.reduce((maxDepth, summary) => (
+            Math.max(maxDepth, summary.top_lane_count || 0, summary.bottom_lane_count || 0, 1)
+        ), 1)
+        : 1;
+    const milestoneRowHeight = resolveMilestoneRowHeight(milestoneLaneDepth, showMilestoneEvents);
 
     if (isLoading) {
         return (
@@ -828,7 +909,7 @@ export default function BudgetProjectScheduleManagement() {
                                                 <div
                                                     key={`milestone-stage-label-${summary.stage}`}
                                                     className="flex items-center justify-between gap-3 px-3"
-                                                    style={{ height: `${resolveMilestoneRowHeight(summary, showMilestoneEvents)}px` }}
+                                                    style={{ height: `${milestoneRowHeight}px` }}
                                                 >
                                                     <span className="text-xs font-bold text-slate-800">{summary.label}</span>
                                                     <div className="text-right font-mono text-[11px] text-slate-600">
@@ -838,7 +919,7 @@ export default function BudgetProjectScheduleManagement() {
                                             ))}
                                         </div>
 
-                                        <div className="relative overflow-visible bg-white">
+                                        <div ref={milestoneChartAreaRef} className="relative overflow-visible bg-white">
                                             <div className="pointer-events-none absolute inset-0 z-0">
                                                 {chartTicks.map((tick) => (
                                                     <div
@@ -861,15 +942,15 @@ export default function BudgetProjectScheduleManagement() {
                                                     const stageStyle = STAGE_STYLES[summary.stage] || STAGE_STYLES.design;
                                                     const barLeft = summary.position?.left ?? 0;
                                                     const barWidth = summary.position ? Math.max(summary.position.width, 0.6) : 0;
-                                                    const rowHeight = resolveMilestoneRowHeight(summary, showMilestoneEvents);
+                                                    const rowHeight = milestoneRowHeight;
 
                                                     return (
                                                         <div
                                                             key={`milestone-stage-row-${summary.stage}`}
-                                                            className="flex px-2"
+                                                            className="relative overflow-visible px-2"
                                                             style={{ height: `${rowHeight}px` }}
                                                         >
-                                                            <div className={cn('relative mt-auto h-3.5 w-full rounded-md border border-slate-200/70', stageStyle.rail)}>
+                                                            <div className={cn('absolute inset-x-2 top-1/2 h-3.5 -translate-y-1/2 rounded-md border border-slate-200/70', stageStyle.rail)}>
                                                                 {summary.position ? (
                                                                     <span
                                                                         className={cn('absolute inset-y-0 rounded-md shadow-sm', stageStyle.bar)}
@@ -877,42 +958,50 @@ export default function BudgetProjectScheduleManagement() {
                                                                     />
                                                                 ) : null}
 
-                                                                {showMilestoneEvents && summary.events.map((event) => (
-                                                                    <React.Fragment key={`milestone-event-${summary.stage}-${event.id}`}>
-                                                                        <div
-                                                                            className="absolute top-1/2 z-40 -translate-x-1/2 -translate-y-1/2"
-                                                                            style={{ left: `${event.position}%` }}
-                                                                        >
-                                                                            <span
-                                                                                className={cn(
-                                                                                    'block h-3 w-3 rounded-full ring-2 ring-white shadow',
-                                                                                    stageStyle.bar,
-                                                                                )}
-                                                                            />
-                                                                        </div>
-                                                                        <div
-                                                                            className="absolute bottom-full z-50 pb-1"
-                                                                            style={{
-                                                                                left: `${event.label_start}%`,
-                                                                                width: `${event.label_width}%`,
-                                                                                transform: `translateY(-${event.lane * MILESTONE_EVENT_LANE_HEIGHT_PX}px)`,
-                                                                            }}
-                                                                        >
-                                                                            <span
-                                                                                className={cn(
-                                                                                    'flex w-full items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
-                                                                                    stageStyle.badge,
-                                                                                )}
-                                                                                title={event.name}
+                                                                {showMilestoneEvents && summary.events.map((event) => {
+                                                                    const laneOffsetPx = event.lane * MILESTONE_EVENT_LANE_HEIGHT_PX;
+                                                                    const isTop = event.placement !== 'bottom';
+                                                                    return (
+                                                                        <React.Fragment key={`milestone-event-${summary.stage}-${event.id}`}>
+                                                                            <div
+                                                                                className="absolute top-1/2 z-40 -translate-x-1/2 -translate-y-1/2"
+                                                                                style={{ left: `${event.position}%` }}
                                                                             >
-                                                                                <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px font-mono text-[10px] text-slate-700">
-                                                                                    {formatDateLabel(event.date)}
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'block h-3 w-3 rounded-full ring-2 ring-white shadow',
+                                                                                        stageStyle.bar,
+                                                                                    )}
+                                                                                />
+                                                                            </div>
+                                                                            <div
+                                                                                className={cn(
+                                                                                    'absolute z-50',
+                                                                                    isTop ? 'bottom-full pb-1' : 'top-full pt-1',
+                                                                                )}
+                                                                                style={{
+                                                                                    left: `${event.position}%`,
+                                                                                    transform: isTop
+                                                                                        ? `translate(-50%, -${laneOffsetPx}px)`
+                                                                                        : `translate(-50%, ${laneOffsetPx}px)`,
+                                                                                }}
+                                                                            >
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'inline-flex w-auto items-center whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
+                                                                                        stageStyle.badge,
+                                                                                    )}
+                                                                                    title={event.name}
+                                                                                >
+                                                                                    <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px font-mono text-[10px] text-slate-700">
+                                                                                        {formatDateLabel(event.date)}
+                                                                                    </span>
+                                                                                    <span className="whitespace-nowrap">{event.name}</span>
                                                                                 </span>
-                                                                                <span className="truncate">{event.name}</span>
-                                                                            </span>
-                                                                        </div>
-                                                                    </React.Fragment>
-                                                                ))}
+                                                                            </div>
+                                                                        </React.Fragment>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     );

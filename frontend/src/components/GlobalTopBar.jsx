@@ -5,6 +5,7 @@ import { getCurrentUser, isAuthenticated } from '../lib/session';
 import { Input } from './ui/Input';
 import Logo from './ui/Logo';
 import UserMenu from './UserMenu';
+import ThemeToggleButton from './ThemeToggleButton';
 
 const SEARCH_PLACEHOLDER = '프로젝트, 안건, 사양, PDF, 엑셀 데이터를 자연어로 검색';
 
@@ -73,7 +74,7 @@ export default function GlobalTopBar() {
                     <div className="flex-1" />
                 )}
 
-                <div className="flex w-44 shrink-0 items-center justify-end gap-2">
+                <div className="flex w-56 shrink-0 items-center justify-end gap-2">
                     {authed ? (
                         <>
                             <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-card hover:text-primary">
@@ -118,6 +119,7 @@ export default function GlobalTopBar() {
                                 </div>
                             )}
                         </div>
+                            <ThemeToggleButton />
                             <UserMenu user={user} />
                         </>
                     ) : (

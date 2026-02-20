@@ -29,6 +29,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 211 34% 95%;
     --foreground: 220 40% 15%;
     --card: 0 0% 100%;
@@ -56,6 +57,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222 30% 10%;
     --foreground: 210 35% 96%;
     --card: 222 29% 13%;
@@ -101,6 +103,14 @@
     position: relative;
   }
 
+  .dark body {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(circle at 8% 0%, hsl(206 85% 54% / 0.16), transparent 36%),
+      radial-gradient(circle at 96% 10%, hsl(188 85% 48% / 0.13), transparent 42%),
+      linear-gradient(180deg, hsl(224 32% 14%), hsl(var(--background)));
+  }
+
   body::before {
     content: "";
     position: fixed;
@@ -113,6 +123,13 @@
       linear-gradient(90deg, hsl(212 22% 70% / 0.28) 1px, transparent 1px);
     background-size: 34px 34px;
     mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+  }
+
+  .dark body::before {
+    opacity: 0.2;
+    background-image:
+      linear-gradient(hsl(212 35% 42% / 0.24) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(212 35% 42% / 0.24) 1px, transparent 1px);
   }
 
   h1,

@@ -60,6 +60,7 @@
   - `Layout.jsx`: 라우트별 공통 레이아웃/상단바 분기
   - `ProtectedRoute.jsx`: 인증 가드
   - `GlobalTopBar.jsx`: 전역 상단바(검색/퀵메뉴/사용자)
+  - `ThemeToggleButton.jsx`: 상단바 다크/라이트 모드 토글 버튼
   - `UserMenu.jsx`: 상단바 사용자 메뉴(이름/이메일 표시 + 로그아웃)
   - `ProjectResultList.jsx`: 프로젝트 검색 결과(구글형 리스트, 매칭 이유/스니펫/하이라이트 표시)
   - `HealthStatus.jsx`: 백엔드/의존성 헬스 상태 표시
@@ -90,6 +91,7 @@
   - `download.js`: Authorization 포함 blob 다운로드 유틸(문서/첨부 공용)
   - `scheduleUtils.js`: WBS 일정 정규화/연쇄 계산/간트 유틸
   - `session.js`: 인증 세션 저장/조회
+  - `theme.js`: 다크/라이트 모드 초기화/저장/토글 유틸 + `useTheme` 훅
   - `highlight.jsx`, `utils.js`: 표시/유틸 함수
 
 ## 주요 프론트 라우트

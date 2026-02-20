@@ -578,14 +578,9 @@ function buildDuplicatedUnitName(sourceName, existingNameSet) {
 const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetailsChange = null }) => {
     const params = useParams();
     const projectId = params.projectId;
-    const section = forceSection || params.section || 'material';
-
-    if (!SECTION_META[section]) {
-        if (embedded) {
-            return null;
-        }
-        return <Navigate to={`/project-management/projects/${projectId}/edit/material`} replace />;
-    }
+    const requestedSection = forceSection || params.section || 'material';
+    const isKnownSection = Boolean(SECTION_META[requestedSection]);
+    const section = isKnownSection ? requestedSection : 'material';
 
     const [project, setProject] = useState(null);
     const [version, setVersion] = useState(null);
@@ -1076,7 +1071,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             try {
                 const equipmentResp = await api.get(`/budget/versions/${currentVersion.id}/equipments`);
                 equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-            } catch (_err) {
+            } catch {
                 equipmentItems = [];
             }
             const resolvedEquipmentNames = resolveEquipmentNames({
@@ -1588,7 +1583,6 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             const overseasLodgingDaily = toNumber(settings.overseas_lodging_daily) || 200000;
             const overseasAirfareDaily = toNumber(settings.overseas_airfare_daily) || 350000;
             const overseasTransportDailyCount = toNumber(settings.overseas_transport_daily_count) || 1;
-            const isDomesticExpenseFormula = phase === 'fabrication' || locale === 'domestic';
             const defaultTransportBundle = Math.ceil(installationManDays / 5);
             const defaultOverseasTransportCount = Math.ceil(installationManDays * overseasTransportDailyCount);
             const autoRows = [];
@@ -2246,7 +2240,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             try {
                 const equipmentResp = await api.get(`/budget/versions/${version.id}/equipments`);
                 equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-            } catch (_err) {
+            } catch {
                 equipmentItems = [];
             }
             const refreshedEquipmentNames = resolveEquipmentNames({
@@ -2340,7 +2334,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             try {
                 const equipmentResp = await api.get(`/budget/versions/${nextVersion.id}/equipments`);
                 equipmentItems = Array.isArray(equipmentResp?.data?.items) ? equipmentResp.data.items : [];
-            } catch (_err) {
+            } catch {
                 equipmentItems = [];
             }
             const refreshedEquipmentNames = resolveEquipmentNames({
@@ -2447,6 +2441,13 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
             appendMaterialBufferRows(30);
         }
     }, [appendMaterialBufferRows, section]);
+
+    if (!isKnownSection) {
+        if (embedded) {
+            return null;
+        }
+        return <Navigate to={`/project-management/projects/${projectId}/edit/material`} replace />;
+    }
 
     if (isLoading) {
         return <p className="text-sm text-muted-foreground p-6">불러오는 중...</p>;
@@ -3048,6 +3049,7 @@ const ExcelTable = ({
 
     useEffect(() => {
         if (!isFillDragging || !fillAnchor || !fillTarget) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFillOverlayRect(null);
             return;
         }
@@ -3341,22 +3343,6 @@ const ExcelTable = ({
         setSelectionEnd({ row: rowMax, col: colMax });
         focusCell(startRow, startCol, { preserveSelection: true });
     };
-
-    useEffect(() => {
-        if (!rowCount || !colCount) return;
-        setActiveCell((prev) => ({
-            row: clamp(prev.row, 0, rowCount - 1),
-            col: clamp(prev.col, 0, colCount - 1),
-        }));
-        setSelectionStart((prev) => ({
-            row: clamp(prev.row, 0, rowCount - 1),
-            col: clamp(prev.col, 0, colCount - 1),
-        }));
-        setSelectionEnd((prev) => ({
-            row: clamp(prev.row, 0, rowCount - 1),
-            col: clamp(prev.col, 0, colCount - 1),
-        }));
-    }, [colCount, rowCount]);
 
     return (
         <>

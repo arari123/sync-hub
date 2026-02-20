@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearSession, getAccessToken } from './session';
+import { clearSession, getAccessToken, isAuthenticated } from './session';
 
 const configuredApiBaseUrl = (import.meta.env.VITE_API_URL ?? '').trim();
 
@@ -16,6 +16,7 @@ export const HEALTH_POLLING_INTERVAL_MS = 7000;
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
+    withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
@@ -30,7 +31,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error?.response?.status === 401 && getAccessToken()) {
+        if (error?.response?.status === 401 && isAuthenticated()) {
             clearSession();
         }
         return Promise.reject(error);
@@ -49,7 +50,7 @@ export function resolveApiAssetUrl(assetUrl) {
     const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
     try {
         return new URL(normalizedPath, `${API_BASE_URL}/`).toString();
-    } catch (_error) {
+    } catch {
         return normalizedPath;
     }
 }

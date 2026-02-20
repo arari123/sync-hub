@@ -1,6 +1,6 @@
 # Sync-Hub Repository Map
 
-- 업데이트 기준: 2026-02-19
+- 업데이트 기준: 2026-02-20
 
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
@@ -143,6 +143,7 @@
 - localhost 시작/복구: `scripts/start_localhost.sh`
 - Cloud Run 백엔드 배포: `scripts/deploy_backend_cloudrun.sh`
 - 빠른 검증: `scripts/verify_fast.sh`
+- 프론트 집중 린트: `scripts/verify_frontend_fast.sh`
 - 전체 검증: `scripts/verify.sh`
 - 디자인 토큰 린트: `scripts/lint_frontend_design_tokens.py`
 - 예산 목업 데이터 초기화: `scripts/reset_and_seed_budget_mock_data.py`

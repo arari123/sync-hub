@@ -48,5 +48,8 @@ PY
 echo "Running frontend design-token lint..."
 python3 scripts/lint_frontend_design_tokens.py
 
+echo "Running frontend focused lint..."
+bash scripts/verify_frontend_fast.sh
+
 echo "Running unit tests..."
 python3 -m unittest discover -s tests -p 'test_*.py' -v

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Database, Grid2x2, Plus, Search } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '../lib/session';
@@ -22,17 +22,14 @@ export default function GlobalTopBar() {
     const authed = isAuthenticated();
     const user = getCurrentUser();
 
-    const [inputQuery, setInputQuery] = useState('');
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
     const quickMenuRef = useRef(null);
+    const searchInputRef = useRef(null);
 
-    useEffect(() => {
-        if (!authed) {
-            setInputQuery('');
-            return;
-        }
+    const locationSearchQuery = useMemo(() => {
+        if (!authed) return '';
         const params = new URLSearchParams(location.search || '');
-        setInputQuery(params.get('q') || '');
+        return params.get('q') || '';
     }, [authed, location.search]);
 
     useEffect(() => {
@@ -49,7 +46,8 @@ export default function GlobalTopBar() {
 
     const handleSearchSubmit = (event) => {
         event.preventDefault();
-        navigate(buildHomeSearchPath(inputQuery));
+        const text = String(searchInputRef.current?.value || '').trim();
+        navigate(buildHomeSearchPath(text));
     };
 
     return (
@@ -62,9 +60,10 @@ export default function GlobalTopBar() {
                         <label className="relative block">
                             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
                             <Input
+                                key={`global-search-${locationSearchQuery}`}
+                                ref={searchInputRef}
                                 type="text"
-                                value={inputQuery}
-                                onChange={(event) => setInputQuery(event.target.value)}
+                                defaultValue={locationSearchQuery}
                                 placeholder={SEARCH_PLACEHOLDER}
                                 className="h-10 w-full rounded-full border-border/90 bg-card/85 pl-11 pr-4 text-sm"
                             />

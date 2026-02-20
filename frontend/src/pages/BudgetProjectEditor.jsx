@@ -19,6 +19,7 @@ const DEFAULT_LABOR_DEPARTMENTS = ['PM', '설계', 'SW', '검사기술', '제어
 const OUTSOURCE_LABOR_DEPARTMENTS = ['PM', '설계', '기구', '전장', '제어', 'SW'];
 const STAFFING_TYPE_OPTIONS = ['자체', '외주'];
 const EXPENSE_TYPE_OPTIONS = ['자체', '외주'];
+const EMPTY_ROWS = Object.freeze([]);
 const INHOUSE_LABOR_RATE_PER_HOUR = 35000;
 const OUTSOURCE_LABOR_RATE_PER_DAY = 400000;
 
@@ -103,6 +104,25 @@ function parseLockAutoValue(value) {
     const text = String(value ?? '').trim().toLowerCase();
     if (!text) return false;
     return ['잠금', 'locked', 'true', '1', 'yes', 'y'].includes(text);
+}
+
+function normalizeCellHistoryValue(value, column) {
+    if (column?.key === 'lock_auto') return parseLockAutoValue(value) ? '잠금' : '해제';
+    if (column?.type === 'number') return String(toNumber(value));
+    if (column?.key === 'unit') return String(value ?? '').toUpperCase();
+    return String(value ?? '');
+}
+
+function normalizeCellWriteValue(value, column) {
+    if (column?.key === 'lock_auto') {
+        const text = String(value ?? '').trim();
+        if (text === '잠금') return '잠금';
+        if (text === '해제') return '해제';
+        return parseLockAutoValue(value) ? '잠금' : '해제';
+    }
+    if (column?.type === 'number') return String(value ?? '').replace(/[^0-9]/g, '');
+    if (column?.key === 'unit') return String(value ?? '').trim().toUpperCase();
+    return String(value ?? '');
 }
 
 function normalizeExpenseType(value) {
@@ -648,7 +668,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
 
     const activeMode = isExecutionStage ? 'execution' : 'budget';
     const activeKey = activeMode === 'execution' ? SECTION_META[section].executionKey : SECTION_META[section].budgetKey;
-    const rows = details[activeKey] || [];
+    const rows = details[activeKey] ?? EMPTY_ROWS;
 
     const canEditExecutionFields = canEditProject && isExecutionStage;
     const canEditBudgetFields = canEditProject && !isConfirmed && !isExecutionStage;
@@ -2415,7 +2435,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
                 [activeKey]: [...source, ...buffer],
             };
         });
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, details[activeKey], section, activePhaseFilter, activeUnitFilter]);
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, rows, section, activePhaseFilter, activeUnitFilter]);
 
     const appendMaterialBufferRows = useCallback((count = 50) => {
         if (section !== 'material') return;
@@ -2432,7 +2452,7 @@ const BudgetProjectEditor = ({ embedded = false, forceSection = '', onLiveDetail
                 })),
             ],
         }));
-    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section, activePhaseFilter, activeUnitFilter]);
+    }, [activeEquipmentName, activeKey, activeMode, currentPhase, section, activePhaseFilter]);
 
     const handleMaterialTableScroll = useCallback((event) => {
         if (section !== 'material') return;
@@ -2809,52 +2829,33 @@ const ExcelTable = ({
             && col <= copiedRange.colMax;
     };
 
-    const normalizeHistoryValue = (value, column) => {
-        if (column?.key === 'lock_auto') return parseLockAutoValue(value) ? '잠금' : '해제';
-        if (column?.type === 'number') return String(toNumber(value));
-        if (column?.key === 'unit') return String(value ?? '').toUpperCase();
-        return String(value ?? '');
-    };
-
-    const normalizeWriteValue = (value, column) => {
-        if (column?.key === 'lock_auto') {
-            const text = String(value ?? '').trim();
-            if (text === '잠금') return '잠금';
-            if (text === '해제') return '해제';
-            return parseLockAutoValue(value) ? '잠금' : '해제';
-        }
-        if (column?.type === 'number') return String(value ?? '').replace(/[^0-9]/g, '');
-        if (column?.key === 'unit') return String(value ?? '').trim().toUpperCase();
-        return String(value ?? '');
-    };
-
-    const isCellLocked = (rowIndex, colIndex, columnArg = null, rowArg = null) => {
+    const isCellLocked = useCallback((rowIndex, colIndex, columnArg = null, rowArg = null) => {
         const column = columnArg || columns[colIndex];
         const row = rowArg || rows[rowIndex];
         if (!column || !row) return true;
         if (column.readonly) return true;
         return Boolean(isCellReadonly?.(row, column, rowIndex, colIndex));
-    };
+    }, [columns, isCellReadonly, rows]);
 
     const resolveCellDisplayRawValue = (rowIndex, colIndex, row, column, rawValue) => {
         if (!getCellDisplayValue) return rawValue;
         return getCellDisplayValue(row, column, rawValue, rowIndex, colIndex);
     };
 
-    const pushUndoAction = (changes) => {
+    const pushUndoAction = useCallback((changes) => {
         if (!changes.length) return;
         undoStackRef.current.push(changes);
         if (undoStackRef.current.length > 200) undoStackRef.current.shift();
-    };
+    }, []);
 
-    const buildCellChange = (rowIndex, colIndex, nextValue) => {
+    const buildCellChange = useCallback((rowIndex, colIndex, nextValue) => {
         const column = columns[colIndex];
         const row = rows[rowIndex];
         if (!column || !row || isCellLocked(rowIndex, colIndex, column, row)) return null;
         const currentRaw = column.computed ? column.computed(row) : row[column.key];
-        const before = normalizeHistoryValue(currentRaw, column);
-        const writeValue = normalizeWriteValue(nextValue, column);
-        const after = normalizeHistoryValue(writeValue, column);
+        const before = normalizeCellHistoryValue(currentRaw, column);
+        const writeValue = normalizeCellWriteValue(nextValue, column);
+        const after = normalizeCellHistoryValue(writeValue, column);
         if (before === after) return null;
         return {
             row: rowIndex,
@@ -2863,9 +2864,9 @@ const ExcelTable = ({
             after,
             writeValue,
         };
-    };
+    }, [columns, isCellLocked, rows]);
 
-    const applyCellChanges = (changes, { trackUndo = true } = {}) => {
+    const applyCellChanges = useCallback((changes, { trackUndo = true } = {}) => {
         if (!changes.length) return;
         changes.forEach((change) => {
             onChange(change.row, change.key, change.writeValue);
@@ -2873,7 +2874,7 @@ const ExcelTable = ({
         if (trackUndo && !isUndoingRef.current) {
             pushUndoAction(changes.map(({ row, key, before, after }) => ({ row, key, before, after })));
         }
-    };
+    }, [onChange, pushUndoAction]);
 
     const undoLastChange = () => {
         const lastAction = undoStackRef.current.pop();

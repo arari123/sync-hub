@@ -2,8 +2,8 @@ const ACCESS_TOKEN_KEY = 'sync_hub_access_token';
 const USER_INFO_KEY = 'sync_hub_user_info';
 
 export function getAccessToken() {
-    // Cookie-based auth is primary. Keep this for legacy migration only.
-    return '';
+    const raw = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    return String(raw || '').trim();
 }
 
 export function isAuthenticated() {
@@ -22,8 +22,13 @@ export function getCurrentUser() {
 }
 
 export function setSession(accessToken, user) {
-    void accessToken;
-    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    const token = String(accessToken || '').trim();
+    if (token) {
+        window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
+    } else {
+        window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    }
+
     if (user) {
         window.localStorage.setItem(USER_INFO_KEY, JSON.stringify(user));
     } else {

@@ -1822,21 +1822,26 @@ const SearchResults = () => {
 	                                                        <div className="h-14 rounded-md border border-border/75 bg-background/45 p-1">
 	                                                            {updateBookmarks.length > 0 ? (
 	                                                                <div className="grid h-full grid-cols-2 auto-rows-fr gap-1">
-	                                                                    {updateBookmarks.map((bookmark) => (
+	                                                                    {updateBookmarks.map((bookmark, index) => {
+	                                                                        const isLastOddItem = updateBookmarks.length % 2 === 1
+	                                                                            && index === updateBookmarks.length - 1;
+	                                                                        return (
 	                                                                        <Link
 	                                                                            key={`${project.id}-bookmark-${bookmark.key}`}
 	                                                                            to={bookmark.to}
 	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
 	                                                                            title={bookmark.label}
 	                                                                            className={cn(
-	                                                                                'group relative inline-flex min-h-0 items-center justify-center rounded-md border border-border/70 bg-card/85 px-1 text-[9px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                'group relative inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border border-border/70 bg-card/85 px-1 text-[9px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                isLastOddItem && 'col-span-2',
 	                                                                                bookmark.textClass
 	                                                                            )}
 	                                                                        >
-	                                                                            <span>{bookmark.label}</span>
+	                                                                            <span className="truncate">{bookmark.label}</span>
 	                                                                            <span className={cn('pointer-events-none absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
 	                                                                        </Link>
-	                                                                    ))}
+	                                                                        );
+	                                                                    })}
 	                                                                </div>
 	                                                            ) : (
 	                                                                <div className="grid h-full place-items-center text-[8px] font-semibold text-muted-foreground/75">

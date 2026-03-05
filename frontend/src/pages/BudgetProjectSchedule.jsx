@@ -242,8 +242,8 @@ const BudgetProjectSchedule = () => {
     const scale = useMemo(() => pickAutoScale(flatRows), [flatRows]);
     const tickItems = useMemo(() => buildTickItems(bounds, scale), [bounds, scale]);
     const weekendOverlays = useMemo(
-        () => (schedule.weekend_mode === WEEKEND_MODES.exclude ? weekendBands(bounds) : []),
-        [bounds, schedule.weekend_mode],
+        () => (schedule.weekend_mode === WEEKEND_MODES.exclude && scale === 'day' ? weekendBands(bounds) : []),
+        [bounds, scale, schedule.weekend_mode],
     );
 
     const loadSchedule = useCallback(async () => {
@@ -534,7 +534,7 @@ const BudgetProjectSchedule = () => {
         event.dataTransfer.effectAllowed = 'move';
         try {
             event.dataTransfer.setData('text/plain', JSON.stringify(payload));
-        } catch (_error) {
+        } catch {
             // noop
         }
     }, [canEdit]);

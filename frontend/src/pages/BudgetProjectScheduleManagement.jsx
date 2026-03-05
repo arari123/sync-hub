@@ -419,10 +419,10 @@ export default function BudgetProjectScheduleManagement() {
     const chartScale = useMemo(() => pickAutoScale(scopedRows), [scopedRows]);
     const chartTicks = useMemo(() => buildTickItems(chartBounds, chartScale), [chartBounds, chartScale]);
     const chartWeekendBands = useMemo(() => (
-        schedule.weekend_mode === WEEKEND_MODES.exclude
+        schedule.weekend_mode === WEEKEND_MODES.exclude && chartScale === 'day'
             ? weekendBands(chartBounds)
             : []
-    ), [chartBounds, schedule.weekend_mode]);
+    ), [chartBounds, chartScale, schedule.weekend_mode]);
     const todayLinePos = useMemo(() => getTodayLinePosition(chartBounds, today), [chartBounds, today]);
 
     useEffect(() => {

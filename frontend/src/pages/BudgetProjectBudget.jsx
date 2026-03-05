@@ -1633,7 +1633,7 @@ const BudgetProjectBudget = () => {
                                 <p className="text-xs font-semibold text-slate-600">총 예산</p>
                                 <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalBudget)}</h3>
                             </div>
-                            <div className="rounded-md bg-blue-50 p-2 text-blue-600">
+                            <div className="inline-flex items-center justify-center rounded-md border border-sky-400/35 bg-sky-500/12 p-2 text-sky-200">
                                 <Wallet className="h-4 w-4" />
                             </div>
                         </div>
@@ -1650,7 +1650,7 @@ const BudgetProjectBudget = () => {
                                 <p className="text-xs font-semibold text-slate-600">총 집행</p>
                                 <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalExecution)}</h3>
                             </div>
-                            <div className="rounded-md bg-rose-50 p-2 text-rose-600">
+                            <div className="inline-flex items-center justify-center rounded-md border border-rose-400/35 bg-rose-500/12 p-2 text-rose-200">
                                 <BarChart3 className="h-4 w-4" />
                             </div>
                         </div>
@@ -1669,7 +1669,7 @@ const BudgetProjectBudget = () => {
                                 <p className="text-xs font-semibold text-slate-600">총 잔액</p>
                                 <h3 className="mt-1 text-2xl font-bold leading-none text-slate-900">{formatWon(totalRemaining)}</h3>
                             </div>
-                            <div className="rounded-md bg-emerald-50 p-2 text-emerald-600">
+                            <div className="inline-flex items-center justify-center rounded-md border border-emerald-400/35 bg-emerald-500/12 p-2 text-emerald-200">
                                 <Scale className="h-4 w-4" />
                             </div>
                         </div>
@@ -1740,7 +1740,7 @@ const BudgetProjectBudget = () => {
                                     'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors',
                                     !version?.id || isExcelUploading
                                         ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                        : 'border-border bg-background text-foreground/85 hover:bg-secondary/70'
                                 )}
                             >
                                 <Download className="h-3.5 w-3.5" />
@@ -1754,7 +1754,7 @@ const BudgetProjectBudget = () => {
                                     'inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold shadow-sm transition-colors',
                                     !version?.id || isExcelUploading
                                         ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                                        : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-emerald-400/40 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/20'
                                 )}
                             >
                                 <Upload className="h-3.5 w-3.5" />
@@ -1832,21 +1832,21 @@ const BudgetStatusBadge = ({ budget, execution }) => {
 const SUMMARY_THEME = {
     material: {
         dot: 'bg-blue-500',
-        categoryIcon: 'bg-blue-100 text-blue-600',
+        categoryIcon: 'border border-sky-400/35 bg-sky-500/12 text-sky-200',
         categoryProgress: 'bg-blue-500',
         childProgress: 'bg-blue-400',
         childBorder: 'border-l-blue-500/20',
     },
     labor: {
         dot: 'bg-violet-500',
-        categoryIcon: 'bg-violet-100 text-violet-600',
+        categoryIcon: 'border border-violet-400/35 bg-violet-500/12 text-violet-200',
         categoryProgress: 'bg-violet-500',
         childProgress: 'bg-violet-400',
         childBorder: 'border-l-violet-500/20',
     },
     expense: {
         dot: 'bg-orange-500',
-        categoryIcon: 'bg-orange-100 text-orange-600',
+        categoryIcon: 'border border-amber-400/35 bg-amber-500/12 text-amber-200',
         categoryProgress: 'bg-orange-500',
         childProgress: 'bg-orange-400',
         childBorder: 'border-l-orange-500/20',
@@ -2236,8 +2236,8 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                                     {!isMaterialCategory && isPhaseExpanded && phaseUnits.map((unit) => {
                                                         const isLaborCategory = category.key === 'labor';
                                                         const sourceBadgeClass = unit?.source === '자체'
-                                                            ? 'bg-indigo-100 text-indigo-700'
-                                                            : 'bg-violet-100 text-violet-700';
+                                                            ? 'border border-indigo-400/35 bg-indigo-500/12 text-indigo-200'
+                                                            : 'border border-violet-400/35 bg-violet-500/12 text-violet-200';
                                                         const titleText = isLaborCategory
                                                             ? `${unit?.equipmentName || ''} / ${unit?.name || ''}`.trim()
                                                             : `${unit?.equipmentName || ''} / ${unit?.name || ''}${unit?.basis ? ` (${unit.basis})` : ''}`.trim();

@@ -997,7 +997,7 @@ const SearchResults = () => {
                         params: {
                             include_drafts: true,
                             page,
-                            per_page: 100,
+                            per_page: 50,
                         },
                         signal: controller.signal,
                     });
@@ -1031,7 +1031,7 @@ const SearchResults = () => {
             active = false;
             controller.abort();
         };
-    }, [hasHomePanel, homeTab]);
+    }, [hasHomePanel]);
 
     useEffect(() => {
         if (!hasProjectPanel) return;

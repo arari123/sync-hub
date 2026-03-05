@@ -739,7 +739,7 @@ const BudgetProjectSchedule = () => {
 
     if (isLoading) {
         return (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="schedule-dark-page flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 일정 데이터를 불러오는 중입니다.
             </div>
@@ -747,7 +747,7 @@ const BudgetProjectSchedule = () => {
     }
 
     if (!project) {
-        return <p className="text-sm text-slate-500">프로젝트를 찾을 수 없습니다.</p>;
+        return <p className="schedule-dark-page text-sm text-muted-foreground">프로젝트를 찾을 수 없습니다.</p>;
     }
 
     const projectTypeKey = String(project?.project_type || '').trim().toLowerCase();
@@ -756,7 +756,7 @@ const BudgetProjectSchedule = () => {
 
     if (isAsProject) {
         return (
-            <div className="space-y-5">
+            <div className="schedule-dark-page space-y-5">
                 <ProjectPageHeader
                     projectId={project.id}
                     projectName={project.name || '프로젝트'}
@@ -781,14 +781,14 @@ const BudgetProjectSchedule = () => {
                     ) : null}
                 />
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div className="rounded-xl border border-amber-400/40 bg-amber-500/12 px-4 py-3 text-sm text-amber-100">
                     <p className="font-semibold">AS 프로젝트는 일정 입력이 필요하지 않습니다.</p>
                     {parentProject?.id ? (
-                        <p className="mt-2 text-xs text-amber-900/80">
+                        <p className="mt-2 text-xs text-amber-200/80">
                             소속 설비 프로젝트에서 일정을 관리해 주세요.
                         </p>
                     ) : (
-                        <p className="mt-2 text-xs text-amber-900/80">
+                        <p className="mt-2 text-xs text-amber-200/80">
                             소속 설비 프로젝트가 지정되어 있지 않습니다. 프로젝트 정보에서 소속 설비를 선택해 주세요.
                         </p>
                     )}
@@ -947,7 +947,7 @@ const BudgetProjectSchedule = () => {
     };
 
     return (
-        <div className="space-y-5">
+        <div className="schedule-dark-page space-y-5">
             <ProjectPageHeader
                 projectId={project.id}
                 projectName={project.name || '프로젝트'}

@@ -28,22 +28,22 @@ import {
 
 const STAGE_STYLES = {
     design: {
-        badge: 'border-sky-200 bg-sky-50 text-sky-700',
+        badge: 'border-sky-400/35 bg-sky-500/12 text-sky-200',
         bar: 'bg-sky-500',
-        rail: 'bg-sky-100',
-        rowBorder: 'border-l-sky-500',
+        rail: 'bg-sky-500/18',
+        rowBorder: 'border-l-sky-500/70',
     },
     fabrication: {
-        badge: 'border-amber-200 bg-amber-50 text-amber-700',
+        badge: 'border-amber-400/35 bg-amber-500/12 text-amber-200',
         bar: 'bg-amber-500',
-        rail: 'bg-amber-100',
-        rowBorder: 'border-l-amber-500',
+        rail: 'bg-amber-500/18',
+        rowBorder: 'border-l-amber-500/70',
     },
     installation: {
-        badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        badge: 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200',
         bar: 'bg-emerald-500',
-        rail: 'bg-emerald-100',
-        rowBorder: 'border-l-emerald-500',
+        rail: 'bg-emerald-500/18',
+        rowBorder: 'border-l-emerald-500/70',
     },
 };
 
@@ -552,7 +552,7 @@ export default function BudgetProjectScheduleManagement() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="schedule-dark-page flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 일정 관리 화면을 불러오는 중입니다.
             </div>
@@ -560,7 +560,7 @@ export default function BudgetProjectScheduleManagement() {
     }
 
     if (!project) {
-        return <p className="text-sm text-slate-500">{error || '프로젝트를 찾을 수 없습니다.'}</p>;
+        return <p className="schedule-dark-page text-sm text-muted-foreground">{error || '프로젝트를 찾을 수 없습니다.'}</p>;
     }
 
     const projectTypeKey = String(project?.project_type || '').trim().toLowerCase();
@@ -569,7 +569,7 @@ export default function BudgetProjectScheduleManagement() {
 
     if (isAsProject) {
         return (
-            <div className="space-y-5">
+            <div className="schedule-dark-page space-y-5">
                 <ProjectPageHeader
                     projectId={project.id}
                     projectName={project.name || '프로젝트'}
@@ -589,16 +589,16 @@ export default function BudgetProjectScheduleManagement() {
                     ) : null}
                 />
 
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <div className="rounded-xl border border-amber-400/40 bg-amber-500/12 px-4 py-3 text-sm text-amber-100">
                     <p className="font-semibold">AS 프로젝트는 일정 입력이 필요하지 않습니다.</p>
                     {parentProject?.id ? (
-                        <p className="mt-2 text-xs text-amber-900/80">
+                        <p className="mt-2 text-xs text-amber-200/80">
                             소속 설비: <Link className="font-semibold underline underline-offset-2" to={`/project-management/projects/${parentProject.id}`}>
                                 {(parentProject.code || parentProject.name || `#${parentProject.id}`)}
                             </Link>
                         </p>
                     ) : (
-                        <p className="mt-2 text-xs text-amber-900/80">
+                        <p className="mt-2 text-xs text-amber-200/80">
                             소속 설비 프로젝트가 지정되어 있지 않습니다. 프로젝트 정보에서 소속 설비를 선택해 주세요.
                         </p>
                     )}
@@ -610,7 +610,7 @@ export default function BudgetProjectScheduleManagement() {
     const scaleText = chartScale === 'day' ? '일 단위' : chartScale === 'week' ? '주 단위' : '월 단위';
 
     return (
-        <div className="space-y-5">
+        <div className="schedule-dark-page space-y-5">
             <ProjectPageHeader
                 projectId={project.id}
                 projectName={project.name || '프로젝트'}

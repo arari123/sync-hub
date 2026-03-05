@@ -1507,7 +1507,7 @@ const BudgetProjectBudget = () => {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen text-foreground">
+            <div className="budget-dark-page min-h-screen text-foreground">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-20">
                     <div className="rounded-xl border border-border bg-card px-4 py-12 text-center">
                         <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
@@ -1522,7 +1522,7 @@ const BudgetProjectBudget = () => {
 
     if (!project) {
         return (
-            <div className="min-h-screen text-foreground">
+            <div className="budget-dark-page min-h-screen text-foreground">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-20">
                     <div className="rounded-xl border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
                         프로젝트를 찾을 수 없습니다.
@@ -1533,7 +1533,7 @@ const BudgetProjectBudget = () => {
     }
 
     return (
-        <div className="app-shell min-h-screen text-foreground">
+        <div className="budget-dark-page app-shell min-h-screen text-foreground">
             <GlobalTopBar />
 
             <div className="border-b border-border/80 bg-card/65 backdrop-blur">

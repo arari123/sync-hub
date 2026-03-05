@@ -101,6 +101,24 @@ function isTypingTarget(target) {
     return false;
 }
 
+function matchesAgendaListQuery(item, normalizedQuery) {
+    const query = String(normalizedQuery || '').trim().toLowerCase();
+    if (!query) return true;
+    const fields = [
+        item?.title,
+        item?.agenda_code,
+        item?.project_name,
+        item?.project_code,
+        item?.author_name,
+        item?.requester_name,
+        item?.requester_org,
+        item?.responder_name,
+        item?.responder_org,
+        item?.summary_plain,
+    ];
+    return fields.some((value) => String(value || '').toLowerCase().includes(query));
+}
+
 function stripHtmlText(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
@@ -282,6 +300,8 @@ export default function AgendaSplitView({
     mode = 'project',
     projectId = '',
     listFilter = 'all',
+    prefetchedUnreadItems = [],
+    isUnreadSeedLoading = false,
     onEntrySeen = null,
     className = '',
 }) {
@@ -324,6 +344,8 @@ export default function AgendaSplitView({
     const normalizedListFilter = String(listFilter || '').trim().toLowerCase() === 'unread'
         ? 'unread'
         : 'all';
+    const isUnreadFilter = normalizedListFilter === 'unread';
+    const usePrefetchedUnreadMode = isMyMode && isUnreadFilter;
     const listApiPath = isMyMode
         ? '/agenda/entries/my'
         : normalizedProjectId > 0
@@ -338,6 +360,7 @@ export default function AgendaSplitView({
     }, [searchInput]);
 
     useEffect(() => {
+        if (usePrefetchedUnreadMode) return;
         setItems([]);
         setPage(1);
         setTotal(0);
@@ -347,10 +370,31 @@ export default function AgendaSplitView({
         if (listScrollRef.current) {
             listScrollRef.current.scrollTop = 0;
         }
-    }, [listApiPath, searchQuery]);
+    }, [listApiPath, searchQuery, usePrefetchedUnreadMode]);
 
     useEffect(() => {
-        if (!listApiPath) return undefined;
+        if (!usePrefetchedUnreadMode) return;
+        const normalizedQuery = String(searchQuery || '').trim().toLowerCase();
+        const source = Array.isArray(prefetchedUnreadItems) ? prefetchedUnreadItems : [];
+        const filtered = normalizedQuery
+            ? source.filter((item) => matchesAgendaListQuery(item, normalizedQuery))
+            : source;
+
+        setItems(filtered);
+        setPage(1);
+        setTotal(filtered.length);
+        setHasMore(false);
+        setListError('');
+        setIsLoadingMore(false);
+        setIsListLoading(Boolean(isUnreadSeedLoading));
+        loadMoreLockRef.current = false;
+        if (listScrollRef.current) {
+            listScrollRef.current.scrollTop = 0;
+        }
+    }, [isUnreadSeedLoading, prefetchedUnreadItems, searchQuery, usePrefetchedUnreadMode]);
+
+    useEffect(() => {
+        if (!listApiPath || usePrefetchedUnreadMode) return undefined;
 
         const controller = new AbortController();
         let active = true;
@@ -430,9 +474,10 @@ export default function AgendaSplitView({
             active = false;
             controller.abort();
         };
-    }, [includeDrafts, listApiPath, page, searchQuery]);
+    }, [includeDrafts, listApiPath, page, searchQuery, usePrefetchedUnreadMode]);
 
     useEffect(() => {
+        if (usePrefetchedUnreadMode) return undefined;
         const rootElement = listScrollRef.current;
         const sentinelElement = sentinelRef.current;
 
@@ -459,7 +504,7 @@ export default function AgendaSplitView({
         return () => {
             observer.disconnect();
         };
-    }, [hasMore, isListLoading, isLoadingMore, items.length]);
+    }, [hasMore, isListLoading, isLoadingMore, items.length, usePrefetchedUnreadMode]);
 
     useEffect(() => {
         if (normalizedListFilter !== 'unread') {

@@ -637,6 +637,8 @@ const SearchResults = () => {
     const [projectScheduleMap, setProjectScheduleMap] = useState({});
     const [projectUpdateBaselines, setProjectUpdateBaselines] = useState(() => loadProjectUpdateBaselines());
     const [unreadAgendaEntryCount, setUnreadAgendaEntryCount] = useState(0);
+    const [unreadAgendaEntryItems, setUnreadAgendaEntryItems] = useState([]);
+    const [isUnreadAgendaSeedLoading, setIsUnreadAgendaSeedLoading] = useState(false);
     const [agendaListFilter, setAgendaListFilter] = useState(AGENDA_LIST_FILTER_ALL);
     const unreadAgendaEntryIdsRef = React.useRef(new Set());
 
@@ -973,12 +975,15 @@ const SearchResults = () => {
         next.delete(normalizedEntryId);
         unreadAgendaEntryIdsRef.current = next;
         setUnreadAgendaEntryCount(next.size);
+        setUnreadAgendaEntryItems((prev) => prev.filter((item) => Number(item?.entry_id || 0) !== normalizedEntryId));
     }, []);
 
     useEffect(() => {
         if (!hasHomePanel) {
             unreadAgendaEntryIdsRef.current = new Set();
             setUnreadAgendaEntryCount(0);
+            setUnreadAgendaEntryItems([]);
+            setIsUnreadAgendaSeedLoading(false);
             return undefined;
         }
 
@@ -986,42 +991,62 @@ const SearchResults = () => {
         const controller = new AbortController();
 
         const fetchUnreadAgendaEntryCount = async () => {
+            setIsUnreadAgendaSeedLoading(true);
             try {
                 const seenBaselines = loadAgendaEntrySeenBaselines();
-                const nextUnreadIds = new Set();
-                let page = 1;
-                let totalPages = 1;
-
-                while (page <= totalPages) {
+                const fetchPage = async (pageNo) => {
                     const response = await api.get('/agenda/entries/my', {
                         params: {
                             include_drafts: true,
-                            page,
+                            page: pageNo,
                             per_page: 50,
                         },
                         signal: controller.signal,
                     });
-                    const payload = response?.data || {};
-                    const items = Array.isArray(payload.items) ? payload.items : [];
-                    const nextTotalPages = Number(payload.total_pages || 1);
-                    totalPages = Number.isFinite(nextTotalPages) && nextTotalPages > 0 ? nextTotalPages : 1;
+                    return response?.data || {};
+                };
 
+                const payloads = [];
+                const firstPayload = await fetchPage(1);
+                payloads.push(firstPayload);
+
+                const firstTotalPages = Number(firstPayload?.total_pages || 1);
+                const totalPages = Number.isFinite(firstTotalPages) && firstTotalPages > 0 ? firstTotalPages : 1;
+                if (totalPages > 1) {
+                    const pages = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
+                    const BATCH_SIZE = 4;
+                    for (let index = 0; index < pages.length; index += BATCH_SIZE) {
+                        const batch = pages.slice(index, index + BATCH_SIZE);
+                        const batchPayloads = await Promise.all(batch.map((pageNo) => fetchPage(pageNo)));
+                        payloads.push(...batchPayloads);
+                        if (!active) return;
+                    }
+                }
+
+                const nextUnreadIds = new Set();
+                const nextUnreadItems = [];
+                for (const payload of payloads) {
+                    const items = Array.isArray(payload?.items) ? payload.items : [];
                     for (const item of items) {
                         const entryId = Number(item?.entry_id || 0);
                         if (!entryId) continue;
                         if (!isAgendaEntryUnreadByBaselines(seenBaselines, entryId, item?.updated_at)) continue;
+                        if (nextUnreadIds.has(entryId)) continue;
                         nextUnreadIds.add(entryId);
+                        nextUnreadItems.push(item);
                     }
-                    page += 1;
                 }
 
                 if (!active) return;
                 unreadAgendaEntryIdsRef.current = nextUnreadIds;
                 setUnreadAgendaEntryCount(nextUnreadIds.size);
+                setUnreadAgendaEntryItems(nextUnreadItems);
             } catch (err) {
                 if (!active || err?.code === 'ERR_CANCELED') return;
-                unreadAgendaEntryIdsRef.current = new Set();
-                setUnreadAgendaEntryCount(0);
+            } finally {
+                if (active) {
+                    setIsUnreadAgendaSeedLoading(false);
+                }
             }
         };
 
@@ -2423,7 +2448,13 @@ const SearchResults = () => {
                     ) : null}
 
                     {hasHomePanel && isAgendaTab && (
-                        <AgendaSplitView mode="my" listFilter={agendaListFilter} onEntrySeen={handleAgendaEntrySeen} />
+                        <AgendaSplitView
+                            mode="my"
+                            listFilter={agendaListFilter}
+                            prefetchedUnreadItems={unreadAgendaEntryItems}
+                            isUnreadSeedLoading={isUnreadAgendaSeedLoading}
+                            onEntrySeen={handleAgendaEntrySeen}
+                        />
                     )}
 
                     {hasSearchQuery && documentResults.length > 0 && (

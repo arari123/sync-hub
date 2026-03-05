@@ -143,15 +143,15 @@ const STAGE_STYLE_MAP = {
     },
 };
 const HOME_STAGE_TIMELINE = [
-    { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-500/30', textClass: 'text-sky-300' },
-    { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-500/30', textClass: 'text-indigo-300' },
-    { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-500/30', textClass: 'text-emerald-300' },
-    { key: 'warranty', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-500/30', textClass: 'text-amber-300' },
+    { key: 'design', label: '설계', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
+    { key: 'fabrication', label: '제작', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
+    { key: 'installation', label: '설치', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
+    { key: 'warranty', label: '워런티', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
 ];
 const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
 const HOME_AS_TIMELINE = [
-    { key: 'start', label: '시작', solidClass: 'bg-amber-500', softClass: 'bg-amber-500/30', textClass: 'text-amber-300' },
-    { key: 'end', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-500/35', textClass: 'text-slate-200' },
+    { key: 'start', label: '시작', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
+    { key: 'end', label: '종료', solidClass: 'bg-primary/58', softClass: 'bg-secondary/72', textClass: 'text-foreground/88' },
 ];
 const HOME_AS_TIMELINE_META = HOME_AS_TIMELINE;
 
@@ -1800,9 +1800,9 @@ const SearchResults = () => {
 	                                    return (
 	                                        <article
 	                                            key={`project-row-${project.id}`}
-	                                            className="app-surface-soft relative overflow-hidden border border-border/80 bg-card/92 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_24px_56px_-40px_hsl(var(--primary)/0.55)]"
+	                                            className="app-surface-soft relative overflow-hidden border border-border/80 bg-card/92 p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_24px_56px_-40px_hsl(var(--primary)/0.45)]"
 	                                        >
-	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500/75 via-indigo-500/70 to-emerald-500/75" />
+	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-border/90 to-transparent" />
 	                                            {updateBookmarks.length > 0 && (
 	                                                <div className="mb-3 flex flex-wrap items-center justify-end gap-1.5">
 	                                                    {updateBookmarks.map((bookmark) => (
@@ -1821,9 +1821,9 @@ const SearchResults = () => {
 	                                                    ))}
 	                                                </div>
 	                                            )}
-	                                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
-	                                                <div className="flex min-h-[212px] min-w-0 gap-3 rounded-xl border border-border/70 bg-card/72 p-3">
-                                                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-secondary/70">
+	                                            <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-3">
+	                                                <div className="flex h-full min-h-[192px] min-w-0 gap-2.5 rounded-xl border border-border/70 bg-card/72 p-2.5">
+                                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
                                                         {coverImage ? (
                                                             <img
                                                                 src={coverImage}
@@ -1839,14 +1839,14 @@ const SearchResults = () => {
 
 	                                                    <div className="flex min-w-0 flex-1 flex-col">
 	                                                        <div>
-	                                                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+	                                                            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
 	                                                                <span className="truncate text-[10px] font-mono font-semibold tracking-[0.12em] text-muted-foreground/85">
 	                                                                    {project.code || '코드 없음'}
 	                                                                </span>
 	                                                                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
 	                                                                    <span
 	                                                                        className={cn(
-	                                                                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow-sm',
+	                                                                            'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-extrabold tracking-wide shadow-sm',
 	                                                                            typeBadgeMeta.className
 	                                                                        )}
 	                                                                    >
@@ -1857,7 +1857,7 @@ const SearchResults = () => {
 	                                                                        <Link
 	                                                                            to={`/project-management/projects/${parentProject.id}`}
 	                                                                            title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
-	                                                                            className="inline-flex max-w-[170px] items-center gap-1 rounded-md border border-border/80 bg-secondary/55 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground shadow-sm transition hover:border-primary/35 hover:bg-secondary/75"
+	                                                                            className="inline-flex max-w-[160px] items-center gap-1 rounded-md border border-border/80 bg-secondary/55 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground shadow-sm transition hover:border-primary/35 hover:bg-secondary/75"
 	                                                                        >
 	                                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
 	                                                                            <span className="truncate">
@@ -1872,7 +1872,7 @@ const SearchResults = () => {
 	                                                                        </Link>
 	                                                                    )}
 	                                                                    <span className={cn(
-	                                                                        'inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold',
+	                                                                        'inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-bold',
 	                                                                        stageStyle.badgeClass
 	                                                                    )}
 	                                                                    >
@@ -1883,14 +1883,14 @@ const SearchResults = () => {
 
 	                                                            <Link
 	                                                                to={`/project-management/projects/${project.id}`}
-	                                                                className="mb-2 block min-h-[2.55rem] text-[17px] font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-primary"
+	                                                                className="mb-1.5 block min-h-[2.3rem] text-base font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-primary"
 	                                                            >
 	                                                                {project.name || '이름 없는 프로젝트'}
 	                                                            </Link>
 
 	                                                            <p
 	                                                                className={cn(
-	                                                                    'min-h-[2.4rem] text-[11px] leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
+	                                                                    'min-h-[2.1rem] text-[10px] leading-relaxed [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
 	                                                                    projectOverview ? 'text-foreground/85' : 'text-muted-foreground/80'
 	                                                                )}
 	                                                                title={projectOverview || '프로젝트 개요가 없습니다.'}
@@ -1899,36 +1899,36 @@ const SearchResults = () => {
 	                                                            </p>
 	                                                        </div>
 
-	                                                        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5">
+	                                                        <div className="mt-auto flex flex-wrap items-center gap-1 pt-2">
 	                                                            <span
 	                                                                title={project.customer_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
-	                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">고객사</span>
+	                                                                <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">고객사</span>
 	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.customer_name || '-'}</span>
 	                                                            </span>
 	                                                            <span
 	                                                                title={project.installation_site || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
-	                                                                <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">설치장소</span>
+	                                                                <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">설치장소</span>
 	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.installation_site || '-'}</span>
 	                                                            </span>
 	                                                            <span
 	                                                                title={project.manager_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
-	                                                                <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">담당자</span>
+	                                                                <User className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">담당자</span>
 	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.manager_name || '미지정'}</span>
 	                                                            </span>
 	                                                        </div>
 	                                                    </div>
 	                                                </div>
 
-                                                <div className="rounded-xl border border-border/70 bg-card/68 p-3">
+                                                <div className="h-full min-h-[192px] rounded-xl border border-border/70 bg-card/68 p-2.5">
                                                     <Link
                                                         to={`/project-management/projects/${project.id}/budget`}
                                                         onClick={() => markProjectUpdateSeen(project, { budgetConfirmed: confirmedSnapshot })}
@@ -1973,23 +1973,27 @@ const SearchResults = () => {
                                                         </div>
 
                                                         <div className="relative mt-1 h-9">
-                                                            <div className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded-full bg-secondary/75 shadow-inner">
-                                                                <div className="flex h-full divide-x divide-border/45">
+                                                            <div className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2 rounded-full border border-border/70 bg-background/55 p-[1px] shadow-inner">
+                                                                <div className="flex h-full overflow-hidden rounded-full">
                                                                     {(useStartEndTimeline ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
                                                                         const isDone = timelineActiveIndex > index;
                                                                         const isActive = timelineActiveIndex === index;
                                                                         const barClass = isDone || isActive ? item.solidClass : item.softClass;
-                                                                        const opacityClass = isActive ? 'opacity-100' : isDone ? 'opacity-90' : 'opacity-55';
-                                                                        const labelTextClass = isDone || isActive
-                                                                            ? 'text-white drop-shadow-sm'
-                                                                            : 'text-foreground/75';
+                                                                        const opacityClass = isActive ? 'opacity-100' : isDone ? 'opacity-88' : 'opacity-95';
+                                                                        const labelTextClass = isActive
+                                                                            ? 'text-primary-foreground'
+                                                                            : isDone ? 'text-foreground/90' : 'text-muted-foreground/80';
                                                                         return (
                                                                             <div
                                                                                 key={`timeline-bar-${project.id}-${item.key}`}
-                                                                                className={cn('relative h-full flex-1 transition-colors', barClass, opacityClass)}
+                                                                                className={cn(
+                                                                                    'relative h-full flex-1 border-r border-border/45 transition-colors last:border-r-0',
+                                                                                    barClass,
+                                                                                    opacityClass
+                                                                                )}
                                                                             >
                                                                                 <span className={cn(
-                                                                                    'pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-black tracking-[0.12em]',
+                                                                                    'pointer-events-none absolute inset-0 flex items-center justify-center text-[9px] font-semibold tracking-[0.08em]',
                                                                                     labelTextClass,
                                                                                 )}
                                                                                 >
@@ -2004,12 +2008,12 @@ const SearchResults = () => {
                                                             {isReviewStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-400/45 bg-sky-500/14 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(201_96%_50%/0.55)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
-                                                                            <span className="shrink-0 tracking-[0.12em] text-sky-200">검토</span>
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-primary/40 bg-background/88 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.68)] backdrop-blur-md">
+                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
+                                                                            <span className="shrink-0 tracking-[0.12em] text-primary/90">검토</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">생성 {createdDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-500/12 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-primary/12 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2018,12 +2022,12 @@ const SearchResults = () => {
                                                             {isClosureStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-slate-400/35 bg-slate-700/35 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.75)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-slate-300 to-slate-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-border/70 bg-background/88 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.7)] backdrop-blur-md">
+                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
                                                                             <span className="shrink-0 tracking-[0.12em] text-foreground/90">종료</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">종료일 {closureDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-500/12 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-muted-foreground/12 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2090,8 +2094,8 @@ const SearchResults = () => {
                                                     </Link>
                                                 </div>
 
-                                                <div className="rounded-xl border border-border/70 bg-card/68 p-3">
-                                                        <div className="rounded-xl border border-border/75 bg-gradient-to-b from-slate-900/60 via-slate-900/24 to-slate-800/42 p-2.5">
+                                                <div className="h-full min-h-[192px] rounded-xl border border-border/70 bg-card/68 p-2.5">
+                                                        <div className="flex h-full flex-col rounded-xl border border-border/75 bg-gradient-to-b from-slate-900/60 via-slate-900/24 to-slate-800/42 p-2.5">
                                                             <div className="mb-2 flex items-center justify-between">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">최신 안건</p>
@@ -2108,7 +2112,7 @@ const SearchResults = () => {
 	                                                            </Link>
                                                         </div>
 
-                                                        <div className="space-y-1">
+                                                        <div className="mt-0.5 flex-1 space-y-1 overflow-y-auto pr-0.5">
                                                             {isAgendaLoading && (
                                                                 <div className="rounded-lg border border-border bg-card/80 px-2 py-2 text-[10px] font-medium text-muted-foreground">
                                                                     최신 안건을 불러오는 중입니다.

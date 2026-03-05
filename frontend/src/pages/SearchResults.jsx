@@ -1854,7 +1854,7 @@ const SearchResults = () => {
 	                                                                        </Link>
 	                                                                    )}
 	                                                                    <span className={cn(
-	                                                                        'inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-bold',
+	                                                                        'inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold',
 	                                                                        stageStyle.badgeClass
 	                                                                    )}
 	                                                                    >
@@ -1890,7 +1890,7 @@ const SearchResults = () => {
 	                                                                            to={bookmark.to}
 	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
 	                                                                            className={cn(
-	                                                                                'group inline-flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/88 px-1.5 text-[10px] font-semibold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                'group inline-flex h-6 items-center gap-1 rounded-md border border-border/70 bg-card/88 px-2 text-[11px] font-semibold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
 	                                                                                bookmark.textClass
 	                                                                            )}
 	                                                                        >

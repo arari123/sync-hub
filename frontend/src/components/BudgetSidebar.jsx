@@ -260,6 +260,7 @@ const TreeNode = ({
         }
     };
     const nodeType = String(node?.nodeType || '');
+    const isPhaseNode = nodeType === 'phase';
     const isDraggableUnit = nodeType === 'unit';
     const isPhaseDropTarget = nodeType === 'phase' && dropTargetKey === node.key;
     return (
@@ -313,13 +314,27 @@ const TreeNode = ({
                             ) : (
                                 <span className="h-4 w-4 shrink-0" />
                             )}
-                            <span className="truncate text-[11px] font-black">{node.label}</span>
+                            {isPhaseNode ? (
+                                <span
+                                    className={`inline-flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[11px] font-extrabold tracking-wide ${
+                                        isActive || isPhaseDropTarget
+                                            ? 'border-sky-400 bg-sky-700 text-white'
+                                            : isActivePath
+                                                ? 'border-slate-400 bg-slate-800 text-slate-100'
+                                                : 'border-slate-300 bg-slate-700 text-slate-100'
+                                    }`}
+                                >
+                                    {node.label}
+                                </span>
+                            ) : (
+                                <span className="truncate text-[11px] font-black">{node.label}</span>
+                            )}
                         </div>
                         {Number.isFinite(node.count) && (
-                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${
+                            <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-extrabold tabular-nums ${
                                 isActive
-                                    ? 'border border-sky-300 bg-sky-100 text-sky-800'
-                                    : 'border border-slate-300 bg-slate-100 text-slate-700'
+                                    ? 'border-sky-300 bg-sky-100 text-sky-900'
+                                    : 'border-slate-400 bg-slate-800 text-slate-100'
                             }`}
                             >
                                 {node.count}

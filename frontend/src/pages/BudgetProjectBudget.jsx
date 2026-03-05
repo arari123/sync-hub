@@ -1859,8 +1859,8 @@ const PHASE_TOTAL_THEME = {
 };
 
 const phaseBadgeClass = (phase) => (phase === 'fabrication'
-    ? 'border-sky-300 bg-sky-100 text-sky-800'
-    : 'border-emerald-300 bg-emerald-100 text-emerald-800');
+    ? 'border-sky-500 bg-sky-700 text-white shadow-sm shadow-sky-900/30'
+    : 'border-emerald-500 bg-emerald-700 text-white shadow-sm shadow-emerald-900/30');
 
 const CostSummaryPanel = ({ panelBadge, items }) => (
     <section className="rounded-2xl border border-slate-300/80 bg-gradient-to-br from-slate-100 to-slate-50 p-3 shadow-sm">

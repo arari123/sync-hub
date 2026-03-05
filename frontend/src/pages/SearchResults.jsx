@@ -1972,124 +1972,90 @@ const SearchResults = () => {
                                                             </span>
                                                         </div>
 
-                                                        <div className="relative mt-1 h-9">
-                                                            <div className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2 rounded-full border border-border/70 bg-background/55 p-[1px] shadow-inner">
-                                                                <div className="flex h-full overflow-hidden rounded-full">
-                                                                    {(useStartEndTimeline ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
-                                                                        const isDone = timelineActiveIndex > index;
-                                                                        const isActive = timelineActiveIndex === index;
-                                                                        const barClass = isDone || isActive ? item.solidClass : item.softClass;
-                                                                        const opacityClass = isActive ? 'opacity-100' : isDone ? 'opacity-88' : 'opacity-95';
-                                                                        const labelTextClass = isActive
-                                                                            ? 'text-primary-foreground'
-                                                                            : isDone ? 'text-foreground/90' : 'text-muted-foreground/80';
-                                                                        return (
-                                                                            <div
-                                                                                key={`timeline-bar-${project.id}-${item.key}`}
-                                                                                className={cn(
-                                                                                    'relative h-full flex-1 border-r border-border/45 transition-colors last:border-r-0',
-                                                                                    barClass,
-                                                                                    opacityClass
-                                                                                )}
-                                                                            >
-                                                                                <span className={cn(
-                                                                                    'pointer-events-none absolute inset-0 flex items-center justify-center text-[9px] font-semibold tracking-[0.08em]',
-                                                                                    labelTextClass,
-                                                                                )}
-                                                                                >
+                                                        <div className="mt-2 rounded-xl border border-border/75 bg-background/45 p-2.5">
+                                                            <div className={cn(
+                                                                'relative grid gap-2',
+                                                                useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
+                                                            )}
+                                                            >
+                                                                {(useStartEndTimeline ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index, timelineItems) => {
+                                                                    const stageDates = useStartEndTimeline ? {} : (scheduleStages[item.key] || {});
+                                                                    const isDone = timelineActiveIndex > index;
+                                                                    const isActive = timelineActiveIndex === index;
+                                                                    const isUpcoming = !isDone && !isActive;
+                                                                    const isLast = index === timelineItems.length - 1;
+
+                                                                    let startLabel = '...';
+                                                                    let endLabel = '...';
+                                                                    if (!isScheduleLoading) {
+                                                                        if (scheduleSummary?.hasError) {
+                                                                            startLabel = '-';
+                                                                            endLabel = '-';
+                                                                        } else if (useStartEndTimeline) {
+                                                                            const range = isAsProject ? { start: warrantyStart, end: warrantyEnd } : { start: partsStart, end: partsEnd };
+                                                                            const dateLabel = item.key === 'start'
+                                                                                ? formatYmdDot(range.start)
+                                                                                : formatYmdDot(range.end);
+                                                                            startLabel = dateLabel;
+                                                                            endLabel = dateLabel;
+                                                                        } else {
+                                                                            startLabel = formatYmdDot(stageDates.start);
+                                                                            endLabel = formatYmdDot(stageDates.end);
+                                                                        }
+                                                                    }
+
+                                                                    const nodeClass = isActive
+                                                                        ? 'border-primary bg-primary ring-2 ring-primary/35'
+                                                                        : isDone
+                                                                            ? 'border-primary/75 bg-primary/70'
+                                                                            : 'border-border/80 bg-background/85';
+                                                                    const nodeLabelClass = isActive
+                                                                        ? 'text-primary'
+                                                                        : isDone ? 'text-foreground/90' : 'text-muted-foreground/80';
+                                                                    const dateTextClass = isUpcoming ? 'text-muted-foreground/75' : 'text-foreground/85';
+                                                                    const connectorClass = isDone ? 'bg-primary/60' : 'bg-border/70';
+
+                                                                    return (
+                                                                        <div key={`timeline-meta-${project.id}-${item.key}`} className="relative min-w-0">
+                                                                            {!isLast && (
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'pointer-events-none absolute left-[calc(50%+0.68rem)] right-[-50%] top-[0.34rem] h-px',
+                                                                                        connectorClass
+                                                                                    )}
+                                                                                />
+                                                                            )}
+                                                                            <div className="relative z-10 flex items-center gap-1.5">
+                                                                                <span className={cn('h-3 w-3 shrink-0 rounded-full border-2', nodeClass)} />
+                                                                                <span className={cn('truncate text-[9px] font-bold tracking-[0.12em]', nodeLabelClass)}>
                                                                                     {item.label}
                                                                                 </span>
                                                                             </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-
-                                                            {isReviewStage && (
-                                                                <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
-                                                                    <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-primary/40 bg-background/88 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.68)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
-                                                                            <span className="shrink-0 tracking-[0.12em] text-primary/90">검토</span>
-                                                                            <span className="text-muted-foreground/70">|</span>
-                                                                            <span className="truncate font-mono text-foreground/90">생성 {createdDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-primary/12 blur-xl" />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {isClosureStage && (
-                                                                <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
-                                                                    <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-border/70 bg-background/88 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.7)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
-                                                                            <span className="shrink-0 tracking-[0.12em] text-foreground/90">종료</span>
-                                                                            <span className="text-muted-foreground/70">|</span>
-                                                                            <span className="truncate font-mono text-foreground/90">종료일 {closureDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-muted-foreground/12 blur-xl" />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className={cn(
-                                                            'mt-2 grid gap-1',
-                                                            useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
-                                                        )}
-                                                        >
-                                                            {(useStartEndTimeline ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index) => {
-                                                                const stageDates = useStartEndTimeline ? {} : (scheduleStages[item.key] || {});
-                                                                const isDone = timelineActiveIndex > index;
-                                                                const isActive = timelineActiveIndex === index;
-                                                                const isUpcoming = !isDone && !isActive;
-
-                                                                let startLabel = '...';
-                                                                let endLabel = '...';
-                                                                if (!isScheduleLoading) {
-                                                                    if (scheduleSummary?.hasError) {
-                                                                        startLabel = '-';
-                                                                        endLabel = '-';
-                                                                    } else if (useStartEndTimeline) {
-                                                                        const range = isAsProject ? { start: warrantyStart, end: warrantyEnd } : { start: partsStart, end: partsEnd };
-                                                                        const dateLabel = item.key === 'start'
-                                                                            ? formatYmdDot(range.start)
-                                                                            : formatYmdDot(range.end);
-                                                                        startLabel = dateLabel;
-                                                                        endLabel = dateLabel;
-                                                                    } else {
-                                                                        startLabel = formatYmdDot(stageDates.start);
-                                                                        endLabel = formatYmdDot(stageDates.end);
-                                                                    }
-                                                                }
-
-                                                                const startTextClass = isUpcoming ? 'text-muted-foreground/80' : 'text-muted-foreground';
-                                                                const endTextClass = isUpcoming ? 'text-muted-foreground' : 'text-foreground/90';
-                                                                const singleDateTextClass = isUpcoming ? 'text-muted-foreground/80' : item.textClass;
-
-                                                                return (
-                                                                    <div key={`timeline-meta-${project.id}-${item.key}`} className="min-w-0 text-center">
-                                                                        <p className="sr-only">{item.label}</p>
-                                                                        <p className={cn(
-                                                                            'font-mono text-[11px] font-semibold leading-none tabular-nums',
-                                                                            useStartEndTimeline ? singleDateTextClass : startTextClass
-                                                                        )}
-                                                                        >
-                                                                            {startLabel}
-                                                                        </p>
-                                                                        {!useStartEndTimeline && (
-                                                                            <p className={cn(
-                                                                                'mt-1 font-mono text-[11px] font-semibold leading-none tabular-nums',
-                                                                                endTextClass
-                                                                            )}
-                                                                            >
-                                                                                {endLabel}
+                                                                            <p className={cn('mt-1.5 truncate font-mono text-[10px] font-semibold tabular-nums', dateTextClass)}>
+                                                                                {useStartEndTimeline ? startLabel : `${startLabel} ~ ${endLabel}`}
                                                                             </p>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            {(isReviewStage || isClosureStage) && (
+                                                                <div className="mt-2 flex justify-end">
+                                                                    <span className={cn(
+                                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold',
+                                                                        isClosureStage
+                                                                            ? 'border-border/80 bg-background/82 text-foreground/85'
+                                                                            : 'border-primary/40 bg-primary/12 text-primary/90'
+                                                                    )}
+                                                                    >
+                                                                        <span className={cn(
+                                                                            'h-1.5 w-1.5 rounded-full',
+                                                                            isClosureStage ? 'bg-muted-foreground' : 'bg-primary'
                                                                         )}
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                                        />
+                                                                        {isClosureStage ? `종료일 ${closureDateLabel}` : `검토 생성일 ${createdDateLabel}`}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </Link>
                                                 </div>
@@ -2112,7 +2078,7 @@ const SearchResults = () => {
 	                                                            </Link>
                                                         </div>
 
-                                                        <div className="mt-0.5 flex-1 space-y-1 overflow-y-auto pr-0.5">
+                                                        <div className="mt-0.5 grid flex-1 auto-rows-fr gap-1 overflow-y-auto pr-0.5">
                                                             {isAgendaLoading && (
                                                                 <div className="rounded-lg border border-border bg-card/80 px-2 py-2 text-[10px] font-medium text-muted-foreground">
                                                                     최신 안건을 불러오는 중입니다.
@@ -2140,7 +2106,7 @@ const SearchResults = () => {
 	                                                                        to={agendaDetailPath}
 	                                                                        onClick={() => markProjectUpdateSeen(project, { agendaLastUpdatedAt: latestAgendaUpdatedAt })}
 		                                                                        className={cn(
-		                                                                            'group relative block overflow-hidden rounded-lg border px-2.5 py-1.5 transition-all',
+		                                                                            'group relative block h-full overflow-hidden rounded-lg border px-2.5 py-1.5 transition-all',
 		                                                                            index === 0
 		                                                                                ? 'border-sky-400/45 bg-card shadow-sm'
                                                                                 : 'border-border/80 bg-card/85 hover:border-primary/30'

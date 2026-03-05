@@ -1890,7 +1890,7 @@ const SearchResults = () => {
 	                                                                            to={bookmark.to}
 	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
 	                                                                            className={cn(
-	                                                                                'group inline-flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/88 px-1.5 text-[9px] font-bold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                'group inline-flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/88 px-1.5 text-[10px] font-semibold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
 	                                                                                bookmark.textClass
 	                                                                            )}
 	                                                                        >
@@ -1903,26 +1903,26 @@ const SearchResults = () => {
 	                                                            <div className="flex flex-wrap items-center gap-1">
 	                                                                <span
 	                                                                    title={project.customer_name || ''}
-	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                                >
 	                                                                    <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">고객사</span>
+	                                                                    <span className="shrink-0 text-[10px] font-bold text-muted-foreground">고객사</span>
 	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.customer_name || '-'}</span>
 	                                                                </span>
 	                                                                <span
 	                                                                    title={project.installation_site || ''}
-	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                                >
 	                                                                    <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">설치장소</span>
+	                                                                    <span className="shrink-0 text-[10px] font-bold text-muted-foreground">설치장소</span>
 	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.installation_site || '-'}</span>
 	                                                                </span>
 	                                                                <span
 	                                                                    title={project.manager_name || ''}
-	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                                >
 	                                                                    <User className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">담당자</span>
+	                                                                    <span className="shrink-0 text-[10px] font-bold text-muted-foreground">담당자</span>
 	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.manager_name || '미지정'}</span>
 	                                                                </span>
 	                                                            </div>
@@ -1965,16 +1965,7 @@ const SearchResults = () => {
                                                         to={`/project-management/projects/${project.id}/schedule`}
                                                         className="group block rounded-xl border border-border/75 bg-secondary/35 p-2.5 transition hover:border-primary/30 hover:bg-secondary/45"
                                                     >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">
-                                                                {useStartEndTimeline ? '일정' : '단계 일정'}
-                                                            </span>
-                                                            <span className={cn('text-[10px] font-bold leading-none', stageStyle.statusTextClass)}>
-                                                                {resolveProjectStatusLabel(project)}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="mt-2 rounded-xl border border-border/75 bg-background/45 p-2.5">
+                                                        <div className="rounded-xl border border-border/75 bg-background/45 p-2.5">
                                                             <div className={cn(
                                                                 'relative grid gap-2',
                                                                 useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
@@ -2035,7 +2026,7 @@ const SearchResults = () => {
                                                                                         connectorClass
                                                                                     )}
                                                                                 />
-                                                                                <span className={cn('relative z-10 truncate text-[9px] font-bold tracking-[0.1em]', nodeLabelClass)}>
+                                                                                <span className={cn('relative z-10 truncate text-[10px] font-bold tracking-[0.08em]', nodeLabelClass)}>
                                                                                     {item.label}
                                                                                 </span>
                                                                             </div>
@@ -2043,7 +2034,7 @@ const SearchResults = () => {
                                                                                 {useStartEndTimeline ? (
                                                                                     <p
                                                                                         title={startLabel}
-                                                                                        className={cn('font-mono text-[9px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                        className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                     >
                                                                                         {startDisplay}
                                                                                     </p>
@@ -2051,13 +2042,13 @@ const SearchResults = () => {
                                                                                     <div className="space-y-0.5">
                                                                                         <p
                                                                                             title={`시작 ${startLabel}`}
-                                                                                            className={cn('font-mono text-[9px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                            className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                         >
                                                                                             {startDisplay}
                                                                                         </p>
                                                                                         <p
                                                                                             title={`종료 ${endLabel}`}
-                                                                                            className={cn('font-mono text-[9px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                            className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                         >
                                                                                             {endDisplay}
                                                                                         </p>

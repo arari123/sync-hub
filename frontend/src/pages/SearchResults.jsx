@@ -1485,7 +1485,7 @@ const SearchResults = () => {
                             </div>
 
                             <div className="hidden lg:flex lg:min-h-8 lg:items-center lg:gap-2">
-                                <div className={FILTER_TOGGLE_GROUP_CLASS}>
+                                <div className={cn(FILTER_TOGGLE_GROUP_CLASS, isProjectTab && 'mr-4')}>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -1540,7 +1540,7 @@ const SearchResults = () => {
 
                                 {isProjectTab ? (
                                     <>
-                                        <div className="relative w-44 shrink-0">
+                                        <div className="relative w-52 shrink-0">
                                             <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
                                             <Input
                                                 type="text"

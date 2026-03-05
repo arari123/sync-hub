@@ -1805,7 +1805,7 @@ const SearchResults = () => {
 	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-border/90 to-transparent" />
 	                                            <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-3">
 	                                                <div className="flex h-full min-h-[192px] min-w-0 gap-2.5 rounded-xl border border-border/70 bg-card/72 p-2.5">
-	                                                    <div className="flex w-20 shrink-0 flex-col gap-1.5">
+	                                                    <div className="flex h-full w-20 shrink-0 flex-col gap-1.5">
 	                                                        <div className="h-20 w-20 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
 	                                                            {coverImage ? (
 	                                                                <img
@@ -1819,9 +1819,9 @@ const SearchResults = () => {
 	                                                                </div>
 	                                                            )}
 	                                                        </div>
-	                                                        <div className="h-14 rounded-md border border-border/75 bg-background/45 p-1">
+	                                                        <div className="min-h-0 flex-1 rounded-md border border-border/75 bg-background/45 p-1">
 	                                                            {updateBookmarks.length > 0 ? (
-	                                                                <div className="grid h-full grid-cols-2 auto-rows-fr gap-1">
+	                                                                <div className="grid h-full grid-cols-2 auto-rows-min content-start gap-1">
 	                                                                    {updateBookmarks.map((bookmark, index) => {
 	                                                                        const isLastOddItem = updateBookmarks.length % 2 === 1
 	                                                                            && index === updateBookmarks.length - 1;

@@ -2026,14 +2026,13 @@ const SearchResults = () => {
                                                                         <div key={`timeline-meta-${project.id}-${item.key}`} className="relative min-w-0">
                                                                             <div className="relative flex min-w-0 items-center gap-1">
                                                                                 <span className={cn('relative z-10 h-2.5 w-2.5 shrink-0 rounded-full border-2', nodeClass)} />
-                                                                                {!isLast && (
-                                                                                    <span
-                                                                                        className={cn(
-                                                                                            'pointer-events-none absolute left-3 right-[-0.75rem] top-1/2 h-px -translate-y-1/2',
-                                                                                            connectorClass
-                                                                                        )}
-                                                                                    />
-                                                                                )}
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'pointer-events-none absolute left-3 top-1/2 h-px -translate-y-1/2',
+                                                                                        isLast ? 'right-0' : 'right-[-0.75rem]',
+                                                                                        connectorClass
+                                                                                    )}
+                                                                                />
                                                                                 <span className={cn('relative z-10 truncate text-[9px] font-bold tracking-[0.1em]', nodeLabelClass)}>
                                                                                     {item.label}
                                                                                 </span>

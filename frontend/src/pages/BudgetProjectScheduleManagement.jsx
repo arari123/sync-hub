@@ -29,18 +29,21 @@ import {
 const STAGE_STYLES = {
     design: {
         badge: 'border-sky-400/35 bg-sky-500/12 text-sky-200',
+        overlay_badge: 'border-sky-300/90 bg-sky-500 text-white',
         bar: 'bg-sky-500',
         rail: 'bg-sky-500/18',
         rowBorder: 'border-l-sky-500/70',
     },
     fabrication: {
         badge: 'border-amber-400/35 bg-amber-500/12 text-amber-200',
+        overlay_badge: 'border-amber-300/90 bg-amber-500 text-white',
         bar: 'bg-amber-500',
         rail: 'bg-amber-500/18',
         rowBorder: 'border-l-amber-500/70',
     },
     installation: {
         badge: 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200',
+        overlay_badge: 'border-emerald-300/90 bg-emerald-500 text-white',
         bar: 'bg-emerald-500',
         rail: 'bg-emerald-500/18',
         rowBorder: 'border-l-emerald-500/70',
@@ -68,10 +71,11 @@ const STATUS_FILTER_OPTIONS = [
 ];
 const MILESTONE_ROW_HEIGHT_NO_EVENTS_PX = 44;
 const MILESTONE_BASE_ROW_HEIGHT_PX = 56;
-const MILESTONE_EVENT_LANE_HEIGHT_PX = 18;
+const MILESTONE_MIN_LABEL_WIDTH_PX = 76;
 const MILESTONE_EVENT_LABEL_MIN_WIDTH_PX = 96;
 const MILESTONE_EVENT_LABEL_MAX_WIDTH_PX = 320;
 const MILESTONE_EVENT_LABEL_GAP_PX = 10;
+const MILESTONE_EVENT_LABEL_LANE_HEIGHT_PX = 26;
 const MILESTONE_CHART_MIN_WIDTH_PX = 320;
 
 function formatDateLabel(value) {
@@ -226,97 +230,80 @@ function estimateMilestoneLabelWidthPx(dateValue, eventName) {
     );
 }
 
-function resolveMilestoneLabelWindowPx(positionPx, widthPx, chartWidthPx) {
-    const safeWidth = Math.min(
-        MILESTONE_EVENT_LABEL_MAX_WIDTH_PX,
-        Math.max(MILESTONE_EVENT_LABEL_MIN_WIDTH_PX, widthPx),
-    );
-    const maxStart = Math.max(0, chartWidthPx - safeWidth);
-    const startPx = Math.min(maxStart, Math.max(0, positionPx - (safeWidth / 2)));
-    return { startPx, widthPx: safeWidth };
-}
-
 function layoutMilestoneEvents(rows, bounds, chartWidthPx) {
-    if (!Number.isFinite(chartWidthPx) || chartWidthPx <= 0) return [];
+    if (!Number.isFinite(chartWidthPx) || chartWidthPx <= 0) {
+        return { lines: [], labels: [], lane_count: 0 };
+    }
 
-    const topLaneRightEdges = [];
-    const bottomLaneRightEdges = [];
-    let previousWindow = null;
+    const lineByKey = new Map();
+    const laneRightEdges = [];
 
-    const findLane = (laneRightEdges, startPx) => {
-        let lane = 0;
-        while (
-            lane < laneRightEdges.length
-            && startPx <= (laneRightEdges[lane] + MILESTONE_EVENT_LABEL_GAP_PX)
-        ) {
-            lane += 1;
-        }
-        return lane;
-    };
-
-    return rows
-        .map((row) => {
+    const labels = rows
+        .map((row, index) => {
             const rawPos = getDatePositionPercent(bounds, row.start_date);
             const safePosition = clampPercent(rawPos);
             if (safePosition === null) return null;
 
-            const anchorPx = (safePosition / 100) * chartWidthPx;
-            const labelWidthPx = estimateMilestoneLabelWidthPx(row.start_date, row.name || '이벤트');
-            const window = resolveMilestoneLabelWindowPx(
-                anchorPx,
-                labelWidthPx,
-                chartWidthPx,
-            );
-
-            const isCloseToPrevious = previousWindow
-                ? window.startPx <= (previousWindow.endPx + MILESTONE_EVENT_LABEL_GAP_PX)
-                : false;
-
-            const preferredPlacement = isCloseToPrevious
-                ? (previousWindow?.placement === 'top' ? 'bottom' : 'top')
-                : 'top';
-            const oppositePlacement = preferredPlacement === 'top' ? 'bottom' : 'top';
-
-            const preferredLaneRightEdges = preferredPlacement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
-            const oppositeLaneRightEdges = oppositePlacement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
-
-            let placement = preferredPlacement;
-            let lane = findLane(preferredLaneRightEdges, window.startPx);
-
-            if (lane > 0) {
-                const oppositeLane = findLane(oppositeLaneRightEdges, window.startPx);
-                if (oppositeLane < lane) {
-                    placement = oppositePlacement;
-                    lane = oppositeLane;
-                }
+            const styleKey = STAGE_STYLES[row.stage] ? row.stage : 'design';
+            const lineKey = `${row.start_date}-${styleKey}`;
+            if (!lineByKey.has(lineKey)) {
+                lineByKey.set(lineKey, {
+                    id: lineKey,
+                    date: row.start_date,
+                    stage: styleKey,
+                    position: safePosition,
+                });
             }
 
-            const laneRightEdges = placement === 'top' ? topLaneRightEdges : bottomLaneRightEdges;
-            laneRightEdges[lane] = window.startPx + window.widthPx;
+            const anchorPx = (safePosition / 100) * chartWidthPx;
+            const estimatedLabelWidthPx = estimateMilestoneLabelWidthPx(row.start_date, row.name || '이벤트');
+            const maxLabelWidthPx = chartWidthPx > 640 ? 260 : 220;
+            const labelWidthPx = Math.min(
+                maxLabelWidthPx,
+                Math.max(MILESTONE_MIN_LABEL_WIDTH_PX, estimatedLabelWidthPx),
+            );
+            const startPx = anchorPx - (labelWidthPx / 2);
+            const endPx = startPx + labelWidthPx;
 
-            const event = {
-                id: row.id,
-                name: row.name || '이벤트',
+            let lane = 0;
+            while (true) {
+                const rightEdge = laneRightEdges[lane] ?? Number.NEGATIVE_INFINITY;
+                if (startPx >= (rightEdge + MILESTONE_EVENT_LABEL_GAP_PX)) {
+                    laneRightEdges[lane] = endPx;
+                    break;
+                }
+                lane += 1;
+            }
+
+            const eventName = row.name || '이벤트';
+            const dateText = formatDateLabel(row.start_date);
+            return {
+                id: row.id ?? `${row.start_date}-${styleKey}-${index}`,
+                stage: styleKey,
+                name: eventName,
                 date: row.start_date,
-                lane,
-                placement,
+                date_text: dateText,
+                title: `${dateText} · ${eventName}`,
                 position: safePosition,
+                width_px: labelWidthPx,
+                lane,
             };
-
-            previousWindow = {
-                placement,
-                endPx: window.startPx + window.widthPx,
-            };
-
-            return event;
         })
         .filter(Boolean);
+
+    return {
+        lines: Array.from(lineByKey.values()).sort((a, b) => (
+            (a.position - b.position)
+            || (STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage))
+        )),
+        labels,
+        lane_count: laneRightEdges.length,
+    };
 }
 
-function resolveMilestoneRowHeight(laneDepth, showEvents) {
+function resolveMilestoneRowHeight(showEvents) {
     if (!showEvents) return MILESTONE_ROW_HEIGHT_NO_EVENTS_PX;
-    const safeLaneDepth = Math.max(1, Number(laneDepth || 1));
-    return MILESTONE_BASE_ROW_HEIGHT_PX + ((safeLaneDepth - 1) * MILESTONE_EVENT_LANE_HEIGHT_PX * 2);
+    return MILESTONE_BASE_ROW_HEIGHT_PX;
 }
 
 export default function BudgetProjectScheduleManagement() {
@@ -450,6 +437,8 @@ export default function BudgetProjectScheduleManagement() {
         return undefined;
     }, [chartBounds]);
 
+    const showMilestoneEvents = kindFilter !== 'task';
+
     const stageSummaries = useMemo(() => {
         if (!chartBounds) return [];
 
@@ -476,24 +465,6 @@ export default function BudgetProjectScheduleManagement() {
                 ? ganttPosition({ kind: 'task', start_date: startDate, end_date: endDate }, chartBounds)
                 : null;
 
-            const eventRows = scopedRows
-                .filter((row) => row.stage === stage && row.kind === 'event' && parseYmd(row.start_date))
-                .sort((a, b) => {
-                    if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
-                    return a.name.localeCompare(b.name, 'ko-KR');
-                });
-            const events = layoutMilestoneEvents(eventRows, chartBounds, milestoneChartWidth);
-            const topLaneCount = events.reduce((maxLane, event) => (
-                event.placement === 'top'
-                    ? Math.max(maxLane, event.lane + 1)
-                    : maxLane
-            ), 0);
-            const bottomLaneCount = events.reduce((maxLane, event) => (
-                event.placement === 'bottom'
-                    ? Math.max(maxLane, event.lane + 1)
-                    : maxLane
-            ), 0);
-
             return {
                 stage,
                 label: STAGE_LABELS[stage] || stage,
@@ -501,12 +472,26 @@ export default function BudgetProjectScheduleManagement() {
                 end_date: endDate,
                 position,
                 task_count: tasks.length,
-                events,
-                top_lane_count: topLaneCount,
-                bottom_lane_count: bottomLaneCount,
             };
         });
-    }, [chartBounds, scopedRows, milestoneChartWidth]);
+    }, [chartBounds, scopedRows]);
+
+    const milestoneEvents = useMemo(() => {
+        if (!chartBounds || !showMilestoneEvents) {
+            return { lines: [], labels: [], lane_count: 0 };
+        }
+
+        const eventRows = scopedRows
+            .filter((row) => row.kind === 'event' && parseYmd(row.start_date))
+            .sort((a, b) => {
+                if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+                const stageDiff = STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage);
+                if (stageDiff !== 0) return stageDiff;
+                return a.name.localeCompare(b.name, 'ko-KR');
+            });
+
+        return layoutMilestoneEvents(eventRows, chartBounds, milestoneChartWidth);
+    }, [chartBounds, scopedRows, showMilestoneEvents, milestoneChartWidth]);
 
     const resetFilters = () => {
         setSearchText('');
@@ -541,14 +526,7 @@ export default function BudgetProjectScheduleManagement() {
 
     const handleMilestoneScroll = () => syncHorizontalScroll('milestone');
     const handleGanttScroll = () => syncHorizontalScroll('gantt');
-
-    const showMilestoneEvents = kindFilter !== 'task';
-    const milestoneLaneDepth = showMilestoneEvents
-        ? stageSummaries.reduce((maxDepth, summary) => (
-            Math.max(maxDepth, summary.top_lane_count || 0, summary.bottom_lane_count || 0, 1)
-        ), 1)
-        : 1;
-    const milestoneRowHeight = resolveMilestoneRowHeight(milestoneLaneDepth, showMilestoneEvents);
+    const milestoneRowHeight = resolveMilestoneRowHeight(showMilestoneEvents);
 
     if (isLoading) {
         return (
@@ -892,7 +870,7 @@ export default function BudgetProjectScheduleManagement() {
                             <p className="text-[11px] text-slate-500">
                                 일정 {stageSummaries.reduce((sum, item) => sum + item.task_count, 0).toLocaleString('ko-KR')}건
                                 {' · '}
-                                이벤트 {stageSummaries.reduce((sum, item) => sum + item.events.length, 0).toLocaleString('ko-KR')}건
+                                이벤트 {milestoneEvents.labels.length.toLocaleString('ko-KR')}건
                             </p>
                         </div>
 
@@ -904,7 +882,7 @@ export default function BudgetProjectScheduleManagement() {
                             >
                                 <div className="min-w-[1060px]">
                                     <div className="grid grid-cols-[460px_1fr]">
-                                        <div className="divide-y divide-slate-200 border-r border-slate-200 bg-white/40 pt-3">
+                                        <div className="divide-y divide-slate-200 border-r border-slate-200 bg-white/40">
                                             {stageSummaries.map((summary) => (
                                                 <div
                                                     key={`milestone-stage-label-${summary.stage}`}
@@ -930,6 +908,20 @@ export default function BudgetProjectScheduleManagement() {
                                                 ))}
                                             </div>
 
+                                            {showMilestoneEvents && milestoneEvents.lines.map((eventLine) => {
+                                                const stageStyle = STAGE_STYLES[eventLine.stage] || STAGE_STYLES.design;
+                                                return (
+                                                    <div
+                                                        key={`milestone-event-line-${eventLine.id}`}
+                                                        className={cn(
+                                                            'pointer-events-none absolute inset-y-0 z-20 -translate-x-1/2 opacity-80',
+                                                            stageStyle.bar,
+                                                        )}
+                                                        style={{ left: `${eventLine.position}%`, width: '3px' }}
+                                                    />
+                                                );
+                                            })}
+
                                             {todayLinePos !== null && (
                                                 <div
                                                     className="pointer-events-none absolute inset-y-0 z-30 border-l-2 border-rose-500/80"
@@ -937,7 +929,36 @@ export default function BudgetProjectScheduleManagement() {
                                                 />
                                             )}
 
-                                            <div className="relative z-10 divide-y divide-slate-200 pt-3">
+                                            {showMilestoneEvents && milestoneEvents.labels.map((eventLabel) => {
+                                                const stageStyle = STAGE_STYLES[eventLabel.stage] || STAGE_STYLES.design;
+                                                return (
+                                                    <div
+                                                        key={`milestone-event-label-${eventLabel.date}-${eventLabel.id}`}
+                                                        className="absolute z-50"
+                                                        style={{
+                                                            left: `${eventLabel.position}%`,
+                                                            top: `${4 + (eventLabel.lane * MILESTONE_EVENT_LABEL_LANE_HEIGHT_PX)}px`,
+                                                            width: `${eventLabel.width_px}px`,
+                                                            transform: 'translateX(-50%)',
+                                                        }}
+                                                    >
+                                                        <span
+                                                            className={cn(
+                                                                'inline-flex w-full min-w-0 items-center overflow-hidden rounded-md border px-1.5 py-0.5 text-[10px] font-bold leading-none shadow-sm',
+                                                                stageStyle.overlay_badge,
+                                                            )}
+                                                            title={eventLabel.title}
+                                                        >
+                                                            <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px font-mono text-[10px] leading-none text-slate-700">
+                                                                {eventLabel.date_text}
+                                                            </span>
+                                                            <span className="min-w-0 truncate">{eventLabel.name}</span>
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <div className="relative z-10 divide-y divide-slate-200">
                                                 {stageSummaries.map((summary) => {
                                                     const stageStyle = STAGE_STYLES[summary.stage] || STAGE_STYLES.design;
                                                     const barLeft = summary.position?.left ?? 0;
@@ -957,61 +978,6 @@ export default function BudgetProjectScheduleManagement() {
                                                                         style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
                                                                     />
                                                                 ) : null}
-
-                                                                {showMilestoneEvents && summary.events.map((event) => {
-                                                                    const laneOffsetPx = event.lane * MILESTONE_EVENT_LANE_HEIGHT_PX;
-                                                                    const isTop = event.placement !== 'bottom';
-                                                                    return (
-                                                                        <React.Fragment key={`milestone-event-${summary.stage}-${event.id}`}>
-                                                                            <div
-                                                                                className="absolute top-1/2 z-40 -translate-x-1/2"
-                                                                                style={{
-                                                                                    left: `${event.position}%`,
-                                                                                    transform: `translate(-50%, ${isTop ? '-170%' : '70%'})`,
-                                                                                }}
-                                                                            >
-                                                                                <span
-                                                                                    className={cn(
-                                                                                        'pointer-events-none absolute left-1/2 h-2 w-px -translate-x-1/2',
-                                                                                        isTop ? 'top-full' : 'bottom-full',
-                                                                                        stageStyle.bar,
-                                                                                    )}
-                                                                                />
-                                                                                <span
-                                                                                    className={cn(
-                                                                                        'block h-2.5 w-2.5 rounded-full border border-slate-950/70 shadow-sm',
-                                                                                        stageStyle.bar,
-                                                                                    )}
-                                                                                />
-                                                                            </div>
-                                                                            <div
-                                                                                className={cn(
-                                                                                    'absolute z-50',
-                                                                                    isTop ? 'bottom-full pb-1' : 'top-full pt-1',
-                                                                                )}
-                                                                                style={{
-                                                                                    left: `${event.position}%`,
-                                                                                    transform: isTop
-                                                                                        ? `translate(-50%, -${laneOffsetPx}px)`
-                                                                                        : `translate(-50%, ${laneOffsetPx}px)`,
-                                                                                }}
-                                                                            >
-                                                                                <span
-                                                                                    className={cn(
-                                                                                        'inline-flex w-auto items-center whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-bold shadow-sm',
-                                                                                        stageStyle.badge,
-                                                                                    )}
-                                                                                    title={event.name}
-                                                                                >
-                                                                                    <span className="mr-1 shrink-0 rounded bg-white/60 px-1 py-px font-mono text-[10px] text-slate-700">
-                                                                                        {formatDateLabel(event.date)}
-                                                                                    </span>
-                                                                                    <span className="whitespace-nowrap">{event.name}</span>
-                                                                                </span>
-                                                                            </div>
-                                                                        </React.Fragment>
-                                                                    );
-                                                                })}
                                                             </div>
                                                         </div>
                                                     );
@@ -1036,7 +1002,7 @@ export default function BudgetProjectScheduleManagement() {
                             <span className={cn('h-2.5 w-2.5 rounded-full ring-1 ring-white', STAGE_STYLES.fabrication.bar)} />
                             <span className={cn('h-2.5 w-2.5 rounded-full ring-1 ring-white', STAGE_STYLES.installation.bar)} />
                         </span>
-                        이벤트 포인트
+                        이벤트 라벨
                     </span>
                 </div>
 

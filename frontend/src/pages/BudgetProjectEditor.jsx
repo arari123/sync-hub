@@ -3348,7 +3348,7 @@ const ExcelTable = ({
     return (
         <>
             <div className="relative" ref={tableWrapperRef} onCopy={handleCopy} onPaste={handlePasteToCells}>
-                <table className="w-full text-[11px] border-collapse bg-white" ref={tableRef}>
+                <table className="w-full border-collapse bg-card text-[11px]" ref={tableRef}>
                 <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
                     <tr>
                         <th className="w-14 p-0 text-center font-black text-slate-500 uppercase tracking-tighter border-r border-slate-200">
@@ -3375,12 +3375,12 @@ const ExcelTable = ({
                 </thead>
                 <tbody>
                     {rows.map((row, rowIndex) => (
-                        <tr key={rowIndex} className="border-b border-slate-100 hover:bg-slate-50/50 focus-within:bg-blue-50/30 group transition-colors">
+                        <tr key={rowIndex} className="group border-b border-slate-100 transition-colors hover:bg-slate-50/50 focus-within:bg-primary/14">
                             <td
                                 className={cn(
                                     "w-14 h-8 px-1 text-center text-[10px] font-black border-r border-slate-200 select-none cursor-default",
                                     rowIndex >= range.rowMin && rowIndex <= range.rowMax
-                                        ? "bg-sky-100 text-sky-700"
+                                        ? "bg-primary/20 text-primary"
                                         : "bg-slate-50 text-slate-400",
                                 )}
                                 onMouseDown={(event) => handleRowHeaderMouseDown(event, rowIndex)}
@@ -3423,9 +3423,9 @@ const ExcelTable = ({
                                                 "p-0 border-r border-slate-200 last:border-0 relative",
                                                 cellCursorClass,
                                                 !isSelected && isLockAutoColumn && (isLockedAuto ? 'bg-amber-50' : 'bg-emerald-50'),
-                                                isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
-                                                isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
-                                                isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-50/60",
+                                                isSelected && "bg-primary/16 border-primary/45 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.42)]",
+                                                isActive && "ring-2 ring-primary/85 ring-inset z-10",
+                                                isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-500/12",
                                             )}
                                             data-row={rowIndex}
                                             data-col={colIndex}
@@ -3435,7 +3435,7 @@ const ExcelTable = ({
                                         >
                                             {isEditingCurrentCell ? (
                                                 <select
-                                                    className="w-full h-8 px-2 bg-transparent text-[10.5px] font-medium outline-none focus:bg-white focus:ring-1 focus:ring-primary text-slate-700 cursor-text"
+                                                    className="w-full h-8 cursor-text bg-transparent px-2 text-[10.5px] font-medium text-foreground outline-none focus:bg-card/95 focus:ring-1 focus:ring-primary/80"
                                                     value={optionValue}
                                                     onChange={(event) => {
                                                         const change = buildCellChange(rowIndex, colIndex, event.target.value);
@@ -3460,7 +3460,7 @@ const ExcelTable = ({
                                                         "w-full h-8 px-2 bg-transparent text-[10.5px] font-medium text-left cursor-default",
                                                         isLockAutoColumn
                                                             ? (isLockedAuto ? 'text-amber-700 font-black' : 'text-emerald-700 font-black')
-                                                            : 'text-slate-700',
+                                                            : 'text-foreground',
                                                     )}
                                                     onFocus={() => handleCellFocus(rowIndex, colIndex)}
                                                     onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
@@ -3486,9 +3486,9 @@ const ExcelTable = ({
                                         className={cn(
                                             "p-0 border-r border-slate-200 last:border-0 relative",
                                             cellCursorClass,
-                                            isSelected && "bg-sky-100/90 border-sky-300 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.42)]",
-                                            isActive && "ring-2 ring-sky-600/85 ring-inset z-10",
-                                            isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-50/60",
+                                            isSelected && "bg-primary/16 border-primary/45 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.42)]",
+                                            isActive && "ring-2 ring-primary/85 ring-inset z-10",
+                                            isCopied && "outline outline-2 outline-emerald-500/80 -outline-offset-2 bg-emerald-500/12",
                                         )}
                                         data-row={rowIndex}
                                         data-col={colIndex}
@@ -3502,7 +3502,7 @@ const ExcelTable = ({
                                             className={cn(
                                                 'w-full h-8 px-2 outline-none transition-all font-medium placeholder:text-slate-300 text-[10.5px]',
                                                 isCellEditable
-                                                    ? 'bg-transparent focus:bg-white focus:ring-1 focus:ring-primary text-slate-700'
+                                                    ? 'bg-transparent text-foreground focus:bg-card/95 focus:ring-1 focus:ring-primary/80'
                                                     : 'bg-slate-100 text-slate-600 font-black',
                                                 isEditingCurrentCell ? 'cursor-text' : 'cursor-default',
                                             )}

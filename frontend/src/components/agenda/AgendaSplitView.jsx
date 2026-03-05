@@ -30,8 +30,8 @@ function entryKindLabel(value) {
 function entryToneClass(value) {
     const kind = String(value || '').toLowerCase();
     if (kind === 'root') return 'border-border bg-secondary/60 text-foreground/85';
-    if (kind === 'additional_work') return 'border-amber-200 bg-amber-50 text-amber-700';
-    return 'border-cyan-200 bg-cyan-50 text-cyan-700';
+    if (kind === 'additional_work') return 'border-amber-400/35 bg-amber-500/12 text-amber-200';
+    return 'border-cyan-400/35 bg-cyan-500/12 text-cyan-200';
 }
 
 function progressStatusLabel(value) {
@@ -43,7 +43,7 @@ function progressStatusLabel(value) {
 function progressStatusToneClass(value) {
     const status = String(value || '').toLowerCase();
     if (status === 'completed') return 'border-border bg-muted/80 text-muted-foreground';
-    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    return 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200';
 }
 
 function isUnreadByBaselines(baselines, entryId, updatedAt) {
@@ -162,9 +162,9 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
             className={cn(
                 'w-full rounded-xl border px-3 py-2 text-left transition-colors',
                 isSelected
-                    ? 'border-cyan-300 bg-cyan-50/70'
+                    ? 'border-cyan-400/50 bg-cyan-500/14 shadow-[0_0_0_1px_hsl(189_94%_43%/0.35)]'
                     : isUnread
-                        ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
+                        ? 'border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/18'
                         : 'border-border bg-card hover:bg-secondary/60',
             )}
         >
@@ -205,9 +205,9 @@ function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
     if (!entry) return null;
 
     const toneClass = tone === 'cyan'
-        ? 'border-cyan-200 bg-cyan-50/30'
+        ? 'border-cyan-400/35 bg-cyan-500/10'
         : tone === 'amber'
-            ? 'border-amber-200 bg-amber-50/30'
+            ? 'border-amber-400/35 bg-amber-500/10'
             : 'border-border bg-card';
 
     return (
@@ -691,7 +691,7 @@ export default function AgendaSplitView({
                                     <span className={cn(
                                         'inline-flex h-7 items-center rounded-full border px-3 text-xs font-bold',
                                         detail.thread.progress_status === 'in_progress'
-                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                            ? 'border-emerald-400/40 bg-emerald-500/12 text-emerald-200'
                                             : 'border-border bg-muted/80 text-muted-foreground',
                                     )}
                                     >

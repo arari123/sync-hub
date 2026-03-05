@@ -638,6 +638,7 @@ const SearchResults = () => {
     const [projectUpdateBaselines, setProjectUpdateBaselines] = useState(() => loadProjectUpdateBaselines());
     const [unreadAgendaEntryCount, setUnreadAgendaEntryCount] = useState(0);
     const [agendaListFilter, setAgendaListFilter] = useState(AGENDA_LIST_FILTER_ALL);
+    const unreadAgendaEntryIdsRef = React.useRef(new Set());
 
     const user = getCurrentUser();
     const isAgendaTab = homeTab === HOME_TAB_ALL_AGENDAS;
@@ -954,8 +955,29 @@ const SearchResults = () => {
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
     const unreadAgendaBadgeLabel = unreadAgendaEntryCount > 99 ? '99+' : String(unreadAgendaEntryCount || 0);
 
+    const handleAgendaEntrySeen = React.useCallback((entryId, wasUnread = false) => {
+        const normalizedEntryId = Number(entryId || 0);
+        if (!normalizedEntryId || !wasUnread) return;
+
+        const currentSet = unreadAgendaEntryIdsRef.current;
+        if (!(currentSet instanceof Set)) {
+            setUnreadAgendaEntryCount((prev) => Math.max(0, prev - 1));
+            return;
+        }
+        if (!currentSet.has(normalizedEntryId)) {
+            setUnreadAgendaEntryCount((prev) => Math.max(0, prev - 1));
+            return;
+        }
+
+        const next = new Set(currentSet);
+        next.delete(normalizedEntryId);
+        unreadAgendaEntryIdsRef.current = next;
+        setUnreadAgendaEntryCount(next.size);
+    }, []);
+
     useEffect(() => {
         if (!hasHomePanel) {
+            unreadAgendaEntryIdsRef.current = new Set();
             setUnreadAgendaEntryCount(0);
             return undefined;
         }
@@ -966,7 +988,7 @@ const SearchResults = () => {
         const fetchUnreadAgendaEntryCount = async () => {
             try {
                 const seenBaselines = loadAgendaEntrySeenBaselines();
-                let unreadCount = 0;
+                const nextUnreadIds = new Set();
                 let page = 1;
                 let totalPages = 1;
 
@@ -975,7 +997,7 @@ const SearchResults = () => {
                         params: {
                             include_drafts: true,
                             page,
-                            per_page: 50,
+                            per_page: 100,
                         },
                         signal: controller.signal,
                     });
@@ -985,17 +1007,20 @@ const SearchResults = () => {
                     totalPages = Number.isFinite(nextTotalPages) && nextTotalPages > 0 ? nextTotalPages : 1;
 
                     for (const item of items) {
-                        if (isAgendaEntryUnreadByBaselines(seenBaselines, item?.entry_id, item?.updated_at)) {
-                            unreadCount += 1;
-                        }
+                        const entryId = Number(item?.entry_id || 0);
+                        if (!entryId) continue;
+                        if (!isAgendaEntryUnreadByBaselines(seenBaselines, entryId, item?.updated_at)) continue;
+                        nextUnreadIds.add(entryId);
                     }
                     page += 1;
                 }
 
                 if (!active) return;
-                setUnreadAgendaEntryCount(unreadCount);
+                unreadAgendaEntryIdsRef.current = nextUnreadIds;
+                setUnreadAgendaEntryCount(nextUnreadIds.size);
             } catch (err) {
                 if (!active || err?.code === 'ERR_CANCELED') return;
+                unreadAgendaEntryIdsRef.current = new Set();
                 setUnreadAgendaEntryCount(0);
             }
         };
@@ -1482,7 +1507,7 @@ const SearchResults = () => {
                                     </div>
                                 ) : (
                                     <div className="flex items-center justify-between gap-2">
-                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'min-w-0')}>
+                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'ml-2 min-w-0')}>
                                             <button
                                                 type="button"
                                                 onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_ALL)}
@@ -1662,7 +1687,7 @@ const SearchResults = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'shrink-0')}>
+                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'ml-5 shrink-0')}>
                                             <button
                                                 type="button"
                                                 onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_ALL)}
@@ -2398,7 +2423,7 @@ const SearchResults = () => {
                     ) : null}
 
                     {hasHomePanel && isAgendaTab && (
-                        <AgendaSplitView mode="my" listFilter={agendaListFilter} />
+                        <AgendaSplitView mode="my" listFilter={agendaListFilter} onEntrySeen={handleAgendaEntrySeen} />
                     )}
 
                     {hasSearchQuery && documentResults.length > 0 && (

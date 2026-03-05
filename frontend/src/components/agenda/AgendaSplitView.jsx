@@ -92,6 +92,15 @@ function formatDateLabel(value) {
     return text.slice(0, 16).replace('T', ' ');
 }
 
+function isTypingTarget(target) {
+    if (!target || typeof target !== 'object') return false;
+    const element = target;
+    const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return true;
+    if (typeof element.isContentEditable === 'boolean' && element.isContentEditable) return true;
+    return false;
+}
+
 function stripHtmlText(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
@@ -273,6 +282,7 @@ export default function AgendaSplitView({
     mode = 'project',
     projectId = '',
     listFilter = 'all',
+    onEntrySeen = null,
     className = '',
 }) {
     const navigate = useNavigate();
@@ -304,6 +314,7 @@ export default function AgendaSplitView({
     const [statusError, setStatusError] = useState('');
 
     const [entrySeenBaselines, setEntrySeenBaselines] = useState(() => loadAgendaEntrySeenBaselines());
+    const [stickyUnreadEntryIdMap, setStickyUnreadEntryIdMap] = useState({});
 
     const listScrollRef = useRef(null);
     const sentinelRef = useRef(null);
@@ -450,14 +461,54 @@ export default function AgendaSplitView({
         };
     }, [hasMore, isListLoading, isLoadingMore, items.length]);
 
+    useEffect(() => {
+        if (normalizedListFilter !== 'unread') {
+            setStickyUnreadEntryIdMap({});
+            return;
+        }
+        setStickyUnreadEntryIdMap({});
+    }, [normalizedListFilter, listApiPath, searchQuery]);
+
+    const unreadEntryMap = useMemo(() => {
+        const next = {};
+        for (const item of items) {
+            const entryId = Number(item?.entry_id || 0);
+            if (!entryId) continue;
+            next[String(entryId)] = isUnreadByBaselines(entrySeenBaselines, entryId, item?.updated_at);
+        }
+        return next;
+    }, [entrySeenBaselines, items]);
+
+    useEffect(() => {
+        if (normalizedListFilter !== 'unread') return;
+        if (items.length <= 0) return;
+
+        setStickyUnreadEntryIdMap((prev) => {
+            const next = { ...(prev || {}) };
+            let changed = false;
+
+            for (const item of items) {
+                const entryId = Number(item?.entry_id || 0);
+                if (!entryId) continue;
+                if (!unreadEntryMap[String(entryId)]) continue;
+                const key = String(entryId);
+                if (next[key]) continue;
+                next[key] = true;
+                changed = true;
+            }
+            return changed ? next : prev;
+        });
+    }, [items, normalizedListFilter, unreadEntryMap]);
+
     const visibleItems = useMemo(() => {
         if (normalizedListFilter !== 'unread') return items;
-        return items.filter((item) => isUnreadByBaselines(
-            entrySeenBaselines,
-            Number(item?.entry_id || 0),
-            item?.updated_at,
-        ));
-    }, [entrySeenBaselines, items, normalizedListFilter]);
+        return items.filter((item) => {
+            const entryId = Number(item?.entry_id || 0);
+            if (!entryId) return false;
+            const key = String(entryId);
+            return Boolean(unreadEntryMap[key]) || Boolean(stickyUnreadEntryIdMap[key]);
+        });
+    }, [items, normalizedListFilter, stickyUnreadEntryIdMap, unreadEntryMap]);
     const visibleCountText = useMemo(() => {
         if (normalizedListFilter !== 'unread') {
             return `표시 ${items.length.toLocaleString('ko-KR')} / 총 ${total.toLocaleString('ko-KR')}`;
@@ -520,10 +571,44 @@ export default function AgendaSplitView({
         };
     }, [selectedThreadId]);
 
+    useEffect(() => {
+        if (visibleItems.length <= 0) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.defaultPrevented) return;
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            if (isTypingTarget(event.target)) return;
+
+            const currentIndex = visibleItems.findIndex(
+                (item) => Number(item?.entry_id || 0) === Number(selectedEntryId || 0),
+            );
+
+            let nextIndex = currentIndex;
+            if (event.key === 'ArrowDown') {
+                nextIndex = currentIndex < 0 ? 0 : Math.min(visibleItems.length - 1, currentIndex + 1);
+            } else if (event.key === 'ArrowUp') {
+                nextIndex = currentIndex < 0 ? 0 : Math.max(0, currentIndex - 1);
+            }
+            if (nextIndex < 0 || nextIndex >= visibleItems.length) return;
+
+            const target = visibleItems[nextIndex];
+            if (!target) return;
+            event.preventDefault();
+            selectItem(target);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedEntryId, visibleItems]);
+
     const selectItem = (item) => {
         const nextThreadId = Number(item?.thread_id || 0);
         const nextEntryId = Number(item?.entry_id || 0);
         const nextProjectId = Number(item?.project_id || 0);
+        const wasUnread = isUnreadByBaselines(entrySeenBaselines, nextEntryId, item?.updated_at);
 
         setSelectedThreadId(nextThreadId);
         setSelectedEntryId(nextEntryId);
@@ -545,6 +630,10 @@ export default function AgendaSplitView({
             saveAgendaEntrySeenBaselines(next);
             return next;
         });
+
+        if (wasUnread && typeof onEntrySeen === 'function') {
+            onEntrySeen(nextEntryId, true);
+        }
     };
 
     const selectedEntry = useMemo(() => {
@@ -688,7 +777,7 @@ export default function AgendaSplitView({
                                     visibleItems.map((item) => {
                                         const entryId = Number(item?.entry_id || 0);
                                         const isSelected = entryId > 0 && entryId === Number(selectedEntryId || 0);
-                                        const isUnread = isUnreadByBaselines(entrySeenBaselines, entryId, item?.updated_at);
+                                        const isUnread = Boolean(unreadEntryMap[String(entryId)]);
                                         return (
                                             <ListItem
                                                 key={`entry-item-${item.entry_id}`}

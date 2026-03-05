@@ -1819,9 +1819,9 @@ const SearchResults = () => {
 	                                                                </div>
 	                                                            )}
 	                                                        </div>
-	                                                        <div className="h-10 rounded-md border border-border/75 bg-background/45 p-1">
+	                                                        <div className="h-14 rounded-md border border-border/75 bg-background/45 p-1">
 	                                                            {updateBookmarks.length > 0 ? (
-	                                                                <div className="grid h-full grid-cols-3 gap-1">
+	                                                                <div className="grid h-full grid-cols-2 auto-rows-fr gap-1">
 	                                                                    {updateBookmarks.map((bookmark) => (
 	                                                                        <Link
 	                                                                            key={`${project.id}-bookmark-${bookmark.key}`}
@@ -1829,12 +1829,11 @@ const SearchResults = () => {
 	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
 	                                                                            title={bookmark.label}
 	                                                                            className={cn(
-	                                                                                'group relative grid place-items-center rounded border border-border/70 bg-card/85 text-[8px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                'group relative inline-flex min-h-0 items-center justify-center rounded-md border border-border/70 bg-card/85 px-1 text-[9px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
 	                                                                                bookmark.textClass
 	                                                                            )}
 	                                                                        >
-	                                                                            <span className="sr-only">{bookmark.label}</span>
-	                                                                            <span>{String(bookmark.label || '').slice(0, 1) || '?'}</span>
+	                                                                            <span>{bookmark.label}</span>
 	                                                                            <span className={cn('pointer-events-none absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
 	                                                                        </Link>
 	                                                                    ))}

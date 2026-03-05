@@ -1805,50 +1805,18 @@ const SearchResults = () => {
 	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-border/90 to-transparent" />
 	                                            <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-3">
 	                                                <div className="flex h-full min-h-[192px] min-w-0 gap-2.5 rounded-xl border border-border/70 bg-card/72 p-2.5">
-	                                                    <div className="flex h-full w-20 shrink-0 flex-col gap-1.5">
-	                                                        <div className="h-20 w-20 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
-	                                                            {coverImage ? (
-	                                                                <img
-	                                                                    src={coverImage}
-	                                                                    alt={`${project.name || '프로젝트'} 대표 이미지`}
-	                                                                    className="h-full w-full object-cover"
-	                                                                />
-	                                                            ) : (
-	                                                                <div className="grid h-full w-full place-items-center text-xs font-semibold text-muted-foreground/80">
-	                                                                    이미지 없음
-	                                                                </div>
-	                                                            )}
-	                                                        </div>
-	                                                        <div className="min-h-0 flex-1 rounded-md border border-border/75 bg-background/45 p-1">
-	                                                            {updateBookmarks.length > 0 ? (
-	                                                                <div className="grid h-full grid-cols-2 auto-rows-min content-start gap-1">
-	                                                                    {updateBookmarks.map((bookmark, index) => {
-	                                                                        const isLastOddItem = updateBookmarks.length % 2 === 1
-	                                                                            && index === updateBookmarks.length - 1;
-	                                                                        return (
-	                                                                        <Link
-	                                                                            key={`${project.id}-bookmark-${bookmark.key}`}
-	                                                                            to={bookmark.to}
-	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
-	                                                                            title={bookmark.label}
-	                                                                            className={cn(
-	                                                                                'group relative inline-flex min-h-0 min-w-0 items-center justify-center rounded-md border border-border/70 bg-card/85 px-1 text-[9px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
-	                                                                                isLastOddItem && 'col-span-2',
-	                                                                                bookmark.textClass
-	                                                                            )}
-	                                                                        >
-	                                                                            <span className="truncate">{bookmark.label}</span>
-	                                                                            <span className={cn('pointer-events-none absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
-	                                                                        </Link>
-	                                                                        );
-	                                                                    })}
-	                                                                </div>
-	                                                            ) : (
-	                                                                <div className="grid h-full place-items-center text-[8px] font-semibold text-muted-foreground/75">
-	                                                                    업데이트 없음
-	                                                                </div>
-	                                                            )}
-	                                                        </div>
+	                                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
+	                                                        {coverImage ? (
+	                                                            <img
+	                                                                src={coverImage}
+	                                                                alt={`${project.name || '프로젝트'} 대표 이미지`}
+	                                                                className="h-full w-full object-cover"
+	                                                            />
+	                                                        ) : (
+	                                                            <div className="grid h-full w-full place-items-center text-xs font-semibold text-muted-foreground/80">
+	                                                                이미지 없음
+	                                                            </div>
+	                                                        )}
 	                                                    </div>
 
 	                                                    <div className="flex min-w-0 flex-1 flex-col">
@@ -1913,31 +1881,51 @@ const SearchResults = () => {
 	                                                            </p>
 	                                                        </div>
 
-	                                                        <div className="mt-auto flex flex-wrap items-center gap-1 pt-2">
-	                                                            <span
-	                                                                title={project.customer_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
-	                                                            >
-	                                                                <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">고객사</span>
-	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.customer_name || '-'}</span>
-	                                                            </span>
-	                                                            <span
-	                                                                title={project.installation_site || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
-	                                                            >
-	                                                                <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">설치장소</span>
-	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.installation_site || '-'}</span>
-	                                                            </span>
-	                                                            <span
-	                                                                title={project.manager_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
-	                                                            >
-	                                                                <User className="h-3 w-3 shrink-0 text-muted-foreground/80" />
-	                                                                <span className="shrink-0 text-[9px] font-bold text-muted-foreground">담당자</span>
-	                                                                <span className="min-w-0 truncate font-semibold text-foreground/90">{project.manager_name || '미지정'}</span>
-	                                                            </span>
+	                                                        <div className="mt-auto pt-2">
+	                                                            {updateBookmarks.length > 0 && (
+	                                                                <div className="mb-1.5 flex flex-wrap items-center gap-1">
+	                                                                    {updateBookmarks.map((bookmark) => (
+	                                                                        <Link
+	                                                                            key={`${project.id}-bookmark-inline-${bookmark.key}`}
+	                                                                            to={bookmark.to}
+	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
+	                                                                            className={cn(
+	                                                                                'group inline-flex h-5 items-center gap-1 rounded-md border border-border/70 bg-card/88 px-1.5 text-[9px] font-bold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                bookmark.textClass
+	                                                                            )}
+	                                                                        >
+	                                                                            <span className={cn('h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
+	                                                                            <span>{bookmark.label}</span>
+	                                                                        </Link>
+	                                                                    ))}
+	                                                                </div>
+	                                                            )}
+	                                                            <div className="flex flex-wrap items-center gap-1">
+	                                                                <span
+	                                                                    title={project.customer_name || ''}
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                >
+	                                                                    <Building2 className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">고객사</span>
+	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.customer_name || '-'}</span>
+	                                                                </span>
+	                                                                <span
+	                                                                    title={project.installation_site || ''}
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                >
+	                                                                    <MapPin className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">설치장소</span>
+	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.installation_site || '-'}</span>
+	                                                                </span>
+	                                                                <span
+	                                                                    title={project.manager_name || ''}
+	                                                                    className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-border/75 bg-secondary/45 px-1.5 py-0.5 text-[10px] font-semibold text-foreground/85 shadow-sm"
+	                                                                >
+	                                                                    <User className="h-3 w-3 shrink-0 text-muted-foreground/80" />
+	                                                                    <span className="shrink-0 text-[9px] font-bold text-muted-foreground">담당자</span>
+	                                                                    <span className="min-w-0 truncate font-semibold text-foreground/90">{project.manager_name || '미지정'}</span>
+	                                                                </span>
+	                                                            </div>
 	                                                        </div>
 	                                                    </div>
 	                                                </div>

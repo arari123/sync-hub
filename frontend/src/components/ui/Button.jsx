@@ -4,10 +4,10 @@ import { Loader2 } from 'lucide-react';
 
 const Button = React.forwardRef(({ className, variant = 'default', size = 'default', children, isLoading, disabled, ...props }, ref) => {
     const variants = {
-        default: 'border border-primary/80 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
-        ghost: 'border border-transparent hover:border-border hover:bg-accent hover:text-accent-foreground',
-        outline: 'border border-input bg-card text-foreground hover:bg-accent hover:text-accent-foreground',
-        secondary: 'border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        default: 'border border-primary/60 bg-primary text-primary-foreground shadow-[0_14px_30px_-22px_hsl(var(--primary)/0.95)] hover:bg-primary/90',
+        ghost: 'border border-transparent hover:border-border hover:bg-accent/70 hover:text-accent-foreground',
+        outline: 'border border-input bg-card text-foreground hover:bg-accent/65 hover:text-accent-foreground',
+        secondary: 'border border-border bg-secondary/90 text-secondary-foreground hover:bg-secondary',
     };
 
     const sizes = {
@@ -20,7 +20,7 @@ const Button = React.forwardRef(({ className, variant = 'default', size = 'defau
     return (
         <button
             className={cn(
-                'inline-flex items-center justify-center rounded-md text-sm font-semibold tracking-tight ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+                'inline-flex items-center justify-center rounded-md text-sm font-semibold tracking-tight ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
                 variants[variant],
                 sizes[size],
                 className

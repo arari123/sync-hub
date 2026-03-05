@@ -12,7 +12,7 @@ const Logo = ({ className, size = 'default', asLink = true, showSubtitle = true,
             <div className={cn(
                 'relative flex items-center justify-center overflow-hidden rounded-xl border transition-all',
                 isTopbar
-                    ? 'h-9 w-9 border-cyan-200/70 bg-gradient-to-br from-cyan-500 via-sky-500 to-indigo-600 text-white shadow-[0_8px_18px_-10px_rgba(6,182,212,0.9)]'
+                    ? 'h-9 w-9 border-primary/35 bg-gradient-to-br from-primary via-sky-500 to-cyan-400 text-slate-950 shadow-[0_8px_22px_-10px_hsl(var(--primary)/0.92)]'
                     : 'border-primary/35 bg-primary text-primary-foreground shadow-sm',
                 !isTopbar && (isLarge ? 'h-12 w-12' : 'h-8 w-8')
             )}>
@@ -22,13 +22,13 @@ const Logo = ({ className, size = 'default', asLink = true, showSubtitle = true,
                 <span className={cn(
                     'absolute border',
                     isTopbar
-                        ? 'h-6 w-6 rounded-lg border-white/30'
+                        ? 'h-6 w-6 rounded-lg border-black/20'
                         : 'rounded-full border-primary-foreground/30',
                     !isTopbar && (isLarge ? 'h-9 w-9' : 'h-6 w-6')
                 )}
                 />
                 <Layers className={cn('relative', isLarge ? 'h-6 w-6' : 'h-4 w-4')} />
-                {isTopbar && <span className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-200/95" />}
+                {isTopbar && <span className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-emerald-300/95" />}
             </div>
             <div className="flex flex-col leading-none">
                 <span className={cn(

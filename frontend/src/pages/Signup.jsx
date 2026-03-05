@@ -58,16 +58,16 @@ const Signup = () => {
                 <aside className="auth-aside hidden lg:flex lg:flex-col lg:justify-between">
                     <div className="space-y-4">
                         <span className="chip-pill">Onboarding</span>
-                        <h1 className="text-3xl font-extrabold leading-tight text-slate-900">
+                        <h1 className="text-3xl font-extrabold leading-tight text-foreground">
                             조직 단위 워크스페이스를
                             <br />
                             안전하게 시작하세요.
                         </h1>
-                        <p className="max-w-sm text-sm leading-relaxed text-slate-600">
+                        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                             회사 도메인 인증을 통과한 계정만 프로젝트 데이터에 접근할 수 있습니다.
                         </p>
                     </div>
-                    <div className="space-y-2 text-xs text-slate-600">
+                    <div className="space-y-2 text-xs text-muted-foreground">
                         <p>도메인 정책 기반 자동 승인/차단</p>
                         <p>이메일 인증 후 즉시 로그인 가능</p>
                     </div>
@@ -85,7 +85,7 @@ const Signup = () => {
 
                     <form className="space-y-4" onSubmit={onSubmit}>
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="full-name">이름(선택)</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="full-name">이름(선택)</label>
                             <Input
                                 id="full-name"
                                 type="text"
@@ -96,7 +96,7 @@ const Signup = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="signup-email">이메일</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="signup-email">이메일</label>
                             <Input
                                 id="signup-email"
                                 type="email"
@@ -108,7 +108,7 @@ const Signup = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="signup-password">비밀번호</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="signup-password">비밀번호</label>
                             <Input
                                 id="signup-password"
                                 type="password"
@@ -119,7 +119,7 @@ const Signup = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="signup-password-confirm">비밀번호 확인</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="signup-password-confirm">비밀번호 확인</label>
                             <Input
                                 id="signup-password-confirm"
                                 type="password"

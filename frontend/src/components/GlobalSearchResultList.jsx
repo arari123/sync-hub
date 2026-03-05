@@ -57,7 +57,7 @@ function highlightText(text, terms) {
             return (
                 <mark
                     key={`${index}-${part}`}
-                    className="rounded bg-yellow-100 px-0.5 font-semibold text-foreground"
+                    className="rounded bg-primary/25 px-0.5 font-semibold text-foreground"
                 >
                     {part}
                 </mark>
@@ -240,4 +240,3 @@ const GlobalSearchResultList = ({ results, query }) => {
 };
 
 export default GlobalSearchResultList;
-

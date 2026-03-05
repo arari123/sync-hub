@@ -12,16 +12,9 @@ const Layout = ({ children }) => {
         && pathname !== '/project-management/projects/new';
     const isProjectBudgetMainRoute = /^\/project-management\/projects\/[^/]+\/budget\/?$/.test(pathname)
         && pathname !== '/project-management/projects/new';
+    const hideGlobalTopBar = isAuthRoute || isHomeRoute || isProjectMainRoute || isProjectBudgetMainRoute;
 
-    if (isAuthRoute || isHomeRoute) {
-        return (
-            <div className="app-shell min-h-screen text-foreground antialiased">
-                {children}
-            </div>
-        );
-    }
-
-    if (isProjectMainRoute || isProjectBudgetMainRoute) {
+    if (hideGlobalTopBar) {
         return (
             <div className="app-shell min-h-screen text-foreground antialiased">
                 {children}

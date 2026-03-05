@@ -17,9 +17,15 @@ function createTableMarkup(rows, cols) {
     const safeRows = Math.max(1, Math.min(8, Number(rows) || 2));
     const safeCols = Math.max(1, Math.min(8, Number(cols) || 2));
 
-    const headCells = Array.from({ length: safeCols }, () => '<th style="border:1px solid #cbd5e1;padding:6px;background-color:#f8fafc;">헤더</th>').join('');
+    const headCells = Array.from(
+        { length: safeCols },
+        () => '<th style="border:1px solid #334155;padding:6px;background-color:#1e293b;color:#e2e8f0;">헤더</th>'
+    ).join('');
     const bodyRows = Array.from({ length: safeRows }, () => {
-        const cells = Array.from({ length: safeCols }, () => '<td style="border:1px solid #cbd5e1;padding:6px;">내용</td>').join('');
+        const cells = Array.from(
+            { length: safeCols },
+            () => '<td style="border:1px solid #334155;padding:6px;color:#e2e8f0;">내용</td>'
+        ).join('');
         return `<tr>${cells}</tr>`;
     }).join('');
 
@@ -38,15 +44,15 @@ function stripHtml(value) {
     return (el.textContent || el.innerText || '').trim();
 }
 
-function ToolbarButton({ onClick, icon: Icon, title }) {
+function ToolbarButton({ onClick, title, children }) {
     return (
         <button
             type="button"
             onClick={onClick}
             title={title}
-            className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-card text-muted-foreground hover:bg-secondary/60"
         >
-            <Icon className="h-4 w-4" />
+            {children}
         </button>
     );
 }
@@ -61,7 +67,7 @@ export default function RichTextEditor({
     const editorRef = useRef(null);
     const imageInputRef = useRef(null);
     const [fontSize, setFontSize] = useState('3');
-    const [fontColor, setFontColor] = useState('#0f172a');
+    const [fontColor, setFontColor] = useState('#e2e8f0');
 
     const plainText = useMemo(() => stripHtml(value), [value]);
 
@@ -130,27 +136,43 @@ export default function RichTextEditor({
     };
 
     return (
-        <div className={cn('overflow-hidden rounded-xl border border-slate-300 bg-white', className)}>
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 p-2">
-                <div className="flex items-center gap-1 rounded border border-slate-300 bg-white p-1">
-                    <ToolbarButton title="굵게" icon={Bold} onClick={() => exec('bold')} />
-                    <ToolbarButton title="기울임" icon={Italic} onClick={() => exec('italic')} />
-                    <ToolbarButton title="밑줄" icon={Underline} onClick={() => exec('underline')} />
+        <div className={cn('overflow-hidden rounded-xl border border-border bg-card', className)}>
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-secondary/60 p-2">
+                <div className="flex items-center gap-1 rounded border border-border bg-card p-1">
+                    <ToolbarButton title="굵게" onClick={() => exec('bold')}>
+                        <Bold className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton title="기울임" onClick={() => exec('italic')}>
+                        <Italic className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton title="밑줄" onClick={() => exec('underline')}>
+                        <Underline className="h-4 w-4" />
+                    </ToolbarButton>
                 </div>
 
-                <div className="flex items-center gap-1 rounded border border-slate-300 bg-white p-1">
-                    <ToolbarButton title="왼쪽 정렬" icon={AlignLeft} onClick={() => exec('justifyLeft')} />
-                    <ToolbarButton title="가운데 정렬" icon={AlignCenter} onClick={() => exec('justifyCenter')} />
-                    <ToolbarButton title="오른쪽 정렬" icon={AlignRight} onClick={() => exec('justifyRight')} />
+                <div className="flex items-center gap-1 rounded border border-border bg-card p-1">
+                    <ToolbarButton title="왼쪽 정렬" onClick={() => exec('justifyLeft')}>
+                        <AlignLeft className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton title="가운데 정렬" onClick={() => exec('justifyCenter')}>
+                        <AlignCenter className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton title="오른쪽 정렬" onClick={() => exec('justifyRight')}>
+                        <AlignRight className="h-4 w-4" />
+                    </ToolbarButton>
                 </div>
 
-                <div className="flex items-center gap-1 rounded border border-slate-300 bg-white p-1">
-                    <ToolbarButton title="글머리" icon={List} onClick={() => exec('insertUnorderedList')} />
-                    <ToolbarButton title="번호" icon={ListOrdered} onClick={() => exec('insertOrderedList')} />
+                <div className="flex items-center gap-1 rounded border border-border bg-card p-1">
+                    <ToolbarButton title="글머리" onClick={() => exec('insertUnorderedList')}>
+                        <List className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton title="번호" onClick={() => exec('insertOrderedList')}>
+                        <ListOrdered className="h-4 w-4" />
+                    </ToolbarButton>
                 </div>
 
-                <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1">
-                    <label htmlFor="agenda-font-size" className="text-xs font-semibold text-slate-500">크기</label>
+                <div className="flex items-center gap-2 rounded border border-border bg-card px-2 py-1">
+                    <label htmlFor="agenda-font-size" className="text-xs font-semibold text-muted-foreground">크기</label>
                     <select
                         id="agenda-font-size"
                         value={fontSize}
@@ -159,7 +181,7 @@ export default function RichTextEditor({
                             setFontSize(next);
                             exec('fontSize', next);
                         }}
-                        className="rounded border border-slate-300 px-1 py-0.5 text-xs"
+                        className="rounded border border-border px-1 py-0.5 text-xs"
                     >
                         <option value="1">10</option>
                         <option value="2">12</option>
@@ -170,8 +192,8 @@ export default function RichTextEditor({
                     </select>
                 </div>
 
-                <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-1">
-                    <label htmlFor="agenda-font-color" className="text-xs font-semibold text-slate-500">색상</label>
+                <div className="flex items-center gap-2 rounded border border-border bg-card px-2 py-1">
+                    <label htmlFor="agenda-font-color" className="text-xs font-semibold text-muted-foreground">색상</label>
                     <input
                         id="agenda-font-color"
                         type="color"
@@ -181,14 +203,14 @@ export default function RichTextEditor({
                             setFontColor(next);
                             exec('foreColor', next);
                         }}
-                        className="h-6 w-8 cursor-pointer rounded border border-slate-300"
+                        className="h-6 w-8 cursor-pointer rounded border border-border"
                     />
                 </div>
 
                 <button
                     type="button"
                     onClick={handleInsertTable}
-                    className="inline-flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex h-8 items-center gap-1 rounded border border-border bg-card px-2 text-xs font-semibold text-foreground/85 hover:bg-secondary/60"
                 >
                     <Table2 className="h-4 w-4" /> 표
                 </button>
@@ -196,7 +218,7 @@ export default function RichTextEditor({
                 <button
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
-                    className="inline-flex h-8 items-center gap-1 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex h-8 items-center gap-1 rounded border border-border bg-card px-2 text-xs font-semibold text-foreground/85 hover:bg-secondary/60"
                 >
                     <ImagePlus className="h-4 w-4" /> 이미지
                 </button>
@@ -209,7 +231,7 @@ export default function RichTextEditor({
                     onChange={handleImageFileSelect}
                 />
 
-                <span className="ml-auto text-[11px] text-slate-400">텍스트 편집기</span>
+                <span className="ml-auto text-[11px] text-muted-foreground/80">텍스트 편집기</span>
             </div>
 
             <div
@@ -218,7 +240,7 @@ export default function RichTextEditor({
                 suppressContentEditableWarning
                 onInput={handleEditorInput}
                 onPaste={handlePaste}
-                className="prose max-w-none whitespace-pre-wrap break-words px-4 py-3 text-sm text-slate-800 focus:outline-none"
+                className="prose max-w-none whitespace-pre-wrap break-words px-4 py-3 text-sm text-foreground/90 focus:outline-none"
                 style={{ minHeight }}
                 data-placeholder={placeholder}
             />

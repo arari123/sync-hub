@@ -29,7 +29,7 @@ function entryKindLabel(value) {
 
 function entryToneClass(value) {
     const kind = String(value || '').toLowerCase();
-    if (kind === 'root') return 'border-slate-200 bg-slate-50 text-slate-700';
+    if (kind === 'root') return 'border-border bg-secondary/60 text-foreground/85';
     if (kind === 'additional_work') return 'border-amber-200 bg-amber-50 text-amber-700';
     return 'border-cyan-200 bg-cyan-50 text-cyan-700';
 }
@@ -42,7 +42,7 @@ function progressStatusLabel(value) {
 
 function progressStatusToneClass(value) {
     const status = String(value || '').toLowerCase();
-    if (status === 'completed') return 'border-slate-200 bg-slate-100 text-slate-600';
+    if (status === 'completed') return 'border-border bg-muted/80 text-muted-foreground';
     return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 }
 
@@ -136,12 +136,12 @@ function WorkReportSectionsPanel({ reportSections }) {
             {sectionItems.map((item) => {
                 const section = resolveReportSection(reportSections, item.key);
                 return (
-                    <section key={`report-section-${item.key}`} className="rounded-lg border border-slate-200 bg-white p-3">
-                        <h4 className="text-xs font-black text-slate-700">{item.label}</h4>
-                        <div className="prose prose-slate mt-2 max-w-none rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                    <section key={`report-section-${item.key}`} className="rounded-lg border border-border bg-card p-3">
+                        <h4 className="text-xs font-black text-foreground/85">{item.label}</h4>
+                        <div className="prose prose-slate mt-2 max-w-none rounded-md border border-border bg-secondary/60 px-3 py-2 text-sm text-foreground/90">
                             {section.html
                                 ? <div dangerouslySetInnerHTML={{ __html: section.html }} />
-                                : <p className="whitespace-pre-wrap text-sm text-slate-600">{section.plain || '-'}</p>}
+                                : <p className="whitespace-pre-wrap text-sm text-muted-foreground">{section.plain || '-'}</p>}
                         </div>
                     </section>
                 );
@@ -165,7 +165,7 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
                     ? 'border-cyan-300 bg-cyan-50/70'
                     : isUnread
                         ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
-                        : 'border-slate-200 bg-white hover:bg-slate-50',
+                        : 'border-border bg-card hover:bg-secondary/60',
             )}
         >
             <div className="mb-1 flex items-center gap-1.5">
@@ -178,22 +178,22 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
                 {isUnread && <span className="ml-auto h-2 w-2 rounded-full bg-amber-500" aria-label="미조회" />}
             </div>
 
-            <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-slate-900' : 'font-semibold text-slate-800')}>
+            <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-foreground' : 'font-semibold text-foreground/90')}>
                 {item?.title || '-'}
             </p>
 
             {showProjectMeta && projectLabel && (
-                <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">
+                <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">
                     {projectLabel}
                 </p>
             )}
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">
+                <span className="rounded bg-muted/80 px-1.5 py-0.5 font-semibold text-foreground/85">
                     {item?.author_name || '-'}
                 </span>
-                <span className="text-slate-300">|</span>
-                <span className="font-mono tracking-[0.03em] text-slate-500">
+                <span className="text-muted-foreground/70">|</span>
+                <span className="font-mono tracking-[0.03em] text-muted-foreground">
                     {formatDateLabel(item?.created_at)}
                 </span>
             </div>
@@ -208,32 +208,32 @@ function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
         ? 'border-cyan-200 bg-cyan-50/30'
         : tone === 'amber'
             ? 'border-amber-200 bg-amber-50/30'
-            : 'border-slate-200 bg-white';
+            : 'border-border bg-card';
 
     return (
         <article className={cn('rounded-xl border p-4 shadow-sm', toneClass)}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
                 {label && (
-                    <span className="inline-flex h-6 items-center rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600">
+                    <span className="inline-flex h-6 items-center rounded-md border border-border bg-card px-2 text-[11px] font-bold text-muted-foreground">
                         {label}
                     </span>
                 )}
-                <span className="text-[11px] text-slate-500">{formatDateLabel(entry.created_at)}</span>
+                <span className="text-[11px] text-muted-foreground">{formatDateLabel(entry.created_at)}</span>
             </div>
 
-            <h3 className="text-lg font-bold text-slate-900">{entry.title}</h3>
+            <h3 className="text-lg font-bold text-foreground">{entry.title}</h3>
 
-            <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-600 md:grid-cols-2">
-                <p><span className="font-semibold text-slate-500">작성자</span> {entry.author_name || '-'}</p>
-                <p><span className="font-semibold text-slate-500">요청자</span> {entry.requester_name || '-'}{entry.requester_org ? ` (${entry.requester_org})` : ''}</p>
-                <p><span className="font-semibold text-slate-500">답변자</span> {entry.responder_name || '-'}{entry.responder_org ? ` (${entry.responder_org})` : ''}</p>
-                <p><span className="font-semibold text-slate-500">첨부</span> {entry.attachment_count || 0}건</p>
+            <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground md:grid-cols-2">
+                <p><span className="font-semibold text-muted-foreground">작성자</span> {entry.author_name || '-'}</p>
+                <p><span className="font-semibold text-muted-foreground">요청자</span> {entry.requester_name || '-'}{entry.requester_org ? ` (${entry.requester_org})` : ''}</p>
+                <p><span className="font-semibold text-muted-foreground">답변자</span> {entry.responder_name || '-'}{entry.responder_org ? ` (${entry.responder_org})` : ''}</p>
+                <p><span className="font-semibold text-muted-foreground">첨부</span> {entry.attachment_count || 0}건</p>
             </div>
 
             {threadKind === 'work_report' ? (
                 <WorkReportSectionsPanel reportSections={entry?.payload?.report_sections} />
             ) : (
-                <div className="prose mt-4 max-w-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
+                <div className="prose mt-4 max-w-none rounded-lg border border-border bg-card p-3 text-sm text-foreground/90">
                     {entry.content_html
                         ? <div dangerouslySetInnerHTML={{ __html: entry.content_html }} />
                         : <p>{entry.content_plain || '-'}</p>}
@@ -241,8 +241,8 @@ function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
             )}
 
             {(entry.attachments || []).length > 0 && (
-                <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
+                <div className="mt-3 space-y-1 rounded-lg border border-border bg-secondary/60 p-3">
+                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
                         <Paperclip className="h-3.5 w-3.5" /> 첨부 파일
                     </p>
                     {(entry.attachments || []).map((attachment) => (
@@ -250,7 +250,7 @@ function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
                             key={`att-${attachment.id}`}
                             type="button"
                             onClick={() => downloadFromApi(attachment.download_url, attachment.original_filename)}
-                            className="block truncate text-xs text-slate-700 underline-offset-2 hover:underline"
+                            className="block truncate text-xs text-foreground/85 underline-offset-2 hover:underline"
                         >
                             {attachment.original_filename}
                         </button>
@@ -479,8 +479,9 @@ export default function AgendaSplitView({
                 setDetail(null);
                 setDetailError(getErrorMessage(error, '안건 상세를 불러오지 못했습니다.'));
             } finally {
-                if (!active) return;
-                setIsDetailLoading(false);
+                if (active) {
+                    setIsDetailLoading(false);
+                }
             }
         };
 
@@ -595,12 +596,12 @@ export default function AgendaSplitView({
                     : 'grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)]',
             )}
             >
-                <section className="min-h-0 rounded-xl border border-slate-200 bg-white shadow-sm h-full flex flex-col">
-                    <div className={cn('border-b border-slate-200 p-2', isListCollapsed && 'flex h-full items-start justify-center border-b-0')}>
+                <section className="min-h-0 rounded-xl border border-border bg-card shadow-sm h-full flex flex-col">
+                    <div className={cn('border-b border-border p-2', isListCollapsed && 'flex h-full items-start justify-center border-b-0')}>
                         <button
                             type="button"
                             onClick={() => setIsListCollapsed((prev) => !prev)}
-                            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-xs font-semibold text-foreground/85 hover:bg-secondary/60"
                         >
                             {isListCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                             {!isListCollapsed && '리스트 접기'}
@@ -609,22 +610,22 @@ export default function AgendaSplitView({
 
                     {!isListCollapsed && (
                         <>
-                            <div className="border-b border-slate-200 p-2">
+                            <div className="border-b border-border p-2">
                                 <label className="relative block">
-                                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/80" />
                                     <input
                                         type="text"
                                         value={searchInput}
                                         onChange={(event) => setSearchInput(event.target.value)}
                                         placeholder="안건 검색"
-                                        className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 pl-7 text-xs text-slate-700 outline-none transition focus:border-cyan-400"
+                                        className="h-8 w-full rounded-md border border-border bg-card px-2 pl-7 text-xs text-foreground/85 outline-none transition focus:border-cyan-400"
                                     />
                                 </label>
                             </div>
 
                             <div ref={listScrollRef} className="flex-1 min-h-0 overflow-auto p-2 space-y-2">
                                 {isListLoading && items.length <= 0 ? (
-                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-10 text-center text-sm text-slate-500">
+                                    <div className="rounded-lg border border-border bg-secondary/60 px-3 py-10 text-center text-sm text-muted-foreground">
                                         목록을 불러오는 중...
                                     </div>
                                 ) : listError ? (
@@ -632,7 +633,7 @@ export default function AgendaSplitView({
                                         {listError}
                                     </div>
                                 ) : items.length <= 0 ? (
-                                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-10 text-center text-sm text-slate-500">
+                                    <div className="rounded-lg border border-border bg-secondary/60 px-3 py-10 text-center text-sm text-muted-foreground">
                                         표시할 안건이 없습니다.
                                     </div>
                                 ) : (
@@ -654,7 +655,7 @@ export default function AgendaSplitView({
                                 )}
 
                                 {isLoadingMore && (
-                                    <div className="flex items-center justify-center py-2 text-xs text-slate-500">
+                                    <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
                                         <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                                         더 불러오는 중...
                                     </div>
@@ -663,16 +664,16 @@ export default function AgendaSplitView({
                                 {hasMore && <div ref={sentinelRef} className="h-6" />}
                             </div>
 
-                            <div className="border-t border-slate-200 p-2 text-[11px] font-semibold text-slate-500">
+                            <div className="border-t border-border p-2 text-[11px] font-semibold text-muted-foreground">
                                 표시 {items.length.toLocaleString('ko-KR')} / 총 {total.toLocaleString('ko-KR')}
                             </div>
                         </>
                     )}
                 </section>
 
-                <section className="min-h-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm h-full overflow-auto">
+                <section className="min-h-0 rounded-xl border border-border bg-card p-3 shadow-sm h-full overflow-auto">
                     {isDetailLoading ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-12 text-center text-sm text-slate-500">
+                        <div className="rounded-lg border border-border bg-secondary/60 px-3 py-12 text-center text-sm text-muted-foreground">
                             상세를 불러오는 중...
                         </div>
                     ) : detailError ? (
@@ -680,24 +681,24 @@ export default function AgendaSplitView({
                             {detailError}
                         </div>
                     ) : !detail?.thread || !selectedEntry ? (
-                        <div className="rounded-lg border border-dashed border-slate-300 px-3 py-12 text-center text-sm text-slate-500">
+                        <div className="rounded-lg border border-dashed border-border px-3 py-12 text-center text-sm text-muted-foreground">
                             왼쪽 리스트에서 안건을 선택하세요.
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className={cn(
                                         'inline-flex h-7 items-center rounded-full border px-3 text-xs font-bold',
                                         detail.thread.progress_status === 'in_progress'
                                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                            : 'border-slate-200 bg-slate-100 text-slate-600',
+                                            : 'border-border bg-muted/80 text-muted-foreground',
                                     )}
                                     >
                                         {detail.thread.progress_status === 'in_progress' ? '진행 중' : '완료'}
                                     </span>
-                                    <span className="text-xs font-semibold text-slate-500">{detail.thread.agenda_code}</span>
-                                    <span className="text-xs text-slate-400">업데이트 {formatDateLabel(detail.thread.last_updated_at)}</span>
+                                    <span className="text-xs font-semibold text-muted-foreground">{detail.thread.agenda_code}</span>
+                                    <span className="text-xs text-muted-foreground/80">업데이트 {formatDateLabel(detail.thread.last_updated_at)}</span>
 
                                     <div className="ml-auto flex items-center gap-2">
                                         {detail?.can_change_status && (
@@ -705,7 +706,7 @@ export default function AgendaSplitView({
                                                 type="button"
                                                 onClick={handleStatusToggle}
                                                 disabled={isStatusSubmitting}
-                                                className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="inline-flex h-8 items-center rounded-md border border-border bg-card px-2 text-xs font-semibold text-foreground/85 hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
                                                 {detail.thread.progress_status === 'in_progress' ? '완료 처리' : '진행 중 복귀'}
                                             </button>
@@ -722,14 +723,14 @@ export default function AgendaSplitView({
                                         <button
                                             type="button"
                                             onClick={openFullDetail}
-                                            className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                            className="inline-flex h-8 items-center rounded-md border border-border bg-card px-2 text-xs font-semibold text-foreground/85 hover:bg-secondary/60"
                                         >
                                             상세 페이지 열기
                                         </button>
                                     </div>
                                 </div>
-                                <h2 className="mt-2 text-xl font-black text-slate-900">{detail.thread.root_title || detail.thread.title}</h2>
-                                <p className="mt-1 text-sm font-medium text-slate-600">
+                                <h2 className="mt-2 text-xl font-black text-foreground">{detail.thread.root_title || detail.thread.title}</h2>
+                                <p className="mt-1 text-sm font-medium text-muted-foreground">
                                     현재 선택: {entryKindLabel(selectedEntry.entry_kind)} · {selectedEntry.title}
                                 </p>
                             </section>
@@ -761,22 +762,22 @@ export default function AgendaSplitView({
                                 />
                             )}
 
-                            <aside className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                                <h3 className="inline-flex items-center gap-1 text-sm font-bold text-slate-800">
+                            <aside className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+                                <h3 className="inline-flex items-center gap-1 text-sm font-bold text-foreground/90">
                                     <MessageCircle className="h-4 w-4" /> 코멘트 ({detail.thread.comment_count || 0})
                                 </h3>
 
                                 <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
                                     {(detail.comments || []).length <= 0 && (
-                                        <p className="text-xs text-slate-500">등록된 코멘트가 없습니다.</p>
+                                        <p className="text-xs text-muted-foreground">등록된 코멘트가 없습니다.</p>
                                     )}
                                     {(detail.comments || []).map((comment) => (
-                                        <div key={`comment-${comment.id}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                        <div key={`comment-${comment.id}`} className="rounded-lg border border-border bg-secondary/60 p-2">
                                             <div className="mb-1 flex items-center justify-between gap-2">
-                                                <p className="text-xs font-semibold text-slate-700">{comment.author_name}</p>
-                                                <p className="text-[11px] text-slate-400">{formatDateLabel(comment.created_at)}</p>
+                                                <p className="text-xs font-semibold text-foreground/85">{comment.author_name}</p>
+                                                <p className="text-[11px] text-muted-foreground/80">{formatDateLabel(comment.created_at)}</p>
                                             </div>
-                                            <p className="whitespace-pre-wrap break-words text-xs text-slate-700">{comment.body}</p>
+                                            <p className="whitespace-pre-wrap break-words text-xs text-foreground/85">{comment.body}</p>
                                         </div>
                                     ))}
                                 </div>

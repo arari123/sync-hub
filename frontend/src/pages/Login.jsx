@@ -50,16 +50,16 @@ const Login = () => {
                 <aside className="auth-aside hidden lg:flex lg:flex-col lg:justify-between">
                     <div className="space-y-4">
                         <span className="chip-pill">Access Portal</span>
-                        <h1 className="text-3xl font-extrabold leading-tight text-slate-900">
+                        <h1 className="text-3xl font-extrabold leading-tight text-foreground">
                             실시간 프로젝트 데이터와
                             <br />
                             지식 검색을 한 번에.
                         </h1>
-                        <p className="max-w-sm text-sm leading-relaxed text-slate-600">
+                        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
                             Sync-Hub는 예산, 안건, 사양 데이터를 통합해 빠른 의사결정을 지원합니다.
                         </p>
                     </div>
-                    <div className="space-y-2 text-xs text-slate-600">
+                    <div className="space-y-2 text-xs text-muted-foreground">
                         <p>보안 이메일 인증 기반 계정 정책 적용</p>
                         <p>프로젝트별 권한/버전 이력 기반 작업 추적</p>
                     </div>
@@ -77,7 +77,7 @@ const Login = () => {
 
                     <form className="space-y-4" onSubmit={onSubmit}>
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="email">이메일</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="email">이메일</label>
                             <Input
                                 id="email"
                                 type="email"
@@ -89,7 +89,7 @@ const Login = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-slate-700" htmlFor="password">비밀번호</label>
+                            <label className="text-sm font-semibold text-foreground/85" htmlFor="password">비밀번호</label>
                             <Input
                                 id="password"
                                 type="password"

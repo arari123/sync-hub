@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -29,6 +29,33 @@
 
 @layer base {
   :root {
+    --background: 225 26% 8%;
+    --foreground: 216 40% 95%;
+    --card: 223 23% 12%;
+    --card-foreground: 216 40% 95%;
+    --popover: 223 23% 12%;
+    --popover-foreground: 216 40% 95%;
+    --primary: 201 96% 55%;
+    --primary-foreground: 220 30% 6%;
+    --secondary: 223 20% 17%;
+    --secondary-foreground: 216 32% 90%;
+    --muted: 222 19% 18%;
+    --muted-foreground: 216 19% 72%;
+    --accent: 216 23% 24%;
+    --accent-foreground: 206 86% 88%;
+    --destructive: 0 72% 49%;
+    --destructive-foreground: 210 35% 96%;
+    --border: 220 18% 28%;
+    --input: 220 18% 28%;
+    --ring: 201 96% 60%;
+    --radius: 0.72rem;
+    --surface-shadow: 0 34px 70px -42px hsl(220 65% 2% / 0.95), 0 14px 24px -20px hsl(216 60% 2% / 0.62);
+    --surface-shadow-soft: 0 20px 36px -26px hsl(220 65% 2% / 0.85), 0 1px 0 hsl(210 30% 98% / 0.08) inset;
+    --font-sans: "Noto Sans KR", "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-display: "Plus Jakarta Sans", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+
+  .light {
     --background: 211 34% 95%;
     --foreground: 220 40% 15%;
     --card: 0 0% 100%;
@@ -48,37 +75,8 @@
     --border: 213 26% 80%;
     --input: 213 26% 80%;
     --ring: 210 88% 46%;
-    --radius: 0.68rem;
-    --surface-shadow: 0 22px 38px -30px hsl(220 45% 15% / 0.68), 0 10px 20px -16px hsl(220 40% 22% / 0.25);
-    --surface-shadow-soft: 0 14px 26px -20px hsl(220 30% 25% / 0.35), 0 1px 0 hsl(0 0% 100% / 0.58) inset;
-    --font-sans: "Noto Sans KR", "Manrope", "Segoe UI", sans-serif;
-    --font-display: "Manrope", "Noto Sans KR", "Segoe UI", sans-serif;
   }
 
-  .dark {
-    --background: 222 30% 10%;
-    --foreground: 210 35% 96%;
-    --card: 222 29% 13%;
-    --card-foreground: 210 35% 96%;
-    --popover: 222 29% 13%;
-    --popover-foreground: 210 35% 96%;
-    --primary: 206 90% 54%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 221 24% 21%;
-    --secondary-foreground: 210 35% 96%;
-    --muted: 221 24% 21%;
-    --muted-foreground: 214 19% 71%;
-    --accent: 196 34% 24%;
-    --accent-foreground: 190 52% 88%;
-    --destructive: 2 64% 42%;
-    --destructive-foreground: 210 35% 96%;
-    --border: 220 22% 26%;
-    --input: 220 22% 26%;
-    --ring: 207 90% 58%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
@@ -95,9 +93,9 @@
     letter-spacing: -0.01em;
     background-color: hsl(var(--background));
     background-image:
-      radial-gradient(circle at 0% 0%, hsl(206 85% 86% / 0.58), transparent 38%),
-      radial-gradient(circle at 100% 20%, hsl(190 72% 86% / 0.42), transparent 42%),
-      linear-gradient(180deg, hsl(213 42% 98%), hsl(var(--background)));
+      radial-gradient(circle at 10% 6%, hsl(203 100% 56% / 0.2), transparent 34%),
+      radial-gradient(circle at 84% 12%, hsl(188 92% 52% / 0.12), transparent 28%),
+      linear-gradient(180deg, hsl(226 28% 10%), hsl(var(--background)) 38%);
     position: relative;
   }
 
@@ -107,12 +105,12 @@
     inset: 0;
     pointer-events: none;
     z-index: -1;
-    opacity: 0.26;
+    opacity: 0.2;
     background-image:
-      linear-gradient(hsl(212 22% 70% / 0.28) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(212 22% 70% / 0.28) 1px, transparent 1px);
+      linear-gradient(hsl(210 22% 78% / 0.24) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(210 22% 78% / 0.24) 1px, transparent 1px);
     background-size: 34px 34px;
-    mask-image: radial-gradient(circle at center, black 45%, transparent 100%);
+    mask-image: radial-gradient(circle at center, black 44%, transparent 100%);
   }
 
   h1,
@@ -143,7 +141,7 @@
   }
 
   ::selection {
-    background: hsl(var(--primary) / 0.2);
+    background: hsl(var(--primary) / 0.3);
     color: hsl(var(--foreground));
   }
 
@@ -174,18 +172,18 @@
   }
 
   .app-surface {
-    @apply rounded-xl border border-border bg-card/88 backdrop-blur-md;
+    @apply rounded-xl border border-border bg-card/92 backdrop-blur-md;
     box-shadow: var(--surface-shadow);
   }
 
   .app-surface-soft {
-    @apply rounded-xl border border-border bg-card/82 backdrop-blur;
+    @apply rounded-xl border border-border bg-card/86 backdrop-blur;
     box-shadow: var(--surface-shadow-soft);
   }
 
   .topbar-shell {
     @apply relative z-[60] overflow-visible border-b border-border bg-card/88 backdrop-blur-xl;
-    box-shadow: 0 8px 26px -20px hsl(220 35% 20% / 0.52);
+    box-shadow: 0 10px 28px -18px hsl(210 100% 4% / 0.9);
   }
 
   .chip-pill {
@@ -213,17 +211,116 @@
   .auth-aside {
     @apply relative overflow-hidden border-b border-border p-8 lg:border-b-0 lg:border-r;
     background:
-      radial-gradient(circle at 20% 15%, hsl(var(--primary) / 0.18), transparent 42%),
-      radial-gradient(circle at 90% 80%, hsl(190 80% 58% / 0.2), transparent 45%),
-      hsl(0 0% 100% / 0.48);
+      radial-gradient(circle at 18% 20%, hsl(var(--primary) / 0.25), transparent 40%),
+      radial-gradient(circle at 82% 76%, hsl(174 82% 54% / 0.15), transparent 38%),
+      hsl(222 26% 11% / 0.88);
   }
 
   .auth-aside::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(140deg, hsl(var(--primary) / 0.06), transparent 45%);
+    background: linear-gradient(145deg, hsl(var(--primary) / 0.16), transparent 52%);
     pointer-events: none;
+  }
+}
+
+@layer utilities {
+  .dark .bg-white {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .dark .bg-white\/70,
+  .dark .bg-white\/75,
+  .dark .bg-white\/80,
+  .dark .bg-white\/90 {
+    background-color: hsl(var(--card) / 0.82) !important;
+  }
+
+  .dark .hover\:bg-white:hover,
+  .dark .hover\:bg-white\/80:hover,
+  .dark .hover\:bg-white\/90:hover {
+    background-color: hsl(var(--secondary) / 0.82) !important;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-slate-50\/40,
+  .dark .bg-slate-50\/65,
+  .dark .bg-slate-50\/70,
+  .dark .bg-slate-50\/80 {
+    background-color: hsl(var(--secondary) / 0.64) !important;
+  }
+
+  .dark .bg-slate-100,
+  .dark .bg-slate-100\/65 {
+    background-color: hsl(var(--muted) / 0.74) !important;
+  }
+
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-slate-100:hover,
+  .dark .hover\:bg-slate-50\/70:hover {
+    background-color: hsl(var(--secondary) / 0.88) !important;
+  }
+
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-slate-300 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .text-slate-900 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .text-slate-800,
+  .dark .text-slate-700 {
+    color: hsl(var(--foreground) / 0.92) !important;
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark .text-slate-400,
+  .dark .text-slate-300 {
+    color: hsl(var(--muted-foreground) / 0.72) !important;
+  }
+
+  .dark .from-slate-50 {
+    --tw-gradient-from: hsl(var(--card)) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: hsl(var(--card) / 0) var(--tw-gradient-to-position) !important;
+  }
+
+  .dark .to-slate-50,
+  .dark .to-slate-50\/70,
+  .dark .to-slate-100,
+  .dark .to-slate-100\/65 {
+    --tw-gradient-to: hsl(var(--secondary) / 0.72) var(--tw-gradient-to-position) !important;
+  }
+
+  .dark .via-white,
+  .dark .via-white\/55 {
+    --tw-gradient-via: hsl(var(--card) / 0.92) var(--tw-gradient-via-position) !important;
+  }
+
+  .dark .from-white,
+  .dark .from-white\/55,
+  .dark .from-white\/65 {
+    --tw-gradient-from: hsl(var(--card) / 0.9) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: hsl(var(--card) / 0) var(--tw-gradient-to-position) !important;
+  }
+
+  .dark .prose {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .prose :where(p, h1, h2, h3, h4, h5, h6, strong, li, code) {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .prose :where(table, td, th, blockquote) {
+    border-color: hsl(var(--border));
   }
 }
 

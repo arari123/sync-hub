@@ -39,12 +39,12 @@ const VerifyEmail = () => {
                 <aside className="auth-aside hidden lg:flex lg:flex-col lg:justify-between">
                     <div className="space-y-4">
                         <span className="chip-pill">Verification</span>
-                        <h1 className="text-3xl font-extrabold leading-tight text-slate-900">
+                        <h1 className="text-3xl font-extrabold leading-tight text-foreground">
                             이메일 인증 후
                             <br />
                             안전하게 작업을 시작하세요.
                         </h1>
-                        <p className="text-sm leading-relaxed text-slate-600">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
                             인증된 계정만 프로젝트 데이터와 예산 워크플로우에 접근할 수 있습니다.
                         </p>
                     </div>
@@ -68,7 +68,7 @@ const VerifyEmail = () => {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <p className="rounded-md border border-primary/25 bg-primary/8 px-3 py-2 text-sm text-slate-700">{message}</p>
+                            <p className="rounded-md border border-primary/25 bg-primary/8 px-3 py-2 text-sm text-foreground/85">{message}</p>
                             <Link className="text-sm font-semibold text-primary hover:underline" to="/login">
                                 로그인 페이지로 이동
                             </Link>

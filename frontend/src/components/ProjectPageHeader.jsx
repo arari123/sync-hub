@@ -26,20 +26,20 @@ const ProjectPageHeader = ({
                 <div className="min-w-0">
                     <div className="mt-1 flex flex-wrap items-center gap-2.5">
                         {projectName && (
-                            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{projectName}</h1>
+                            <h1 className="text-2xl font-extrabold tracking-tight text-foreground">{projectName}</h1>
                         )}
                         {projectCode && (
-                            <span className="rounded-md border border-border/70 bg-card px-2 py-0.5 font-mono text-[11px] font-bold tracking-tight text-slate-500">
+                            <span className="rounded-md border border-border/70 bg-card px-2 py-0.5 font-mono text-[11px] font-bold tracking-tight text-muted-foreground">
                                 {projectCode}
                             </span>
                         )}
                         {pageLabel && (
-                            <span className="inline-flex h-6 items-center rounded-md border border-border/80 bg-secondary px-2 text-[11px] font-bold text-slate-700">
+                            <span className="inline-flex h-6 items-center rounded-md border border-border/80 bg-secondary px-2 text-[11px] font-bold text-foreground/85">
                                 {pageLabel}
                             </span>
                         )}
                         {!canEdit && (
-                            <span className="inline-flex h-6 items-center rounded-md border border-border bg-muted px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <span className="inline-flex h-6 items-center rounded-md border border-border bg-muted px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 READ ONLY
                             </span>
                         )}

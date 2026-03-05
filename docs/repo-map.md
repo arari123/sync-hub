@@ -56,12 +56,14 @@
 - `app/ocr_parsing_utils.py`: OCR 결과 정규화/후처리 유틸
 
 ## Frontend (`frontend/src/`)
-- `main.jsx`: React 엔트리
+- `main.jsx`: React 엔트리(기본 다크모드 class 적용)
+- `index.css`: 전역 다크 디자인 토큰/서피스/레거시 컬러 유틸 오버라이드
 - `App.jsx`: 전체 라우팅 정의
 - `components/`
   - `Layout.jsx`: 라우트별 공통 레이아웃/상단바 분기
   - `ProtectedRoute.jsx`: 인증 가드
   - `GlobalTopBar.jsx`: 전역 상단바(검색/퀵메뉴/사용자)
+  - `AppQuickMenu.jsx`: 상단 공통 퀵메뉴(새 프로젝트/데이터 허브)
   - `UserMenu.jsx`: 상단바 사용자 메뉴(이름/이메일 표시 + 로그아웃)
   - `ProjectResultList.jsx`: 프로젝트 검색 결과(구글형 리스트, 매칭 이유/스니펫/하이라이트 표시)
   - `HealthStatus.jsx`: 백엔드/의존성 헬스 상태 표시

@@ -272,6 +272,7 @@ function EntryBodyPanel({ entry, label, tone = 'slate', threadKind = '' }) {
 export default function AgendaSplitView({
     mode = 'project',
     projectId = '',
+    listFilter = 'all',
     className = '',
 }) {
     const navigate = useNavigate();
@@ -309,6 +310,9 @@ export default function AgendaSplitView({
     const loadMoreLockRef = useRef(false);
 
     const includeDrafts = isMyMode;
+    const normalizedListFilter = String(listFilter || '').trim().toLowerCase() === 'unread'
+        ? 'unread'
+        : 'all';
     const listApiPath = isMyMode
         ? '/agenda/entries/my'
         : normalizedProjectId > 0
@@ -446,8 +450,23 @@ export default function AgendaSplitView({
         };
     }, [hasMore, isListLoading, isLoadingMore, items.length]);
 
+    const visibleItems = useMemo(() => {
+        if (normalizedListFilter !== 'unread') return items;
+        return items.filter((item) => isUnreadByBaselines(
+            entrySeenBaselines,
+            Number(item?.entry_id || 0),
+            item?.updated_at,
+        ));
+    }, [entrySeenBaselines, items, normalizedListFilter]);
+    const visibleCountText = useMemo(() => {
+        if (normalizedListFilter !== 'unread') {
+            return `표시 ${items.length.toLocaleString('ko-KR')} / 총 ${total.toLocaleString('ko-KR')}`;
+        }
+        return `읽지 않은 안건 ${visibleItems.length.toLocaleString('ko-KR')}건 (총 ${total.toLocaleString('ko-KR')}건)`;
+    }, [items.length, normalizedListFilter, total, visibleItems.length]);
+
     useEffect(() => {
-        if (items.length <= 0) {
+        if (visibleItems.length <= 0) {
             setSelectedThreadId(0);
             setSelectedEntryId(0);
             setSelectedProjectId(0);
@@ -455,14 +474,14 @@ export default function AgendaSplitView({
             return;
         }
 
-        const exists = items.some((item) => Number(item?.entry_id || 0) === Number(selectedEntryId || 0));
+        const exists = visibleItems.some((item) => Number(item?.entry_id || 0) === Number(selectedEntryId || 0));
         if (exists) return;
 
-        const first = items[0];
+        const first = visibleItems[0];
         setSelectedThreadId(Number(first?.thread_id || 0));
         setSelectedEntryId(Number(first?.entry_id || 0));
         setSelectedProjectId(Number(first?.project_id || 0));
-    }, [items, selectedEntryId]);
+    }, [selectedEntryId, visibleItems]);
 
     useEffect(() => {
         setStatusNotice('');
@@ -661,8 +680,12 @@ export default function AgendaSplitView({
                                     <div className="rounded-lg border border-border bg-secondary/60 px-3 py-10 text-center text-sm text-muted-foreground">
                                         표시할 안건이 없습니다.
                                     </div>
+                                ) : visibleItems.length <= 0 ? (
+                                    <div className="rounded-lg border border-border bg-secondary/60 px-3 py-10 text-center text-sm text-muted-foreground">
+                                        읽지 않은 안건이 없습니다.
+                                    </div>
                                 ) : (
-                                    items.map((item) => {
+                                    visibleItems.map((item) => {
                                         const entryId = Number(item?.entry_id || 0);
                                         const isSelected = entryId > 0 && entryId === Number(selectedEntryId || 0);
                                         const isUnread = isUnreadByBaselines(entrySeenBaselines, entryId, item?.updated_at);
@@ -690,7 +713,7 @@ export default function AgendaSplitView({
                             </div>
 
                             <div className="border-t border-border p-2 text-[11px] font-semibold text-muted-foreground">
-                                표시 {items.length.toLocaleString('ko-KR')} / 총 {total.toLocaleString('ko-KR')}
+                                {visibleCountText}
                             </div>
                         </>
                     )}

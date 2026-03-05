@@ -60,6 +60,8 @@ const PAGE_GROUP_SIZE = 10;
 const HOME_TAB_MY_PROJECTS = 'my_projects';
 const HOME_TAB_ALL_PROJECTS = 'all_projects';
 const HOME_TAB_ALL_AGENDAS = 'all_agendas';
+const AGENDA_LIST_FILTER_ALL = 'all';
+const AGENDA_LIST_FILTER_UNREAD = 'unread';
 const STAGE_LABEL_MAP = Object.fromEntries(EQUIPMENT_STAGE_OPTIONS.map((item) => [item.value, item.label]));
 const PROJECT_TYPE_LABEL_MAP = {
     equipment: '설비',
@@ -635,6 +637,7 @@ const SearchResults = () => {
     const [projectScheduleMap, setProjectScheduleMap] = useState({});
     const [projectUpdateBaselines, setProjectUpdateBaselines] = useState(() => loadProjectUpdateBaselines());
     const [unreadAgendaEntryCount, setUnreadAgendaEntryCount] = useState(0);
+    const [agendaListFilter, setAgendaListFilter] = useState(AGENDA_LIST_FILTER_ALL);
 
     const user = getCurrentUser();
     const isAgendaTab = homeTab === HOME_TAB_ALL_AGENDAS;
@@ -1478,8 +1481,36 @@ const SearchResults = () => {
                                         </span>
                                     </div>
                                 ) : (
-                                    <div className="pr-0.5 text-right text-[11px] font-semibold text-muted-foreground">
-                                        안건 목록/상세 분할 보기
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'min-w-0')}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_ALL)}
+                                                className={cn(
+                                                    `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                                    agendaListFilter === AGENDA_LIST_FILTER_ALL
+                                                        ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                        : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS,
+                                                )}
+                                            >
+                                                모든 안건
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_UNREAD)}
+                                                className={cn(
+                                                    `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                                    agendaListFilter === AGENDA_LIST_FILTER_UNREAD
+                                                        ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                        : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS,
+                                                )}
+                                            >
+                                                읽지 않은 안건
+                                            </button>
+                                        </div>
+                                        <div className="min-w-0 pr-0.5 text-right text-[11px] font-semibold text-muted-foreground">
+                                            안건 목록/상세 분할 보기
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -1630,9 +1661,37 @@ const SearchResults = () => {
                                         )}
                                     </>
                                 ) : (
-                                    <span className="ml-auto pr-1 text-xs font-semibold text-muted-foreground">
-                                        안건 목록/상세 분할 보기
-                                    </span>
+                                    <>
+                                        <div className={cn(FILTER_TOGGLE_GROUP_CLASS, 'shrink-0')}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_ALL)}
+                                                className={cn(
+                                                    FILTER_TOGGLE_BUTTON_BASE_CLASS,
+                                                    agendaListFilter === AGENDA_LIST_FILTER_ALL
+                                                        ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                        : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS,
+                                                )}
+                                            >
+                                                모든 안건
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgendaListFilter(AGENDA_LIST_FILTER_UNREAD)}
+                                                className={cn(
+                                                    FILTER_TOGGLE_BUTTON_BASE_CLASS,
+                                                    agendaListFilter === AGENDA_LIST_FILTER_UNREAD
+                                                        ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
+                                                        : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS,
+                                                )}
+                                            >
+                                                읽지 않은 안건
+                                            </button>
+                                        </div>
+                                        <span className="ml-auto pr-1 text-xs font-semibold text-muted-foreground">
+                                            안건 목록/상세 분할 보기
+                                        </span>
+                                    </>
                                 )}
                             </div>
 
@@ -2339,7 +2398,7 @@ const SearchResults = () => {
                     ) : null}
 
                     {hasHomePanel && isAgendaTab && (
-                        <AgendaSplitView mode="my" />
+                        <AgendaSplitView mode="my" listFilter={agendaListFilter} />
                     )}
 
                     {hasSearchQuery && documentResults.length > 0 && (

@@ -323,7 +323,7 @@
     border-color: hsl(var(--border));
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) {
     --biz-surface: hsl(223 23% 12%);
     --biz-surface-soft: hsl(223 22% 15%);
     --biz-surface-strong: hsl(224 30% 9%);
@@ -334,7 +334,13 @@
     --biz-text-faint: hsl(216 15% 62%);
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.main-dark-page) {
+    --muted-foreground: 216 24% 78%;
+    --secondary: 223 20% 20%;
+    --muted: 223 18% 22%;
+  }
+
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-white,
     .bg-white\/95,
     .bg-white\/90,
@@ -346,7 +352,7 @@
     background-color: var(--biz-surface) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-slate-50,
     .bg-slate-100,
     .bg-slate-200,
@@ -358,7 +364,7 @@
     background-color: var(--biz-surface-soft) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-slate-900,
     .bg-slate-950,
     [class*="bg-slate-950/"]
@@ -366,13 +372,15 @@
     background-color: var(--biz-surface-strong) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) .bg-slate-400 {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .bg-slate-400 {
     background-color: hsl(215 17% 58% / 0.85) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-blue-50,
     [class*="bg-blue-50/"],
+    .bg-cyan-50,
+    [class*="bg-cyan-50/"],
     .bg-indigo-50,
     [class*="bg-indigo-50/"],
     .bg-violet-50,
@@ -383,7 +391,11 @@
     background-color: hsl(210 86% 54% / 0.14) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .bg-cyan-100 {
+    background-color: hsl(188 92% 52% / 0.16) !important;
+  }
+
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-emerald-50,
     [class*="bg-emerald-50/"],
     .bg-emerald-100
@@ -391,7 +403,7 @@
     background-color: hsl(155 76% 43% / 0.16) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-rose-50,
     [class*="bg-rose-50/"],
     .bg-red-50,
@@ -400,7 +412,7 @@
     background-color: hsl(345 84% 58% / 0.16) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .bg-amber-50,
     [class*="bg-amber-50/"],
     .bg-amber-100,
@@ -409,7 +421,7 @@
     background-color: hsl(40 94% 55% / 0.18) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .border-slate-100,
     .border-slate-200,
     .border-slate-300,
@@ -420,11 +432,23 @@
     border-color: var(--biz-line) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
+    .border-sky-200,
+    .border-sky-300,
+    .border-cyan-200,
+    .border-indigo-200,
+    .border-violet-200,
+    [class*="border-sky-200/"],
+    [class*="border-sky-300/"]
+  ) {
+    border-color: hsl(204 98% 62% / 0.46) !important;
+  }
+
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
     border-color: var(--biz-line-soft) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .text-slate-900,
     .text-slate-800,
     .text-slate-700
@@ -432,57 +456,65 @@
     color: var(--biz-text) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .text-slate-600,
     .text-slate-500
   ) {
     color: var(--biz-text-soft) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     .text-slate-400,
     .text-slate-300
   ) {
     color: var(--biz-text-faint) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-blue-800, .text-blue-700, .text-blue-600) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-blue-800, .text-blue-700, .text-blue-600) {
     color: hsl(204 98% 83%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-indigo-700, .text-violet-700, .text-violet-600) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-indigo-700, .text-violet-700, .text-violet-600) {
     color: hsl(258 92% 84%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-emerald-900, .text-emerald-800, .text-emerald-700, .text-emerald-600) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-emerald-900, .text-emerald-800, .text-emerald-700, .text-emerald-600) {
     color: hsl(152 76% 80%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-amber-700, .text-orange-600) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-amber-700, .text-orange-600) {
     color: hsl(42 98% 79%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-rose-700, .text-rose-600, .text-red-700) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-rose-700, .text-rose-600, .text-red-700) {
     color: hsl(345 92% 81%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.text-sky-900, .text-sky-700) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-sky-900, .text-sky-800, .text-sky-700) {
     color: hsl(198 96% 84%) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.border-rose-200, .border-red-200) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.text-cyan-800, .text-cyan-700, .text-cyan-600) {
+    color: hsl(187 95% 82%) !important;
+  }
+
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .text-indigo-800 {
+    color: hsl(246 100% 86%) !important;
+  }
+
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.border-rose-200, .border-red-200) {
     border-color: hsl(345 84% 58% / 0.5) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.border-emerald-200, .border-emerald-300) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.border-emerald-200, .border-emerald-300) {
     border-color: hsl(152 76% 43% / 0.5) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.border-amber-100, .border-amber-200) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.border-amber-100, .border-amber-200) {
     border-color: hsl(40 94% 55% / 0.52) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(
     [class*="hover:bg-slate-50"]:hover,
     [class*="hover:bg-slate-100"]:hover,
     [class*="hover:bg-white"]:hover
@@ -490,12 +522,12 @@
     background-color: hsl(223 20% 22% / 0.96) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) .from-slate-100 {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .from-slate-100 {
     --tw-gradient-from: hsl(223 20% 17%) var(--tw-gradient-from-position) !important;
     --tw-gradient-to: hsl(223 20% 17% / 0) var(--tw-gradient-to-position) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page) :is(.to-slate-50, .to-slate-100) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) :is(.to-slate-50, .to-slate-100) {
     --tw-gradient-to: hsl(222 19% 14%) var(--tw-gradient-to-position) !important;
   }
 }

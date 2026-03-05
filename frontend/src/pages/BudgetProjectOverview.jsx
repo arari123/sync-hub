@@ -525,7 +525,7 @@ const BudgetProjectOverview = () => {
     const isSettingActive = pathname.startsWith(projectSettingPath);
 
     return (
-        <div className="app-shell min-h-screen text-foreground">
+        <div className="main-dark-page app-shell min-h-screen text-foreground">
             <GlobalTopBar />
 
             <div className="border-b border-border/80 bg-card/65 backdrop-blur">
@@ -761,20 +761,20 @@ const BudgetProjectOverview = () => {
 	                                        <div className="pointer-events-none absolute inset-x-0 top-[4px] z-10 flex justify-center px-2">
 	                                            <div className="w-fit max-w-full">
 	                                                {isReviewStage ? (
-	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-sky-200/60 bg-gradient-to-r from-sky-50/65 via-white/55 to-emerald-50/65 px-5 py-2 text-[12px] font-extrabold leading-none text-slate-900 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
-	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
-	                                                        <span className="shrink-0 tracking-[0.14em] text-sky-800">검토</span>
+	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-sky-400/45 bg-gradient-to-r from-sky-500/18 via-slate-950/75 to-emerald-500/18 px-5 py-2 text-[12px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
+	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
+	                                                        <span className="shrink-0 tracking-[0.14em] text-sky-200">검토</span>
 	                                                        <span className="text-slate-300">|</span>
 	                                                        <span className="truncate font-mono text-slate-700/90">생성 {createdDateLabel}</span>
-	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-200/20 blur-xl" />
+	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-500/16 blur-xl" />
 	                                                    </div>
 	                                                ) : (
-	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-slate-200/65 bg-gradient-to-r from-slate-50/65 via-white/55 to-slate-100/65 px-5 py-2 text-[12px] font-extrabold leading-none text-slate-900 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
-	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+	                                                    <div className="relative inline-flex max-w-[420px] items-center gap-2 rounded-full border border-slate-400/35 bg-gradient-to-r from-slate-700/45 via-slate-950/70 to-slate-600/45 px-5 py-2 text-[12px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.85)] backdrop-blur-md">
+	                                                        <span className="h-3 w-3 shrink-0 rounded-full bg-gradient-to-r from-slate-300 to-slate-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
 	                                                        <span className="shrink-0 tracking-[0.14em] text-slate-800">종료</span>
 	                                                        <span className="text-slate-300">|</span>
 	                                                        <span className="truncate font-mono text-slate-700/90">종료일 {closureDateLabel}</span>
-	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-300/20 blur-xl" />
+	                                                        <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-500/16 blur-xl" />
 	                                                    </div>
 	                                                )}
 	                                            </div>

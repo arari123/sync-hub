@@ -86,40 +86,40 @@ const STAGE_PROGRESS_FALLBACK = {
 };
 const STAGE_STYLE_MAP = {
     review: {
-        badgeClass: 'border-sky-200 bg-sky-50 text-sky-700',
-        statusTextClass: 'text-sky-600',
+        badgeClass: 'border-sky-400/35 bg-sky-500/12 text-sky-200',
+        statusTextClass: 'text-sky-300',
         progressFrom: '#38bdf8',
         progressTo: '#10b981',
         dotColor: '#0ea5e9',
         statusLabel: '검토 진행',
     },
     design: {
-        badgeClass: 'border-cyan-200 bg-cyan-50 text-cyan-700',
-        statusTextClass: 'text-cyan-600',
+        badgeClass: 'border-cyan-400/35 bg-cyan-500/12 text-cyan-200',
+        statusTextClass: 'text-cyan-300',
         progressFrom: '#22d3ee',
         progressTo: '#60a5fa',
         dotColor: '#06b6d4',
         statusLabel: '설계 진행',
     },
     fabrication: {
-        badgeClass: 'border-indigo-200 bg-indigo-50 text-indigo-700',
-        statusTextClass: 'text-indigo-600',
+        badgeClass: 'border-indigo-400/35 bg-indigo-500/12 text-indigo-200',
+        statusTextClass: 'text-indigo-300',
         progressFrom: '#6366f1',
         progressTo: '#14b8a6',
         dotColor: '#6366f1',
         statusLabel: '제작 진행',
     },
     installation: {
-        badgeClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        statusTextClass: 'text-emerald-600',
+        badgeClass: 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200',
+        statusTextClass: 'text-emerald-300',
         progressFrom: '#34d399',
         progressTo: '#06b6d4',
         dotColor: '#10b981',
         statusLabel: '설치 진행',
     },
     warranty: {
-        badgeClass: 'border-amber-200 bg-amber-50 text-amber-700',
-        statusTextClass: 'text-amber-600',
+        badgeClass: 'border-amber-400/35 bg-amber-500/12 text-amber-200',
+        statusTextClass: 'text-amber-300',
         progressFrom: '#f59e0b',
         progressTo: '#f97316',
         dotColor: '#f59e0b',
@@ -143,15 +143,15 @@ const STAGE_STYLE_MAP = {
     },
 };
 const HOME_STAGE_TIMELINE = [
-    { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-200', textClass: 'text-sky-700' },
-    { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-200', textClass: 'text-indigo-700' },
-    { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-200', textClass: 'text-emerald-700' },
-    { key: 'warranty', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
+    { key: 'design', label: '설계', solidClass: 'bg-sky-500', softClass: 'bg-sky-500/30', textClass: 'text-sky-300' },
+    { key: 'fabrication', label: '제작', solidClass: 'bg-indigo-500', softClass: 'bg-indigo-500/30', textClass: 'text-indigo-300' },
+    { key: 'installation', label: '설치', solidClass: 'bg-emerald-500', softClass: 'bg-emerald-500/30', textClass: 'text-emerald-300' },
+    { key: 'warranty', label: '워런티', solidClass: 'bg-amber-500', softClass: 'bg-amber-500/30', textClass: 'text-amber-300' },
 ];
 const HOME_STAGE_TIMELINE_META = HOME_STAGE_TIMELINE;
 const HOME_AS_TIMELINE = [
-    { key: 'start', label: '시작', solidClass: 'bg-amber-500', softClass: 'bg-amber-200', textClass: 'text-amber-700' },
-    { key: 'end', label: '종료', solidClass: 'bg-muted-foreground', softClass: 'bg-muted/80', textClass: 'text-foreground/85' },
+    { key: 'start', label: '시작', solidClass: 'bg-amber-500', softClass: 'bg-amber-500/30', textClass: 'text-amber-300' },
+    { key: 'end', label: '종료', solidClass: 'bg-slate-500', softClass: 'bg-slate-500/35', textClass: 'text-slate-200' },
 ];
 const HOME_AS_TIMELINE_META = HOME_AS_TIMELINE;
 
@@ -296,7 +296,7 @@ function resolveProjectTypeBadgeMeta(project) {
         return {
             label: '설비',
             Icon: Building2,
-            className: 'border-sky-200/70 bg-sky-50/80 text-sky-800',
+            className: 'border-sky-400/35 bg-sky-500/12 text-sky-200',
             accentClass: 'bg-sky-500',
         };
     }
@@ -304,7 +304,7 @@ function resolveProjectTypeBadgeMeta(project) {
         return {
             label: '파츠',
             Icon: Boxes,
-            className: 'border-indigo-200/70 bg-indigo-50/80 text-indigo-800',
+            className: 'border-indigo-400/35 bg-indigo-500/12 text-indigo-200',
             accentClass: 'bg-indigo-500',
         };
     }
@@ -312,7 +312,7 @@ function resolveProjectTypeBadgeMeta(project) {
         return {
             label: 'AS',
             Icon: Wrench,
-            className: 'border-amber-200/70 bg-amber-50/80 text-amber-800',
+            className: 'border-amber-400/35 bg-amber-500/12 text-amber-200',
             accentClass: 'bg-amber-500',
         };
     }
@@ -1254,7 +1254,7 @@ const SearchResults = () => {
     };
 
     return (
-        <div className="app-shell min-h-screen text-foreground">
+        <div className="main-dark-page app-shell min-h-screen text-foreground">
             <header className="topbar-shell h-16">
                 <div className="mx-auto flex h-full max-w-[1640px] items-center gap-3 px-4 lg:px-6">
                     <Logo variant="topbar" showSubtitle={false} className="w-48 shrink-0" />
@@ -1750,7 +1750,7 @@ const SearchResults = () => {
 	                                                label: '안건',
 	                                                to: agendaDetailPath,
 	                                                accentClass: 'bg-sky-500',
-	                                                textClass: 'text-sky-800',
+                                                textClass: 'text-sky-200',
 	                                                seenPatch: { agendaLastUpdatedAt: latestAgendaUpdatedAt },
 	                                            });
 	                                        }
@@ -1762,7 +1762,7 @@ const SearchResults = () => {
 	                                                label: '재료비',
 	                                                to: `/project-management/projects/${project.id}/budget?tab=material`,
 	                                                accentClass: 'bg-sky-500',
-	                                                textClass: 'text-sky-800',
+                                                textClass: 'text-sky-200',
 	                                                seenPatch: { budgetConfirmed: { ...baselineBudget, material: confirmedSnapshot.material } },
 	                                            });
 	                                        }
@@ -1772,7 +1772,7 @@ const SearchResults = () => {
 	                                                label: '인건비',
 	                                                to: `/project-management/projects/${project.id}/budget?tab=labor`,
 	                                                accentClass: 'bg-indigo-500',
-	                                                textClass: 'text-indigo-800',
+                                                textClass: 'text-indigo-200',
 	                                                seenPatch: { budgetConfirmed: { ...baselineBudget, labor: confirmedSnapshot.labor } },
 	                                            });
 	                                        }
@@ -1782,7 +1782,7 @@ const SearchResults = () => {
 	                                                label: '경비',
 	                                                to: `/project-management/projects/${project.id}/budget?tab=expense`,
 	                                                accentClass: 'bg-emerald-500',
-	                                                textClass: 'text-emerald-800',
+                                                textClass: 'text-emerald-200',
 	                                                seenPatch: { budgetConfirmed: { ...baselineBudget, expense: confirmedSnapshot.expense } },
 	                                            });
 	                                        }
@@ -1793,14 +1793,14 @@ const SearchResults = () => {
 	                                            label: '사양',
 	                                            to: `/project-management/projects/${project.id}/spec`,
 	                                            accentClass: 'bg-violet-500',
-	                                            textClass: 'text-violet-800',
+                                            textClass: 'text-violet-200',
 	                                            seenPatch: { equipmentSignature: currentEquipmentSignature },
 	                                        });
 	                                    }
 	                                    return (
 	                                        <article
 	                                            key={`project-row-${project.id}`}
-	                                            className="app-surface-soft relative overflow-visible p-3 transition-all hover:border-sky-200"
+	                                            className="app-surface-soft relative overflow-visible p-3 transition-all hover:border-sky-400/45"
 	                                        >
 	                                            {updateBookmarks.length > 0 && (
 	                                                <div className="absolute -left-2 top-4 z-10 flex flex-col gap-1.5">
@@ -1883,7 +1883,7 @@ const SearchResults = () => {
 
 	                                                            <Link
 	                                                                to={`/project-management/projects/${project.id}`}
-	                                                                className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-700"
+	                                                                className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-300"
 	                                                            >
 	                                                                {project.name || '이름 없는 프로젝트'}
 	                                                            </Link>
@@ -1932,7 +1932,7 @@ const SearchResults = () => {
                                                     <Link
                                                         to={`/project-management/projects/${project.id}/budget`}
                                                         onClick={() => markProjectUpdateSeen(project, { budgetConfirmed: confirmedSnapshot })}
-                                                        className="group mb-2 grid grid-cols-3 gap-2 rounded-lg border border-border bg-secondary/60 p-1.5 transition hover:border-sky-200 hover:bg-card/90"
+                                                        className="group mb-2 grid grid-cols-3 gap-2 rounded-lg border border-border bg-secondary/60 p-1.5 transition hover:border-sky-400/45 hover:bg-card/90"
                                                     >
                                                         <div className="flex flex-col">
                                                             <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">예산</span>
@@ -2004,12 +2004,12 @@ const SearchResults = () => {
                                                             {isReviewStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-200/60 bg-gradient-to-r from-sky-50/65 via-white/55 to-emerald-50/65 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/90 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
-                                                                            <span className="shrink-0 tracking-[0.12em] text-sky-800">검토</span>
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-400/45 bg-gradient-to-r from-sky-500/18 via-slate-950/75 to-emerald-500/18 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
+                                                                            <span className="shrink-0 tracking-[0.12em] text-sky-200">검토</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">생성 {createdDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-200/20 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-500/16 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2018,12 +2018,12 @@ const SearchResults = () => {
                                                             {isClosureStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-border/65 bg-gradient-to-r from-slate-50/65 via-white/55 to-slate-100/65 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/90 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
-                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-slate-500 to-slate-700 shadow-[0_0_0_2px_hsl(0_0%_100%/0.75)]" />
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-slate-400/35 bg-gradient-to-r from-slate-700/45 via-slate-950/70 to-slate-600/45 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-slate-300 to-slate-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
                                                                             <span className="shrink-0 tracking-[0.12em] text-foreground/90">종료</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">종료일 {closureDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-300/20 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-500/16 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2091,18 +2091,18 @@ const SearchResults = () => {
                                                 </div>
 
                                                 <div className="border-t border-border pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                        <div className="rounded-xl border border-border bg-gradient-to-b from-slate-50 via-white to-slate-50/70 p-1.5">
+                                                        <div className="rounded-xl border border-border bg-gradient-to-b from-slate-900/72 via-slate-900/34 to-slate-800/64 p-1.5">
                                                             <div className="mb-1.5 flex items-center justify-between">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">최신 안건</p>
-                                                                    <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-600">
+                                                                    <span className="rounded-full border border-sky-400/40 bg-sky-500/14 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200">
                                                                         {isAgendaLoading ? '...' : `${agendaCount}건`}
                                                                     </span>
                                                                 </div>
 	                                                            <Link
 	                                                                to={`/project-management/projects/${project.id}/agenda`}
 	                                                                onClick={() => markProjectUpdateSeen(project, { agendaLastUpdatedAt: latestAgendaUpdatedAt })}
-	                                                                className="text-[10px] font-semibold text-sky-600 hover:underline"
+	                                                                className="text-[10px] font-semibold text-sky-300 hover:underline"
 	                                                            >
 	                                                                보기
 	                                                            </Link>
@@ -2138,7 +2138,7 @@ const SearchResults = () => {
 	                                                                        className={cn(
 	                                                                            'group relative block overflow-hidden rounded-lg border px-2 py-1 transition-all',
 	                                                                            index === 0
-	                                                                                ? 'border-sky-300 bg-card shadow-sm'
+	                                                                                ? 'border-sky-400/45 bg-card shadow-sm'
                                                                                 : 'border-border bg-card/80 hover:border-border'
                                                                         )}
                                                                     >

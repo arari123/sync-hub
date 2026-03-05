@@ -2027,7 +2027,7 @@ const SearchResults = () => {
                                                                                         connectorClass
                                                                                     )}
                                                                                 />
-                                                                                <span className={cn('relative z-10 truncate text-[10px] font-bold tracking-[0.08em]', nodeLabelClass)}>
+                                                                                <span className={cn('relative z-10 truncate text-[11px] font-bold tracking-[0.06em]', nodeLabelClass)}>
                                                                                     {item.label}
                                                                                 </span>
                                                                             </div>
@@ -2035,7 +2035,7 @@ const SearchResults = () => {
                                                                                 {useStartEndTimeline ? (
                                                                                     <p
                                                                                         title={startLabel}
-                                                                                        className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                        className={cn('font-mono text-[11px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                     >
                                                                                         {startDisplay}
                                                                                     </p>
@@ -2043,13 +2043,13 @@ const SearchResults = () => {
                                                                                     <div className="space-y-0.5">
                                                                                         <p
                                                                                             title={`시작 ${startLabel}`}
-                                                                                            className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                            className={cn('font-mono text-[11px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                         >
                                                                                             {startDisplay}
                                                                                         </p>
                                                                                         <p
                                                                                             title={`종료 ${endLabel}`}
-                                                                                            className={cn('font-mono text-[10px] font-semibold leading-none tabular-nums', dateLabelClass)}
+                                                                                            className={cn('font-mono text-[11px] font-semibold leading-none tabular-nums', dateLabelClass)}
                                                                                         >
                                                                                             {endDisplay}
                                                                                         </p>

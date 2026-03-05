@@ -13,7 +13,7 @@ const ProjectPageHeader = ({
 }) => {
     return (
         <div className="space-y-4">
-            <div className="-mx-4 -mt-4 border-b border-border/80 bg-card/65 backdrop-blur lg:-mx-6 lg:-mt-6">
+            <div className="project-header-band -mt-4 border-b border-border/80 bg-card/65 backdrop-blur lg:-mt-6">
                 <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-2">
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <BudgetBreadcrumb items={breadcrumbItems} />

@@ -2071,7 +2071,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                     </div>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-sm text-left">
+                    <table className="w-full min-w-[980px] border-collapse text-sm text-left">
                         <thead className="border-b border-slate-200 bg-slate-100 text-xs uppercase text-slate-500">
                             <tr>
                                 <th className="w-1/4 px-6 py-4 font-semibold">비용 구분 / 단계</th>
@@ -2082,13 +2082,13 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                 <th className="w-24 px-6 py-4 text-center font-semibold">Status</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 text-slate-700">
+                        <tbody className="budget-summary-body divide-y divide-slate-200 text-slate-700">
                             {summaryCategoryRows.map((category) => {
                                 const theme = SUMMARY_THEME[category.key];
                                 const isMaterialCategory = category.key === 'material';
                                 return (
                                     <React.Fragment key={category.key}>
-                                        <tr className="bg-slate-50 font-medium">
+                                        <tr className="bg-white font-medium">
                                             <td className="px-6 py-3">
                                                 <div className="flex items-center gap-2">
                                                     <div className={cn('rounded p-1.5', theme.categoryIcon)}>
@@ -2118,7 +2118,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-slate-700">합계</span>
                                             </td>
                                         </tr>
-                                        {category.children.map((child) => {
+                                        {category.children.map((child, childIndex) => {
                                             const childStatus = getBudgetStatusMeta(child.budget, child.execution);
                                             const phaseUnits = Array.isArray(child.units) ? child.units : [];
                                             const isPhaseExpanded = expandedPhaseKeys.includes(child.key);
@@ -2128,6 +2128,7 @@ const SummaryTabContent = ({ summaryView, summaryCategoryRows }) => {
                                                         className={cn(
                                                             'bg-white transition border-l-4',
                                                             theme.childBorder,
+                                                            childIndex === 0 && '!border-t-0',
                                                             'cursor-pointer hover:bg-slate-50',
                                                         )}
                                                         onClick={() => toggleSummaryPhase(child.key)}
@@ -2482,7 +2483,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                 ) : (
                     <div className="overflow-x-auto">
 	                        {unitViewMode === 'execution' ? (
-	                            <table className="w-full min-w-[980px] table-fixed text-sm text-left">
+		                            <table className="w-full min-w-[980px] table-fixed border-collapse text-sm text-left">
 	                                <colgroup>
 	                                    <col className="w-[88px]" />
 	                                    <col className="w-[180px]" />
@@ -2501,7 +2502,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
 	                                        <th className="w-40 px-4 py-3 text-right font-semibold">집행</th>
 	                                    </tr>
 	                                </thead>
-	                                <tbody className="divide-y divide-slate-200 text-slate-700">
+		                                <tbody className="budget-material-body divide-y divide-slate-200 text-slate-700">
 	                                    {executionRows.length === 0 && (
 	                                        <tr>
 	                                            <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
@@ -2522,10 +2523,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                                     return (
                                                         <React.Fragment key={row.key}>
                                                             <tr
-                                                                className={cn(
-                                                                    index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
-                                                                    'cursor-pointer hover:bg-slate-100/70',
-                                                                )}
+                                                                className="bg-white cursor-pointer hover:bg-slate-100/70"
                                                                 onClick={() => toggleUnitRow(row.key)}
                                                                 role="button"
                                                                 tabIndex={0}
@@ -2600,7 +2598,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                 )}
                             </table>
                         ) : (
-                            <table className="w-full min-w-[900px] table-fixed text-sm text-left">
+	                            <table className="w-full min-w-[900px] table-fixed border-collapse text-sm text-left">
                                 <colgroup>
                                     <col className="w-[88px]" />
                                     <col className="w-[180px]" />
@@ -2619,7 +2617,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                         <th className="w-32 px-4 py-3 text-right font-semibold">예산</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200 text-slate-700">
+                                <tbody className="budget-material-body divide-y divide-slate-200 text-slate-700">
                                     {budgetRows.length === 0 && (
                                         <tr>
                                             <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
@@ -2640,10 +2638,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                                     return (
                                                         <React.Fragment key={row.key}>
                                                             <tr
-                                                                className={cn(
-                                                                    index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50',
-                                                                    'cursor-pointer hover:bg-slate-100/70',
-                                                                )}
+                                                                className="bg-white cursor-pointer hover:bg-slate-100/70"
                                                                 onClick={() => toggleUnitRow(row.key)}
                                                                 role="button"
                                                                 tabIndex={0}

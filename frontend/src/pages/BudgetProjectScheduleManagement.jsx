@@ -964,12 +964,22 @@ export default function BudgetProjectScheduleManagement() {
                                                                     return (
                                                                         <React.Fragment key={`milestone-event-${summary.stage}-${event.id}`}>
                                                                             <div
-                                                                                className="absolute top-1/2 z-40 -translate-x-1/2 -translate-y-1/2"
-                                                                                style={{ left: `${event.position}%` }}
+                                                                                className="absolute top-1/2 z-40 -translate-x-1/2"
+                                                                                style={{
+                                                                                    left: `${event.position}%`,
+                                                                                    transform: `translate(-50%, ${isTop ? '-170%' : '70%'})`,
+                                                                                }}
                                                                             >
                                                                                 <span
                                                                                     className={cn(
-                                                                                        'block h-3 w-3 rounded-full ring-2 ring-white shadow',
+                                                                                        'pointer-events-none absolute left-1/2 h-2 w-px -translate-x-1/2',
+                                                                                        isTop ? 'top-full' : 'bottom-full',
+                                                                                        stageStyle.bar,
+                                                                                    )}
+                                                                                />
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'block h-2.5 w-2.5 rounded-full border border-slate-950/70 shadow-sm',
                                                                                         stageStyle.bar,
                                                                                     )}
                                                                                 />

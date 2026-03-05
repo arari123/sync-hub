@@ -186,6 +186,18 @@
     box-shadow: 0 10px 28px -18px hsl(210 100% 4% / 0.9);
   }
 
+  .project-header-band {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+  }
+
+  @supports (width: 100dvw) {
+    .project-header-band {
+      margin-left: calc(50% - 50dvw);
+      margin-right: calc(50% - 50dvw);
+    }
+  }
+
   .chip-pill {
     @apply inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground;
   }
@@ -444,7 +456,7 @@
     border-color: hsl(204 98% 62% / 0.46) !important;
   }
 
-  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  :where(.budget-dark-page, .schedule-dark-page, .main-dark-page) .divide-slate-200 > :not(:last-child) {
     border-color: var(--biz-line-soft) !important;
   }
 

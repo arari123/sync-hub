@@ -2335,7 +2335,7 @@ const SearchResults = () => {
                                                                             <p className="min-w-0 truncate text-[11px] font-semibold leading-tight text-foreground/90">
                                                                                 {agendaTitle}
                                                                             </p>
-                                                                            <span className="shrink-0 text-[9px] font-mono text-muted-foreground/80">
+                                                                            <span className="shrink-0 text-[11px] font-mono font-semibold tabular-nums text-muted-foreground/90">
                                                                                 {agendaUpdatedDate}
                                                                             </span>
                                                                         </div>

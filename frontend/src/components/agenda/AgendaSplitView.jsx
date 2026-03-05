@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Briefcase,
     Loader2,
     MessageCircle,
     PanelLeftClose,
@@ -154,6 +155,10 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
     const projectCode = String(item?.project_code || '').trim();
     const projectName = String(item?.project_name || '').trim();
     const projectLabel = [projectCode, projectName].filter(Boolean).join(' · ');
+    const fallbackProjectLabel = Number(item?.project_id || 0) > 0
+        ? `프로젝트 #${Number(item?.project_id || 0)}`
+        : '프로젝트 정보 없음';
+    const visibleProjectLabel = projectLabel || fallbackProjectLabel;
 
     return (
         <button
@@ -168,6 +173,15 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
                         : 'border-border bg-card hover:bg-secondary/60',
             )}
         >
+            {showProjectMeta && (
+                <div className="mb-1.5 flex items-center gap-1.5 rounded-lg border border-sky-400/45 bg-sky-500/14 px-2 py-1">
+                    <Briefcase className="h-3.5 w-3.5 shrink-0 text-sky-100" />
+                    <span className="min-w-0 truncate text-[11px] font-extrabold tracking-[0.01em] text-sky-100">
+                        {visibleProjectLabel}
+                    </span>
+                </div>
+            )}
+
             <div className="mb-1 flex items-center gap-1.5">
                 <span className={cn('inline-flex h-5 items-center rounded-md border px-1.5 text-[10px] font-bold', entryToneClass(item?.entry_kind))}>
                     {entryKindLabel(item?.entry_kind)}
@@ -181,12 +195,6 @@ function ListItem({ item, isSelected, isUnread, onClick, showProjectMeta = false
             <p className={cn('line-clamp-2 text-sm', isUnread ? 'font-black text-foreground' : 'font-semibold text-foreground/90')}>
                 {item?.title || '-'}
             </p>
-
-            {showProjectMeta && projectLabel && (
-                <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">
-                    {projectLabel}
-                </p>
-            )}
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
                 <span className="rounded bg-muted/80 px-1.5 py-0.5 font-semibold text-foreground/85">
@@ -526,6 +534,23 @@ export default function AgendaSplitView({
         if (match) return match;
         return entries[0] || null;
     }, [detail, selectedEntryId]);
+    const selectedListItem = useMemo(
+        () => items.find((item) => Number(item?.entry_id || 0) === Number(selectedEntryId || 0)) || null,
+        [items, selectedEntryId],
+    );
+    const selectedProjectLabel = useMemo(() => {
+        const projectCode = String(selectedListItem?.project_code || '').trim();
+        const projectName = String(selectedListItem?.project_name || '').trim();
+        const label = [projectCode, projectName].filter(Boolean).join(' · ');
+        if (label) return label;
+        const fallbackProjectId = Number(
+            selectedProjectId
+            || selectedListItem?.project_id
+            || detail?.thread?.project_id
+            || 0,
+        );
+        return fallbackProjectId > 0 ? `프로젝트 #${fallbackProjectId}` : '';
+    }, [selectedListItem, selectedProjectId, detail?.thread?.project_id]);
 
     const rootEntry = detail?.root_entry || null;
     const selectedIsRoot = selectedEntry && rootEntry
@@ -730,6 +755,12 @@ export default function AgendaSplitView({
                                     </div>
                                 </div>
                                 <h2 className="mt-2 text-xl font-black text-foreground">{detail.thread.root_title || detail.thread.title}</h2>
+                                {selectedProjectLabel && (
+                                    <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-md border border-sky-400/45 bg-sky-500/14 px-2.5 py-1">
+                                        <Briefcase className="h-3.5 w-3.5 shrink-0 text-sky-100" />
+                                        <span className="truncate text-xs font-extrabold text-sky-100">{selectedProjectLabel}</span>
+                                    </div>
+                                )}
                                 <p className="mt-1 text-sm font-medium text-muted-foreground">
                                     현재 선택: {entryKindLabel(selectedEntry.entry_kind)} · {selectedEntry.title}
                                 </p>

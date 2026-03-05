@@ -1478,7 +1478,7 @@ const SearchResults = () => {
                                         </span>
                                     </div>
                                 ) : (
-                                    <div className="text-[11px] font-medium text-muted-foreground">
+                                    <div className="pr-0.5 text-right text-[11px] font-semibold text-muted-foreground">
                                         안건 목록/상세 분할 보기
                                     </div>
                                 )}
@@ -1630,7 +1630,7 @@ const SearchResults = () => {
                                         )}
                                     </>
                                 ) : (
-                                    <span className="text-xs font-semibold text-muted-foreground">
+                                    <span className="ml-auto pr-1 text-xs font-semibold text-muted-foreground">
                                         안건 목록/상세 분할 보기
                                     </span>
                                 )}

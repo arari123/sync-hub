@@ -975,7 +975,6 @@ const SearchResults = () => {
         next.delete(normalizedEntryId);
         unreadAgendaEntryIdsRef.current = next;
         setUnreadAgendaEntryCount(next.size);
-        setUnreadAgendaEntryItems((prev) => prev.filter((item) => Number(item?.entry_id || 0) !== normalizedEntryId));
     }, []);
 
     useEffect(() => {

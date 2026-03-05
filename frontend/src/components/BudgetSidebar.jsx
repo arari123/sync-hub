@@ -317,7 +317,9 @@ const TreeNode = ({
                         </div>
                         {Number.isFinite(node.count) && (
                             <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${
-                                isActive ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'
+                                isActive
+                                    ? 'border border-sky-300 bg-sky-100 text-sky-800'
+                                    : 'border border-slate-300 bg-slate-100 text-slate-700'
                             }`}
                             >
                                 {node.count}

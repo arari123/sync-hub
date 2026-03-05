@@ -1859,8 +1859,8 @@ const PHASE_TOTAL_THEME = {
 };
 
 const phaseBadgeClass = (phase) => (phase === 'fabrication'
-    ? 'bg-blue-100 text-blue-800'
-    : 'bg-emerald-100 text-emerald-800');
+    ? 'border-sky-300 bg-sky-100 text-sky-800'
+    : 'border-emerald-300 bg-emerald-100 text-emerald-800');
 
 const CostSummaryPanel = ({ panelBadge, items }) => (
     <section className="rounded-2xl border border-slate-300/80 bg-gradient-to-br from-slate-100 to-slate-50 p-3 shadow-sm">
@@ -2540,7 +2540,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                                                         rowSpan={phaseRowSpan}
                                                                         className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
                                                                     >
-                                                                        <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
+                                                                        <span className={cn('inline-flex min-w-[44px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-extrabold tracking-wide', phaseBadgeClass(group.phase))}>
                                                                             {group.phase === 'fabrication' ? '제작' : '설치'}
                                                                         </span>
                                                                     </td>
@@ -2658,7 +2658,7 @@ const MaterialTabContent = ({ rows, executionItems, currentStage, isInputMode, o
                                                                         rowSpan={phaseRowSpan}
                                                                         className="border-r border-slate-200 px-4 py-3 text-center align-middle font-bold"
                                                                     >
-                                                                        <span className={cn('rounded px-2 py-1 text-xs', phaseBadgeClass(group.phase))}>
+                                                                        <span className={cn('inline-flex min-w-[44px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-extrabold tracking-wide', phaseBadgeClass(group.phase))}>
                                                                             {group.phase === 'fabrication' ? '제작' : '설치'}
                                                                         </span>
                                                                     </td>

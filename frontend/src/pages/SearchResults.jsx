@@ -1800,30 +1800,30 @@ const SearchResults = () => {
 	                                    return (
 	                                        <article
 	                                            key={`project-row-${project.id}`}
-	                                            className="app-surface-soft relative overflow-visible p-3 transition-all hover:border-sky-400/45"
+	                                            className="app-surface-soft relative overflow-hidden border border-border/80 bg-card/92 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_24px_56px_-40px_hsl(var(--primary)/0.55)]"
 	                                        >
+	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-sky-500/75 via-indigo-500/70 to-emerald-500/75" />
 	                                            {updateBookmarks.length > 0 && (
-	                                                <div className="absolute -left-2 top-4 z-10 flex flex-col gap-1.5">
+	                                                <div className="mb-3 flex flex-wrap items-center justify-end gap-1.5">
 	                                                    {updateBookmarks.map((bookmark) => (
 	                                                        <Link
 	                                                            key={`${project.id}-bookmark-${bookmark.key}`}
 	                                                            to={bookmark.to}
 	                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
 	                                                            className={cn(
-	                                                                'group relative inline-flex h-7 items-center gap-2 rounded-r-full border border-border/70 bg-card/90 pl-3 pr-2 text-[11px] font-extrabold shadow-sm backdrop-blur transition hover:border-border hover:bg-card',
+	                                                                'group inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-card/92 px-2.5 text-[10px] font-bold tracking-wide shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
 	                                                                bookmark.textClass
 	                                                            )}
 	                                                        >
-	                                                            <span className={cn('absolute left-0 top-0 h-full w-1.5 rounded-r-full', bookmark.accentClass)} />
-	                                                            <span className="relative z-10">{bookmark.label}</span>
-	                                                            <span className="relative z-10 text-muted-foreground/70 group-hover:text-muted-foreground/80">&rsaquo;</span>
+	                                                            <span className={cn('h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
+	                                                            <span>{bookmark.label}</span>
 	                                                        </Link>
 	                                                    ))}
 	                                                </div>
 	                                            )}
-	                                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-	                                                <div className="flex h-full min-w-0 gap-3">
-                                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/80">
+	                                            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
+	                                                <div className="flex min-h-[212px] min-w-0 gap-3 rounded-xl border border-border/70 bg-card/72 p-3">
+                                                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-secondary/70">
                                                         {coverImage ? (
                                                             <img
                                                                 src={coverImage}
@@ -1837,16 +1837,16 @@ const SearchResults = () => {
                                                         )}
                                                     </div>
 
-	                                                    <div className="min-w-0 flex flex-1 flex-col">
+	                                                    <div className="flex min-w-0 flex-1 flex-col">
 	                                                        <div>
-	                                                            <div className="mb-1 flex items-center justify-between gap-2">
-	                                                                <span className="truncate text-[10px] font-mono tracking-wider text-muted-foreground/80">
+	                                                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+	                                                                <span className="truncate text-[10px] font-mono font-semibold tracking-[0.12em] text-muted-foreground/85">
 	                                                                    {project.code || '코드 없음'}
 	                                                                </span>
-	                                                                <div className="flex shrink-0 items-center gap-1.5">
+	                                                                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
 	                                                                    <span
 	                                                                        className={cn(
-	                                                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow-sm',
+	                                                                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] font-extrabold tracking-wide shadow-sm',
 	                                                                            typeBadgeMeta.className
 	                                                                        )}
 	                                                                    >
@@ -1857,7 +1857,7 @@ const SearchResults = () => {
 	                                                                        <Link
 	                                                                            to={`/project-management/projects/${parentProject.id}`}
 	                                                                            title={`${parentProject.code || ''} ${parentProject.name || ''}`.trim()}
-	                                                                            className="inline-flex max-w-[170px] items-center gap-1 rounded-full border border-border bg-card/72 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground shadow-sm transition hover:border-border hover:bg-card"
+	                                                                            className="inline-flex max-w-[170px] items-center gap-1 rounded-md border border-border/80 bg-secondary/55 px-2 py-0.5 text-[9px] font-semibold text-muted-foreground shadow-sm transition hover:border-primary/35 hover:bg-secondary/75"
 	                                                                        >
 	                                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
 	                                                                            <span className="truncate">
@@ -1872,7 +1872,7 @@ const SearchResults = () => {
 	                                                                        </Link>
 	                                                                    )}
 	                                                                    <span className={cn(
-	                                                                        'inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold',
+	                                                                        'inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold',
 	                                                                        stageStyle.badgeClass
 	                                                                    )}
 	                                                                    >
@@ -1883,7 +1883,7 @@ const SearchResults = () => {
 
 	                                                            <Link
 	                                                                to={`/project-management/projects/${project.id}`}
-	                                                                className="mb-1.5 block min-h-[2.4rem] text-base font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-sky-300"
+	                                                                className="mb-2 block min-h-[2.55rem] text-[17px] font-bold leading-tight tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden hover:text-primary"
 	                                                            >
 	                                                                {project.name || '이름 없는 프로젝트'}
 	                                                            </Link>
@@ -1899,10 +1899,10 @@ const SearchResults = () => {
 	                                                            </p>
 	                                                        </div>
 
-	                                                        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2">
+	                                                        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-2.5">
 	                                                            <span
 	                                                                title={project.customer_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border bg-card/75 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
 	                                                                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
 	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">고객사</span>
@@ -1910,7 +1910,7 @@ const SearchResults = () => {
 	                                                            </span>
 	                                                            <span
 	                                                                title={project.installation_site || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border bg-card/75 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
 	                                                                <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
 	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">설치장소</span>
@@ -1918,7 +1918,7 @@ const SearchResults = () => {
 	                                                            </span>
 	                                                            <span
 	                                                                title={project.manager_name || ''}
-	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border bg-card/75 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
+	                                                                className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border/75 bg-secondary/45 px-2 py-1 text-[11px] font-semibold text-foreground/85 shadow-sm"
 	                                                            >
 	                                                                <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
 	                                                                <span className="shrink-0 text-[10px] font-bold text-muted-foreground">담당자</span>
@@ -1928,29 +1928,29 @@ const SearchResults = () => {
 	                                                    </div>
 	                                                </div>
 
-                                                <div className="border-t border-border pt-2 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
+                                                <div className="rounded-xl border border-border/70 bg-card/68 p-3">
                                                     <Link
                                                         to={`/project-management/projects/${project.id}/budget`}
                                                         onClick={() => markProjectUpdateSeen(project, { budgetConfirmed: confirmedSnapshot })}
-                                                        className="group mb-2 grid grid-cols-3 gap-2 rounded-lg border border-border bg-secondary/60 p-1.5 transition hover:border-sky-400/45 hover:bg-card/90"
+                                                        className="group mb-3 grid grid-cols-3 gap-2 rounded-xl border border-border/75 bg-gradient-to-br from-card to-secondary/30 p-2.5 transition hover:border-primary/35 hover:bg-card/95"
                                                     >
                                                         <div className="flex flex-col">
-                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">예산</span>
-                                                            <span className="text-xs font-bold text-foreground/85">
+                                                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">예산</span>
+                                                            <span className="text-xs font-bold text-foreground/90">
                                                                 {formatCompactKrw(budget.confirmedBudget)}
                                                             </span>
                                                         </div>
                                                         <div className="flex flex-col border-l border-border pl-2">
-                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">사용</span>
-                                                            <span className="text-xs font-bold text-foreground/85">
+                                                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">사용</span>
+                                                            <span className="text-xs font-bold text-foreground/90">
                                                                 {formatCompactKrw(budget.spent)}
                                                             </span>
                                                         </div>
                                                         <div className="flex flex-col border-l border-border pl-2">
-                                                            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">잔액</span>
+                                                            <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">잔액</span>
                                                             <span className={cn(
                                                                 'text-xs font-bold',
-                                                                budget.balance >= 0 ? 'text-emerald-600' : 'text-amber-600'
+                                                                budget.balance >= 0 ? 'text-emerald-400' : 'text-amber-300'
                                                             )}
                                                             >
                                                                 {budget.balance >= 0 ? '+' : ''}
@@ -1961,10 +1961,10 @@ const SearchResults = () => {
 
                                                     <Link
                                                         to={`/project-management/projects/${project.id}/schedule`}
-                                                        className="group block rounded-lg px-1 py-1 transition hover:bg-card/80"
+                                                        className="group block rounded-xl border border-border/75 bg-secondary/35 p-2.5 transition hover:border-primary/30 hover:bg-secondary/45"
                                                     >
                                                         <div className="flex items-center justify-between">
-                                                            <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                                                            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">
                                                                 {useStartEndTimeline ? '일정' : '단계 일정'}
                                                             </span>
                                                             <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
@@ -1972,9 +1972,9 @@ const SearchResults = () => {
                                                             </span>
                                                         </div>
 
-                                                        <div className="relative mt-0.5 h-8">
-                                                            <div className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded-full bg-muted/80 shadow-inner">
-                                                                <div className="flex h-full divide-x divide-white/70">
+                                                        <div className="relative mt-1 h-9">
+                                                            <div className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded-full bg-secondary/75 shadow-inner">
+                                                                <div className="flex h-full divide-x divide-border/45">
                                                                     {(useStartEndTimeline ? HOME_AS_TIMELINE : HOME_STAGE_TIMELINE).map((item, index) => {
                                                                         const isDone = timelineActiveIndex > index;
                                                                         const isActive = timelineActiveIndex === index;
@@ -2004,12 +2004,12 @@ const SearchResults = () => {
                                                             {isReviewStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-400/45 bg-gradient-to-r from-sky-500/18 via-slate-950/75 to-emerald-500/18 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-sky-400/45 bg-sky-500/14 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(201_96%_50%/0.55)] backdrop-blur-md">
                                                                             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
                                                                             <span className="shrink-0 tracking-[0.12em] text-sky-200">검토</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">생성 {createdDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-500/16 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-sky-500/12 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2018,12 +2018,12 @@ const SearchResults = () => {
                                                             {isClosureStage && (
                                                                 <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center px-2">
                                                                     <div className="w-fit max-w-full">
-                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-slate-400/35 bg-gradient-to-r from-slate-700/45 via-slate-950/70 to-slate-600/45 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_18px_42px_-30px_hsl(220_40%_15%/0.8)] backdrop-blur-md">
+                                                                        <div className="relative inline-flex max-w-[320px] items-center gap-2 rounded-full border border-slate-400/35 bg-slate-700/35 px-4 py-1.5 text-[11px] font-extrabold leading-none text-foreground/95 shadow-[0_12px_24px_-20px_hsl(220_40%_15%/0.75)] backdrop-blur-md">
                                                                             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r from-slate-300 to-slate-500 shadow-[0_0_0_2px_hsl(223_23%_12%/0.86)]" />
                                                                             <span className="shrink-0 tracking-[0.12em] text-foreground/90">종료</span>
                                                                             <span className="text-muted-foreground/70">|</span>
                                                                             <span className="truncate font-mono text-foreground/90">종료일 {closureDateLabel}</span>
-                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-500/16 blur-xl" />
+                                                                            <span className="pointer-events-none absolute -inset-1 -z-10 rounded-full bg-slate-500/12 blur-xl" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -2031,7 +2031,7 @@ const SearchResults = () => {
                                                         </div>
 
                                                         <div className={cn(
-                                                            'mt-1 grid gap-1',
+                                                            'mt-2 grid gap-1',
                                                             useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
                                                         )}
                                                         >
@@ -2090,19 +2090,19 @@ const SearchResults = () => {
                                                     </Link>
                                                 </div>
 
-                                                <div className="border-t border-border pt-3 xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-                                                        <div className="rounded-xl border border-border bg-gradient-to-b from-slate-900/72 via-slate-900/34 to-slate-800/64 p-1.5">
-                                                            <div className="mb-1.5 flex items-center justify-between">
+                                                <div className="rounded-xl border border-border/70 bg-card/68 p-3">
+                                                        <div className="rounded-xl border border-border/75 bg-gradient-to-b from-slate-900/60 via-slate-900/24 to-slate-800/42 p-2.5">
+                                                            <div className="mb-2 flex items-center justify-between">
                                                                 <div className="flex items-center gap-1.5">
-                                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">최신 안건</p>
-                                                                    <span className="rounded-full border border-sky-400/40 bg-sky-500/14 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200">
+                                                                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">최신 안건</p>
+                                                                    <span className="rounded-md border border-sky-400/40 bg-sky-500/14 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200">
                                                                         {isAgendaLoading ? '...' : `${agendaCount}건`}
                                                                     </span>
                                                                 </div>
 	                                                            <Link
 	                                                                to={`/project-management/projects/${project.id}/agenda`}
 	                                                                onClick={() => markProjectUpdateSeen(project, { agendaLastUpdatedAt: latestAgendaUpdatedAt })}
-	                                                                className="text-[10px] font-semibold text-sky-300 hover:underline"
+	                                                                className="text-[10px] font-semibold text-sky-300 hover:text-sky-200 hover:underline"
 	                                                            >
 	                                                                보기
 	                                                            </Link>
@@ -2135,21 +2135,21 @@ const SearchResults = () => {
 	                                                                        key={`${project.id}-agenda-${agendaItem.id || index}`}
 	                                                                        to={agendaDetailPath}
 	                                                                        onClick={() => markProjectUpdateSeen(project, { agendaLastUpdatedAt: latestAgendaUpdatedAt })}
-	                                                                        className={cn(
-	                                                                            'group relative block overflow-hidden rounded-lg border px-2 py-1 transition-all',
-	                                                                            index === 0
-	                                                                                ? 'border-sky-400/45 bg-card shadow-sm'
-                                                                                : 'border-border bg-card/80 hover:border-border'
-                                                                        )}
+		                                                                        className={cn(
+		                                                                            'group relative block overflow-hidden rounded-lg border px-2.5 py-1.5 transition-all',
+		                                                                            index === 0
+		                                                                                ? 'border-sky-400/45 bg-card shadow-sm'
+                                                                                : 'border-border/80 bg-card/85 hover:border-primary/30'
+		                                                                        )}
                                                                     >
                                                                         <span
                                                                             className={cn(
                                                                                 'absolute left-0 top-0 h-full w-0.5',
-                                                                                index === 0 ? 'bg-sky-400' : 'bg-border'
+                                                                                index === 0 ? 'bg-sky-400' : 'bg-border/80'
                                                                             )}
                                                                         />
                                                                         <div className="flex items-center justify-between gap-2">
-                                                                            <p className="min-w-0 truncate text-[10px] font-semibold text-foreground/85">
+                                                                            <p className="min-w-0 truncate text-[11px] font-semibold text-foreground/90">
                                                                                 {agendaTitle}
                                                                             </p>
                                                                             <span className="shrink-0 text-[9px] font-mono text-muted-foreground/80">

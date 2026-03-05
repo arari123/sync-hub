@@ -1803,39 +1803,47 @@ const SearchResults = () => {
 	                                            className="app-surface-soft relative overflow-hidden border border-border/80 bg-card/92 p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_24px_56px_-40px_hsl(var(--primary)/0.45)]"
 	                                        >
 	                                            <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-border/90 to-transparent" />
-	                                            {updateBookmarks.length > 0 && (
-	                                                <div className="mb-3 flex flex-wrap items-center justify-end gap-1.5">
-	                                                    {updateBookmarks.map((bookmark) => (
-	                                                        <Link
-	                                                            key={`${project.id}-bookmark-${bookmark.key}`}
-	                                                            to={bookmark.to}
-	                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
-	                                                            className={cn(
-	                                                                'group inline-flex h-7 items-center gap-1.5 rounded-md border border-border/70 bg-card/92 px-2.5 text-[10px] font-bold tracking-wide shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
-	                                                                bookmark.textClass
-	                                                            )}
-	                                                        >
-	                                                            <span className={cn('h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
-	                                                            <span>{bookmark.label}</span>
-	                                                        </Link>
-	                                                    ))}
-	                                                </div>
-	                                            )}
 	                                            <div className="grid grid-cols-1 items-stretch gap-3 xl:grid-cols-3">
 	                                                <div className="flex h-full min-h-[192px] min-w-0 gap-2.5 rounded-xl border border-border/70 bg-card/72 p-2.5">
-                                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
-                                                        {coverImage ? (
-                                                            <img
-                                                                src={coverImage}
-                                                                alt={`${project.name || '프로젝트'} 대표 이미지`}
-                                                                className="h-full w-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="grid h-full w-full place-items-center text-xs font-semibold text-muted-foreground/80">
-                                                                이미지 없음
-                                                            </div>
-                                                        )}
-                                                    </div>
+	                                                    <div className="flex w-20 shrink-0 flex-col gap-1.5">
+	                                                        <div className="h-20 w-20 overflow-hidden rounded-lg border border-border/80 bg-secondary/70">
+	                                                            {coverImage ? (
+	                                                                <img
+	                                                                    src={coverImage}
+	                                                                    alt={`${project.name || '프로젝트'} 대표 이미지`}
+	                                                                    className="h-full w-full object-cover"
+	                                                                />
+	                                                            ) : (
+	                                                                <div className="grid h-full w-full place-items-center text-xs font-semibold text-muted-foreground/80">
+	                                                                    이미지 없음
+	                                                                </div>
+	                                                            )}
+	                                                        </div>
+	                                                        <div className="h-10 rounded-md border border-border/75 bg-background/45 p-1">
+	                                                            {updateBookmarks.length > 0 ? (
+	                                                                <div className="flex h-full flex-wrap content-start gap-1 overflow-y-auto pr-0.5">
+	                                                                    {updateBookmarks.map((bookmark) => (
+	                                                                        <Link
+	                                                                            key={`${project.id}-bookmark-${bookmark.key}`}
+	                                                                            to={bookmark.to}
+	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
+	                                                                            className={cn(
+	                                                                                'group inline-flex h-5 items-center gap-1 rounded border border-border/70 bg-card/85 px-1.5 text-[9px] font-bold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                bookmark.textClass
+	                                                                            )}
+	                                                                        >
+	                                                                            <span className={cn('h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
+	                                                                            <span>{bookmark.label}</span>
+	                                                                        </Link>
+	                                                                    ))}
+	                                                                </div>
+	                                                            ) : (
+	                                                                <div className="grid h-full place-items-center text-[8px] font-semibold text-muted-foreground/75">
+	                                                                    업데이트 없음
+	                                                                </div>
+	                                                            )}
+	                                                        </div>
+	                                                    </div>
 
 	                                                    <div className="flex min-w-0 flex-1 flex-col">
 	                                                        <div>

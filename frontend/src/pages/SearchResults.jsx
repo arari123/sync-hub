@@ -1965,9 +1965,10 @@ const SearchResults = () => {
                                                         to={`/project-management/projects/${project.id}/schedule`}
                                                         className="group block rounded-xl border border-border/75 bg-secondary/35 p-2.5 transition hover:border-primary/30 hover:bg-secondary/45"
                                                     >
-                                                        <div className="rounded-xl border border-border/75 bg-background/45 p-2.5">
+                                                        <div className="relative rounded-xl border border-border/75 bg-background/45 p-2.5">
                                                             <div className={cn(
                                                                 'relative grid gap-2',
+                                                                (isReviewStage || isClosureStage) && 'pb-4',
                                                                 useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
                                                             )}
                                                             >
@@ -2060,12 +2061,12 @@ const SearchResults = () => {
                                                                 })}
                                                             </div>
                                                             {(isReviewStage || isClosureStage) && (
-                                                                <div className="mt-2 flex justify-end">
+                                                                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
                                                                     <span className={cn(
-                                                                        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold',
+                                                                        'inline-flex max-w-[92%] items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold shadow-[0_10px_20px_-14px_hsl(220_40%_10%/0.9)] backdrop-blur-sm',
                                                                         isClosureStage
-                                                                            ? 'border-border/80 bg-background/82 text-foreground/85'
-                                                                            : 'border-primary/40 bg-primary/12 text-primary/90'
+                                                                            ? 'border-border/85 bg-background/88 text-foreground/90'
+                                                                            : 'border-primary/50 bg-primary/14 text-primary/95'
                                                                     )}
                                                                     >
                                                                         <span className={cn(
@@ -2073,7 +2074,7 @@ const SearchResults = () => {
                                                                             isClosureStage ? 'bg-muted-foreground' : 'bg-primary'
                                                                         )}
                                                                         />
-                                                                        {isClosureStage ? `종료일 ${closureDateLabel}` : `검토 생성일 ${createdDateLabel}`}
+                                                                        <span className="truncate">{isClosureStage ? `종료일 ${closureDateLabel}` : `검토 생성일 ${createdDateLabel}`}</span>
                                                                     </span>
                                                                 </div>
                                                             )}

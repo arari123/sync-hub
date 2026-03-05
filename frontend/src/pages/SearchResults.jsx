@@ -931,6 +931,28 @@ const SearchResults = () => {
     const myProjectCount = projectPool.filter((project) => project?.is_mine !== false).length;
     const allProjectCount = projectPool.length;
     const totalProjectCount = showAllProjects ? allProjectCount : myProjectCount;
+    const unreadAgendaProjectCount = useMemo(() => {
+        if (!Array.isArray(tableProjects) || tableProjects.length === 0) return 0;
+        let count = 0;
+        for (const project of tableProjects) {
+            const projectId = normalizeProjectId(project?.id);
+            if (!projectId) continue;
+            const projectKey = String(projectId);
+            const baseline = projectUpdateBaselines?.[projectKey];
+            if (!baseline || baseline.agendaLastUpdatedAt === undefined) continue;
+
+            const summary = projectAgendaMap?.[projectKey];
+            const agendaPool = Array.isArray(summary?.items) ? summary.items : [];
+            const latestAgenda = agendaPool[0] || null;
+            const latestUpdatedAt = String(latestAgenda?.last_updated_at || latestAgenda?.updated_at || '').trim();
+            const seenUpdatedAt = String(baseline.agendaLastUpdatedAt || '').trim();
+            if (latestUpdatedAt && latestUpdatedAt > seenUpdatedAt) {
+                count += 1;
+            }
+        }
+        return count;
+    }, [projectAgendaMap, projectUpdateBaselines, tableProjects]);
+    const unreadAgendaBadgeLabel = unreadAgendaProjectCount > 99 ? '99+' : String(unreadAgendaProjectCount || 0);
 
     useEffect(() => {
         if (!hasProjectPanel) return;
@@ -1369,13 +1391,18 @@ const SearchResults = () => {
                                             setIsMobileFilterOpen(false);
                                         }}
                                         className={cn(
-                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} flex-1 justify-center`,
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} relative flex-1 justify-center`,
                                             homeTab === HOME_TAB_ALL_AGENDAS
                                                 ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
                                                 : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         전체안건
+                                        {unreadAgendaProjectCount > 0 && (
+                                            <span className="pointer-events-none absolute right-0 top-0 inline-flex h-4 min-w-4 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-sky-300/45 bg-sky-500 px-1 text-[9px] font-extrabold leading-none text-white shadow-sm">
+                                                {unreadAgendaBadgeLabel}
+                                            </span>
+                                        )}
                                     </button>
                                 </div>
 
@@ -1445,13 +1472,18 @@ const SearchResults = () => {
                                             setIsMobileFilterOpen(false);
                                         }}
                                         className={cn(
-                                            FILTER_TOGGLE_BUTTON_BASE_CLASS,
+                                            `${FILTER_TOGGLE_BUTTON_BASE_CLASS} relative`,
                                             homeTab === HOME_TAB_ALL_AGENDAS
                                                 ? FILTER_TOGGLE_BUTTON_ACTIVE_CLASS
                                                 : FILTER_TOGGLE_BUTTON_INACTIVE_CLASS
                                         )}
                                     >
                                         전체안건
+                                        {unreadAgendaProjectCount > 0 && (
+                                            <span className="pointer-events-none absolute right-0 top-0 inline-flex h-4 min-w-4 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-sky-300/45 bg-sky-500 px-1 text-[9px] font-extrabold leading-none text-white shadow-sm">
+                                                {unreadAgendaBadgeLabel}
+                                            </span>
+                                        )}
                                     </button>
                                 </div>
 

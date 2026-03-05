@@ -1973,11 +1973,7 @@ const SearchResults = () => {
                                                         </div>
 
                                                         <div className="mt-2 rounded-xl border border-border/75 bg-background/45 p-2.5">
-                                                            <div className={cn(
-                                                                'relative grid gap-2',
-                                                                useStartEndTimeline ? 'grid-cols-2' : 'grid-cols-4'
-                                                            )}
-                                                            >
+                                                            <div className="space-y-2">
                                                                 {(useStartEndTimeline ? HOME_AS_TIMELINE_META : HOME_STAGE_TIMELINE_META).map((item, index, timelineItems) => {
                                                                     const stageDates = useStartEndTimeline ? {} : (scheduleStages[item.key] || {});
                                                                     const isDone = timelineActiveIndex > index;
@@ -2012,28 +2008,55 @@ const SearchResults = () => {
                                                                     const nodeLabelClass = isActive
                                                                         ? 'text-primary'
                                                                         : isDone ? 'text-foreground/90' : 'text-muted-foreground/80';
-                                                                    const dateTextClass = isUpcoming ? 'text-muted-foreground/75' : 'text-foreground/85';
-                                                                    const connectorClass = isDone ? 'bg-primary/60' : 'bg-border/70';
+                                                                    const connectorClass = isDone ? 'bg-primary/55' : 'bg-border/70';
+                                                                    const panelClass = isActive
+                                                                        ? 'border-primary/45 bg-primary/8'
+                                                                        : isDone
+                                                                            ? 'border-primary/25 bg-background/80'
+                                                                            : 'border-border/75 bg-background/65';
+                                                                    const dateLabelClass = isUpcoming ? 'text-muted-foreground/75' : 'text-foreground/85';
 
                                                                     return (
-                                                                        <div key={`timeline-meta-${project.id}-${item.key}`} className="relative min-w-0">
-                                                                            {!isLast && (
-                                                                                <span
-                                                                                    className={cn(
-                                                                                        'pointer-events-none absolute left-[calc(50%+0.68rem)] right-[-50%] top-[0.34rem] h-px',
-                                                                                        connectorClass
-                                                                                    )}
-                                                                                />
-                                                                            )}
-                                                                            <div className="relative z-10 flex items-center gap-1.5">
-                                                                                <span className={cn('h-3 w-3 shrink-0 rounded-full border-2', nodeClass)} />
-                                                                                <span className={cn('truncate text-[9px] font-bold tracking-[0.12em]', nodeLabelClass)}>
-                                                                                    {item.label}
-                                                                                </span>
+                                                                        <div key={`timeline-meta-${project.id}-${item.key}`} className="relative flex min-w-0 items-start gap-2.5">
+                                                                            <div className="relative flex w-4 shrink-0 justify-center pt-0.5">
+                                                                                <span className={cn('relative z-10 h-3 w-3 rounded-full border-2', nodeClass)} />
+                                                                                {!isLast && (
+                                                                                    <span
+                                                                                        className={cn(
+                                                                                            'absolute top-3.5 bottom-[-0.75rem] w-px',
+                                                                                            connectorClass
+                                                                                        )}
+                                                                                    />
+                                                                                )}
                                                                             </div>
-                                                                            <p className={cn('mt-1.5 truncate font-mono text-[10px] font-semibold tabular-nums', dateTextClass)}>
-                                                                                {useStartEndTimeline ? startLabel : `${startLabel} ~ ${endLabel}`}
-                                                                            </p>
+                                                                            <div className={cn('min-w-0 flex-1 rounded-md border px-2 py-1.5', panelClass)}>
+                                                                                <div className="flex items-center justify-between gap-2">
+                                                                                    <span className={cn('text-[9px] font-bold tracking-[0.12em]', nodeLabelClass)}>
+                                                                                        {item.label}
+                                                                                    </span>
+                                                                                    <span className={cn(
+                                                                                        'rounded-sm border px-1.5 py-0.5 text-[8px] font-semibold leading-none',
+                                                                                        isActive
+                                                                                            ? 'border-primary/45 bg-primary/12 text-primary'
+                                                                                            : isDone
+                                                                                                ? 'border-border/75 bg-background/70 text-foreground/80'
+                                                                                                : 'border-border/70 bg-background/60 text-muted-foreground/85'
+                                                                                    )}
+                                                                                    >
+                                                                                        {isActive ? '진행' : isDone ? '완료' : '예정'}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {useStartEndTimeline ? (
+                                                                                    <p className={cn('mt-1 font-mono text-[10px] font-semibold tabular-nums', dateLabelClass)}>
+                                                                                        {startLabel}
+                                                                                    </p>
+                                                                                ) : (
+                                                                                    <div className="mt-1 space-y-0.5 font-mono text-[10px] font-semibold tabular-nums">
+                                                                                        <p className={cn(dateLabelClass)}>시작 {startLabel}</p>
+                                                                                        <p className={cn(dateLabelClass)}>종료 {endLabel}</p>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     );
                                                                 })}

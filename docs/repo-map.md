@@ -1,6 +1,6 @@
 # Sync-Hub Repository Map
 
-- 업데이트 기준: 2026-02-20
+- 업데이트 기준: 2026-03-05
 
 ## 빠른 문서 링크
 - 시스템/프론트/디자인 컨텍스트: `docs/ai-system-context.md`, `docs/ai-frontend-guide.md`, `docs/ai-design-guide.md`
@@ -17,6 +17,8 @@
 - `docs/`: PRD/설계/운영 문서 및 예제 HTML
 - `tests/`: 백엔드 단위 테스트
 - `scripts/`: 검증/유틸 스크립트
+- `skills/`: Codex 스킬 정의 디렉터리
+  - `skills/skill-creator/`: 스킬 생성/수정 가이드 스킬(`SKILL.md`, `agents/openai.yaml`)
 - `uploads/`: 런타임 업로드 파일(문서/안건 첨부)
 - `reports/`: OCR/리포트 산출물
   - `reports/generated/2026-02-19-executive/`: 경영진 보고용 PPT 생성 산출물(컨텍스트/스크린샷/PPTX)

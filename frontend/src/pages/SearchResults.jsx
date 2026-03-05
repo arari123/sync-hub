@@ -2061,7 +2061,7 @@ const SearchResults = () => {
                                                                 })}
                                                             </div>
                                                             {(isReviewStage || isClosureStage) && (
-                                                                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center">
+                                                                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-2">
                                                                     <span className={cn(
                                                                         'inline-flex max-w-[92%] items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold shadow-[0_10px_20px_-14px_hsl(220_40%_10%/0.9)] backdrop-blur-sm',
                                                                         isClosureStage

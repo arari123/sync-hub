@@ -1963,11 +1963,11 @@ const SearchResults = () => {
                                                         to={`/project-management/projects/${project.id}/schedule`}
                                                         className="group block rounded-xl border border-border/75 bg-secondary/35 p-2.5 transition hover:border-primary/30 hover:bg-secondary/45"
                                                     >
-                                                        <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-1.5">
                                                             <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">
                                                                 {useStartEndTimeline ? '일정' : '단계 일정'}
                                                             </span>
-                                                            <span className={cn('text-[10px] font-bold', stageStyle.statusTextClass)}>
+                                                            <span className={cn('text-[10px] font-bold leading-none', stageStyle.statusTextClass)}>
                                                                 {resolveProjectStatusLabel(project)}
                                                             </span>
                                                         </div>

@@ -1821,19 +1821,21 @@ const SearchResults = () => {
 	                                                        </div>
 	                                                        <div className="h-10 rounded-md border border-border/75 bg-background/45 p-1">
 	                                                            {updateBookmarks.length > 0 ? (
-	                                                                <div className="flex h-full flex-wrap content-start gap-1 overflow-y-auto pr-0.5">
+	                                                                <div className="grid h-full grid-cols-3 gap-1">
 	                                                                    {updateBookmarks.map((bookmark) => (
 	                                                                        <Link
 	                                                                            key={`${project.id}-bookmark-${bookmark.key}`}
 	                                                                            to={bookmark.to}
 	                                                                            onClick={() => markProjectUpdateSeen(project, bookmark.seenPatch)}
+	                                                                            title={bookmark.label}
 	                                                                            className={cn(
-	                                                                                'group inline-flex h-5 items-center gap-1 rounded border border-border/70 bg-card/85 px-1.5 text-[9px] font-bold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
+	                                                                                'group relative grid place-items-center rounded border border-border/70 bg-card/85 text-[8px] font-extrabold leading-none shadow-sm transition hover:border-primary/35 hover:bg-secondary/70',
 	                                                                                bookmark.textClass
 	                                                                            )}
 	                                                                        >
-	                                                                            <span className={cn('h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
-	                                                                            <span>{bookmark.label}</span>
+	                                                                            <span className="sr-only">{bookmark.label}</span>
+	                                                                            <span>{String(bookmark.label || '').slice(0, 1) || '?'}</span>
+	                                                                            <span className={cn('pointer-events-none absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full', bookmark.accentClass)} />
 	                                                                        </Link>
 	                                                                    ))}
 	                                                                </div>
